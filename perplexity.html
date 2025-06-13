@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perplexity & Burstiness Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.2rem;
+        }
+
+        .game-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-left: 5px solid #3498db;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .concept-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transform: translateY(0);
+            transition: transform 0.3s ease;
+        }
+
+        .concept-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .concept-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            color: #7f8c8d;
+        }
+
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .interactive-demo {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .text-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid #3498db;
+            border-radius: 10px;
+            font-size: 1rem;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+
+        .analyze-btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+
+        .results {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+            border-left: 4px solid #e74c3c;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-card.perplexity {
+            border-left-color: #e74c3c;
+        }
+
+        .result-card.burstiness {
+            border-left-color: #f39c12;
+        }
+
+        .metric-display {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .quiz-section {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+        }
+
+        .quiz-question {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .quiz-options {
+            display: grid;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .quiz-option {
+            background: #ecf0f1;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 12px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .quiz-option:hover {
+            background: #d5dbdb;
+            border-color: #3498db;
+        }
+
+        .quiz-option.selected {
+            background: #3498db;
+            color: white;
+        }
+
+        .quiz-option.correct {
+            background: #27ae60;
+            color: white;
+        }
+
+        .quiz-option.incorrect {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .visualization {
+            height: 300px;
+            background: white;
+            border-radius: 10px;
+            margin: 20px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .score-display {
+            text-align: center;
+            font-size: 1.5rem;
+            color: #2c3e50;
+            margin: 20px 0;
+        }
+
+        .example-texts {
+            display: grid;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .example-text {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .example-text:hover {
+            border-color: #3498db;
+            background: #e3f2fd;
+        }
+
+        .example-text h4 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .example-text p {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .highlight {
+            background: linear-gradient(120deg, #a8edea 0%, #fed6e3 100%);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        .math-formula {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            text-align: center;
+            font-size: 1.1rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 Perplexity & Burstiness Explorer</h1>
+            <p>Interactive Learning Game for LLM Concepts</p>
+        </div>
+
+        <div class="tab-container">
+            <button class="tab active" data-tab="0">📚 Learn Concepts</button>
+            <button class="tab" data-tab="1">🔬 Interactive Demo</button>
+            <button class="tab" data-tab="2">🎯 Quiz Challenge</button>
+            <button class="tab" data-tab="3">📊 Visualization</button>
+        </div>
+
+        <!-- Tab 1: Learn Concepts -->
+        <div class="tab-content active" data-content="0">
+            <div class="concept-card">
+                <h3>🎯 What is Perplexity?</h3>
+                <p><strong>Perplexity</strong> measures how "surprised" or "confused" a language model is when predicting text. It quantifies the uncertainty of a model's predictions.</p>
+                <div class="math-formula">
+                    Perplexity = 2^(-1/N × Σ log₂ P(wᵢ|context))
+                </div>
+                <ul style="margin-top: 15px; padding-left: 20px;">
+                    <li><span class="highlight">Lower perplexity</span> = Better predictions, more confident model</li>
+                    <li><span class="highlight">Higher perplexity</span> = More uncertainty, poorer predictions</li>
+                    <li>Think of it as: "How many words could plausibly come next?"</li>
+                </ul>
+            </div>
+
+            <div class="concept-card">
+                <h3>📈 What is Burstiness?</h3>
+                <p><strong>Burstiness</strong> refers to the clustering or grouping of related words/terms in text. It measures how words tend to appear in "bursts" rather than evenly distributed.</p>
+                <ul style="margin-top: 15px; padding-left: 20px;">
+                    <li><span class="highlight">High burstiness</span> = Words cluster together (human-like)</li>
+                    <li><span class="highlight">Low burstiness</span> = Words evenly distributed (AI-like)</li>
+                    <li>Humans naturally vary sentence length and word choice</li>
+                    <li>AI tends to be more consistent and formulaic</li>
+                </ul>
+            </div>
+
+            <div class="game-section">
+                <h3>🎮 Why Do These Concepts Matter?</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 10px;">
+                        <h4>✅ Model Evaluation</h4>
+                        <p>Perplexity helps us compare different language models and understand their performance.</p>
+                    </div>
+                    <div style="background: #fff3e0; padding: 15px; border-radius: 10px;">
+                        <h4>🔍 AI Detection</h4>
+                        <p>Burstiness patterns can help identify whether text was written by humans or AI.</p>
+                    </div>
+                    <div style="background: #e3f2fd; padding: 15px; border-radius: 10px;">
+                        <h4>🎯 Text Quality</h4>
+                        <p>Both metrics help assess the naturalness and quality of generated text.</p>
+                    </div>
+                    <div style="background: #fce4ec; padding: 15px; border-radius: 10px;">
+                        <h4>⚡ Training Optimization</h4>
+                        <p>These metrics guide the training and fine-tuning of language models.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Interactive Demo -->
+        <div class="tab-content" data-content="1">
+            <div class="game-section">
+                <h3>🔬 Text Analysis Demo</h3>
+                <p>Enter text below to analyze its perplexity and burstiness characteristics:</p>
+                
+                <div class="example-texts">
+                    <div class="example-text" data-example="0">
+                        <h4>📝 Human-Written Sample</h4>
+                        <p>Natural, varied writing with high burstiness</p>
+                        <em>"I love coffee. Really, truly love it! The aroma wafts through my kitchen every morning, creating this magical ritual that transforms me from zombie to human."</em>
+                    </div>
+                    <div class="example-text" data-example="1">
+                        <h4>🤖 AI-Generated Sample</h4>
+                        <p>Consistent, predictable writing with low burstiness</p>
+                        <em>"I enjoy coffee. Coffee is a popular beverage. Many people drink coffee in the morning. Coffee contains caffeine which provides energy."</em>
+                    </div>
+                    <div class="example-text" data-example="2">
+                        <h4>📚 Technical Text</h4>
+                        <p>Specialized vocabulary with medium perplexity</p>
+                        <em>"Neural networks utilize backpropagation algorithms to optimize weight parameters through gradient descent iterations."</em>
+                    </div>
+                </div>
+
+                <div class="interactive-demo">
+                    <textarea id="textInput" class="text-input" placeholder="Type or paste your text here for analysis..."></textarea>
+                    <button class="analyze-btn" id="analyzeBtn">🔍 Analyze Text</button>
+                    
+                    <div id="results" class="results">
+                        <div class="result-card perplexity">
+                            <h4>🎯 Perplexity Score</h4>
+                            <div id="perplexityScore" class="metric-display">--</div>
+                            <p id="perplexityExplanation">--</p>
+                        </div>
+                        <div class="result-card burstiness">
+                            <h4>📈 Burstiness Score</h4>
+                            <div id="burstinesses" class="metric-display">--</div>
+                            <p id="burstiessExplanation">--</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Quiz Challenge -->
+        <div class="tab-content" data-content="2">
+            <div class="quiz-section">
+                <h3>🎯 Knowledge Challenge</h3>
+                <div class="score-display">Score: <span id="score">0</span>/5</div>
+                <div class="progress-bar">
+                    <div id="progressBar" class="progress-fill"></div>
+                </div>
+                
+                <div id="quizContainer">
+                    <!-- Quiz questions will be generated here -->
+                </div>
+                
+                <button id="nextBtn" class="analyze-btn hidden">Next Question</button>
+                <button id="restartBtn" class="analyze-btn hidden">🔄 Restart Quiz</button>
+            </div>
+        </div>
+
+        <!-- Tab 4: Visualization -->
+        <div class="tab-content" data-content="3">
+            <div class="game-section">
+                <h3>📊 Interactive Visualizations</h3>
+                <p>Explore how perplexity and burstiness change with different text characteristics:</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div>
+                        <h4>🎯 Perplexity Simulation</h4>
+                        <div class="visualization">
+                            <canvas id="perplexityCanvas" width="400" height="250"></canvas>
+                        </div>
+                        <p><strong>Vocabulary Size:</strong> <input type="range" id="vocabSlider" min="10" max="1000" value="100"></p>
+                    </div>
+                    <div>
+                        <h4>📈 Burstiness Patterns</h4>
+                        <div class="visualization">
+                            <canvas id="burstiessCanvas" width="400" height="250"></canvas>
+                        </div>
+                        <p><strong>Text Variety:</strong> <input type="range" id="varietySlider" min="1" max="10" value="5"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentQuestion = 0;
+        let score = 0;
+        let userAnswers = [];
+
+        // Example texts
+        const examples = [
+            "I love coffee. Really, truly love it! The aroma wafts through my kitchen every morning, creating this magical ritual that transforms me from zombie to human.",
+            "I enjoy coffee. Coffee is a popular beverage. Many people drink coffee in the morning. Coffee contains caffeine which provides energy.",
+            "Neural networks utilize backpropagation algorithms to optimize weight parameters through gradient descent iterations."
+        ];
+
+        // Quiz questions
+        const quizQuestions = [
+            {
+                question: "What does low perplexity indicate about a language model?",
+                options: [
+                    "The model is confused and uncertain",
+                    "The model is confident and makes good predictions",
+                    "The model has a large vocabulary",
+                    "The model generates creative text"
+                ],
+                correct: 1,
+                explanation: "Low perplexity means the model is confident in its predictions and assigns high probabilities to the correct words."
+            },
+            {
+                question: "Which type of text typically has higher burstiness?",
+                options: [
+                    "AI-generated text",
+                    "Technical documentation",
+                    "Human-written creative text",
+                    "Dictionary definitions"
+                ],
+                correct: 2,
+                explanation: "Human-written creative text has higher burstiness because humans naturally vary their sentence structure and word choice."
+            },
+            {
+                question: "If a model assigns equal probability to 8 possible next words, what is its perplexity?",
+                options: ["2", "4", "8", "16"],
+                correct: 2,
+                explanation: "When a model assigns equal probability to N possible words, the perplexity equals N. So if there are 8 equally likely words, perplexity = 8."
+            },
+            {
+                question: "What does burstiness measure in text analysis?",
+                options: [
+                    "The speed of text generation",
+                    "The clustering of related words",
+                    "The complexity of vocabulary",
+                    "The length of sentences"
+                ],
+                correct: 1,
+                explanation: "Burstiness measures how words tend to cluster together in 'bursts' rather than being evenly distributed throughout the text."
+            },
+            {
+                question: "Why are perplexity and burstiness useful for AI detection?",
+                options: [
+                    "AI text typically has low perplexity and low burstiness",
+                    "AI text typically has high perplexity and high burstiness", 
+                    "AI text typically has low perplexity and high burstiness",
+                    "They are not useful for AI detection"
+                ],
+                correct: 0,
+                explanation: "AI text typically has low perplexity (predictable) and low burstiness (consistent patterns), while human text shows more variation."
+            }
+        ];
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEventListeners();
+            initializeQuiz();
+        });
+
+        function initializeEventListeners() {
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabIndex = parseInt(this.dataset.tab);
+                    switchTab(tabIndex);
+                });
+            });
+
+            // Example text clicking
+            document.querySelectorAll('.example-text').forEach(example => {
+                example.addEventListener('click', function() {
+                    const exampleIndex = parseInt(this.dataset.example);
+                    loadExample(exampleIndex);
+                });
+            });
+
+            // Analyze button
+            document.getElementById('analyzeBtn').addEventListener('click', analyzeText);
+
+            // Quiz buttons
+            document.getElementById('nextBtn').addEventListener('click', nextQuestion);
+            document.getElementById('restartBtn').addEventListener('click', restartQuiz);
+
+            // Sliders
+            document.getElementById('vocabSlider').addEventListener('input', updateVisualization);
+            document.getElementById('varietySlider').addEventListener('input', updateVisualization);
+        }
+
+        // Tab switching
+        function switchTab(tabIndex) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach((tab, index) => {
+                tab.classList.toggle('active', index === tabIndex);
+            });
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach((content, index) => {
+                content.classList.toggle('active', index === tabIndex);
+            });
+            
+            // Initialize visualizations if switching to that tab
+            if (tabIndex === 3) {
+                setTimeout(initializeVisualizations, 100);
+            }
+        }
+
+        // Load example text
+        function loadExample(index) {
+            document.getElementById('textInput').value = examples[index];
+        }
+
+        // Simplified text analysis
+        function analyzeText() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                alert('Please enter some text to analyze!');
+                return;
+            }
+
+            const words = text.toLowerCase().split(/\s+/);
+            const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+            
+            // Simplified perplexity calculation (lower = more predictable)
+            const uniqueWords = new Set(words);
+            const vocabularyDiversity = uniqueWords.size / words.length;
+            
+            // Simulate perplexity (in reality this would require a trained model)
+            const estimatedPerplexity = Math.max(2, Math.min(100, 
+                10 + (vocabularyDiversity * 30) + (Math.random() * 20)
+            ));
+
+            // Burstiness calculation (variance in sentence lengths and word repetition)
+            const sentenceLengths = sentences.map(s => s.trim().split(/\s+/).length);
+            const avgLength = sentenceLengths.reduce((a, b) => a + b, 0) / sentenceLengths.length;
+            const variance = sentenceLengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) / sentenceLengths.length;
+            const burstiness = Math.min(10, Math.max(0, variance / 2));
+
+            // Display results
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('perplexityScore').textContent = estimatedPerplexity.toFixed(1);
+            document.getElementById('burstinesses').textContent = burstiness.toFixed(1);
+            
+            // Explanations
+            let perplexityExp = estimatedPerplexity < 15 ? "Low - Very predictable text" :
+                             estimatedPerplexity < 40 ? "Medium - Moderately predictable" :
+                             "High - Unpredictable text";
+            
+            let burstiessExp = burstiness < 3 ? "Low - Even, consistent patterns" :
+                              burstiness < 7 ? "Medium - Some variation" :
+                              "High - Highly varied patterns";
+            
+            document.getElementById('perplexityExplanation').textContent = perplexityExp;
+            document.getElementById('burstiessExplanation').textContent = burstiessExp;
+            
+            // Add animation
+            document.getElementById('results').classList.add('fade-in');
+        }
+
+        // Quiz functionality
+        function initializeQuiz() {
+            currentQuestion = 0;
+            score = 0;
+            userAnswers = [];
+            document.getElementById('score').textContent = score;
+            showQuestion();
+        }
+
+        function showQuestion() {
+            if (currentQuestion >= quizQuestions.length) {
+                showQuizResults();
+                return;
+            }
+
+            const question = quizQuestions[currentQuestion];
+            const container = document.getElementById('quizContainer');
+            
+            container.innerHTML = `
+                <div class="quiz-question fade-in">
+                    <h4>Question ${currentQuestion + 1}: ${question.question}</h4>
+                    <div class="quiz-options">
+                        ${question.options.map((option, index) => `
+                            <div class="quiz-option" data-option="${index}">${option}</div>
+                        `).join('')}
+                    </div>
+                    <div id="explanation" style="display: none; margin-top: 15px; padding: 15px; background: #e8f5e8; border-radius: 8px;">
+                        <strong>Explanation:</strong> <span id="explanationText"></span>
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners to quiz options
+            container.querySelectorAll('.quiz-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const selectedIndex = parseInt(this.dataset.option);
+                    selectAnswer(selectedIndex);
+                });
+            });
+            
+            document.getElementById('nextBtn').classList.add('hidden');
+            updateProgress();
+        }
+
+        function selectAnswer(selectedIndex) {
+            const question = quizQuestions[currentQuestion];
+            const options = document.querySelectorAll('.quiz-option');
+            
+            // Disable further clicks
+            options.forEach(option => option.style.pointerEvents = 'none');
+            
+            // Show correct/incorrect
+            options[selectedIndex].classList.add(selectedIndex === question.correct ? 'correct' : 'incorrect');
+            if (selectedIndex !== question.correct) {
+                options[question.correct].classList.add('correct');
+            }
+            
+            // Update score
+            if (selectedIndex === question.correct) {
+                score++;
+                document.getElementById('score').textContent = score;
+            }
+            
+            userAnswers.push(selectedIndex);
+            
+            // Show explanation
+            document.getElementById('explanation').style.display = 'block';
+            document.getElementById('explanationText').textContent = question.explanation;
+            document.getElementById('nextBtn').classList.remove('hidden');
+        }
+
+        function nextQuestion() {
+            currentQuestion++;
+            showQuestion();
+        }
+
+        function showQuizResults() {
+            const container = document.getElementById('quizContainer');
+            const percentage = Math.round((score / quizQuestions.length) * 100);
+            
+            let message = "";
+            if (percentage >= 80) message = "🎉 Excellent! You've mastered these concepts!";
+            else if (percentage >= 60) message = "👍 Good job! You understand the basics well.";
+            else message = "📚 Keep learning! Review the concepts and try again.";
+            
+            container.innerHTML = `
+                <div class="quiz-question fade-in" style="text-align: center;">
+                    <h3>🏆 Quiz Complete!</h3>
+                    <div style="font-size: 3rem; margin: 20px 0;">${percentage}%</div>
+                    <p style="font-size: 1.2rem; margin-bottom: 20px;">${message}</p>
+                    <p>You scored ${score} out of ${quizQuestions.length} questions correctly.</p>
+                </div>
+            `;
+            
+            document.getElementById('nextBtn').classList.add('hidden');
+            document.getElementById('restartBtn').classList.remove('hidden');
+        }
+
+        function restartQuiz() {
+            document.getElementById('restartBtn').classList.add('hidden');
+            initializeQuiz();
+        }
+
+        function updateProgress() {
+            const progress = (currentQuestion / quizQuestions.length) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+        }
+
+        // Visualization functions
+        function initializeVisualizations() {
+            updateVisualization();
+        }
+
+        function updateVisualization() {
+            drawPerplexityChart();
+            drawBurstiessChart();
+        }
+
+        function drawPerplexityChart() {
+            const canvas = document.getElementById('perplexityCanvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const vocabSize = document.getElementById('vocabSlider').value;
+            
+            // Set canvas size
+            canvas.width = 400;
+            canvas.height = 250;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw perplexity curve
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            
+            for (let x = 0; x < canvas.width; x++) {
+                const t = x / canvas.width;
+                const perplexity = Math.log(vocabSize / 10) * (1 - Math.exp(-t * 3)) + 2;
+                const y = canvas.height - (perplexity / Math.log(vocabSize) * canvas.height * 0.8);
+                
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            // Add labels
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = '14px Arial';
+            ctx.fillText('Perplexity vs Training Progress', 10, 20);
+            ctx.fillText(`Vocab Size: ${vocabSize}`, 10, canvas.height - 10);
+        }
+
+        function drawBurstiessChart() {
+            const canvas = document.getElementById('burstiessCanvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const variety = document.getElementById('varietySlider').value;
+            
+            // Set canvas size
+            canvas.width = 400;
+            canvas.height = 250;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw burstiness pattern
+            ctx.fillStyle = '#f39c12';
+            const barWidth = canvas.width / 20;
+            
+            for (let i = 0; i < 20; i++) {
+                const x = i * barWidth;
+                const baseHeight = 30;
+                const variation = (variety / 10) * 100 * Math.sin(i * 0.5) * Math.random();
+                const height = Math.max(10, baseHeight + variation);
+                const y = canvas.height - height;
+                
+                ctx.fillRect(x, y, barWidth - 2, height);
+            }
+            
+            // Add labels
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = '14px Arial';
+            ctx.fillText('Word Frequency Distribution', 10, 20);
+            ctx.fillText(`Variety Level: ${variety}`, 10, canvas.height - 10);
+        }
+    </script>
+</body>
+</html>
