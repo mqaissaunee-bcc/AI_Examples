@@ -244,6 +244,10 @@
             color: white;
         }
 
+        .option:disabled {
+            cursor: not-allowed;
+        }
+
         .explanation {
             margin-top: 20px;
             padding: 20px;
@@ -251,16 +255,13 @@
             border-left: 4px solid #0075A2;
             border-radius: 8px;
             display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in;
         }
 
         .explanation.show {
             display: block;
-            animation: fadeIn 0.5s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            opacity: 1;
         }
 
         .flashcard {
@@ -301,6 +302,38 @@
             right: 20px;
             font-size: 0.8rem;
             opacity: 0.7;
+        }
+
+        .card-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .card-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .card-btn.correct {
+            background: #28a745;
+            color: white;
+        }
+
+        .card-btn.incorrect {
+            background: #dc3545;
+            color: white;
+        }
+
+        .card-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
         .learning-content h3 {
@@ -370,6 +403,16 @@
         .btn-outline:hover {
             background: #0075A2;
             color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
         }
 
         .results-actions {
@@ -447,6 +490,26 @@
             margin: 20px 0;
         }
 
+        .answer-status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .answer-status.correct {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .answer-status.incorrect {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
         @media (max-width: 768px) {
             .title {
                 font-size: 2rem;
@@ -480,6 +543,11 @@
             .results-actions .btn {
                 padding: 12px 15px;
                 font-size: 0.9rem;
+            }
+
+            .card-controls {
+                flex-direction: column;
+                align-items: center;
             }
         }
     </style>
@@ -540,6 +608,7 @@
         <div class="content-container" id="questionContainer">
             <div class="question" id="question"></div>
             <div class="options" id="options"></div>
+            <div class="answer-status" id="answerStatus" style="display: none;"></div>
             <div class="explanation" id="explanation"></div>
         </div>
 
@@ -554,6 +623,10 @@
         <div class="flashcard" id="flashcard" style="display: none;">
             <div class="card-content" id="cardContent"></div>
             <div class="card-hint">Click to flip</div>
+            <div class="card-controls" id="cardControls" style="display: none;">
+                <button class="card-btn correct" onclick="markCard(true)">✓ Got it right</button>
+                <button class="card-btn incorrect" onclick="markCard(false)">✗ Need more practice</button>
+            </div>
         </div>
 
         <div class="controls" id="controls" style="display: none;">
@@ -566,6 +639,7 @@
             <h2>🎉 Complete!</h2>
             <div class="results-score" id="finalScore"></div>
             <p id="resultMessage"></p>
+            <div id="detailedResults" style="margin: 20px 0;"></div>
             <div class="results-actions">
                 <button class="btn btn-primary" onclick="playAgain()">🔄 Play Again</button>
                 <button class="btn btn-secondary" onclick="goToMainScreen()">🏠 Main Menu</button>
@@ -584,6 +658,8 @@
         let streak = 0;
         let answeredQuestions = [];
         let currentQuestions = [];
+        let flashcardStats = { correct: 0, needPractice: 0 };
+        let answerSubmitted = false;
 
         // Comprehensive Question Bank aligned with CISA Domain 3
         const questionBank = {
@@ -591,12 +667,12 @@
                 {
                     question: "What is the primary purpose of a business case in the project initiation phase?",
                     options: [
-                        "To define technical specifications",
                         "To justify the project investment and expected benefits",
+                        "To define technical specifications",
                         "To assign team members to tasks",
                         "To schedule project activities"
                     ],
-                    correct: 1,
+                    correct: 0,
                     explanation: "A business case provides the justification for undertaking a project by outlining the expected benefits, costs, risks, and return on investment to support decision-making."
                 },
                 {
@@ -620,28 +696,28 @@
                     question: "In Agile methodology, what is a 'sprint'?",
                     options: [
                         "A final testing phase",
-                        "A short, time-boxed development iteration",
                         "A project management tool",
-                        "A type of requirement document"
+                        "A type of requirement document",
+                        "A short, time-boxed development iteration"
                     ],
-                    correct: 1,
+                    correct: 3,
                     explanation: "A sprint is a time-boxed iteration in Agile development, typically 1-4 weeks long, during which a potentially shippable product increment is developed."
                 },
                 {
                     question: "What is the key difference between verification and validation in software testing?",
                     options: [
-                        "Verification is automated, validation is manual",
                         "Verification checks if we built it right, validation checks if we built the right thing",
+                        "Verification is automated, validation is manual",
                         "Verification is done by developers, validation by users",
                         "There is no difference between them"
                     ],
-                    correct: 1,
+                    correct: 0,
                     explanation: "Verification ensures the product meets specifications (are we building it right?), while validation ensures the product meets user needs and business requirements (are we building the right thing?)."
                 },
                 {
                     question: "Which project management framework is specifically designed for IT projects?",
-                    options: ["PRINCE2", "PMBOK", "COBIT", "All methodologies are IT-specific"],
-                    correct: 0,
+                    options: ["PMBOK", "PRINCE2", "COBIT", "All methodologies are IT-specific"],
+                    correct: 1,
                     explanation: "PRINCE2 (Projects IN Controlled Environments) was specifically designed for IT projects, though it can be adapted for other types of projects. PMBOK is generic, and COBIT is for IT governance."
                 },
                 {
@@ -659,11 +735,11 @@
                     question: "In the context of application controls, what are input controls primarily designed to ensure?",
                     options: [
                         "Fast data processing",
-                        "Complete, accurate, and authorized data entry",
                         "Backup and recovery capabilities",
-                        "User interface consistency"
+                        "User interface consistency",
+                        "Complete, accurate, and authorized data entry"
                     ],
-                    correct: 1,
+                    correct: 3,
                     explanation: "Input controls are designed to ensure that data entered into the system is complete, accurate, and properly authorized, preventing erroneous or fraudulent data from entering the system."
                 }
             ],
@@ -671,12 +747,12 @@
                 {
                     question: "What is the primary objective of User Acceptance Testing (UAT)?",
                     options: [
-                        "To test system performance under load",
                         "To verify that the system meets business requirements",
+                        "To test system performance under load",
                         "To check for technical bugs",
                         "To test system security"
                     ],
-                    correct: 1,
+                    correct: 0,
                     explanation: "User Acceptance Testing verifies that the system meets business requirements and is acceptable to end users before it goes into production."
                 },
                 {
@@ -689,39 +765,39 @@
                     question: "What is the main purpose of a rollback plan during system implementation?",
                     options: [
                         "To train users on the new system",
-                        "To test system functionality",
                         "To return to the previous system if critical issues occur",
+                        "To test system functionality",
                         "To migrate data between systems"
                     ],
-                    correct: 2,
+                    correct: 1,
                     explanation: "A rollback plan provides procedures to return to the previous system if critical issues are encountered during implementation, ensuring business continuity."
                 },
                 {
                     question: "During data conversion, what is the most critical consideration?",
                     options: [
                         "Conversion speed",
-                        "Data integrity and accuracy",
                         "Storage space efficiency",
+                        "Data integrity and accuracy",
                         "User interface changes"
                     ],
-                    correct: 1,
+                    correct: 2,
                     explanation: "Data integrity and accuracy are paramount during conversion to ensure that business operations can continue with reliable information and that no critical data is lost or corrupted."
                 },
                 {
                     question: "What should be included in a post-implementation review?",
                     options: [
                         "Only technical performance metrics",
-                        "Assessment of project objectives, benefits realization, and lessons learned",
                         "Only user satisfaction surveys",
-                        "Only cost analysis"
+                        "Only cost analysis",
+                        "Assessment of project objectives, benefits realization, and lessons learned"
                     ],
-                    correct: 1,
+                    correct: 3,
                     explanation: "A comprehensive post-implementation review should assess whether project objectives were met, if expected benefits are being realized, and capture lessons learned for future projects."
                 },
                 {
                     question: "Which testing type is performed to ensure the new system works correctly with existing systems?",
-                    options: ["Unit testing", "Integration testing", "System testing", "Acceptance testing"],
-                    correct: 1,
+                    options: ["Integration testing", "Unit testing", "System testing", "Acceptance testing"],
+                    correct: 0,
                     explanation: "Integration testing verifies that the new system interfaces correctly with existing systems and that data flows properly between integrated components."
                 },
                 {
@@ -739,11 +815,11 @@
                     question: "When should user training ideally begin in the implementation process?",
                     options: [
                         "After the system goes live",
-                        "During the final testing phase",
                         "Before system testing begins",
+                        "During the final testing phase",
                         "Only after all issues are resolved"
                     ],
-                    correct: 1,
+                    correct: 2,
                     explanation: "User training should begin during the final testing phase when the system is stable enough for training purposes but early enough to address any usability issues before go-live."
                 }
             ],
@@ -751,51 +827,51 @@
                 {
                     question: "What is the main disadvantage of the Waterfall SDLC model?",
                     options: [
-                        "High development costs",
                         "Inflexibility to accommodate changes once a phase is completed",
+                        "High development costs",
                         "Requires highly skilled developers",
                         "Takes too long to complete"
                     ],
-                    correct: 1,
+                    correct: 0,
                     explanation: "The Waterfall model's main disadvantage is its inflexibility - once a phase is completed, it's difficult and expensive to go back and make changes to earlier phases."
                 },
                 {
                     question: "Which SDLC methodology emphasizes continuous customer collaboration and responding to change?",
-                    options: ["Waterfall", "V-Model", "Agile", "Spiral"],
-                    correct: 2,
+                    options: ["Waterfall", "Agile", "V-Model", "Spiral"],
+                    correct: 1,
                     explanation: "Agile methodology emphasizes customer collaboration throughout development and embraces changing requirements rather than following a rigid plan."
                 },
                 {
                     question: "In the Spiral SDLC model, what happens in each spiral iteration?",
                     options: [
                         "Complete development of one module",
-                        "Risk analysis and prototyping",
                         "User training and documentation",
+                        "Risk analysis and prototyping",
                         "Final testing and deployment"
                     ],
-                    correct: 1,
+                    correct: 2,
                     explanation: "Each spiral iteration includes risk analysis and prototyping to identify and mitigate risks early in the development process, making it particularly suitable for high-risk projects."
                 },
                 {
                     question: "What is Rapid Application Development (RAD) best suited for?",
                     options: [
                         "Large, complex enterprise systems",
-                        "Small to medium projects with well-defined requirements",
                         "Safety-critical systems",
-                        "Legacy system maintenance"
+                        "Legacy system maintenance",
+                        "Small to medium projects with well-defined requirements"
                     ],
-                    correct: 1,
+                    correct: 3,
                     explanation: "RAD is best suited for small to medium projects with well-defined requirements where rapid prototyping and iterative development can quickly deliver working solutions."
                 },
                 {
                     question: "What is the primary focus of the V-Model in SDLC?",
                     options: [
+                        "Testing and verification at each development stage",
                         "Rapid development",
                         "Customer collaboration",
-                        "Testing and verification at each development stage",
                         "Risk management"
                     ],
-                    correct: 2,
+                    correct: 0,
                     explanation: "The V-Model emphasizes testing and verification activities that correspond to each development phase, ensuring quality is built in throughout the process."
                 },
                 {
@@ -808,11 +884,11 @@
                     question: "What is a key characteristic of the DevOps approach to software development?",
                     options: [
                         "Separation of development and operations teams",
-                        "Integration of development and operations with continuous delivery",
                         "Focus only on development activities",
+                        "Integration of development and operations with continuous delivery",
                         "Traditional waterfall methodology"
                     ],
-                    correct: 1,
+                    correct: 2,
                     explanation: "DevOps integrates development and operations teams with emphasis on continuous integration, continuous delivery, and automation throughout the software lifecycle."
                 }
             ],
@@ -820,34 +896,34 @@
                 {
                     question: "What is the critical path in project management?",
                     options: [
-                        "The most expensive sequence of activities",
                         "The sequence of activities that determines the minimum project duration",
+                        "The most expensive sequence of activities",
                         "The path with the most resources",
                         "The path with the highest risk"
                     ],
-                    correct: 1,
+                    correct: 0,
                     explanation: "The critical path is the sequence of activities that determines the minimum project duration. Any delay in critical path activities will delay the entire project."
                 },
                 {
                     question: "What does a Gantt chart primarily show?",
                     options: [
                         "Project costs over time",
-                        "Resource allocation",
                         "Project schedule with task dependencies and timelines",
+                        "Resource allocation",
                         "Risk assessment matrix"
                     ],
-                    correct: 2,
+                    correct: 1,
                     explanation: "A Gantt chart displays project schedules showing tasks, their duration, dependencies, and timeline relationships in a visual format."
                 },
                 {
                     question: "In project management, what is 'scope creep'?",
                     options: [
                         "Gradual increase in project timeline",
-                        "Uncontrolled expansion of project scope without proper change control",
                         "Reduction in project budget",
+                        "Uncontrolled expansion of project scope without proper change control",
                         "Addition of new team members"
                     ],
-                    correct: 1,
+                    correct: 2,
                     explanation: "Scope creep refers to uncontrolled expansion of project scope without going through proper change control processes, often leading to budget and schedule overruns."
                 },
                 {
@@ -855,16 +931,16 @@
                     options: [
                         "Day-to-day project management",
                         "Technical implementation",
-                        "Strategic oversight and decision-making",
-                        "Quality assurance testing"
+                        "Quality assurance testing",
+                        "Strategic oversight and decision-making"
                     ],
-                    correct: 2,
+                    correct: 3,
                     explanation: "A project steering committee provides strategic oversight, makes key decisions, resolves issues that cannot be handled at the project management level, and ensures project alignment with business objectives."
                 },
                 {
                     question: "Which project management approach is best suited for projects with uncertain or changing requirements?",
-                    options: ["Waterfall", "Agile", "Traditional", "Linear"],
-                    correct: 1,
+                    options: ["Agile", "Waterfall", "Traditional", "Linear"],
+                    correct: 0,
                     explanation: "Agile project management is designed to handle uncertainty and changing requirements through iterative development, frequent feedback, and adaptive planning."
                 },
                 {
@@ -893,52 +969,52 @@
             mixed: [
                 {
                     question: "Which control type is most appropriate for preventing unauthorized changes to program source code?",
-                    options: ["Detective", "Preventive", "Corrective", "Compensating"],
-                    correct: 1,
+                    options: ["Preventive", "Detective", "Corrective", "Compensating"],
+                    correct: 0,
                     explanation: "Preventive controls, such as access restrictions and version control systems, are designed to prevent unauthorized changes to source code before they occur."
                 },
                 {
                     question: "What is the primary benefit of conducting regular code reviews during development?",
                     options: [
                         "Faster development speed",
-                        "Reduced development costs",
                         "Early detection of defects and security vulnerabilities",
+                        "Reduced development costs",
                         "Automatic testing"
                     ],
-                    correct: 2,
+                    correct: 1,
                     explanation: "Code reviews help identify defects, security vulnerabilities, and quality issues early in the development process when they are less expensive to fix."
                 },
                 {
                     question: "In the context of system acquisition, what is the purpose of an RFP (Request for Proposal)?",
                     options: [
                         "To define internal project requirements",
-                        "To solicit detailed proposals from potential vendors",
                         "To document system specifications",
+                        "To solicit detailed proposals from potential vendors",
                         "To conduct feasibility analysis"
                     ],
-                    correct: 1,
+                    correct: 2,
                     explanation: "An RFP is used to solicit detailed proposals from potential vendors, allowing organizations to compare solutions and select the best fit for their requirements."
                 },
                 {
                     question: "What is the main purpose of establishing baselines during system development?",
                     options: [
                         "To speed up development",
-                        "To provide reference points for measuring changes and progress",
                         "To reduce development costs",
-                        "To eliminate testing requirements"
+                        "To eliminate testing requirements",
+                        "To provide reference points for measuring changes and progress"
                     ],
-                    correct: 1,
+                    correct: 3,
                     explanation: "Baselines serve as reference points that document the state of deliverables at specific points in time, enabling change control and progress measurement."
                 },
                 {
                     question: "Which factor is most critical when selecting between make vs. buy decisions for software?",
                     options: [
-                        "Development team preferences",
                         "Strategic alignment, cost, and competitive advantage",
+                        "Development team preferences",
                         "Latest technology trends",
                         "Vendor relationships"
                     ],
-                    correct: 1,
+                    correct: 0,
                     explanation: "Make vs. buy decisions should consider strategic alignment with business objectives, total cost of ownership, and whether the solution provides competitive advantage."
                 },
                 {
@@ -1143,34 +1219,34 @@
             {
                 question: "You are auditing a software development project and discover that user acceptance testing was skipped due to schedule pressure, and the system went live with only technical testing completed. What is your primary concern and recommendation?",
                 options: [
+                    "Risk of system not meeting business requirements and user expectations",
                     "Technical testing is sufficient for system deployment",
                     "Schedule pressure justifies skipping UAT",
-                    "Risk of system not meeting business requirements and user expectations",
                     "UAT can be performed after go-live"
                 ],
-                correct: 2,
+                correct: 0,
                 explanation: "Skipping UAT creates significant risk that the system doesn't meet business requirements or user expectations. UAT validates that the system works for real business processes and users. The recommendation should include immediate user validation and potential rollback procedures if critical issues are discovered."
             },
             {
                 question: "During a project audit, you find that requirements were gathered only from IT staff, with no direct input from business users. The project is 70% complete. What should be your audit finding?",
                 options: [
                     "IT staff understand business needs sufficiently",
-                    "Requirements gathering is complete and adequate",
                     "Risk of building system that doesn't meet actual business needs",
+                    "Requirements gathering is complete and adequate",
                     "Business user input is not necessary for technical projects"
                 ],
-                correct: 2,
+                correct: 1,
                 explanation: "Requirements gathered without business user input create significant risk of building a system that doesn't meet actual business needs. Business users understand the real processes, pain points, and requirements that IT staff may not fully grasp."
             },
             {
                 question: "You are reviewing a data conversion project and find that conversion testing was performed on only 100 sample records out of 2 million total records. Management claims this sample size is adequate. What is your assessment?",
                 options: [
                     "100 records is a statistically valid sample",
-                    "Sample size is inadequate and may not identify data quality issues",
                     "Management's decision should be accepted",
+                    "Sample size is inadequate and may not identify data quality issues",
                     "Additional testing would be too expensive"
                 ],
-                correct: 1,
+                correct: 2,
                 explanation: "A sample of 100 records from 2 million (0.005%) is inadequate for data conversion validation. This small sample may miss data quality issues, format problems, or edge cases that could affect thousands of records. Recommend stratified sampling and volume testing."
             },
             {
@@ -1178,21 +1254,21 @@
                 options: [
                     "Error handling can be added during maintenance",
                     "40% missing error handling is acceptable for initial release",
-                    "Implement comprehensive error handling before production deployment",
-                    "Error handling is not critical for business applications"
+                    "Error handling is not critical for business applications",
+                    "Implement comprehensive error handling before production deployment"
                 ],
-                correct: 2,
+                correct: 3,
                 explanation: "Missing error handling creates significant operational and security risks. Without proper error handling, the system may crash unexpectedly, expose sensitive information in error messages, or behave unpredictably. This should be addressed before production deployment."
             },
             {
                 question: "You are auditing a project where the business case projected $500K savings annually, but no metrics are in place to measure actual savings post-implementation. What governance weakness does this represent?",
                 options: [
-                    "Business case accuracy is not important post-implementation",
                     "Lack of benefits realization measurement and tracking",
+                    "Business case accuracy is not important post-implementation",
                     "Cost savings are automatically achieved through implementation",
                     "Metrics would be too expensive to implement"
                 ],
-                correct: 1,
+                correct: 0,
                 explanation: "Without metrics to measure actual benefits, the organization cannot verify that the project delivered expected value or identify optimization opportunities. Benefits realization measurement is essential for validating business case assumptions and ensuring project success."
             },
             {
@@ -1210,11 +1286,11 @@
                 question: "You discover that a critical financial system was implemented using the 'Big Bang' approach with no parallel running, despite processing $10M in daily transactions. What risk assessment should you provide?",
                 options: [
                     "Big Bang is the most efficient implementation approach",
-                    "High risk approach for critical system with no fallback options",
                     "Parallel running would be too expensive for any system",
+                    "High risk approach for critical system with no fallback options",
                     "Financial systems don't require special implementation considerations"
                 ],
-                correct: 1,
+                correct: 2,
                 explanation: "Big Bang implementation of critical financial systems creates extremely high risk with no fallback if major issues occur. For systems processing large transaction volumes, parallel running or phased implementation provides risk mitigation and business continuity protection."
             },
             {
@@ -1222,32 +1298,32 @@
                 options: [
                     "Strategic importance always overrides economic considerations",
                     "The feasibility study should be ignored if strategy supports the project",
-                    "Risk of poor investment decision without clear strategic justification",
-                    "Economic viability is not important for strategic projects"
+                    "Economic viability is not important for strategic projects",
+                    "Risk of poor investment decision without clear strategic justification"
                 ],
-                correct: 2,
+                correct: 3,
                 explanation: "Proceeding with economically non-viable projects requires clear strategic justification and explicit acknowledgment of the investment decision. Without documented strategic rationale, this represents poor investment governance and resource allocation."
             },
             {
                 question: "You are auditing a system development project and find that security requirements were not included in the original requirements and are being 'retrofitted' during testing. What should be your primary concern?",
                 options: [
-                    "Security can be effectively added during any project phase",
                     "Security requirements should be integrated from project inception",
+                    "Security can be effectively added during any project phase",
                     "Testing phase is the optimal time for security implementation",
                     "Retrofitting security is more cost-effective than early integration"
                 ],
-                correct: 1,
+                correct: 0,
                 explanation: "Security requirements should be integrated from project inception through security-by-design principles. Retrofitting security during testing is more expensive, may not be comprehensive, and could require significant architectural changes that impact project timeline and budget."
             },
             {
                 question: "During a post-implementation review, you find that 60% of originally planned system features were removed during development due to budget constraints, but the project was still declared 'successful.' What should be your assessment?",
                 options: [
                     "Feature reduction shows good project management",
-                    "Budget adherence is more important than scope delivery",
                     "Significant scope reduction questions whether project objectives were achieved",
+                    "Budget adherence is more important than scope delivery",
                     "60% feature delivery represents project success"
                 ],
-                correct: 2,
+                correct: 1,
                 explanation: "Removing 60% of planned features raises serious questions about whether the project achieved its original objectives and delivered expected business value. This level of scope reduction should trigger review of project success criteria and benefits realization."
             }
         ];
@@ -1298,6 +1374,8 @@
             score = 0;
             streak = 0;
             answeredQuestions = [];
+            flashcardStats = { correct: 0, needPractice: 0 };
+            answerSubmitted = false;
             
             if (currentMode === 'quiz' || currentMode === 'scenario') {
                 setupQuiz();
@@ -1396,10 +1474,16 @@
                 optionsContainer.appendChild(optionElement);
             });
             
+            // Reset answer status and explanation
+            document.getElementById('answerStatus').style.display = 'none';
             document.getElementById('explanation').style.display = 'none';
             document.getElementById('explanation').classList.remove('show');
+            
             document.getElementById('nextBtn').textContent = 'Submit Answer';
             document.getElementById('nextBtn').disabled = true;
+            document.getElementById('prevBtn').disabled = currentQuestion === 0;
+            
+            answerSubmitted = false;
             
             updateProgress();
         }
@@ -1413,6 +1497,15 @@
             const card = currentQuestions[currentQuestion];
             document.getElementById('cardContent').textContent = card.front;
             document.getElementById('flashcard').classList.remove('flipped');
+            document.getElementById('cardControls').style.display = 'none';
+            
+            document.getElementById('prevBtn').disabled = currentQuestion === 0;
+            
+            if (currentQuestion === currentQuestions.length - 1) {
+                document.getElementById('nextBtn').textContent = 'Complete Flashcards';
+            } else {
+                document.getElementById('nextBtn').textContent = `Next Card (${currentQuestion + 2}/${currentQuestions.length})`;
+            }
             
             updateProgress();
         }
@@ -1448,13 +1541,33 @@
             if (flashcard.classList.contains('flipped')) {
                 document.getElementById('cardContent').textContent = card.front;
                 flashcard.classList.remove('flipped');
+                document.getElementById('cardControls').style.display = 'none';
             } else {
                 document.getElementById('cardContent').textContent = card.back;
                 flashcard.classList.add('flipped');
+                document.getElementById('cardControls').style.display = 'flex';
             }
         }
 
+        function markCard(correct) {
+            if (correct) {
+                flashcardStats.correct++;
+                score += 10;
+            } else {
+                flashcardStats.needPractice++;
+                score += 5; // Partial credit for reviewing
+            }
+            updateScore();
+            
+            // Auto-advance to next card after marking
+            setTimeout(() => {
+                nextQuestion();
+            }, 500);
+        }
+
         function selectOption(index) {
+            if (answerSubmitted) return;
+            
             document.querySelectorAll('.option').forEach(opt => {
                 opt.classList.remove('selected');
             });
@@ -1468,7 +1581,6 @@
         function nextQuestion() {
             if (currentMode === 'flashcards') {
                 currentQuestion++;
-                score++;
                 showFlashcard();
                 return;
             }
@@ -1484,26 +1596,50 @@
             const question = currentQuestions[currentQuestion];
             const selectedAnswer = answeredQuestions[currentQuestion];
             
-            if (document.getElementById('nextBtn').textContent === 'Submit Answer') {
+            if (!answerSubmitted) {
+                // Submit answer
                 const options = document.querySelectorAll('.option');
+                const answerStatus = document.getElementById('answerStatus');
+                
+                // Disable all options
+                options.forEach(opt => opt.style.pointerEvents = 'none');
                 
                 if (selectedAnswer === question.correct) {
                     options[selectedAnswer].classList.add('correct');
                     score += 10;
                     streak++;
+                    answerStatus.className = 'answer-status correct';
+                    answerStatus.textContent = '✓ Correct! Well done!';
                 } else {
                     options[selectedAnswer].classList.add('incorrect');
                     options[question.correct].classList.add('correct');
                     streak = 0;
+                    answerStatus.className = 'answer-status incorrect';
+                    answerStatus.textContent = '✗ Incorrect. The correct answer is highlighted.';
                 }
                 
-                document.getElementById('explanation').innerHTML = `<strong>Explanation:</strong><br>${question.explanation}`;
-                document.getElementById('explanation').classList.add('show');
+                answerStatus.style.display = 'block';
                 
-                document.getElementById('nextBtn').textContent = 'Next Question';
+                // Show explanation with animation
+                const explanationElement = document.getElementById('explanation');
+                explanationElement.innerHTML = `<strong>Explanation:</strong><br>${question.explanation}`;
+                explanationElement.style.display = 'block';
+                
+                // Force reflow before adding class for animation
+                explanationElement.offsetHeight;
+                explanationElement.classList.add('show');
+                
+                if (currentQuestion === currentQuestions.length - 1) {
+                    document.getElementById('nextBtn').textContent = 'View Results';
+                } else {
+                    document.getElementById('nextBtn').textContent = 'Next Question';
+                }
+                
+                answerSubmitted = true;
                 updateScore();
                 
             } else {
+                // Move to next question
                 currentQuestion++;
                 showQuestion();
             }
@@ -1572,10 +1708,17 @@
             document.getElementById('results').classList.add('show');
             
             let resultMessage = '';
+            let detailedResults = '';
             let nextSteps = '';
             
             if (currentMode === 'flashcards') {
                 resultMessage = `You reviewed ${currentQuestions.length} flashcards! Great job studying CISA Domain 3 concepts.`;
+                detailedResults = `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <strong>Flashcard Results:</strong><br>
+                    ✓ Got it right: ${flashcardStats.correct} cards<br>
+                    ⚠️ Need more practice: ${flashcardStats.needPractice} cards<br>
+                    📊 Accuracy: ${flashcardStats.correct > 0 ? Math.round((flashcardStats.correct / (flashcardStats.correct + flashcardStats.needPractice)) * 100) : 0}%
+                </div>`;
                 nextSteps = " Try the quiz mode to test your knowledge or explore another topic area.";
                 document.getElementById('finalScore').textContent = `${currentQuestions.length} Cards Reviewed`;
             } else if (currentMode === 'learn') {
@@ -1584,7 +1727,17 @@
                 document.getElementById('finalScore').textContent = `${currentQuestions.length} Modules Complete`;
             } else {
                 const percentage = Math.round((score / (currentQuestions.length * 10)) * 100);
+                const correctAnswers = answeredQuestions.filter((answer, index) => answer === currentQuestions[index].correct).length;
+                
                 document.getElementById('finalScore').textContent = `${percentage}%`;
+                
+                detailedResults = `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <strong>Quiz Results:</strong><br>
+                    ✓ Correct answers: ${correctAnswers} / ${currentQuestions.length}<br>
+                    📊 Accuracy: ${percentage}%<br>
+                    🔥 Best streak: ${Math.max(...[streak, 0])}<br>
+                    📝 Mode: ${currentMode === 'scenario' ? 'Scenario-based' : 'Standard quiz'}
+                </div>`;
                 
                 if (percentage >= 90) {
                     resultMessage = '🌟 Outstanding! You have excellent mastery of CISA Domain 3 concepts! You\'re well-prepared for this section of the exam.';
@@ -1602,6 +1755,7 @@
             }
             
             document.getElementById('resultMessage').textContent = resultMessage + nextSteps;
+            document.getElementById('detailedResults').innerHTML = detailedResults;
         }
 
         function playAgain() {
@@ -1609,6 +1763,8 @@
             score = 0;
             streak = 0;
             answeredQuestions = [];
+            flashcardStats = { correct: 0, needPractice: 0 };
+            answerSubmitted = false;
             
             document.getElementById('results').classList.remove('show');
             document.getElementById('progressBar').style.display = 'block';
@@ -1691,6 +1847,8 @@
             score = 0;
             streak = 0;
             answeredQuestions = [];
+            flashcardStats = { correct: 0, needPractice: 0 };
+            answerSubmitted = false;
             
             document.querySelectorAll('.mode-card').forEach(card => {
                 card.classList.remove('active');
