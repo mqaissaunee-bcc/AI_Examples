@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Progress Bar Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        .output {
+            margin-top: 30px;
+            display: none;
+        }
+        .code-box {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            position: relative;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📅 Course Progress Bar Generator</h1>
+        
+        <div class="form-group">
+            <label>Semester/Term:</label>
+            <input type="text" id="semester" value="Summer 2025">
+        </div>
+        
+        <div class="form-group">
+            <label>Course Name:</label>
+            <input type="text" id="courseName" value="Sample Course">
+        </div>
+        
+        <div class="form-group">
+            <label>Start Date:</label>
+            <input type="date" id="startDate">
+        </div>
+        
+        <div class="form-group">
+            <label>End Date:</label>
+            <input type="date" id="endDate">
+        </div>
+        
+        <div class="form-group">
+            <label>Holidays (optional, one per line):</label>
+            <textarea id="holidays" placeholder="2025-07-04&#10;2025-12-25"></textarea>
+        </div>
+        
+        <button onclick="generate()">Generate HTML Code</button>
+        
+        <div id="output" class="output">
+            <h3>Generated HTML Code:</h3>
+            <div class="code-box">
+                <button class="copy-btn" onclick="copyCode()">Copy</button>
+                <div id="generatedCode"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setDefaults() {
+            var today = new Date();
+            var start = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+            var end = new Date(today.getTime() + (60 * 24 * 60 * 60 * 1000));
+            
+            document.getElementById('startDate').value = start.toISOString().substr(0, 10);
+            document.getElementById('endDate').value = end.toISOString().substr(0, 10);
+        }
+        
+        function generate() {
+            var semester = document.getElementById('semester').value;
+            var courseName = document.getElementById('courseName').value;
+            var startDate = document.getElementById('startDate').value;
+            var endDate = document.getElementById('endDate').value;
+            var holidaysText = document.getElementById('holidays').value;
+            
+            var start = new Date(startDate);
+            var end = new Date(endDate);
+            
+            var code = '';
+            code += '&lt;div style="font-family: sans-serif; max-width: 600px;"&gt;\n';
+            code += '  &lt;p&gt;&lt;strong&gt;📅 ' + semester + ' - ' + courseName + ' Progress&lt;/strong&gt;&lt;/p&gt;\n';
+            code += '  &lt;div id="progress-text"&gt;&lt;/div&gt;\n';
+            code += '  &lt;div style="background-color: #ddd; width: 100%; height: 25px; border-radius: 5px;"&gt;\n';
+            code += '    &lt;div id="progress-bar" style="background-color: #4caf50; height: 100%; border-radius: 5px;"&gt;&lt;/div&gt;\n';
+            code += '  &lt;/div&gt;\n';
+            code += '&lt;/div&gt;\n';
+            code += '&lt;script&gt;\n';
+            code += '  var startDate = Date.UTC(' + start.getFullYear() + ', ' + start.getMonth() + ', ' + start.getDate() + ');\n';
+            code += '  var endDate = Date.UTC(' + end.getFullYear() + ', ' + end.getMonth() + ', ' + end.getDate() + ');\n';
+            
+            if (holidaysText.trim()) {
+                var holidays = holidaysText.trim().split('\n');
+                code += '  var holidays = [';
+                for (var i = 0; i < holidays.length; i++) {
+                    var holiday = holidays[i].trim();
+                    if (holiday.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        var h = new Date(holiday);
+                        if (i > 0) code += ', ';
+                        code += 'Date.UTC(' + h.getFullYear() + ', ' + h.getMonth() + ', ' + h.getDate() + ')';
+                    }
+                }
+                code += '];\n';
+            }
+            
+            code += '  var today = new Date();\n';
+            code += '  var todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());\n';
+            code += '  var totalDays = 0;\n';
+            code += '  var currentDate = startDate;\n';
+            code += '  while (currentDate &lt;= endDate) {\n';
+            
+            if (holidaysText.trim()) {
+                code += '    var isHoliday = false;\n';
+                code += '    for (var i = 0; i &lt; holidays.length; i++) {\n';
+                code += '      if (holidays[i] === currentDate) { isHoliday = true; break; }\n';
+                code += '    }\n';
+                code += '    if (!isHoliday) totalDays++;\n';
+            } else {
+                code += '    totalDays++;\n';
+            }
+            
+            code += '    currentDate += 24 * 60 * 60 * 1000;\n';
+            code += '  }\n';
+            code += '  var elapsedDays = 0;\n';
+            code += '  if (todayUTC &gt;= startDate) {\n';
+            code += '    currentDate = startDate;\n';
+            code += '    while (currentDate &lt;= Math.min(todayUTC, endDate)) {\n';
+            
+            if (holidaysText.trim()) {
+                code += '      var isHoliday = false;\n';
+                code += '      for (var i = 0; i &lt; holidays.length; i++) {\n';
+                code += '        if (holidays[i] === currentDate) { isHoliday = true; break; }\n';
+                code += '      }\n';
+                code += '      if (!isHoliday) elapsedDays++;\n';
+            } else {
+                code += '      elapsedDays++;\n';
+            }
+            
+            code += '      currentDate += 24 * 60 * 60 * 1000;\n';
+            code += '    }\n';
+            code += '  }\n';
+            code += '  var percent = totalDays &gt; 0 ? ((elapsedDays / totalDays) * 100).toFixed(1) : 0;\n';
+            code += '  document.getElementById("progress-text").innerText = "Day " + elapsedDays + " of " + totalDays + " (" + percent + "%)";\n';
+            code += '  document.getElementById("progress-bar").style.width = percent + "%";\n';
+            code += '&lt;/script&gt;';
+            
+            document.getElementById('generatedCode').innerHTML = code;
+            document.getElementById('output').style.display = 'block';
+        }
+        
+        function copyCode() {
+            var code = document.getElementById('generatedCode').textContent;
+            var textarea = document.createElement('textarea');
+            textarea.value = code;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            
+            var btn = document.querySelector('.copy-btn');
+            btn.textContent = 'Copied!';
+            setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+        }
+        
+        setDefaults();
+    </script>
+</body>
+</html>
