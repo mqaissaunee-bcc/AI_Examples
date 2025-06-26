@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live AI News</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .auto-refresh input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .last-updated {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .news-container {
+            padding: 0 30px 30px;
+        }
+
+        .news-item {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .news-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .news-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .news-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .news-title a {
+            color: inherit;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .news-title a:hover {
+            color: #667eea;
+        }
+
+        .news-summary {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .news-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        .news-source {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-weight: 500;
+        }
+
+        .error {
+            background: #ffe6e6;
+            color: #d63031;
+            padding: 20px;
+            margin: 20px 30px;
+            border-radius: 10px;
+            border-left: 4px solid #d63031;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .news-container {
+                padding: 0 20px 20px;
+            }
+            
+            .news-item {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Live AI News</h1>
+            <p>Stay updated with the latest artificial intelligence developments</p>
+        </div>
+        
+        <div class="controls">
+            <button class="refresh-btn" onclick="fetchNews()" id="refreshBtn">
+                🔄 Refresh News
+            </button>
+            
+            <div class="auto-refresh">
+                <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+                <label for="autoRefresh">Auto-refresh (5 min)</label>
+            </div>
+            
+            <div class="last-updated" id="lastUpdated">
+                Last updated: Never
+            </div>
+        </div>
+        
+        <div id="newsContainer" class="news-container">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading latest AI news...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval;
+        let lastFetchTime = null;
+
+        async function fetchNews(showLoading = true) {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const newsContainer = document.getElementById('newsContainer');
+            const lastUpdated = document.getElementById('lastUpdated');
+
+            if (showLoading) {
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '🔄 Loading...';
+                newsContainer.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Fetching latest AI news...</p>
+                    </div>
+                `;
+            }
+
+            try {
+                const prompt = `Search for the latest AI news from today. Find 5-7 recent news articles about artificial intelligence, machine learning, or AI companies. For each article, provide the following information in JSON format:
+
+{
+  "articles": [
+    {
+      "title": "Article title",
+      "summary": "Brief 2-3 sentence summary of the article",
+      "source": "Source name",
+      "url": "Article URL if available",
+      "timestamp": "Relative time (e.g., '2 hours ago')"
+    }
+  ]
+}
+
+Focus on recent, significant AI developments. DO NOT OUTPUT ANYTHING OTHER THAN VALID JSON. DON'T INCLUDE LEADING BACKTICKS LIKE \`\`\`json.`;
+
+                const response = await window.claude.complete(prompt);
+                
+                let newsData;
+                try {
+                    newsData = JSON.parse(response);
+                } catch (parseError) {
+                    // Try to extract JSON from response if it's wrapped in other text
+                    const jsonMatch = response.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        newsData = JSON.parse(jsonMatch[0]);
+                    } else {
+                        throw new Error('Invalid JSON response');
+                    }
+                }
+
+                displayNews(newsData.articles);
+                lastFetchTime = new Date();
+                lastUpdated.textContent = `Last updated: ${lastFetchTime.toLocaleTimeString()}`;
+
+            } catch (error) {
+                console.error('Error fetching news:', error);
+                newsContainer.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Error Loading News</h3>
+                        <p>Failed to fetch the latest AI news. Please try again.</p>
+                        <p><small>Error: ${error.message}</small></p>
+                    </div>
+                `;
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '🔄 Refresh News';
+            }
+        }
+
+        function displayNews(articles) {
+            const newsContainer = document.getElementById('newsContainer');
+            
+            if (!articles || articles.length === 0) {
+                newsContainer.innerHTML = `
+                    <div class="error">
+                        <h3>📰 No News Found</h3>
+                        <p>No recent AI news articles were found. Try refreshing in a moment.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const newsHTML = articles.map(article => `
+                <div class="news-item">
+                    <div class="news-title">
+                        ${article.url ? 
+                            `<a href="${article.url}" target="_blank" rel="noopener noreferrer">${article.title}</a>` : 
+                            article.title
+                        }
+                    </div>
+                    <div class="news-summary">${article.summary}</div>
+                    <div class="news-meta">
+                        <span class="news-source">${article.source}</span>
+                        <span class="news-time">${article.timestamp}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            newsContainer.innerHTML = newsHTML;
+        }
+
+        function toggleAutoRefresh() {
+            const autoRefreshCheckbox = document.getElementById('autoRefresh');
+            
+            if (autoRefreshCheckbox.checked) {
+                autoRefreshInterval = setInterval(() => {
+                    fetchNews(false);
+                }, 5 * 60 * 1000); // 5 minutes
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+            }
+        }
+
+        // Initialize the widget
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchNews();
+        });
+
+        // Clean up interval on page unload
+        window.addEventListener('beforeunload', function() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>
