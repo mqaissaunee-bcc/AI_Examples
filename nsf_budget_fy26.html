@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSF FY 2026 Budget Explorer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f9fafb;
+            color: #111827;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 32px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: #6b7280;
+            font-size: 1.1rem;
+        }
+
+        .alert-badge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #dc2626;
+        }
+
+        .alert-icon {
+            font-size: 2rem;
+        }
+
+        .alert-text {
+            text-align: right;
+        }
+
+        .alert-number {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .metric-icon {
+            font-size: 2rem;
+            opacity: 0.6;
+        }
+
+        .navigation {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .nav-buttons {
+            display: flex;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .nav-button {
+            flex: 1;
+            padding: 16px 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #6b7280;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+        }
+
+        .nav-button:hover {
+            color: #111827;
+            background-color: #f9fafb;
+        }
+
+        .nav-button.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+
+        .content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 32px;
+        }
+
+        .content h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: #111827;
+        }
+
+        .content h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #111827;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 24px;
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+
+        .info-cards {
+            display: grid;
+            gap: 16px;
+        }
+
+        .info-card {
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+
+        .info-card.red {
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+        }
+
+        .info-card.blue {
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+
+        .info-card.yellow {
+            background-color: #fffbeb;
+            border: 1px solid #fde68a;
+        }
+
+        .info-card.orange {
+            background-color: #fff7ed;
+            border: 1px solid #fed7aa;
+        }
+
+        .info-card.purple {
+            background-color: #faf5ff;
+            border: 1px solid #e9d5ff;
+        }
+
+        .directorate-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .directorate-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background-color: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .directorate-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .directorate-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .directorate-amounts {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .change-percent {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .change-negative {
+            color: #dc2626;
+        }
+
+        .change-positive {
+            color: #16a34a;
+        }
+
+        .impact-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .impact-item {
+            padding: 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .impact-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .impact-severe {
+            background-color: #fef2f2;
+            color: #991b1b;
+        }
+
+        .impact-moderate {
+            background-color: #fffbeb;
+            color: #92400e;
+        }
+
+        .impact-low {
+            background-color: #f0fdf4;
+            color: #166534;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .filter-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .filter-select {
+            padding: 8px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+        }
+
+        .ranking-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .ranking-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background-color: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .ranking-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .ranking-number {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #6b7280;
+        }
+
+        .ranking-name {
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+                gap: 16px;
+            }
+
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-buttons {
+                flex-wrap: wrap;
+            }
+
+            .nav-button {
+                min-width: 50%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1>NSF FY 2026 Budget Explorer</h1>
+                <p>Interactive analysis of the National Science Foundation's budget request to Congress</p>
+            </div>
+            <div class="alert-badge">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-text">
+                    <div class="alert-number">-55.3%</div>
+                    <div>Total Cut</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div>
+                    <div class="metric-label">FY 2024 Budget</div>
+                    <div class="metric-value">$9,264M</div>
+                </div>
+                <div class="metric-icon" style="color: #2563eb;">💰</div>
+            </div>
+            <div class="metric-card">
+                <div>
+                    <div class="metric-label">FY 2026 Request</div>
+                    <div class="metric-value">$4,144M</div>
+                </div>
+                <div class="metric-icon" style="color: #dc2626;">💰</div>
+            </div>
+            <div class="metric-card">
+                <div>
+                    <div class="metric-label">Total Reduction</div>
+                    <div class="metric-value" style="color: #dc2626;">$5,120M</div>
+                </div>
+                <div class="metric-icon" style="color: #dc2626;">📉</div>
+            </div>
+            <div class="metric-card">
+                <div>
+                    <div class="metric-label">Percentage Cut</div>
+                    <div class="metric-value" style="color: #dc2626;">-55.3%</div>
+                </div>
+                <div class="metric-icon" style="color: #dc2626;">📉</div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="navigation">
+            <div class="nav-buttons">
+                <button class="nav-button active" onclick="showView('overview')">📋 Overview</button>
+                <button class="nav-button" onclick="showView('directorates')">📊 By Directorate</button>
+                <button class="nav-button" onclick="showView('comparison')">📈 Comparison</button>
+                <button class="nav-button" onclick="showView('impact')">👥 Impact Analysis</button>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Overview View -->
+            <div id="overview-view" class="view">
+                <h2>Budget Overview</h2>
+                <div class="chart-grid">
+                    <div>
+                        <h3>FY 2026 Budget Distribution</h3>
+                        <div class="chart-container">
+                            <canvas id="pieChart"></canvas>
+                        </div>
+                    </div>
+                    <div>
+                        <h3>Key Context</h3>
+                        <div class="info-cards">
+                            <div class="info-card red">
+                                <strong>Historic Cut:</strong> This represents one of the largest proposed cuts to NSF funding in decades, reducing the agency's budget to levels not seen since the early 2000s.
+                            </div>
+                            <div class="info-card blue">
+                                <strong>Congressional Authority:</strong> This is a budget request from the Administration. Congress has the ultimate authority to determine actual funding levels through the appropriations process.
+                            </div>
+                            <div class="info-card yellow">
+                                <strong>Timeline:</strong> The FY 2026 budget request was released on May 30, 2025, with initial details provided in the "skinny budget" on May 2, 2025.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Directorates View -->
+            <div id="directorates-view" class="view hidden">
+                <div class="filter-controls">
+                    <h2>Directorate Analysis</h2>
+                    <select id="directorateFilter" class="filter-select" onchange="updateDirectorateView()">
+                        <option value="all">All Directorates</option>
+                        <option value="BIO">BIO</option>
+                        <option value="CISE">CISE</option>
+                        <option value="EDU">EDU</option>
+                        <option value="ENG">ENG</option>
+                        <option value="GEO">GEO</option>
+                        <option value="MPS">MPS</option>
+                        <option value="SBE">SBE</option>
+                        <option value="TIP">TIP</option>
+                    </select>
+                </div>
+                <div class="chart-grid">
+                    <div>
+                        <h3>Budget Comparison (FY 2024 vs FY 2026)</h3>
+                        <div class="chart-container">
+                            <canvas id="barChart"></canvas>
+                        </div>
+                    </div>
+                    <div>
+                        <h3>Percentage Changes</h3>
+                        <div id="directorateList" class="directorate-list">
+                            <!-- Dynamic content -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison View -->
+            <div id="comparison-view" class="view hidden">
+                <h2>Before vs After Comparison</h2>
+                <div class="chart-grid">
+                    <div>
+                        <h3>Major Program Changes</h3>
+                        <div id="majorProgramsList" class="directorate-list">
+                            <!-- Dynamic content -->
+                        </div>
+                    </div>
+                    <div>
+                        <h3>Directorate Rankings by Cut Severity</h3>
+                        <div id="rankingList" class="ranking-list">
+                            <!-- Dynamic content -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Impact View -->
+            <div id="impact-view" class="view hidden">
+                <h2>Impact Analysis</h2>
+                <div class="chart-grid">
+                    <div>
+                        <h3>Workforce Impact</h3>
+                        <div id="impactList" class="impact-grid">
+                            <!-- Dynamic content -->
+                        </div>
+                    </div>
+                    <div>
+                        <h3>Key Implications</h3>
+                        <div class="info-cards">
+                            <div class="info-card red">
+                                <strong>Research Capacity:</strong> Grant success rates would drop from 24% to 6%, making funding extremely competitive and potentially stalling numerous research projects.
+                            </div>
+                            <div class="info-card orange">
+                                <strong>Workforce Development:</strong> Over 240,000 fewer people would be involved in NSF-supported activities, including students, postdocs, and researchers.
+                            </div>
+                            <div class="info-card yellow">
+                                <strong>Educational Impact:</strong> The Education directorate faces a 75% cut, severely impacting STEM education programs and teacher training.
+                            </div>
+                            <div class="info-card purple">
+                                <strong>International Competitiveness:</strong> The Office of International Science and Engineering faces an 80% cut, potentially isolating US science from global collaborations.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Budget data
+        const budgetData = [
+            { category: 'BIO', fy2024: 789.59, fy2026: 224.89, change: -564.70, changePercent: -71.5, type: 'directorate' },
+            { category: 'CISE', fy2024: 989.35, fy2026: 346.27, change: -643.08, changePercent: -65.0, type: 'directorate' },
+            { category: 'EDU', fy2024: 1154.31, fy2026: 288.43, change: -865.88, changePercent: -75.0, type: 'directorate' },
+            { category: 'ENG', fy2024: 740.80, fy2026: 185.20, change: -555.60, changePercent: -75.0, type: 'directorate' },
+            { category: 'GEO', fy2024: 1577.08, fy2026: 873.57, change: -703.51, changePercent: -44.6, type: 'directorate' },
+            { category: 'MPS', fy2024: 1554.21, fy2026: 515.28, change: -1038.93, changePercent: -66.8, type: 'directorate' },
+            { category: 'SBE', fy2024: 290.29, fy2026: 94.00, change: -196.29, changePercent: -67.6, type: 'directorate' },
+            { category: 'TIP', fy2024: 617.90, fy2026: 350.00, change: -267.90, changePercent: -43.4, type: 'directorate' },
+            { category: 'Research & Related Activities', fy2024: 8348.50, fy2026: 3276.15, change: -5072.35, changePercent: -60.8, type: 'major' },
+            { category: 'Major Res. Equip. & Fac. Construction', fy2024: 234.00, fy2026: 251.00, change: 17.00, changePercent: 7.3, type: 'major' },
+            { category: 'Agency Operations & Award Mgmt.', fy2024: 448.00, fy2026: 355.00, change: -93.00, changePercent: -20.8, type: 'major' }
+        ];
+
+        const impactData = [
+            { metric: 'Grant Success Rate', fy2024: '24%', fy2026: '6%', impact: 'severe' },
+            { metric: 'People Involved', fy2024: '330,100', fy2026: '90,000', impact: 'severe' },
+            { metric: 'Research Grant Applications', fy2024: '36,700', fy2026: '33,000', impact: 'moderate' },
+            { metric: 'Funded Research Proposals', fy2024: '9,600', fy2026: '2,300', impact: 'severe' }
+        ];
+
+        // Chart instances
+        let pieChart = null;
+        let barChart = null;
+
+        // Initialize charts
+        function initializeCharts() {
+            // Pie Chart
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            const directorateData = budgetData.filter(item => item.type === 'directorate');
+            
+            pieChart = new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: directorateData.map(item => item.category),
+                    datasets: [{
+                        data: directorateData.map(item => item.fy2026),
+                        backgroundColor: [
+                            '#dc2626', '#ea580c', '#d97706', '#ca8a04', 
+                            '#65a30d', '#16a34a', '#059669', '#0d9488'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.label + ': $' + context.parsed.toLocaleString() + 'M';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Bar Chart
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            barChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: directorateData.map(item => item.category),
+                    datasets: [{
+                        label: 'FY 2024',
+                        data: directorateData.map(item => item.fy2024),
+                        backgroundColor: '#3b82f6'
+                    }, {
+                        label: 'FY 2026',
+                        data: directorateData.map(item => item.fy2026),
+                        backgroundColor: '#dc2626'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString() + 'M';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': $' + context.parsed.y.toLocaleString() + 'M';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // View management
+        function showView(viewName) {
+            // Hide all views
+            document.querySelectorAll('.view').forEach(view => {
+                view.classList.add('hidden');
+            });
+            
+            // Show selected view
+            document.getElementById(viewName + '-view').classList.remove('hidden');
+            
+            // Update navigation
+            document.querySelectorAll('.nav-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Initialize view-specific content
+            if (viewName === 'overview') {
+                // Pie chart is already initialized
+            } else if (viewName === 'directorates') {
+                updateDirectorateView();
+            } else if (viewName === 'comparison') {
+                updateComparisonView();
+            } else if (viewName === 'impact') {
+                updateImpactView();
+            }
+        }
+
+        function updateDirectorateView() {
+            const filter = document.getElementById('directorateFilter').value;
+            const directorateData = budgetData.filter(item => item.type === 'directorate');
+            const filteredData = filter === 'all' ? directorateData : directorateData.filter(item => item.category === filter);
+            
+            // Update bar chart
+            barChart.data.labels = filteredData.map(item => item.category);
+            barChart.data.datasets[0].data = filteredData.map(item => item.fy2024);
+            barChart.data.datasets[1].data = filteredData.map(item => item.fy2026);
+            barChart.update();
+            
+            // Update directorate list
+            const listHtml = filteredData.map(item => `
+                <div class="directorate-item">
+                    <div class="directorate-info">
+                        <div class="directorate-name">${item.category}</div>
+                        <div class="directorate-amounts">$${item.fy2024.toLocaleString()}M → $${item.fy2026.toLocaleString()}M</div>
+                    </div>
+                    <div class="change-percent ${item.changePercent >= 0 ? 'change-positive' : 'change-negative'}">
+                        ${item.changePercent >= 0 ? '+' : ''}${item.changePercent.toFixed(1)}%
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('directorateList').innerHTML = listHtml;
+        }
+
+        function updateComparisonView() {
+            const majorPrograms = budgetData.filter(item => item.type === 'major');
+            const directorateData = budgetData.filter(item => item.type === 'directorate');
+            
+            // Major programs list
+            const majorProgramsHtml = majorPrograms.map(item => `
+                <div class="directorate-item">
+                    <div class="directorate-info">
+                        <div class="directorate-name">${item.category}</div>
+                        <div class="directorate-amounts">$${item.fy2024.toLocaleString()}M → $${item.fy2026.toLocaleString()}M</div>
+                        <div style="font-size: 0.875rem; font-weight: 600; color: #374151;">
+                            Change: $${Math.abs(item.change).toLocaleString()}M
+                        </div>
+                    </div>
+                    <div class="change-percent ${item.changePercent >= 0 ? 'change-positive' : 'change-negative'}">
+                        ${item.changePercent >= 0 ? '+' : ''}${item.changePercent.toFixed(1)}%
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('majorProgramsList').innerHTML = majorProgramsHtml;
+            
+            // Ranking list
+            const sortedData = [...directorateData].sort((a, b) => a.changePercent - b.changePercent);
+            const rankingHtml = sortedData.map((item, index) => `
+                <div class="ranking-item">
+                    <div class="ranking-info">
+                        <span class="ranking-number">#${index + 1}</span>
+                        <span class="ranking-name">${item.category}</span>
+                    </div>
+                    <div class="change-percent ${item.changePercent >= 0 ? 'change-positive' : 'change-negative'}">
+                        ${item.changePercent >= 0 ? '+' : ''}${item.changePercent.toFixed(1)}%
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('rankingList').innerHTML = rankingHtml;
+        }
+
+        function updateImpactView() {
+            const impactHtml = impactData.map(item => `
+                <div class="impact-item">
+                    <div>
+                        <div class="directorate-name">${item.metric}</div>
+                        <div class="directorate-amounts">${item.fy2024} → ${item.fy2026}</div>
+                    </div>
+                    <div class="impact-badge impact-${item.impact}">
+                        ${item.impact}
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('impactList').innerHTML = impactHtml;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            updateDirectorateView();
+            updateComparisonView();
+            updateImpactView();
+        });
+    </script>
+</body>
+</html>
