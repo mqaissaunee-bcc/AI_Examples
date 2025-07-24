@@ -1,0 +1,2089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Occupational Impact Explorer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        /* Enhanced Typography */
+        h1, h2, h3 {
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        h1 {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            font-weight: 700;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .key-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.95));
+            padding: 25px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3498db, #2ecc71, #f39c12, #e74c3c);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15), 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-number {
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: clamp(0.7rem, 2vw, 0.9rem);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .insights {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .insight-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .insight-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .insight-card h3 {
+            font-size: clamp(1rem, 3vw, 1.3rem);
+            margin-bottom: 10px;
+        }
+
+        .insight-card p {
+            font-size: clamp(0.8rem, 2vw, 0.95rem);
+        }
+
+        /* Charts Section */
+        .charts-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+            height: 400px;
+        }
+
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        /* Controls */
+        .controls {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .help-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .help-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .modal-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .close-modal {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .close-modal:hover {
+            background: #c0392b;
+            transform: scale(1.1);
+        }
+
+        .metric-explanation {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            border-left: 5px solid #3498db;
+        }
+
+        .metric-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .metric-description {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .metric-range {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        /* Tooltip Styles */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 100;
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .search-input, .filter-select {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            min-width: 180px;
+            flex: 1;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-input:focus, .filter-select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .view-toggle {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .view-toggle button {
+            padding: 12px 18px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 14px;
+        }
+
+        .view-toggle button.active {
+            background: #3498db;
+            color: white;
+        }
+
+        /* Comparison Panel */
+        .comparison-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .comparison-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .comparison-select {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            min-width: 200px;
+            flex: 1;
+        }
+
+        .add-comparison-btn, .clear-comparison-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        .add-comparison-btn {
+            background: #27ae60;
+            color: white;
+        }
+
+        .add-comparison-btn:hover {
+            background: #219a52;
+        }
+
+        .clear-comparison-btn {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .clear-comparison-btn:hover {
+            background: #c0392b;
+        }
+
+        .comparison-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .comparison-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #3498db;
+            position: relative;
+        }
+
+        .comparison-remove {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .data-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: clamp(1.3rem, 3vw, 1.8rem);
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3498db;
+        }
+
+        .occupation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .occupation-card {
+            background: linear-gradient(135deg, #ffffff, #f8fafc);
+            padding: 24px;
+            border-radius: 16px;
+            border-left: 5px solid #3498db;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .occupation-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .occupation-card:hover {
+            transform: translateY(-6px) scale(1.01);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .occupation-card:hover::before {
+            opacity: 1;
+        }
+
+        /* AI Score-based gradient colors */
+        .occupation-card.score-excellent {
+            border-left-color: #2ecc71;
+            background: linear-gradient(135deg, #ffffff, #f0f9f4);
+        }
+
+        .occupation-card.score-high {
+            border-left-color: #3498db;
+            background: linear-gradient(135deg, #ffffff, #f0f8ff);
+        }
+
+        .occupation-card.score-medium {
+            border-left-color: #f39c12;
+            background: linear-gradient(135deg, #ffffff, #fefaf0);
+        }
+
+        .occupation-card.score-low {
+            border-left-color: #e74c3c;
+            background: linear-gradient(135deg, #ffffff, #fef7f7);
+        }
+
+        .occupation-card.score-minimal {
+            border-left-color: #95a5a6;
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+        }
+
+        .occupation-title {
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 16px;
+            font-size: clamp(1rem, 2vw, 1.15rem);
+            line-height: 1.3;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .occupation-title {
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 16px;
+            font-size: clamp(1rem, 2vw, 1.15rem);
+            line-height: 1.3;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .occupation-icon {
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.1), rgba(52, 152, 219, 0.05));
+            border: 2px solid rgba(52, 152, 219, 0.2);
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .occupation-icon:empty {
+            display: none;
+        }
+
+        .occupation-card:hover .occupation-icon {
+            transform: scale(1.1) rotate(5deg);
+            background: linear-gradient(135deg, rgba(52, 152, 219, 0.2), rgba(52, 152, 219, 0.1));
+        }
+
+        .occupation-group {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: inline-block;
+            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .occupation-card:hover .occupation-group {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        .occupation-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .stat:hover {
+            background: rgba(255, 255, 255, 0.9);
+            transform: scale(1.02);
+        }
+
+        .stat-name {
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 0.95rem;
+        }
+
+        .sparkline-container {
+            margin: 12px 0;
+            text-align: center;
+        }
+
+        .sparkline-label {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .sparkline {
+            width: 100%;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .score-bar {
+            width: 100%;
+            height: 12px;
+            background: linear-gradient(90deg, #ecf0f1, #d5dbdb);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 16px;
+            position: relative;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .score-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .score-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .score-excellent .score-fill {
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+        }
+
+        .score-high .score-fill {
+            background: linear-gradient(90deg, #3498db, #2980b9);
+        }
+
+        .score-medium .score-fill {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+        }
+
+        .score-low .score-fill {
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+        }
+
+        .score-minimal .score-fill {
+            background: linear-gradient(90deg, #95a5a6, #7f8c8d);
+        }
+
+        .add-to-compare {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: background-color 0.3s ease;
+        }
+
+        .add-to-compare:hover {
+            background: #219a52;
+        }
+
+        .add-to-compare.added {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .table-view {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            min-width: 800px;
+        }
+
+        .data-table th {
+            background: #3498db;
+            color: white;
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .data-table th:hover {
+            background: #2980b9;
+        }
+
+        .data-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #ecf0f1;
+            font-size: 0.85rem;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .methodology {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .methodology h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: clamp(1.2rem, 3vw, 1.5rem);
+        }
+
+        .methodology h3 {
+            color: #34495e;
+            margin: 15px 0 10px 0;
+            font-size: clamp(1rem, 2.5vw, 1.2rem);
+        }
+
+        .methodology ul {
+            padding-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        .methodology li {
+            margin-bottom: 8px;
+            color: #555;
+            font-size: clamp(0.85rem, 2vw, 0.95rem);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Enhanced Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .controls-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-input, .filter-select {
+                min-width: auto;
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            .view-toggle {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .view-toggle button {
+                flex: 1;
+                padding: 15px;
+                font-size: 16px;
+            }
+
+            .occupation-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .occupation-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .occupation-title {
+                flex-direction: row;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .occupation-icon {
+                width: 35px;
+                height: 35px;
+                font-size: 1.3rem;
+            }
+
+            .sparkline {
+                height: 25px;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-container {
+                height: 300px;
+                padding: 20px;
+            }
+
+            .comparison-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .comparison-select {
+                min-width: auto;
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            .add-comparison-btn, .clear-comparison-btn {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            .comparison-results {
+                grid-template-columns: 1fr;
+            }
+
+            .insight-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .key-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .data-table {
+                font-size: 0.8rem;
+            }
+
+            .data-table th, .data-table td {
+                padding: 8px 6px;
+            }
+
+            .stat-card {
+                padding: 20px;
+            }
+
+            .occupation-card, .comparison-card {
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .key-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .occupation-card, .comparison-card {
+                padding: 16px;
+            }
+
+            .chart-container {
+                height: 250px;
+                padding: 15px;
+            }
+
+            .occupation-title {
+                font-size: 0.95rem;
+            }
+
+            .occupation-icon {
+                width: 30px;
+                height: 30px;
+                font-size: 1.1rem;
+            }
+
+            .sparkline {
+                height: 20px;
+            }
+
+            .stat {
+                padding: 6px 10px;
+                font-size: 0.85rem;
+            }
+
+            .occupation-group {
+                font-size: 0.7rem;
+                padding: 4px 8px;
+            }
+        }
+
+        /* Collapsible sections for mobile */
+        .collapsible-header {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .collapsible-content.expanded {
+            max-height: 2000px;
+        }
+
+        .expand-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .expand-icon.rotated {
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 768px) {
+            .insights, .charts-section, .methodology {
+                margin-bottom: 10px;
+            }
+
+            .collapsible-content {
+                padding-top: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Occupational Impact Explorer</h1>
+            <p>Explore how generative AI affects different occupations based on analysis of 200,000 Microsoft Copilot conversations. This data shows which jobs have the highest and lowest potential for AI impact.</p>
+        </div>
+
+        <div class="key-stats">
+            <div class="stat-card">
+                <div class="stat-number">200K</div>
+                <div class="stat-label">Conversations Analyzed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">873</div>
+                <div class="stat-label">Occupations Studied</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">0.73</div>
+                <div class="stat-label">Correlation with Expert Predictions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">40%</div>
+                <div class="stat-label">Different User vs AI Activities</div>
+            </div>
+        </div>
+
+        <div class="insights">
+            <div class="collapsible-header" onclick="toggleCollapsible('insights')">
+                <h2 class="section-title" style="border: none; margin: 0;">Key Research Insights</h2>
+                <span class="expand-icon">▼</span>
+            </div>
+            <div class="collapsible-content expanded" id="insights-content">
+                <div class="insight-grid">
+                    <div class="insight-card">
+                        <h3>Most AI-Applicable</h3>
+                        <p>Knowledge work, communication, and information processing occupations show highest AI applicability scores</p>
+                    </div>
+                    <div class="insight-card">
+                        <h3>Least AI-Applicable</h3>
+                        <p>Physical labor, machinery operation, and hands-on healthcare roles show lowest potential for AI impact</p>
+                    </div>
+                    <div class="insight-card">
+                        <h3>Common AI Uses</h3>
+                        <p>Information gathering, writing, and communication are the most frequent AI-assisted activities</p>
+                    </div>
+                    <div class="insight-card">
+                        <h3>Education Correlation</h3>
+                        <p>Bachelor's degree occupations show slightly higher AI applicability than those requiring less education</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-section">
+            <div class="collapsible-header" onclick="toggleCollapsible('charts')">
+                <h2 class="section-title" style="border: none; margin: 0;">Data Visualizations</h2>
+                <span class="expand-icon">▼</span>
+            </div>
+            <div class="collapsible-content expanded" id="charts-content">
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <div class="chart-title">AI Score vs Employment Size</div>
+                        <canvas id="scatterChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">AI Impact by Industry Group</div>
+                        <canvas id="industryChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Score Distribution</div>
+                        <canvas id="distributionChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">Score Components Correlation</div>
+                        <canvas id="componentsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="comparison-panel">
+            <div class="collapsible-header" onclick="toggleCollapsible('comparison')">
+                <h2 class="section-title" style="border: none; margin: 0;">Compare Occupations</h2>
+                <span class="expand-icon">▼</span>
+            </div>
+            <div class="collapsible-content expanded" id="comparison-content">
+                <div class="comparison-controls">
+                    <select class="comparison-select" id="comparisonSelect">
+                        <option value="">Select an occupation to compare...</option>
+                    </select>
+                    <button class="add-comparison-btn" onclick="addToComparison()">Add to Compare</button>
+                    <button class="clear-comparison-btn" onclick="clearComparison()">Clear All</button>
+                </div>
+                <div class="comparison-results" id="comparisonResults">
+                    <p style="color: #7f8c8d; text-align: center; grid-column: 1 / -1;">Select occupations above to compare their AI impact metrics</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="help-button" onclick="openHelpModal()" title="Learn about AI impact metrics">?</button>
+            <div class="controls-row">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search occupations...">
+                <select class="filter-select" id="categoryFilter">
+                    <option value="all">All Categories</option>
+                    <option value="high">High AI Impact (Top 40)</option>
+                    <option value="low">Low AI Impact (Bottom 40)</option>
+                    <option value="score-high">Score > 0.3</option>
+                    <option value="score-low">Score < 0.1</option>
+                </select>
+                <select class="filter-select" id="industryFilter">
+                    <option value="all">All Industries</option>
+                    <option value="Sales and Related">Sales and Related</option>
+                    <option value="Computer and Mathematical">Computer and Mathematical</option>
+                    <option value="Office and Administrative Support">Office and Administrative Support</option>
+                    <option value="Arts, Design, Entertainment, Sports, Media">Arts and Media</option>
+                    <option value="Business and Financial Operations">Business and Financial</option>
+                    <option value="Educational Instruction and Library">Education and Library</option>
+                    <option value="Healthcare Practitioners and Technical">Healthcare Practitioners</option>
+                    <option value="Management">Management</option>
+                    <option value="Legal">Legal</option>
+                    <option value="Life, Physical, and Social Science">Life and Physical Science</option>
+                    <option value="Community and Social Service">Community and Social Service</option>
+                    <option value="Architecture and Engineering">Architecture and Engineering</option>
+                    <option value="Personal Care and Service">Personal Care and Service</option>
+                    <option value="Food Preparation and Serving Related">Food Service</option>
+                    <option value="Protective Service">Protective Service</option>
+                    <option value="Transportation and Material Moving">Transportation</option>
+                    <option value="Production">Production</option>
+                    <option value="Installation, Maintenance, and Repair">Maintenance and Repair</option>
+                    <option value="Construction and Extraction">Construction</option>
+                    <option value="Healthcare Support">Healthcare Support</option>
+                    <option value="Building, Grounds Cleaning, Maintenance">Cleaning and Maintenance</option>
+                    <option value="Farming, Fishing, and Forestry">Agriculture and Forestry</option>
+                </select>
+                <div class="view-toggle">
+                    <button class="active" onclick="toggleView('cards')">Cards</button>
+                    <button onclick="toggleView('table')">Table</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-section">
+            <h2 class="section-title">Occupation AI Applicability Data</h2>
+            
+            <div id="cardsView" class="occupation-grid">
+                <!-- Cards will be populated by JavaScript -->
+            </div>
+
+            <div id="tableView" class="table-view hidden">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable(0)">Occupation</th>
+                            <th onclick="sortTable(1)">Industry Group</th>
+                            <th onclick="sortTable(2)">AI Score</th>
+                            <th onclick="sortTable(3)">Coverage</th>
+                            <th onclick="sortTable(4)">Completion</th>
+                            <th onclick="sortTable(5)">Scope</th>
+                            <th onclick="sortTable(6)">Employment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- Table rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="methodology">
+            <div class="collapsible-header" onclick="toggleCollapsible('methodology')">
+                <h2 style="margin: 0;">Methodology & Data Source</h2>
+                <span class="expand-icon">▼</span>
+            </div>
+            <div class="collapsible-content expanded" id="methodology-content">
+                <p><strong>Research Paper:</strong> "Working with AI: Measuring the Occupational Implications of Generative AI" by Microsoft Research</p>
+                
+                <h3>How AI Applicability Was Measured:</h3>
+                <ul>
+                    <li><strong>Coverage:</strong> Weighted fraction of occupation's work activities that appear frequently in AI conversations</li>
+                    <li><strong>Completion Rate:</strong> How successfully AI completes tasks related to the occupation's activities</li>
+                    <li><strong>Scope:</strong> Fraction of conversations where AI demonstrates moderate or higher impact on work activities</li>
+                    <li><strong>AI Score:</strong> Combined metric incorporating coverage, completion, and scope</li>
+                </ul>
+
+                <h3>Data Collection:</h3>
+                <ul>
+                    <li>200,000 anonymized conversations with Microsoft Bing Copilot from 2024</li>
+                    <li>Classified using O*NET work activity framework (332 intermediate work activities)</li>
+                    <li>Distinguished between tasks users sought help with vs. tasks AI performed</li>
+                    <li>Combined with employment and wage data from Bureau of Labor Statistics</li>
+                </ul>
+
+                <h3>Key Findings:</h3>
+                <ul>
+                    <li>Strong correlation (r=0.73) with independent expert predictions of AI impact</li>
+                    <li>Highest impact on Sales, Computer/Mathematical, and Office/Administrative occupations</li>
+                    <li>Lowest impact on physical labor, healthcare support, and machinery operation</li>
+                    <li>Weak correlation with wages, moderate correlation with education requirements</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Help Modal -->
+        <div id="helpModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">AI Impact Metrics Explained</h2>
+                    <button class="close-modal" onclick="closeHelpModal()">×</button>
+                </div>
+                
+                <div class="metric-explanation">
+                    <div class="metric-name">🎯 AI Score</div>
+                    <div class="metric-description">
+                        Combined metric showing overall AI applicability to this occupation. Higher scores indicate greater potential for AI impact.
+                    </div>
+                    <div class="metric-range">Range: 0.000 to 0.500+ (Excellent: 0.4+, High: 0.3+, Medium: 0.15+, Low: 0.05+)</div>
+                </div>
+
+                <div class="metric-explanation">
+                    <div class="metric-name">👥 Employment</div>
+                    <div class="metric-description">
+                        Total number of people employed in this occupation in the United States, based on Bureau of Labor Statistics data.
+                    </div>
+                    <div class="metric-range">Shows current workforce size (K = thousands, M = millions)</div>
+                </div>
+
+                <div class="metric-explanation">
+                    <div class="metric-name">📊 Coverage</div>
+                    <div class="metric-description">
+                        Fraction of the occupation's work activities that appear frequently in AI conversations. Higher coverage means more of the job's tasks are being done with AI.
+                    </div>
+                    <div class="metric-range">Range: 0.00 to 1.00 (1.00 = 100% of work activities covered)</div>
+                </div>
+
+                <div class="metric-explanation">
+                    <div class="metric-name">✅ Completion</div>
+                    <div class="metric-description">
+                        How successfully AI completes tasks related to this occupation's activities. Higher completion rates indicate AI is more effective at these tasks.
+                    </div>
+                    <div class="metric-range">Range: 0.00 to 1.00 (1.00 = 100% task completion rate)</div>
+                </div>
+
+                <div class="metric-explanation">
+                    <div class="metric-name">🎯 Scope</div>
+                    <div class="metric-description">
+                        Measures how much of each work activity AI can assist with or perform. Higher scope means AI can handle a larger portion of the activity.
+                    </div>
+                    <div class="metric-range">Range: 0.00 to 1.00 (1.00 = AI can handle the complete activity)</div>
+                </div>
+
+                <div class="metric-explanation">
+                    <div class="metric-name">📈 Sparkline Chart</div>
+                    <div class="metric-description">
+                        Visual representation showing Coverage (blue), Completion (green), and Scope (orange) values. Bar heights are proportional to relative performance.
+                    </div>
+                    <div class="metric-range">Higher bars indicate better performance in each metric</div>
+                </div>
+
+                <div style="margin-top: 20px; padding: 15px; background: rgba(52, 152, 219, 0.1); border-radius: 8px;">
+                    <strong>💡 How to Interpret:</strong> Jobs with high AI scores have many work activities that AI can successfully assist with or perform. This doesn't necessarily mean job displacement - it could mean augmentation and increased productivity.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced occupation data with SOC industry groups
+        const occupationData = [
+            // Top 40 (High AI Impact)
+            { name: "Interpreters and Translators", score: 0.49, coverage: 0.98, completion: 0.88, scope: 0.57, employment: 51560, category: "high", industry: "Arts, Design, Entertainment, Sports, Media" },
+            { name: "Historians", score: 0.48, coverage: 0.91, completion: 0.85, scope: 0.56, employment: 3040, category: "high", industry: "Life, Physical, and Social Science" },
+            { name: "Passenger Attendants", score: 0.47, coverage: 0.80, completion: 0.88, scope: 0.62, employment: 20190, category: "high", industry: "Transportation and Material Moving" },
+            { name: "Sales Representatives of Services", score: 0.46, coverage: 0.84, completion: 0.90, scope: 0.57, employment: 1142020, category: "high", industry: "Sales and Related" },
+            { name: "Writers and Authors", score: 0.45, coverage: 0.85, completion: 0.84, scope: 0.60, employment: 49450, category: "high", industry: "Arts, Design, Entertainment, Sports, Media" },
+            { name: "Customer Service Representatives", score: 0.44, coverage: 0.72, completion: 0.90, scope: 0.59, employment: 2858710, category: "high", industry: "Office and Administrative Support" },
+            { name: "CNC Tool Programmers", score: 0.44, coverage: 0.90, completion: 0.87, scope: 0.53, employment: 28030, category: "high", industry: "Computer and Mathematical" },
+            { name: "Telephone Operators", score: 0.42, coverage: 0.80, completion: 0.86, scope: 0.57, employment: 4600, category: "high", industry: "Office and Administrative Support" },
+            { name: "Ticket Agents and Travel Clerks", score: 0.41, coverage: 0.71, completion: 0.90, scope: 0.56, employment: 119270, category: "high", industry: "Office and Administrative Support" },
+            { name: "Broadcast Announcers and Radio DJs", score: 0.41, coverage: 0.74, completion: 0.84, scope: 0.60, employment: 25070, category: "high", industry: "Arts, Design, Entertainment, Sports, Media" },
+            { name: "Brokerage Clerks", score: 0.41, coverage: 0.74, completion: 0.89, scope: 0.57, employment: 48060, category: "high", industry: "Business and Financial Operations" },
+            { name: "Farm and Home Management Educators", score: 0.41, coverage: 0.77, completion: 0.91, scope: 0.55, employment: 8110, category: "high", industry: "Educational Instruction and Library" },
+            { name: "Telemarketers", score: 0.40, coverage: 0.66, completion: 0.89, scope: 0.60, employment: 81580, category: "high", industry: "Sales and Related" },
+            { name: "Concierges", score: 0.40, coverage: 0.70, completion: 0.88, scope: 0.56, employment: 41020, category: "high", industry: "Personal Care and Service" },
+            { name: "Political Scientists", score: 0.39, coverage: 0.77, completion: 0.87, scope: 0.53, employment: 5580, category: "high", industry: "Life, Physical, and Social Science" },
+            { name: "News Analysts, Reporters, Journalists", score: 0.39, coverage: 0.81, completion: 0.81, scope: 0.56, employment: 45020, category: "high", industry: "Arts, Design, Entertainment, Sports, Media" },
+            { name: "Mathematicians", score: 0.39, coverage: 0.91, completion: 0.74, scope: 0.54, employment: 2220, category: "high", industry: "Computer and Mathematical" },
+            { name: "Technical Writers", score: 0.38, coverage: 0.83, completion: 0.82, scope: 0.54, employment: 47970, category: "high", industry: "Arts, Design, Entertainment, Sports, Media" },
+            { name: "Proofreaders and Copy Markers", score: 0.38, coverage: 0.91, completion: 0.86, scope: 0.49, employment: 5490, category: "high", industry: "Arts, Design, Entertainment, Sports, Media" },
+            { name: "Hosts and Hostesses", score: 0.37, coverage: 0.60, completion: 0.90, scope: 0.57, employment: 425020, category: "high", industry: "Food Preparation and Serving Related" },
+            { name: "Editors", score: 0.37, coverage: 0.78, completion: 0.82, scope: 0.54, employment: 95700, category: "high", industry: "Arts, Design, Entertainment, Sports, Media" },
+            { name: "Business Teachers, Postsecondary", score: 0.37, coverage: 0.70, completion: 0.90, scope: 0.52, employment: 82980, category: "high", industry: "Educational Instruction and Library" },
+            { name: "Public Relations Specialists", score: 0.36, coverage: 0.63, completion: 0.90, scope: 0.60, employment: 275550, category: "high", industry: "Business and Financial Operations" },
+            { name: "Demonstrators and Product Promoters", score: 0.36, coverage: 0.64, completion: 0.88, scope: 0.53, employment: 50790, category: "high", industry: "Sales and Related" },
+            { name: "Advertising Sales Agents", score: 0.36, coverage: 0.66, completion: 0.90, scope: 0.53, employment: 108100, category: "high", industry: "Sales and Related" },
+            { name: "New Accounts Clerks", score: 0.36, coverage: 0.72, completion: 0.87, scope: 0.51, employment: 41180, category: "high", industry: "Business and Financial Operations" },
+            { name: "Statistical Assistants", score: 0.36, coverage: 0.85, completion: 0.84, scope: 0.49, employment: 7200, category: "high", industry: "Computer and Mathematical" },
+            { name: "Counter and Rental Clerks", score: 0.36, coverage: 0.62, completion: 0.90, scope: 0.52, employment: 390300, category: "high", industry: "Sales and Related" },
+            { name: "Data Scientists", score: 0.36, coverage: 0.77, completion: 0.86, scope: 0.51, employment: 192710, category: "high", industry: "Computer and Mathematical" },
+            { name: "Personal Financial Advisors", score: 0.35, coverage: 0.69, completion: 0.88, scope: 0.52, employment: 272190, category: "high", industry: "Business and Financial Operations" },
+            { name: "Archivists", score: 0.35, coverage: 0.66, completion: 0.88, scope: 0.49, employment: 7150, category: "high", industry: "Educational Instruction and Library" },
+            { name: "Economics Teachers, Postsecondary", score: 0.35, coverage: 0.68, completion: 0.90, scope: 0.51, employment: 12210, category: "high", industry: "Educational Instruction and Library" },
+            { name: "Web Developers", score: 0.35, coverage: 0.73, completion: 0.86, scope: 0.51, employment: 85350, category: "high", industry: "Computer and Mathematical" },
+            { name: "Management Analysts", score: 0.35, coverage: 0.68, completion: 0.90, scope: 0.54, employment: 838140, category: "high", industry: "Management" },
+            { name: "Geographers", score: 0.35, coverage: 0.77, completion: 0.83, scope: 0.48, employment: 1460, category: "high", industry: "Life, Physical, and Social Science" },
+            { name: "Models", score: 0.35, coverage: 0.64, completion: 0.89, scope: 0.53, employment: 3090, category: "high", industry: "Arts, Design, Entertainment, Sports, Media" },
+            { name: "Market Research Analysts", score: 0.35, coverage: 0.71, completion: 0.90, scope: 0.52, employment: 846370, category: "high", industry: "Business and Financial Operations" },
+            { name: "Public Safety Telecommunicators", score: 0.35, coverage: 0.66, completion: 0.88, scope: 0.53, employment: 97820, category: "high", industry: "Protective Service" },
+            { name: "Switchboard Operators", score: 0.35, coverage: 0.68, completion: 0.86, scope: 0.52, employment: 43830, category: "high", industry: "Office and Administrative Support" },
+            { name: "Library Science Teachers, Postsecondary", score: 0.34, coverage: 0.65, completion: 0.90, scope: 0.51, employment: 4220, category: "high", industry: "Educational Instruction and Library" },
+
+            // Bottom 40 (Low AI Impact)
+            { name: "Phlebotomists", score: 0.03, coverage: 0.06, completion: 0.95, scope: 0.29, employment: 137080, category: "low", industry: "Healthcare Practitioners and Technical" },
+            { name: "Nursing Assistants", score: 0.03, coverage: 0.07, completion: 0.85, scope: 0.34, employment: 1351760, category: "low", industry: "Healthcare Support" },
+            { name: "Hazardous Materials Removal Workers", score: 0.03, coverage: 0.04, completion: 0.95, scope: 0.35, employment: 49960, category: "low", industry: "Construction and Extraction" },
+            { name: "Helpers–Painters, Plasterers", score: 0.03, coverage: 0.04, completion: 0.96, scope: 0.38, employment: 7700, category: "low", industry: "Construction and Extraction" },
+            { name: "Embalmers", score: 0.03, coverage: 0.07, completion: 0.55, scope: 0.22, employment: 3380, category: "low", industry: "Personal Care and Service" },
+            { name: "Plant and System Operators, All Other", score: 0.03, coverage: 0.05, completion: 0.93, scope: 0.38, employment: 15370, category: "low", industry: "Production" },
+            { name: "Oral and Maxillofacial Surgeons", score: 0.03, coverage: 0.05, completion: 0.89, scope: 0.34, employment: 4160, category: "low", industry: "Healthcare Practitioners and Technical" },
+            { name: "Automotive Glass Installers and Repairers", score: 0.03, coverage: 0.04, completion: 0.93, scope: 0.34, employment: 16890, category: "low", industry: "Installation, Maintenance, and Repair" },
+            { name: "Ship Engineers", score: 0.03, coverage: 0.05, completion: 0.92, scope: 0.39, employment: 8860, category: "low", industry: "Transportation and Material Moving" },
+            { name: "Tire Repairers and Changers", score: 0.02, coverage: 0.04, completion: 0.95, scope: 0.35, employment: 101520, category: "low", industry: "Installation, Maintenance, and Repair" },
+            { name: "Prosthodontists", score: 0.02, coverage: 0.10, completion: 0.90, scope: 0.29, employment: 570, category: "low", industry: "Healthcare Practitioners and Technical" },
+            { name: "Helpers–Production Workers", score: 0.02, coverage: 0.04, completion: 0.93, scope: 0.36, employment: 181810, category: "low", industry: "Production" },
+            { name: "Highway Maintenance Workers", score: 0.02, coverage: 0.03, completion: 0.96, scope: 0.32, employment: 150860, category: "low", industry: "Construction and Extraction" },
+            { name: "Medical Equipment Preparers", score: 0.02, coverage: 0.04, completion: 0.96, scope: 0.31, employment: 66790, category: "low", industry: "Healthcare Support" },
+            { name: "Packaging and Filling Machine Operators", score: 0.02, coverage: 0.04, completion: 0.91, scope: 0.39, employment: 371600, category: "low", industry: "Production" },
+            { name: "Machine Feeders and Offbearers", score: 0.02, coverage: 0.05, completion: 0.89, scope: 0.36, employment: 44500, category: "low", industry: "Production" },
+            { name: "Dishwashers", score: 0.02, coverage: 0.03, completion: 0.95, scope: 0.30, employment: 463940, category: "low", industry: "Food Preparation and Serving Related" },
+            { name: "Cement Masons and Concrete Finishers", score: 0.01, coverage: 0.03, completion: 0.92, scope: 0.39, employment: 203560, category: "low", industry: "Construction and Extraction" },
+            { name: "Supervisors of Firefighters", score: 0.01, coverage: 0.04, completion: 0.88, scope: 0.39, employment: 84120, category: "low", industry: "Protective Service" },
+            { name: "Industrial Truck and Tractor Operators", score: 0.01, coverage: 0.03, completion: 0.94, scope: 0.28, employment: 778920, category: "low", industry: "Transportation and Material Moving" },
+            { name: "Ophthalmic Medical Technicians", score: 0.01, coverage: 0.04, completion: 0.89, scope: 0.33, employment: 73390, category: "low", industry: "Healthcare Practitioners and Technical" },
+            { name: "Massage Therapists", score: 0.01, coverage: 0.10, completion: 0.91, scope: 0.32, employment: 92650, category: "low", industry: "Personal Care and Service" },
+            { name: "Surgical Assistants", score: 0.01, coverage: 0.03, completion: 0.78, scope: 0.29, employment: 18780, category: "low", industry: "Healthcare Practitioners and Technical" },
+            { name: "Tire Builders", score: 0.01, coverage: 0.03, completion: 0.93, scope: 0.40, employment: 20660, category: "low", industry: "Production" },
+            { name: "Helpers–Roofers", score: 0.01, coverage: 0.02, completion: 0.94, scope: 0.37, employment: 4540, category: "low", industry: "Construction and Extraction" },
+            { name: "Gas Compressor and Gas Pumping Station Operators", score: 0.01, coverage: 0.01, completion: 0.96, scope: 0.47, employment: 4400, category: "low", industry: "Production" },
+            { name: "Roofers", score: 0.01, coverage: 0.02, completion: 0.94, scope: 0.38, employment: 135140, category: "low", industry: "Construction and Extraction" },
+            { name: "Roustabouts, Oil and Gas", score: 0.01, coverage: 0.01, completion: 0.95, scope: 0.39, employment: 43830, category: "low", industry: "Construction and Extraction" },
+            { name: "Maids and Housekeeping Cleaners", score: 0.01, coverage: 0.02, completion: 0.94, scope: 0.34, employment: 836230, category: "low", industry: "Building, Grounds Cleaning, Maintenance" },
+            { name: "Paving, Surfacing, and Tamping Equipment Operators", score: 0.01, coverage: 0.01, completion: 0.96, scope: 0.29, employment: 43080, category: "low", industry: "Construction and Extraction" },
+            { name: "Logging Equipment Operators", score: 0.01, coverage: 0.01, completion: 0.95, scope: 0.36, employment: 23720, category: "low", industry: "Farming, Fishing, and Forestry" },
+            { name: "Motorboat Operators", score: 0.00, coverage: 0.01, completion: 0.93, scope: 0.39, employment: 2710, category: "low", industry: "Transportation and Material Moving" },
+            { name: "Orderlies", score: 0.00, coverage: 0.00, completion: 0.76, scope: 0.18, employment: 48710, category: "low", industry: "Healthcare Support" },
+            { name: "Floor Sanders and Finishers", score: 0.00, coverage: 0.00, completion: 0.94, scope: 0.34, employment: 5070, category: "low", industry: "Construction and Extraction" },
+            { name: "Pile Driver Operators", score: 0.00, coverage: 0.00, completion: 0.98, scope: 0.24, employment: 3010, category: "low", industry: "Construction and Extraction" },
+            { name: "Rail-Track Laying and Maintenance Equipment Operators", score: 0.00, coverage: 0.00, completion: 0.96, scope: 0.27, employment: 18770, category: "low", industry: "Transportation and Material Moving" },
+            { name: "Foundry Mold and Coremakers", score: 0.00, coverage: 0.00, completion: 0.95, scope: 0.36, employment: 11780, category: "low", industry: "Production" },
+            { name: "Water Treatment Plant and System Operators", score: 0.00, coverage: 0.00, completion: 0.92, scope: 0.44, employment: 120710, category: "low", industry: "Production" },
+            { name: "Bridge and Lock Tenders", score: 0.00, coverage: 0.00, completion: 0.93, scope: 0.39, employment: 3460, category: "low", industry: "Transportation and Material Moving" },
+            { name: "Dredge Operators", score: 0.00, coverage: 0.00, completion: 0.99, scope: 0.22, employment: 940, category: "low", industry: "Construction and Extraction" }
+        ];
+
+        // Industry group data (from Table 5 in the paper)
+        const industryData = [
+            { name: "Sales and Related", score: 0.32, employment: 13266370 },
+            { name: "Computer and Mathematical", score: 0.30, employment: 5177390 },
+            { name: "Office and Administrative Support", score: 0.29, employment: 18163760 },
+            { name: "Community and Social Service", score: 0.25, employment: 2216930 },
+            { name: "Arts, Design, Entertainment, Sports, Media", score: 0.25, employment: 2039830 },
+            { name: "Business and Financial Operations", score: 0.24, employment: 10087850 },
+            { name: "Educational Instruction and Library", score: 0.23, employment: 8328920 },
+            { name: "Architecture and Engineering", score: 0.22, employment: 2523090 },
+            { name: "Personal Care and Service", score: 0.20, employment: 2959620 },
+            { name: "Life, Physical, and Social Science", score: 0.20, employment: 1381930 },
+            { name: "Food Preparation and Serving Related", score: 0.18, employment: 13142870 },
+            { name: "Management", score: 0.14, employment: 10445050 },
+            { name: "Protective Service", score: 0.14, employment: 3484710 },
+            { name: "Legal", score: 0.13, employment: 1196870 },
+            { name: "Healthcare Practitioners and Technical", score: 0.12, employment: 9251930 },
+            { name: "Installation, Maintenance, and Repair", score: 0.11, employment: 5979150 },
+            { name: "Production", score: 0.11, employment: 8419460 },
+            { name: "Transportation and Material Moving", score: 0.11, employment: 13664940 },
+            { name: "Building, Grounds Cleaning, Maintenance", score: 0.08, employment: 4403350 },
+            { name: "Construction and Extraction", score: 0.08, employment: 6188720 },
+            { name: "Farming, Fishing, and Forestry", score: 0.06, employment: 422740 },
+            { name: "Healthcare Support", score: 0.05, employment: 7063540 }
+        ];
+
+        let currentView = 'cards';
+        let filteredData = occupationData;
+        let comparisonList = [];
+        let charts = {};
+
+        function getOccupationIcon(occupation) {
+            const name = occupation.name.toLowerCase();
+            const industry = occupation.industry.toLowerCase();
+            
+            // Specific occupation mappings first (most specific)
+            if (name.includes('interpreter') || name.includes('translator')) return '🌐';
+            if (name.includes('historian')) return '📜';
+            if (name.includes('writer') || name.includes('author') || name.includes('editor')) return '✍️';
+            if (name.includes('mathematician')) return '🔢';
+            if (name.includes('data scientist') || name.includes('statistical')) return '📊';
+            if (name.includes('web developer')) return '🌐';
+            if (name.includes('programmer') || name.includes('cnc tool')) return '💻';
+            if (name.includes('phlebotomist')) return '🩸';
+            if (name.includes('nursing assistant') || name.includes('nurse')) return '👩‍⚕️';
+            if (name.includes('surgeon') || name.includes('medical') && name.includes('technician')) return '🏥';
+            if (name.includes('massage therapist')) return '💆';
+            if (name.includes('dishwasher')) return '🧽';
+            if (name.includes('roofer') || name.includes('helper')) return '🏗️';
+            if (name.includes('driver') || name.includes('operator') && name.includes('truck')) return '🚛';
+            if (name.includes('pilot') || name.includes('attendant') && name.includes('passenger')) return '✈️';
+            if (name.includes('announcer') || name.includes('radio')) return '📻';
+            if (name.includes('telephone operator')) return '☎️';
+            if (name.includes('dredge') || name.includes('bridge') || name.includes('lock tender')) return '🚢';
+            if (name.includes('logging') || name.includes('forestry')) return '🌲';
+            if (name.includes('oil and gas') || name.includes('gas compressor')) return '⛽';
+            if (name.includes('foundry') || name.includes('mold')) return '🔥';
+            if (name.includes('water treatment')) return '💧';
+            
+            // Broader industry categories (less specific)
+            if (industry.includes('computer') || industry.includes('mathematical')) return '💻';
+            if (industry.includes('healthcare practitioners') || industry.includes('healthcare support')) return '🏥';
+            if (industry.includes('education')) return '📚';
+            if (industry.includes('sales')) return '💼';
+            if (industry.includes('arts') || industry.includes('media')) return '🎨';
+            if (industry.includes('transportation')) return '🚗';
+            if (industry.includes('construction')) return '🔨';
+            if (industry.includes('food')) return '🍽️';
+            if (industry.includes('management')) return '👔';
+            if (industry.includes('science')) return '🔬';
+            if (industry.includes('legal')) return '⚖️';
+            if (industry.includes('financial')) return '💰';
+            if (industry.includes('personal care')) return '💆';
+            if (industry.includes('production')) return '⚙️';
+            if (industry.includes('protective')) return '🛡️';
+            if (industry.includes('cleaning') || industry.includes('maintenance')) return '🧹';
+            
+            // No icon for unclear cases
+            return '';
+        }
+
+        function getScoreClass(score) {
+            if (score >= 0.4) return 'score-excellent';
+            if (score >= 0.3) return 'score-high';
+            if (score >= 0.15) return 'score-medium';
+            if (score >= 0.05) return 'score-low';
+            return 'score-minimal';
+        }
+
+        function createSparkline(coverage, completion, scope) {
+            const values = [coverage, completion, scope];
+            const max = Math.max(...values);
+            const normalizedValues = values.map(v => (v / max) * 100);
+            
+            let sparklineHTML = '<div class="sparkline">';
+            
+            normalizedValues.forEach((value, index) => {
+                const colors = ['#3498db', '#2ecc71', '#f39c12'];
+                const left = (index / (values.length - 1)) * 80 + 10;
+                
+                sparklineHTML += `
+                    <div style="
+                        position: absolute;
+                        left: ${left}%;
+                        bottom: 0;
+                        width: 8px;
+                        height: ${value}%;
+                        background: ${colors[index]};
+                        border-radius: 4px 4px 0 0;
+                        transition: all 0.3s ease;
+                    "></div>
+                `;
+            });
+            
+            sparklineHTML += '</div>';
+            return sparklineHTML;
+        }
+
+        function getIndustryColor(industry) {
+            const colors = {
+                'Sales and Related': '#e74c3c',
+                'Computer and Mathematical': '#3498db',
+                'Office and Administrative Support': '#2ecc71',
+                'Arts, Design, Entertainment, Sports, Media': '#9b59b6',
+                'Business and Financial Operations': '#f39c12',
+                'Educational Instruction and Library': '#1abc9c',
+                'Management': '#34495e',
+                'Healthcare Practitioners and Technical': '#e67e22',
+                'Legal': '#95a5a6',
+                'Life, Physical, and Social Science': '#27ae60',
+                'Community and Social Service': '#8e44ad',
+                'Architecture and Engineering': '#d35400',
+                'Personal Care and Service': '#16a085',
+                'Food Preparation and Serving Related': '#c0392b',
+                'Protective Service': '#7f8c8d',
+                'Transportation and Material Moving': '#2980b9',
+                'Production': '#8e44ad',
+                'Installation, Maintenance, and Repair': '#d68910',
+                'Construction and Extraction': '#a93226',
+                'Healthcare Support': '#48c9b0',
+                'Building, Grounds Cleaning, Maintenance': '#85929e',
+                'Farming, Fishing, and Forestry': '#58d68d'
+            };
+            return colors[industry] || '#95a5a6';
+        }
+
+        function toggleCollapsible(section) {
+            const content = document.getElementById(section + '-content');
+            const icon = content.previousElementSibling.querySelector('.expand-icon');
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                icon.textContent = '▶';
+                icon.classList.remove('rotated');
+            } else {
+                content.classList.add('expanded');
+                icon.textContent = '▼';
+                icon.classList.add('rotated');
+            }
+        }
+
+        function createCharts() {
+            // Scatter Chart: AI Score vs Employment
+            const scatterCtx = document.getElementById('scatterChart').getContext('2d');
+            charts.scatter = new Chart(scatterCtx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'High Impact',
+                        data: occupationData.filter(d => d.category === 'high').map(d => ({
+                            x: Math.log10(d.employment),
+                            y: d.score,
+                            occupation: d.name,
+                            employment: d.employment
+                        })),
+                        backgroundColor: 'rgba(231, 76, 60, 0.6)',
+                        borderColor: 'rgba(231, 76, 60, 1)',
+                        pointRadius: 6
+                    }, {
+                        label: 'Low Impact',
+                        data: occupationData.filter(d => d.category === 'low').map(d => ({
+                            x: Math.log10(d.employment),
+                            y: d.score,
+                            occupation: d.name,
+                            employment: d.employment
+                        })),
+                        backgroundColor: 'rgba(39, 174, 96, 0.6)',
+                        borderColor: 'rgba(39, 174, 96, 1)',
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Employment (Log Scale)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return formatNumber(Math.pow(10, value));
+                                }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'AI Applicability Score'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return context[0].raw.occupation;
+                                },
+                                label: function(context) {
+                                    return [
+                                        `AI Score: ${context.parsed.y.toFixed(3)}`,
+                                        `Employment: ${formatNumber(context.raw.employment)}`
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Industry Bar Chart
+            const industryCtx = document.getElementById('industryChart').getContext('2d');
+            const topIndustries = industryData.slice(0, 10);
+            charts.industry = new Chart(industryCtx, {
+                type: 'bar',
+                data: {
+                    labels: topIndustries.map(d => d.name.length > 20 ? d.name.substring(0, 20) + '...' : d.name),
+                    datasets: [{
+                        label: 'AI Applicability Score',
+                        data: topIndustries.map(d => d.score),
+                        backgroundColor: topIndustries.map(d => getIndustryColor(d.name)),
+                        borderColor: topIndustries.map(d => getIndustryColor(d.name)),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'AI Applicability Score'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return topIndustries[context[0].dataIndex].name;
+                                },
+                                label: function(context) {
+                                    const industry = topIndustries[context.dataIndex];
+                                    return [
+                                        `AI Score: ${industry.score.toFixed(2)}`,
+                                        `Employment: ${formatNumber(industry.employment)}`
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Distribution Chart
+            const distributionCtx = document.getElementById('distributionChart').getContext('2d');
+            const bins = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
+            const binCounts = new Array(bins.length - 1).fill(0);
+            
+            occupationData.forEach(d => {
+                for (let i = 0; i < bins.length - 1; i++) {
+                    if (d.score >= bins[i] && d.score < bins[i + 1]) {
+                        binCounts[i]++;
+                        break;
+                    }
+                }
+            });
+
+            charts.distribution = new Chart(distributionCtx, {
+                type: 'bar',
+                data: {
+                    labels: bins.slice(0, -1).map((bin, i) => `${bin.toFixed(2)}-${bins[i + 1].toFixed(2)}`),
+                    datasets: [{
+                        label: 'Number of Occupations',
+                        data: binCounts,
+                        backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Occupations'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'AI Applicability Score Range'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Components Correlation Chart
+            const componentsCtx = document.getElementById('componentsChart').getContext('2d');
+            charts.components = new Chart(componentsCtx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Coverage vs Completion',
+                        data: occupationData.map(d => ({
+                            x: d.coverage,
+                            y: d.completion,
+                            occupation: d.name,
+                            score: d.score
+                        })),
+                        backgroundColor: occupationData.map(d => 
+                            d.category === 'high' ? 'rgba(231, 76, 60, 0.6)' : 'rgba(39, 174, 96, 0.6)'
+                        ),
+                        borderColor: occupationData.map(d => 
+                            d.category === 'high' ? 'rgba(231, 76, 60, 1)' : 'rgba(39, 174, 96, 1)'
+                        ),
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Coverage'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Completion Rate'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return context[0].raw.occupation;
+                                },
+                                label: function(context) {
+                                    return [
+                                        `Coverage: ${context.parsed.x.toFixed(2)}`,
+                                        `Completion: ${context.parsed.y.toFixed(2)}`,
+                                        `AI Score: ${context.raw.score.toFixed(3)}`
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(0) + 'K';
+            }
+            return num.toLocaleString();
+        }
+
+        function renderCards() {
+            const container = document.getElementById('cardsView');
+            container.innerHTML = '';
+
+            filteredData.forEach(occupation => {
+                const card = document.createElement('div');
+                const scoreClass = getScoreClass(occupation.score);
+                card.className = `occupation-card ${scoreClass}`;
+                
+                const icon = getOccupationIcon(occupation);
+                const sparkline = createSparkline(occupation.coverage, occupation.completion, occupation.scope);
+                
+                const iconHTML = icon ? `<div class="occupation-icon">${icon}</div>` : '';
+                
+                card.innerHTML = `
+                    <button class="add-to-compare ${comparisonList.some(c => c.name === occupation.name) ? 'added' : ''}" 
+                            onclick="toggleComparison('${occupation.name}')" 
+                            ${comparisonList.some(c => c.name === occupation.name) ? 'disabled' : ''}>
+                        ${comparisonList.some(c => c.name === occupation.name) ? 'Added' : 'Compare'}
+                    </button>
+                    <div class="occupation-group">${occupation.industry}</div>
+                    <div class="occupation-title">
+                        ${iconHTML}
+                        <div>${occupation.name}</div>
+                    </div>
+                    <div class="occupation-stats">
+                        <div class="stat">
+                            <span class="stat-name tooltip" data-tooltip="Combined AI applicability metric">AI Score</span>
+                            <span class="stat-value">${occupation.score.toFixed(3)}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-name tooltip" data-tooltip="Total US employment in this occupation">Employment</span>
+                            <span class="stat-value">${formatNumber(occupation.employment)}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-name tooltip" data-tooltip="Fraction of work activities that appear in AI conversations">Coverage</span>
+                            <span class="stat-value">${occupation.coverage.toFixed(2)}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-name tooltip" data-tooltip="How successfully AI completes related tasks">Completion</span>
+                            <span class="stat-value">${occupation.completion.toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div class="sparkline-container">
+                        <div class="sparkline-label">Coverage • Completion • Scope</div>
+                        ${sparkline}
+                    </div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: ${Math.min((occupation.score / 0.5) * 100, 100)}%"></div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            filteredData.forEach(occupation => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${occupation.name}</td>
+                    <td>${occupation.industry}</td>
+                    <td>${occupation.score.toFixed(3)}</td>
+                    <td>${occupation.coverage.toFixed(2)}</td>
+                    <td>${occupation.completion.toFixed(2)}</td>
+                    <td>${occupation.scope.toFixed(2)}</td>
+                    <td>${formatNumber(occupation.employment)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function toggleView(view) {
+            currentView = view;
+            
+            // Update button states
+            document.querySelectorAll('.view-toggle button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Show/hide views
+            if (view === 'cards') {
+                document.getElementById('cardsView').classList.remove('hidden');
+                document.getElementById('tableView').classList.add('hidden');
+                renderCards();
+            } else {
+                document.getElementById('cardsView').classList.add('hidden');
+                document.getElementById('tableView').classList.remove('hidden');
+                renderTable();
+            }
+        }
+
+        function filterData() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const industryFilter = document.getElementById('industryFilter').value;
+
+            filteredData = occupationData.filter(occupation => {
+                const matchesSearch = occupation.name.toLowerCase().includes(searchTerm);
+                let matchesCategory = true;
+                let matchesIndustry = true;
+
+                switch (categoryFilter) {
+                    case 'high':
+                        matchesCategory = occupation.category === 'high';
+                        break;
+                    case 'low':
+                        matchesCategory = occupation.category === 'low';
+                        break;
+                    case 'score-high':
+                        matchesCategory = occupation.score > 0.3;
+                        break;
+                    case 'score-low':
+                        matchesCategory = occupation.score < 0.1;
+                        break;
+                }
+
+                if (industryFilter !== 'all') {
+                    matchesIndustry = occupation.industry === industryFilter;
+                }
+
+                return matchesSearch && matchesCategory && matchesIndustry;
+            });
+
+            if (currentView === 'cards') {
+                renderCards();
+            } else {
+                renderTable();
+            }
+        }
+
+        function populateComparisonSelect() {
+            const select = document.getElementById('comparisonSelect');
+            select.innerHTML = '<option value="">Select an occupation to compare...</option>';
+            
+            occupationData.forEach(occupation => {
+                const option = document.createElement('option');
+                option.value = occupation.name;
+                option.textContent = occupation.name;
+                select.appendChild(option);
+            });
+        }
+
+        function addToComparison() {
+            const select = document.getElementById('comparisonSelect');
+            const selectedName = select.value;
+            
+            if (!selectedName) return;
+            
+            const occupation = occupationData.find(o => o.name === selectedName);
+            if (occupation && !comparisonList.some(c => c.name === selectedName)) {
+                comparisonList.push(occupation);
+                updateComparisonDisplay();
+                select.value = '';
+            }
+        }
+
+        function toggleComparison(occupationName) {
+            const occupation = occupationData.find(o => o.name === occupationName);
+            if (occupation && !comparisonList.some(c => c.name === occupationName)) {
+                comparisonList.push(occupation);
+                updateComparisonDisplay();
+                if (currentView === 'cards') {
+                    renderCards();
+                }
+            }
+        }
+
+        function removeFromComparison(occupationName) {
+            comparisonList = comparisonList.filter(o => o.name !== occupationName);
+            updateComparisonDisplay();
+            if (currentView === 'cards') {
+                renderCards();
+            }
+        }
+
+        function clearComparison() {
+            comparisonList = [];
+            updateComparisonDisplay();
+            if (currentView === 'cards') {
+                renderCards();
+            }
+        }
+
+        function updateComparisonDisplay() {
+            const container = document.getElementById('comparisonResults');
+            
+            if (comparisonList.length === 0) {
+                container.innerHTML = '<p style="color: #7f8c8d; text-align: center; grid-column: 1 / -1;">Select occupations above to compare their AI impact metrics</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            
+            comparisonList.forEach(occupation => {
+                const card = document.createElement('div');
+                const scoreClass = getScoreClass(occupation.score);
+                card.className = `comparison-card ${scoreClass}`;
+                
+                const icon = getOccupationIcon(occupation);
+                const sparkline = createSparkline(occupation.coverage, occupation.completion, occupation.scope);
+                
+                const iconHTML = icon ? `<div class="occupation-icon">${icon}</div>` : '';
+                
+                card.innerHTML = `
+                    <button class="comparison-remove" onclick="removeFromComparison('${occupation.name}')">×</button>
+                    <div class="occupation-group">${occupation.industry}</div>
+                    <div class="occupation-title">
+                        ${iconHTML}
+                        <div>${occupation.name}</div>
+                    </div>
+                    <div class="occupation-stats">
+                        <div class="stat">
+                            <span class="stat-name tooltip" data-tooltip="Combined AI applicability metric">AI Score</span>
+                            <span class="stat-value">${occupation.score.toFixed(3)}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-name tooltip" data-tooltip="Total US employment in this occupation">Employment</span>
+                            <span class="stat-value">${formatNumber(occupation.employment)}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-name tooltip" data-tooltip="Fraction of work activities that appear in AI conversations">Coverage</span>
+                            <span class="stat-value">${occupation.coverage.toFixed(2)}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-name tooltip" data-tooltip="How successfully AI completes related tasks">Completion</span>
+                            <span class="stat-value">${occupation.completion.toFixed(2)}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-name tooltip" data-tooltip="How much of each work activity AI can handle">Scope</span>
+                            <span class="stat-value">${occupation.scope.toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div class="sparkline-container">
+                        <div class="sparkline-label">Coverage • Completion • Scope</div>
+                        ${sparkline}
+                    </div>
+                    <div class="score-bar">
+                        <div class="score-fill" style="width: ${Math.min((occupation.score / 0.5) * 100, 100)}%"></div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        function sortTable(columnIndex) {
+            const table = document.querySelector('.data-table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            rows.sort((a, b) => {
+                const aValue = a.cells[columnIndex].textContent;
+                const bValue = b.cells[columnIndex].textContent;
+
+                if (columnIndex === 0 || columnIndex === 1) { // Name or Industry columns
+                    return aValue.localeCompare(bValue);
+                } else { // Numeric columns
+                    const aNum = parseFloat(aValue.replace(/[^\d.-]/g, ''));
+                    const bNum = parseFloat(bValue.replace(/[^\d.-]/g, ''));
+                    return bNum - aNum; // Descending order
+                }
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', filterData);
+        document.getElementById('categoryFilter').addEventListener('change', filterData);
+        document.getElementById('industryFilter').addEventListener('change', filterData);
+
+        // Modal control functions
+        function openHelpModal() {
+            document.getElementById('helpModal').style.display = 'block';
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        function closeHelpModal() {
+            document.getElementById('helpModal').style.display = 'none';
+            document.body.style.overflow = 'auto'; // Restore background scrolling
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('helpModal');
+            if (event.target === modal) {
+                closeHelpModal();
+            }
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeHelpModal();
+            }
+        });
+
+        // Initialize on page load
+        window.addEventListener('load', function() {
+            populateComparisonSelect();
+            renderCards();
+            createCharts();
+            
+            // Auto-collapse sections on mobile
+            if (window.innerWidth <= 768) {
+                ['insights', 'charts', 'comparison', 'methodology'].forEach(section => {
+                    const content = document.getElementById(section + '-content');
+                    const icon = content.previousElementSibling.querySelector('.expand-icon');
+                    if (section !== 'comparison') { // Keep comparison expanded
+                        content.classList.remove('expanded');
+                        icon.textContent = '▶';
+                    }
+                });
+            }
+        });
+
+        // Handle window resize for chart responsiveness
+        window.addEventListener('resize', function() {
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.resize();
+            });
+        });
+    </script>
+</body>
+</html>
