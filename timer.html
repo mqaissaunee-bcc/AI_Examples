@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Classroom Timer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --container-bg: rgba(255, 255, 255, 0.1);
+            --text-color: white;
+            --accent-color: #4ecdc4;
+            --warning-color: #f093fb;
+            --danger-color: #ff6b6b;
+            --button-bg: rgba(255, 255, 255, 0.2);
+            --button-border: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Theme Variations */
+        body.theme-light {
+            --primary-bg: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            --container-bg: rgba(255, 255, 255, 0.9);
+            --text-color: #333;
+            --button-bg: rgba(0, 0, 0, 0.1);
+            --button-border: rgba(0, 0, 0, 0.2);
+            --accent-color: #007bff;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+        }
+
+        body.theme-math {
+            --primary-bg: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            --accent-color: #74b9ff;
+        }
+
+        body.theme-science {
+            --primary-bg: linear-gradient(135deg, #134e5e 0%, #71b280 100%);
+            --accent-color: #00b894;
+        }
+
+        body.theme-networking {
+            --primary-bg: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            --accent-color: #3498db;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+
+        body.theme-security {
+            --primary-bg: #000000;
+            --container-bg: rgba(0, 20, 0, 0.9);
+            --text-color: #00ff41;
+            --accent-color: #00ff41;
+            --warning-color: #ffff00;
+            --danger-color: #ff0040;
+            --button-bg: rgba(0, 255, 65, 0.1);
+            --button-border: rgba(0, 255, 65, 0.3);
+        }
+
+        body.theme-high-contrast {
+            --primary-bg: #000000;
+            --container-bg: #ffffff;
+            --text-color: #000000;
+            --accent-color: #0066cc;
+            --warning-color: #ff9900;
+            --danger-color: #cc0000;
+            --button-bg: #f0f0f0;
+            --button-border: #333333;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: var(--primary-bg);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-color);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .timer-container {
+            text-align: center;
+            background: var(--container-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--button-border);
+            max-width: 700px;
+            width: 90%;
+            position: relative;
+        }
+
+        .top-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            background: var(--button-bg);
+            border: 2px solid var(--button-border);
+            border-radius: 10px;
+            padding: 8px;
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover {
+            background: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .timer-title {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            font-weight: 300;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .timer-display {
+            font-size: 8rem;
+            font-weight: bold;
+            margin: 30px 0;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.4);
+            letter-spacing: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .timer-display.warning {
+            color: var(--warning-color);
+            animation: pulse 1s infinite;
+        }
+
+        .timer-display.danger {
+            color: var(--danger-color);
+            animation: fastPulse 0.5s infinite;
+        }
+
+        .timer-display.flash {
+            animation: flash 0.3s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes fastPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: var(--button-bg);
+            border-radius: 6px;
+            margin: 20px 0;
+            overflow: hidden;
+            border: 1px solid var(--button-border);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-color), var(--accent-color));
+            transition: width 1s linear;
+            border-radius: 4px;
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, var(--warning-color), var(--warning-color));
+        }
+
+        .progress-fill.danger {
+            background: linear-gradient(90deg, var(--danger-color), var(--danger-color));
+        }
+
+        .quick-controls {
+            display: none;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .quick-controls.active {
+            display: flex;
+        }
+
+        .quick-btn {
+            background: var(--button-bg);
+            border: 2px solid var(--button-border);
+            border-radius: 20px;
+            padding: 8px 16px;
+            color: var(--text-color);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .quick-btn:hover {
+            background: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .status-indicator {
+            font-size: 1.3rem;
+            margin: 20px 0;
+            font-weight: 500;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .input-section {
+            margin: 30px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .time-input {
+            background: var(--button-bg);
+            border: 2px solid var(--button-border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 1.2rem;
+            color: var(--text-color);
+            text-align: center;
+            width: 80px;
+            transition: all 0.3s ease;
+        }
+
+        .time-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            background: var(--button-bg);
+        }
+
+        .preset-section {
+            margin: 20px 0;
+        }
+
+        .preset-label {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            background: var(--button-bg);
+            border: 2px solid var(--button-border);
+            border-radius: 25px;
+            padding: 8px 16px;
+            color: var(--text-color);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .preset-btn:hover {
+            background: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .preset-btn.custom {
+            background: linear-gradient(135deg, var(--accent-color), var(--warning-color));
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: linear-gradient(135deg, var(--accent-color), var(--accent-color));
+            border: none;
+            border-radius: 50px;
+            padding: 15px 30px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .control-btn.pause {
+            background: linear-gradient(135deg, var(--warning-color), var(--warning-color));
+        }
+
+        .control-btn.reset {
+            background: linear-gradient(135deg, #ffecd2, #fcb69f);
+            color: #333;
+        }
+
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .settings-content {
+            background: var(--container-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid var(--button-border);
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .settings-section {
+            margin-bottom: 25px;
+        }
+
+        .settings-section h3 {
+            margin-bottom: 15px;
+            color: var(--accent-color);
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 15px;
+        }
+
+        .setting-item label {
+            flex: 1;
+        }
+
+        .setting-input {
+            background: var(--button-bg);
+            border: 2px solid var(--button-border);
+            border-radius: 5px;
+            padding: 8px 12px;
+            color: var(--text-color);
+            width: 120px;
+        }
+
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .theme-btn {
+            background: var(--button-bg);
+            border: 2px solid var(--button-border);
+            border-radius: 10px;
+            padding: 10px;
+            color: var(--text-color);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .theme-btn.active {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .theme-btn:hover {
+            background: var(--accent-color);
+        }
+
+        .volume-slider {
+            width: 120px;
+        }
+
+        .finished-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 59, 56, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: flashOverlay 0.5s infinite;
+        }
+
+        .finished-message {
+            font-size: 4rem;
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        @keyframes flashOverlay {
+            0%, 100% { opacity: 0.95; }
+            50% { opacity: 0.7; }
+        }
+
+        .notification-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--warning-color);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            z-index: 999;
+            transform: translateX(300px);
+            transition: transform 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .notification-popup.show {
+            transform: translateX(0);
+        }
+
+        @media (max-width: 768px) {
+            .timer-display {
+                font-size: 5rem;
+            }
+            
+            .timer-title {
+                font-size: 2rem;
+            }
+            
+            .finished-message {
+                font-size: 2.5rem;
+            }
+            
+            .timer-container {
+                padding: 20px;
+            }
+            
+            .top-controls {
+                position: relative;
+                top: auto;
+                right: auto;
+                justify-content: center;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body class="theme-default">
+    <div class="timer-container">
+        <div class="top-controls">
+            <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
+            <button class="icon-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">⛶</button>
+        </div>
+        
+        <h1 class="timer-title">Enhanced Classroom Timer</h1>
+        
+        <div class="timer-display" id="timerDisplay">00:00</div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div class="quick-controls" id="quickControls">
+            <button class="quick-btn" onclick="addTime(60)">+1 min</button>
+            <button class="quick-btn" onclick="addTime(300)">+5 min</button>
+            <button class="quick-btn" onclick="addTime(-60)">-1 min</button>
+        </div>
+        
+        <div class="status-indicator" id="statusIndicator">Ready to start</div>
+        
+        <div class="input-section">
+            <input type="number" class="time-input" id="minutesInput" placeholder="Min" min="0" max="99" value="5">
+            <span style="font-size: 1.5rem;">:</span>
+            <input type="number" class="time-input" id="secondsInput" placeholder="Sec" min="0" max="59" value="0">
+        </div>
+        
+        <div class="preset-section">
+            <div class="preset-label">Quick Presets</div>
+            <div class="preset-buttons" id="defaultPresets">
+                <button class="preset-btn" onclick="setPreset(1, 0)">1 min</button>
+                <button class="preset-btn" onclick="setPreset(5, 0)">5 min</button>
+                <button class="preset-btn" onclick="setPreset(10, 0)">10 min</button>
+                <button class="preset-btn" onclick="setPreset(15, 0)">15 min</button>
+                <button class="preset-btn" onclick="setPreset(20, 0)">20 min</button>
+                <button class="preset-btn" onclick="setPreset(0, 30)">30 sec</button>
+                <button class="preset-btn" onclick="setPreset(2, 0)">2 min</button>
+                <button class="preset-btn" onclick="setPreset(45, 0)">45 min</button>
+            </div>
+            <div class="preset-buttons" id="customPresets">
+                <!-- Custom presets will be loaded here -->
+            </div>
+        </div>
+        
+        <div class="control-buttons">
+            <button class="control-btn start" id="startBtn" onclick="startTimer()">Start</button>
+            <button class="control-btn pause" id="pauseBtn" onclick="pauseTimer()" style="display: none;">Pause</button>
+            <button class="control-btn reset" onclick="resetTimer()">Reset</button>
+        </div>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-content">
+            <div class="settings-header">
+                <h2>Timer Settings</h2>
+                <button class="icon-btn" onclick="closeSettings()">✕</button>
+            </div>
+            
+            <div class="settings-section">
+                <h3>Sound Settings</h3>
+                <div class="setting-item">
+                    <label>Sound Type:</label>
+                    <select class="setting-input" id="soundType">
+                        <option value="beep">Classic Beep</option>
+                        <option value="bell">School Bell</option>
+                        <option value="chime">Gentle Chime</option>
+                        <option value="ding">Digital Ding</option>
+                        <option value="none">No Sound</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>Volume:</label>
+                    <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="70">
+                    <span id="volumeValue">70%</span>
+                </div>
+                <div class="setting-item">
+                    <label>Gradual Volume Increase:</label>
+                    <input type="checkbox" id="gradualVolume">
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>Warning Notifications</h3>
+                <div class="setting-item">
+                    <label>2-minute warning:</label>
+                    <input type="checkbox" id="warning2min" checked>
+                </div>
+                <div class="setting-item">
+                    <label>1-minute warning:</label>
+                    <input type="checkbox" id="warning1min" checked>
+                </div>
+                <div class="setting-item">
+                    <label>30-second warning:</label>
+                    <input type="checkbox" id="warning30sec" checked>
+                </div>
+                <div class="setting-item">
+                    <label>Visual flash alerts:</label>
+                    <input type="checkbox" id="visualFlash" checked>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>Visual Theme</h3>
+                <div class="theme-grid">
+                    <button class="theme-btn active" onclick="setTheme('default')">Default</button>
+                    <button class="theme-btn" onclick="setTheme('light')">Light</button>
+                    <button class="theme-btn" onclick="setTheme('math')">Math</button>
+                    <button class="theme-btn" onclick="setTheme('science')">Science</button>
+                    <button class="theme-btn" onclick="setTheme('networking')">Networking</button>
+                    <button class="theme-btn" onclick="setTheme('security')">Security</button>
+                    <button class="theme-btn" onclick="setTheme('high-contrast')">High Contrast</button>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>Custom Presets</h3>
+                <div class="setting-item">
+                    <label>Add Custom Timer:</label>
+                    <input type="number" class="setting-input" id="customMin" placeholder="Min" style="width: 60px;">
+                    <input type="number" class="setting-input" id="customSec" placeholder="Sec" style="width: 60px;">
+                    <button class="preset-btn" onclick="addCustomPreset()">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="finished-overlay" id="finishedOverlay">
+        <div class="finished-message">TIME'S UP!</div>
+    </div>
+    
+    <div class="notification-popup" id="notificationPopup"></div>
+
+    <script>
+        let timerInterval;
+        let totalSeconds = 0;
+        let remainingSeconds = 0;
+        let isRunning = false;
+        let isPaused = false;
+        let warningsShown = new Set();
+        let currentVolume = 0.7;
+        let gradualVolumeMode = false;
+        
+        // Settings
+        let settings = {
+            soundType: 'beep',
+            volume: 70,
+            gradualVolume: false,
+            warning2min: true,
+            warning1min: true,
+            warning30sec: true,
+            visualFlash: true,
+            theme: 'default',
+            customPresets: []
+        };
+
+        const timerDisplay = document.getElementById('timerDisplay');
+        const progressFill = document.getElementById('progressFill');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const finishedOverlay = document.getElementById('finishedOverlay');
+        const minutesInput = document.getElementById('minutesInput');
+        const secondsInput = document.getElementById('secondsInput');
+        const quickControls = document.getElementById('quickControls');
+        const notificationPopup = document.getElementById('notificationPopup');
+
+        // Sound generation functions
+        function generateBeepSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.value = currentVolume;
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 1);
+        }
+
+        function generateBellSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 523; // C note
+            oscillator.type = 'triangle';
+            
+            gainNode.gain.value = currentVolume;
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 2);
+        }
+
+        function generateChimeSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Create multiple harmonics for a chime effect
+            [523, 659, 784].forEach((freq, index) => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = freq;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.value = currentVolume * (1 - index * 0.2);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1.5);
+                
+                oscillator.start(audioContext.currentTime + index * 0.1);
+                oscillator.stop(audioContext.currentTime + 1.5 + index * 0.1);
+            });
+        }
+
+        function generateDingSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 1000;
+            oscillator.type = 'square';
+            
+            gainNode.gain.value = currentVolume;
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
+        }
+
+        function playSound(type = null) {
+            if (settings.soundType === 'none') return;
+            
+            const soundType = type || settings.soundType;
+            
+            try {
+                switch (soundType) {
+                    case 'bell':
+                        generateBellSound();
+                        break;
+                    case 'chime':
+                        generateChimeSound();
+                        break;
+                    case 'ding':
+                        generateDingSound();
+                        break;
+                    default:
+                        generateBeepSound();
+                }
+            } catch (e) {
+                console.log('Audio not supported');
+            }
+        }
+
+        function showNotification(message, duration = 3000) {
+            notificationPopup.textContent = message;
+            notificationPopup.classList.add('show');
+            
+            setTimeout(() => {
+                notificationPopup.classList.remove('show');
+            }, duration);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateDisplay() {
+            timerDisplay.textContent = formatTime(remainingSeconds);
+            
+            // Update progress bar
+            const progress = ((totalSeconds - remainingSeconds) / totalSeconds) * 100;
+            progressFill.style.width = `${progress}%`;
+            
+            // Update volume for gradual increase
+            if (gradualVolumeMode && isRunning) {
+                const timeLeft = remainingSeconds;
+                if (timeLeft <= 30) {
+                    currentVolume = Math.min(1.0, (settings.volume / 100) * (1 + (30 - timeLeft) / 30));
+                } else {
+                    currentVolume = settings.volume / 100;
+                }
+            } else {
+                currentVolume = settings.volume / 100;
+            }
+            
+            // Color coding and warnings
+            const percentRemaining = (remainingSeconds / totalSeconds) * 100;
+            
+            timerDisplay.className = 'timer-display';
+            progressFill.className = 'progress-fill';
+            
+            // Check for warning notifications
+            checkWarnings();
+            
+            if (percentRemaining <= 10 && percentRemaining > 5) {
+                timerDisplay.classList.add('warning');
+                progressFill.classList.add('warning');
+            } else if (percentRemaining <= 5) {
+                timerDisplay.classList.add('danger');
+                progressFill.classList.add('danger');
+                
+                if (settings.visualFlash) {
+                    timerDisplay.classList.add('flash');
+                }
+            }
+        }
+
+        function checkWarnings() {
+            const timeLeft = remainingSeconds;
+            
+            if (settings.warning2min && timeLeft === 120 && !warningsShown.has('2min')) {
+                showNotification('⚠️ 2 minutes remaining');
+                playSound('chime');
+                warningsShown.add('2min');
+            }
+            
+            if (settings.warning1min && timeLeft === 60 && !warningsShown.has('1min')) {
+                showNotification('⚠️ 1 minute remaining');
+                playSound('ding');
+                warningsShown.add('1min');
+            }
+            
+            if (settings.warning30sec && timeLeft === 30 && !warningsShown.has('30sec')) {
+                showNotification('⚠️ 30 seconds remaining');
+                playSound('beep');
+                warningsShown.add('30sec');
+            }
+        }
+
+        function setPreset(minutes, seconds) {
+            minutesInput.value = minutes;
+            secondsInput.value = seconds;
+            resetTimer();
+        }
+
+        function addTime(seconds) {
+            if (isRunning || isPaused) {
+                remainingSeconds = Math.max(0, remainingSeconds + seconds);
+                totalSeconds = Math.max(totalSeconds, remainingSeconds);
+                updateDisplay();
+                
+                if (seconds > 0) {
+                    showNotification(`Added ${Math.abs(seconds/60)} minute(s)`);
+                } else {
+                    showNotification(`Removed ${Math.abs(seconds/60)} minute(s)`);
+                }
+            }
+        }
+
+        function getInputTime() {
+            const minutes = parseInt(minutesInput.value) || 0;
+            const seconds = parseInt(secondsInput.value) || 0;
+            return (minutes * 60) + seconds;
+        }
+
+        function startTimer() {
+            if (!isRunning) {
+                totalSeconds = getInputTime();
+                remainingSeconds = totalSeconds;
+                
+                if (totalSeconds <= 0) {
+                    showNotification('Please set a valid time!');
+                    return;
+                }
+                
+                warningsShown.clear();
+            }
+            
+            isRunning = true;
+            isPaused = false;
+            startBtn.style.display = 'none';
+            pauseBtn.style.display = 'inline-block';
+            quickControls.classList.add('active');
+            statusIndicator.textContent = 'Timer running...';
+            
+            timerInterval = setInterval(() => {
+                remainingSeconds--;
+                updateDisplay();
+                
+                if (remainingSeconds <= 0) {
+                    finishTimer();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            clearInterval(timerInterval);
+            isPaused = true;
+            isRunning = false;
+            startBtn.style.display = 'inline-block';
+            pauseBtn.style.display = 'none';
+            statusIndicator.textContent = 'Timer paused';
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            isPaused = false;
+            totalSeconds = getInputTime();
+            remainingSeconds = totalSeconds;
+            warningsShown.clear();
+            
+            startBtn.style.display = 'inline-block';
+            pauseBtn.style.display = 'none';
+            quickControls.classList.remove('active');
+            statusIndicator.textContent = 'Ready to start';
+            finishedOverlay.style.display = 'none';
+            
+            updateDisplay();
+        }
+
+        function finishTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            isPaused = false;
+            startBtn.style.display = 'inline-block';
+            pauseBtn.style.display = 'none';
+            quickControls.classList.remove('active');
+            statusIndicator.textContent = "Time's up!";
+            
+            // Show finish overlay
+            finishedOverlay.style.display = 'flex';
+            
+            // Play finish sound
+            playSound();
+            
+            // Auto-hide overlay after 5 seconds
+            setTimeout(() => {
+                finishedOverlay.style.display = 'none';
+            }, 5000);
+        }
+
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'flex';
+            loadSettings();
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').style.display = 'none';
+            saveSettings();
+        }
+
+        function loadSettings() {
+            // Load settings from localStorage
+            const saved = localStorage.getItem('timerSettings');
+            if (saved) {
+                settings = { ...settings, ...JSON.parse(saved) };
+            }
+            
+            // Update UI elements
+            document.getElementById('soundType').value = settings.soundType;
+            document.getElementById('volumeSlider').value = settings.volume;
+            document.getElementById('volumeValue').textContent = settings.volume + '%';
+            document.getElementById('gradualVolume').checked = settings.gradualVolume;
+            document.getElementById('warning2min').checked = settings.warning2min;
+            document.getElementById('warning1min').checked = settings.warning1min;
+            document.getElementById('warning30sec').checked = settings.warning30sec;
+            document.getElementById('visualFlash').checked = settings.visualFlash;
+            
+            setTheme(settings.theme);
+            loadCustomPresets();
+        }
+
+        function saveSettings() {
+            // Collect settings from UI
+            settings.soundType = document.getElementById('soundType').value;
+            settings.volume = parseInt(document.getElementById('volumeSlider').value);
+            settings.gradualVolume = document.getElementById('gradualVolume').checked;
+            settings.warning2min = document.getElementById('warning2min').checked;
+            settings.warning1min = document.getElementById('warning1min').checked;
+            settings.warning30sec = document.getElementById('warning30sec').checked;
+            settings.visualFlash = document.getElementById('visualFlash').checked;
+            
+            gradualVolumeMode = settings.gradualVolume;
+            
+            // Save to localStorage
+            localStorage.setItem('timerSettings', JSON.stringify(settings));
+        }
+
+        function setTheme(themeName) {
+            document.body.className = `theme-${themeName}`;
+            settings.theme = themeName;
+            
+            // Update active theme button
+            document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+            event?.target?.classList.add('active');
+        }
+
+        function addCustomPreset() {
+            const minutes = parseInt(document.getElementById('customMin').value) || 0;
+            const seconds = parseInt(document.getElementById('customSec').value) || 0;
+            
+            if (minutes === 0 && seconds === 0) {
+                showNotification('Please enter a valid time');
+                return;
+            }
+            
+            const preset = { minutes, seconds, label: `${minutes}m ${seconds}s` };
+            settings.customPresets.push(preset);
+            
+            document.getElementById('customMin').value = '';
+            document.getElementById('customSec').value = '';
+            
+            loadCustomPresets();
+            saveSettings();
+        }
+
+        function loadCustomPresets() {
+            const container = document.getElementById('customPresets');
+            container.innerHTML = '';
+            
+            settings.customPresets.forEach((preset, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'preset-btn custom';
+                btn.textContent = preset.label;
+                btn.onclick = () => setPreset(preset.minutes, preset.seconds);
+                
+                // Add delete functionality
+                btn.ondblclick = () => {
+                    if (confirm('Delete this preset?')) {
+                        settings.customPresets.splice(index, 1);
+                        loadCustomPresets();
+                        saveSettings();
+                    }
+                };
+                
+                container.appendChild(btn);
+            });
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        }
+
+        // Volume slider update
+        document.getElementById('volumeSlider').addEventListener('input', (e) => {
+            const volume = e.target.value;
+            document.getElementById('volumeValue').textContent = volume + '%';
+            currentVolume = volume / 100;
+        });
+
+        // Initialize
+        loadSettings();
+        resetTimer();
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (isRunning) {
+                    pauseTimer();
+                } else {
+                    startTimer();
+                }
+            } else if (e.code === 'KeyR') {
+                e.preventDefault();
+                resetTimer();
+            } else if (e.code === 'F11') {
+                e.preventDefault();
+                toggleFullscreen();
+            } else if (e.code === 'KeyS' && e.ctrlKey) {
+                e.preventDefault();
+                openSettings();
+            }
+        });
+
+        // Click overlay to dismiss
+        finishedOverlay.addEventListener('click', () => {
+            finishedOverlay.style.display = 'none';
+        });
+
+        // Settings modal click outside to close
+        document.getElementById('settingsModal').addEventListener('click', (e) => {
+            if (e.target.id === 'settingsModal') {
+                closeSettings();
+            }
+        });
+
+        // Auto-update display when inputs change
+        minutesInput.addEventListener('input', () => {
+            if (!isRunning && !isPaused) {
+                resetTimer();
+            }
+        });
+
+        secondsInput.addEventListener('input', () => {
+            if (!isRunning && !isPaused) {
+                resetTimer();
+            }
+        });
+    </script>
+</body>
+</html>
