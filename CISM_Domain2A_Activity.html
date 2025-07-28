@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CISM Domain 2 Activity (Gamified)</title>
+    <style>
+        :root {
+            --primary-color: #003366;
+            --secondary-color: #f4f4f9;
+            --accent-color: #007bff;
+            --text-color: #333;
+            --border-color: #ddd;
+            --low-risk: #28a745;
+            --medium-risk: #ffc107;
+            --high-risk: #fd7e14;
+            --extreme-risk: #dc3545;
+            --white: #ffffff;
+            --info-color: #17a2b8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: var(--white);
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        h1, h2, h3 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        
+        h1 { text-align: center; font-size: 2.2em; }
+        h2 { font-size: 1.8em; margin-top: 30px; }
+        h3 {
+            font-size: 1.4em;
+            border-bottom: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .card {
+            background: #fdfdfd;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+        }
+
+        select, input[type="text"] {
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .entry-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .entry-row select { flex-grow: 1; }
+        .entry-row input[type="text"] { flex-grow: 2; }
+        .hidden { display: none; }
+
+        button.add-btn {
+            background-color: #6c757d;
+            font-size: 0.9em;
+            padding: 8px 12px;
+            margin-top: 10px;
+            cursor: pointer;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button.add-btn:hover { background-color: #5a6268; }
+
+        .risk-matrix { margin-top: 20px; border-collapse: collapse; width: 100%; text-align: center; }
+        .risk-matrix th, .risk-matrix td { border: 1px solid var(--border-color); padding: 12px; font-size: 0.9em; }
+        .risk-matrix th { background-color: #e9ecef; }
+        .risk-matrix td.header-col { font-weight: bold; background-color: #e9ecef; }
+
+        .risk-display { font-size: 1.5em; font-weight: bold; padding: 15px; border-radius: 5px; text-align: center; margin-top: 15px; color: var(--white); background-color: #6c757d; }
+        .risk-display.low { background-color: var(--low-risk); }
+        .risk-display.medium { background-color: var(--medium-risk); }
+        .risk-display.high { background-color: var(--high-risk); }
+        .risk-display.extreme { background-color: var(--extreme-risk); }
+        
+        .action-buttons { display: flex; justify-content: center; gap: 20px; margin-top: 30px; }
+        .action-buttons button { display: block; width: 220px; padding: 12px 20px; font-size: 1.1em; font-weight: bold; color: var(--white); border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; margin: 0; }
+        button#resetBtn { background-color: #6c757d; }
+        button#resetBtn:hover { background-color: #5a6268; }
+        button#scoreBtn { background-color: var(--accent-color); }
+        button#scoreBtn:hover { background-color: #0056b3; }
+        
+        .tooltip { position: relative; display: inline-block; cursor: pointer; }
+        .tooltip .tooltiptext { visibility: hidden; width: 250px; background-color: #555; color: #fff; text-align: center; border-radius: 6px; padding: 8px; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -125px; opacity: 0; transition: opacity 0.3s; font-size: 0.9em; font-weight: normal; }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+        .tooltip .q-icon { font-weight: bold; color: var(--info-color); border: 2px solid var(--info-color); border-radius: 50%; width: 24px; height: 24px; display: inline-flex; justify-content: center; align-items: center; }
+
+        #score-modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
+        .modal-content { background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 8px; text-align: center; }
+        .modal-content h2 { border-bottom: none; }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close-btn:hover { color: black; }
+        #score-feedback ul { text-align: left; list-style-type: '✓ '; padding-left: 20px;}
+        #score-feedback ul li.miss { list-style-type: '✗ '; color: #a00;}
+
+        @media (max-width: 900px) {
+            .grid-container { grid-template-columns: 1fr; }
+            .entry-row { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>CISM Domain 2 Activity: The FinSecure Breach  Gamified Edition 🏆</h1>
+
+        <div class="card">
+            <h2>The Scenario</h2>
+            <p><strong>Company:</strong> FinSecure, a rapidly growing financial services firm known for its online investment platform for high-net-worth individuals. The company is currently in a "quiet period" preparing for a major IPO in six months.</p>
+            <p><strong>The Situation:</strong> It's 8:00 AM on Monday, July 28, 2025. The CISO receives a high-priority alert from their threat intelligence provider and an official warning from CISA. A state-sponsored threat actor, known for targeting Western financial institutions, has released a new ransomware variant called <strong>"LockChain."</strong> LockChain is a double-extortion tool: it exfiltrates sensitive customer and financial data before encrypting critical systems. The attackers are known to publish the data of non-paying victims.</p>
+            <p>The attack vector is a critical Remote Code Execution (RCE) vulnerability (CVE-2025-12345) in the third-party <strong>"VeriData API"</strong> used by FinSecure for real-time customer data validation. Your logs show the API is internet-facing. Making matters worse, <strong>Alex</strong>, a senior network engineer with high-level administrative privileges, was abruptly terminated last Friday after a heated performance dispute. A routine exit audit shows one of his assigned corporate laptops is unaccounted for.</p>
+        </div>
+        
+        <h2>Risk Assessment Workspace</h2>
+        
+        <div class="grid-container">
+            <div class="card">
+                <h3>Phase 1: Risk Identification
+                    <div class="tooltip"><span class="q-icon">?</span><span class="tooltiptext">Identify all potential dangers (threats), weaknesses (vulnerabilities), and external pressures facing the company.</span></div>
+                </h3>
+                
+                <label><strong>Emerging Threats & External Drivers:</strong></label>
+                <div id="threats-container"></div>
+                <button class="add-btn" onclick="addEntry('threats')">+ Add Threat/Driver</button>
+                <hr style="margin: 20px 0;">
+                
+                <label><strong>Insider & Third-Party Risks:</strong></label>
+                <div id="insider-container"></div>
+                <button class="add-btn" onclick="addEntry('insider')">+ Add Insider/3rd-Party Risk</button>
+                <hr style="margin: 20px 0;">
+                
+                <label><strong>Vulnerabilities & Control Weaknesses:</strong></label>
+                <div id="vulnerabilities-container"></div>
+                <button class="add-btn" onclick="addEntry('vulnerabilities')">+ Add Vulnerability</button>
+            </div>
+            
+            <div class="card">
+                <h3>Phase 2: Inherent Risk Assessment
+                     <div class="tooltip"><span class="q-icon">?</span><span class="tooltiptext">Assess the raw risk *before* applying any new controls. How likely is the event, and how bad would the damage be?</span></div>
+                </h3>
+                <p>Assess the risk *before* implementing new controls.</p>
+                <label for="inherent_likelihood"><strong>Likelihood:</strong></label>
+                <select id="inherent_likelihood">
+                    <option value="-1">-- Select --</option>
+                    <option value="4">Almost Certain</option>
+                    <option value="3">Likely</option>
+                    <option value="2">Possible</option>
+                    <option value="1">Unlikely</option>
+                    <option value="0">Rare</option>
+                </select>
+                
+                <label for="inherent_impact"><strong>Business Impact:</strong></label>
+                <select id="inherent_impact">
+                    <option value="-1">-- Select --</option>
+                    <option value="0">Insignificant</option>
+                    <option value="1">Minor</option>
+                    <option value="2">Moderate</option>
+                    <option value="3">Major</option>
+                    <option value="4">Catastrophic</option>
+                </select>
+                
+                <div id="inherent_risk_display" class="risk-display">Inherent Risk: TBD</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 30px;">
+             <h3>Phase 3: Control Recommendations & Residual Risk
+                 <div class="tooltip"><span class="q-icon">?</span><span class="tooltiptext">Propose solutions (controls) to reduce the risk, and then estimate the risk level that *remains* after those controls are in place.</span></div>
+             </h3>
+             <label><strong>Proposed Controls:</strong></label>
+             <div id="controls-container"></div>
+             <button class="add-btn" onclick="addEntry('controls')">+ Add Control</button>
+             
+             <div class="grid-container" style="margin-top: 30px;">
+                 <div>
+                    <label for="residual_likelihood"><strong>Residual Likelihood:</strong></label>
+                    <select id="residual_likelihood">
+                         <option value="-1">-- Select --</option>
+                         <option value="4">Almost Certain</option>
+                         <option value="3">Likely</option>
+                         <option value="2">Possible</option>
+                         <option value="1">Unlikely</option>
+                         <option value="0">Rare</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label for="residual_impact"><strong>Residual Impact:</strong></label>
+                    <select id="residual_impact">
+                         <option value="-1">-- Select --</option>
+                         <option value="0">Insignificant</option>
+                         <option value="1">Minor</option>
+                         <option value="2">Moderate</option>
+                         <option value="3">Major</option>
+                         <option value="4">Catastrophic</option>
+                    </select>
+                 </div>
+            </div>
+            <div id="residual_risk_display" class="risk-display">Residual Risk: TBD</div>
+        </div>
+        
+        <div class="action-buttons">
+            <button id="scoreBtn" onclick="calculateScore()">Calculate My Score!</button>
+            <button id="resetBtn" onclick="resetActivity()">Start Over</button>
+        </div>
+    </div>
+
+    <div id="score-modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="score-title">Your Risk Assessment Score</h2>
+            <h1 id="score-display">0</h1>
+            <div id="score-feedback"></div>
+        </div>
+    </div>
+
+<script>
+    // --- Data Definitions ---
+    const dropdownOptions = {
+        threats: [ "Ransomware (LockChain)", "State-Sponsored Attack", "Phishing Campaign", "Zero-Day Exploit", "Supply Chain Attack", "Geopolitical Instability" ],
+        insider: [ "Disgruntled Former Employee", "Negligent/Unintentional Insider", "Third-Party API Vulnerability", "Managed Service Provider (MSP) Compromise", "Credential Theft (Insider)", "Corporate Espionage" ],
+        vulnerabilities: [ "Unpatched Third-Party Component (RCE)", "Insufficient Access Control Review", "Lack of Egress Filtering", "Inadequate Logging and Monitoring", "No Insider Threat Program", "Missing Company Asset (Laptop)" ],
+        controls: [ "Emergency Patching of API", "Review/Revoke Former Employee Access", "Isolate Internet-Facing API Server", "Deploy Enhanced Endpoint Detection & Response (EDR)", "Implement Egress Traffic Filtering", "Activate Incident Response Plan", "Increase Log Monitoring", "Contact CISA/FBI" ]
+    };
+
+    const riskMatrixLogic = [
+        ['Low','Low','Low','Medium','Medium'], ['Low','Low','Medium','Medium','High'], ['Low','Medium','Medium','High','High'],
+        ['Medium','Medium','High','High','Extreme'], ['Medium','High','High','Extreme','Extreme']
+    ];
+
+    const gamificationPoints = {
+        threats: { "Ransomware (LockChain)": 15, "State-Sponsored Attack": 10 },
+        insider: { "Disgruntled Former Employee": 15, "Third-Party API Vulnerability": 10 },
+        vulnerabilities: { "Unpatched Third-Party Component (RCE)": 15, "Insufficient Access Control Review": 10, "Missing Company Asset (Laptop)": 10 },
+        controls: { "Emergency Patching of API": 15, "Review/Revoke Former Employee Access": 15, "Activate Incident Response Plan": 10, "Isolate Internet-Facing API Server": 10 },
+        inherentRisk: { likelihood: 3, impact: 4 }, // Correct: Likely, Catastrophic
+        residualRisk: { likelihood: 1, impact: 3 }  // Good: Unlikely, Major
+    };
+
+    // --- DOM Elements ---
+    const inherentLikelihood = document.getElementById('inherent_likelihood');
+    const inherentImpact = document.getElementById('inherent_impact');
+    const inherentDisplay = document.getElementById('inherent_risk_display');
+    const residualLikelihood = document.getElementById('residual_likelihood');
+    const residualImpact = document.getElementById('residual_impact');
+    const residualDisplay = document.getElementById('residual_risk_display');
+    const scoreModal = document.getElementById('score-modal');
+
+    // --- Core Functions ---
+    function handleOtherOption(event) {
+        const select = event.target;
+        const otherInput = select.nextElementSibling;
+        if (select.value === 'Other...') { otherInput.classList.remove('hidden'); otherInput.focus(); } 
+        else { otherInput.classList.add('hidden'); otherInput.value = ''; }
+    }
+
+    function addEntry(type, isInitial = false) {
+        const container = document.getElementById(`${type}-container`);
+        if (!isInitial && container.children.length >= 5) { alert("You can add a maximum of 5 entries per category."); return; }
+
+        const entryRow = document.createElement('div');
+        entryRow.className = 'entry-row';
+
+        const select = document.createElement('select');
+        select.innerHTML = `<option value="">-- Select ${type.slice(0, -1)} --</option>`;
+        dropdownOptions[type].forEach(opt => { select.innerHTML += `<option value="${opt}">${opt}</option>`; });
+        select.innerHTML += `<option value="Other...">Other...</option>`;
+        select.addEventListener('change', handleOtherOption);
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Enter custom entry...';
+        input.className = 'hidden';
+
+        entryRow.appendChild(select);
+        entryRow.appendChild(input);
+        container.appendChild(entryRow);
+    }
+    
+    function calculateRisk(likelihoodEl, impactEl, displayEl) {
+        const likelihood = parseInt(likelihoodEl.value);
+        const impact = parseInt(impactEl.value);
+
+        if (likelihood === -1 || impact === -1) {
+            displayEl.textContent = `${displayEl.id.includes('inherent') ? 'Inherent' : 'Residual'} Risk: TBD`;
+            displayEl.className = 'risk-display';
+            return;
+        }
+        const riskLevel = riskMatrixLogic[likelihood][impact];
+        displayEl.textContent = `${displayEl.id.includes('inherent') ? 'Inherent' : 'Residual'} Risk: ${riskLevel}`;
+        displayEl.className = 'risk-display ' + riskLevel.toLowerCase();
+    }
+
+    function resetActivity() {
+        ['threats', 'insider', 'vulnerabilities', 'controls'].forEach(type => {
+            document.getElementById(`${type}-container`).innerHTML = '';
+            addEntry(type, true);
+        });
+        inherentLikelihood.value = '-1'; inherentImpact.value = '-1';
+        residualLikelihood.value = '-1'; residualImpact.value = '-1';
+        calculateRisk(inherentLikelihood, inherentImpact, inherentDisplay);
+        calculateRisk(residualLikelihood, residualImpact, residualDisplay);
+        closeModal();
+        window.scrollTo(0, 0);
+    }
+    
+    // --- Gamification Functions ---
+    function calculateScore() {
+        let totalScore = 0;
+        let feedbackHTML = '<ul>';
+        
+        // 1. Score Identification Sections
+        ['threats', 'insider', 'vulnerabilities', 'controls'].forEach(type => {
+            const container = document.getElementById(`${type}-container`);
+            const selectedItems = new Set();
+            container.querySelectorAll('select').forEach(sel => { if(sel.value && sel.value !== 'Other...') selectedItems.add(sel.value); });
+            
+            Object.keys(gamificationPoints[type]).forEach(key => {
+                if (selectedItems.has(key)) {
+                    totalScore += gamificationPoints[type][key];
+                    feedbackHTML += `<li>Correctly identified a key ${type.slice(0,-1)}: <strong>${key}</strong> (+${gamificationPoints[type][key]} pts)</li>`;
+                } else {
+                     feedbackHTML += `<li class="miss">Missed a key ${type.slice(0,-1)}: <strong>${key}</strong></li>`;
+                }
+            });
+        });
+        
+        // 2. Score Inherent Risk Assessment
+        const iL = parseInt(inherentLikelihood.value);
+        const iI = parseInt(inherentImpact.value);
+        const correctIL = gamificationPoints.inherentRisk.likelihood;
+        const correctII = gamificationPoints.inherentRisk.impact;
+        if (iL === correctIL && iI === correctII) {
+            totalScore += 25;
+            feedbackHTML += `<li>Perfect Inherent Risk assessment (Likely/Catastrophic)! (+25 pts)</li>`;
+        } else if (Math.abs(iL-correctIL) <= 1 && Math.abs(iI-correctII) <=1){
+            totalScore += 10;
+            feedbackHTML += `<li>Close Inherent Risk assessment. The scenario points to Likely/Catastrophic. (+10 pts)</li>`;
+        } else {
+             feedbackHTML += `<li class="miss">Inherent Risk assessment was off. The combination of factors makes it Likely/Catastrophic.</li>`;
+        }
+
+        // 3. Score Risk Reduction
+        const rL = parseInt(residualLikelihood.value);
+        const rI = parseInt(residualImpact.value);
+        if(iL > -1 && iI > -1 && rL > -1 && rI > -1) {
+            const inherentScore = iL + iI;
+            const residualScore = rL + rI;
+            if(residualScore < inherentScore) {
+                const reductionPoints = (inherentScore - residualScore) * 5;
+                totalScore += reductionPoints;
+                feedbackHTML += `<li>Great job reducing the risk score! (+${reductionPoints} pts)</li>`;
+            } else {
+                 feedbackHTML += `<li class="miss">Your controls didn't seem to lower the overall risk score.</li>`;
+            }
+        } else {
+            feedbackHTML += `<li class="miss">Could not calculate risk reduction. Please complete both risk assessments.</li>`;
+        }
+
+        feedbackHTML += '</ul>';
+        document.getElementById('score-display').innerText = totalScore;
+        document.getElementById('score-feedback').innerHTML = feedbackHTML;
+        scoreModal.style.display = "block";
+    }
+
+    function closeModal() {
+        scoreModal.style.display = "none";
+    }
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+        ['threats', 'insider', 'vulnerabilities', 'controls'].forEach(type => addEntry(type, true));
+        inherentLikelihood.addEventListener('change', () => calculateRisk(inherentLikelihood, inherentImpact, inherentDisplay));
+        inherentImpact.addEventListener('change', () => calculateRisk(inherentLikelihood, inherentImpact, inherentDisplay));
+        residualLikelihood.addEventListener('change', () => calculateRisk(residualLikelihood, residualImpact, residualDisplay));
+        residualImpact.addEventListener('change', () => calculateRisk(residualLikelihood, residualImpact, residualDisplay));
+        window.onclick = function(event) { if (event.target == scoreModal) { closeModal(); } }
+    });
+</script>
+
+</body>
+</html>
