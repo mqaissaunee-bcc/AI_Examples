@@ -100,6 +100,11 @@
             margin-bottom: 15px;
         }
         
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        
         .copy-btn {
             background: #2563eb;
             color: white;
@@ -118,6 +123,50 @@
         
         .copy-btn.copied {
             background: #059669;
+        }
+        
+        .copy-btn.secondary {
+            background: #6b7280;
+        }
+        
+        .copy-btn.secondary:hover {
+            background: #4b5563;
+        }
+        
+        .copy-btn.secondary.active {
+            background: #059669;
+        }
+        
+        .preview-section {
+            margin-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 20px;
+        }
+        
+        .preview-header {
+            margin-bottom: 15px;
+        }
+        
+        .preview-header h4 {
+            margin-bottom: 5px;
+            color: #374151;
+        }
+        
+        .preview-header small {
+            color: #6b7280;
+            font-style: italic;
+        }
+        
+        .preview-container {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 20px;
+            background: white;
+            min-height: 400px;
+        }
+        
+        .preview-container iframe {
+            max-width: 100%;
         }
         
         .code-output {
@@ -164,6 +213,14 @@
                 flex-direction: column;
                 gap: 10px;
                 align-items: stretch;
+            }
+            
+            .button-group {
+                width: 100%;
+            }
+            
+            .copy-btn {
+                flex: 1;
             }
             
             body {
@@ -226,14 +283,40 @@
                         <option value="allow-same-origin">Allow same origin only</option>
                     </select>
                 </div>
+                
+                <div class="form-group">
+                    <label for="loading">Loading Behavior</label>
+                    <select id="loading">
+                        <option value="">Default loading</option>
+                        <option value="lazy">Lazy load (better performance)</option>
+                        <option value="eager">Load immediately</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="allow">Permissions (separate with semicolons)</label>
+                    <input type="text" id="allow" placeholder="microphone; camera; fullscreen; geolocation">
+                    <small style="color: #6b7280; font-size: 12px;">Common: microphone; camera; fullscreen; geolocation; payment</small>
+                </div>
             </form>
             
             <div class="output-section">
                 <div class="output-header">
                     <h3>📋 Generated Iframe Code</h3>
-                    <button class="copy-btn" onclick="copyCode()">Copy Code</button>
+                    <div class="button-group">
+                        <button class="copy-btn secondary" onclick="togglePreview()">👁 Preview</button>
+                        <button class="copy-btn" onclick="copyCode()">Copy Code</button>
+                    </div>
                 </div>
                 <div class="code-output" id="codeOutput"></div>
+                
+                <div class="preview-section" id="previewSection" style="display: none;">
+                    <div class="preview-header">
+                        <h4>🔍 Live Preview</h4>
+                        <small>Note: Some sites block embedding for security. Test in your actual LMS.</small>
+                    </div>
+                    <div class="preview-container" id="previewContainer"></div>
+                </div>
             </div>
             
             <div class="tips">
@@ -250,6 +333,8 @@
     </div>
 
     <script>
+        let previewVisible = false;
+        
         function generateIframe() {
             const url = document.getElementById('url').value;
             const title = document.getElementById('title').value;
@@ -258,6 +343,8 @@
             const allowFullscreen = document.getElementById('allowFullscreen').checked;
             const showBorder = document.getElementById('showBorder').checked;
             const sandbox = document.getElementById('sandbox').value;
+            const loading = document.getElementById('loading').value;
+            const allow = document.getElementById('allow').value;
             
             let code = `<iframe\n  src="${url}"\n  width="${width}"\n  height="${height}"`;
             
@@ -277,9 +364,45 @@
                 code += `\n  sandbox="${sandbox}"`;
             }
             
+            if (loading) {
+                code += `\n  loading="${loading}"`;
+            }
+            
+            if (allow && allow.trim()) {
+                code += `\n  allow="${allow.trim()}"`;
+            }
+            
             code += '>\n</iframe>';
             
             document.getElementById('codeOutput').textContent = code;
+            
+            // Update preview if visible
+            if (previewVisible) {
+                updatePreview(code);
+            }
+        }
+        
+        function updatePreview(code) {
+            const previewContainer = document.getElementById('previewContainer');
+            previewContainer.innerHTML = code;
+        }
+        
+        function togglePreview() {
+            const previewSection = document.getElementById('previewSection');
+            const previewButton = document.querySelector('.copy-btn.secondary');
+            
+            previewVisible = !previewVisible;
+            
+            if (previewVisible) {
+                previewSection.style.display = 'block';
+                previewButton.textContent = '👁 Hide Preview';
+                previewButton.classList.add('active');
+                updatePreview(document.getElementById('codeOutput').textContent);
+            } else {
+                previewSection.style.display = 'none';
+                previewButton.textContent = '👁 Preview';
+                previewButton.classList.remove('active');
+            }
         }
         
         function copyCode() {
@@ -287,7 +410,7 @@
             const text = codeOutput.textContent;
             
             navigator.clipboard.writeText(text).then(function() {
-                const button = document.querySelector('.copy-btn');
+                const button = document.querySelector('.copy-btn:not(.secondary)');
                 const originalText = button.textContent;
                 button.textContent = '✅ Copied!';
                 button.classList.add('copied');
@@ -305,12 +428,38 @@
                 textArea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
+                
+                const button = document.querySelector('.copy-btn:not(.secondary)');
+                const originalText = button.textContent;
+                button.textContent = '✅ Copied!';
+                button.classList.add('copied');
+                
+                setTimeout(function() {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
             });
+        }
+        
+        // Validate URL and provide feedback
+        function validateUrl() {
+            const urlInput = document.getElementById('url');
+            const url = urlInput.value;
+            
+            try {
+                new URL(url);
+                urlInput.style.borderColor = '#ddd';
+            } catch (e) {
+                if (url && url.length > 0) {
+                    urlInput.style.borderColor = '#ef4444';
+                }
+            }
         }
         
         // Update code when inputs change
         document.getElementById('iframeForm').addEventListener('input', generateIframe);
         document.getElementById('iframeForm').addEventListener('change', generateIframe);
+        document.getElementById('url').addEventListener('input', validateUrl);
         
         // Generate initial code
         generateIframe();
