@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scientific & Engineering Notation for Electronics</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -339,6 +340,127 @@
             margin: 10px 0;
         }
 
+        .worksheet-container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            color: #333;
+        }
+
+        .worksheet-header {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .worksheet-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .worksheet-problem {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+
+        .worksheet-problem h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .worksheet-input {
+            background: #fff;
+            border: 2px solid #bdc3c7;
+            border-radius: 5px;
+            padding: 8px 12px;
+            font-size: 16px;
+            width: 200px;
+            margin: 5px;
+        }
+
+        .worksheet-input:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+
+        .worksheet-input.correct {
+            border-color: #27ae60;
+            background-color: #d5f4e6;
+        }
+
+        .worksheet-input.incorrect {
+            border-color: #e74c3c;
+            background-color: #fadbd8;
+        }
+
+        .worksheet-solution {
+            background: #e8f5e8;
+            border: 1px solid #27ae60;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .worksheet-score {
+            background: linear-gradient(45deg, #00b894, #00a085);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .printable {
+            font-family: 'Times New Roman', serif;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            
+            .worksheet-container, .worksheet-container * {
+                visibility: visible;
+            }
+            
+            .worksheet-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                box-shadow: none;
+                margin: 0;
+                padding: 20px;
+            }
+            
+            .worksheet-controls {
+                display: none !important;
+            }
+            
+            .nav-btn, .quiz-btn {
+                display: none !important;
+            }
+            
+            .worksheet-header {
+                margin-bottom: 30px;
+            }
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -375,12 +497,13 @@
             <button class="nav-btn" onclick="showSection('applications')">💡 Applications</button>
             <button class="nav-btn" onclick="showSection('assessment1')">📝 Quiz 1</button>
             <button class="nav-btn" onclick="showSection('practice')">🎯 Practice Tools</button>
+            <button class="nav-btn" onclick="showSection('worksheets')">📄 Interactive Worksheets</button>
             <button class="nav-btn" onclick="showSection('assessment2')">📝 Quiz 2</button>
             <button class="nav-btn" onclick="showSection('final')">🏆 Final Assessment</button>
         </nav>
 
         <div class="progress-bar">
-            <div class="progress-fill" id="progressFill" style="width: 11%"></div>
+            <div class="progress-fill" id="progressFill" style="width: 10%"></div>
         </div>
 
         <!-- Introduction Section -->
@@ -996,6 +1119,56 @@
             </div>
         </section>
 
+        <!-- Interactive Worksheets Section -->
+        <section id="worksheets" class="lesson-section">
+            <h2>📄 Interactive Practice Worksheets</h2>
+            <p>Complete these randomized worksheets to practice your skills. Each time you load a worksheet, you'll get new problems!</p>
+
+            <div class="worksheet-header">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <div>
+                        <label><strong>Student Name:</strong></label>
+                        <input type="text" class="calculator-input" id="studentName" placeholder="Enter your name">
+                    </div>
+                    <div>
+                        <label><strong>Date:</strong></label>
+                        <input type="date" class="calculator-input" id="worksheetDate">
+                    </div>
+                </div>
+                
+                <div class="lesson-nav" style="margin-bottom: 30px;">
+                    <button class="nav-btn" onclick="selectWorksheet('scientific')">Scientific Notation</button>
+                    <button class="nav-btn" onclick="selectWorksheet('engineering')">Engineering Notation</button>
+                    <button class="nav-btn" onclick="selectWorksheet('sigfigs')">Significant Figures</button>
+                    <button class="nav-btn" onclick="selectWorksheet('electronics')">Electronics Applications</button>
+                    <button class="nav-btn" onclick="selectWorksheet('mixed')">Mixed Practice</button>
+                </div>
+
+                <div class="worksheet-controls">
+                    <button class="quiz-btn" onclick="generateWorksheet()">🔄 Generate New Worksheet</button>
+                    <button class="quiz-btn" onclick="printWorksheet()">🖨️ Print Worksheet</button>
+                    <button class="quiz-btn" onclick="downloadPDF()">📥 Download PDF</button>
+                    <button class="quiz-btn" onclick="checkAnswers()">✅ Check My Answers</button>
+                </div>
+            </div>
+
+            <div id="worksheet-content" class="worksheet-container">
+                <div class="important-note">
+                    <h3>🎯 Interactive Worksheet System</h3>
+                    <p><strong>How to use:</strong></p>
+                    <ol>
+                        <li>Enter your name and select today's date above</li>
+                        <li>Choose a worksheet type (Scientific Notation, Engineering Notation, etc.)</li>
+                        <li>Click "Generate New Worksheet" to create randomized problems</li>
+                        <li>Complete the problems in the input fields</li>
+                        <li>Click "Check My Answers" for immediate feedback</li>
+                        <li>Use "Print" or "Download PDF" to submit to your instructor</li>
+                    </ol>
+                    <p><strong>✨ Each worksheet is unique!</strong> New problems are generated every time you click "Generate New Worksheet"</p>
+                </div>
+            </div>
+        </section>
+
         <!-- Assessment 2 Section -->
         <section id="assessment2" class="lesson-section">
             <h2>📝 Quiz 2: Applications & Calculations</h2>
@@ -1153,6 +1326,11 @@
         let startTime = Date.now();
         let currentSection = 'intro';
 
+        // Worksheet variables
+        let currentWorksheetType = '';
+        let worksheetProblems = [];
+        let worksheetAnswers = [];
+
         // Timer functionality
         function updateTimer() {
             const elapsed = Date.now() - startTime;
@@ -1184,7 +1362,7 @@
             event.target.classList.add('active');
 
             // Update progress bar
-            const sectionOrder = ['intro', 'scientific', 'engineering', 'significant', 'applications', 'assessment1', 'practice', 'assessment2', 'final'];
+            const sectionOrder = ['intro', 'scientific', 'engineering', 'significant', 'applications', 'assessment1', 'practice', 'worksheets', 'assessment2', 'final'];
             const progress = ((sectionOrder.indexOf(sectionId) + 1) / sectionOrder.length) * 100;
             document.getElementById('progressFill').style.width = progress + '%';
 
@@ -1497,9 +1675,963 @@
             document.getElementById('conversionAnswers').style.display = 'block';
         }
 
+        // Worksheet functionality - completely rewritten
+        function selectWorksheet(type) {
+            currentWorksheetType = type;
+            
+            // Update button styling
+            const buttons = document.querySelectorAll('.worksheet-header .nav-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Set current date
+            document.getElementById('worksheetDate').value = new Date().toISOString().split('T')[0];
+        }
+
+        function generateWorksheet() {
+            if (!currentWorksheetType) {
+                alert('Please select a worksheet type first!');
+                return;
+            }
+
+            worksheetProblems = [];
+            worksheetAnswers = [];
+            
+            const content = document.getElementById('worksheet-content');
+            
+            let html = `
+                <div class="printable">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h2>Scientific & Engineering Notation Practice</h2>
+                        <h3>${getWorksheetTitle(currentWorksheetType)}</h3>
+                        <p><strong>Name:</strong> <span id="print-name">${document.getElementById('studentName').value || '_________________________'}</span> &nbsp;&nbsp;&nbsp; <strong>Date:</strong> <span id="print-date">${document.getElementById('worksheetDate').value || '_____________'}</span></p>
+                    </div>
+            `;
+
+            // Generate problems based on type with EXPLICIT significant figures guidance
+            switch (currentWorksheetType) {
+                case 'scientific':
+                    html += generateScientificWorksheet();
+                    break;
+                case 'engineering':
+                    html += generateEngineeringWorksheet();
+                    break;
+                case 'sigfigs':
+                    html += generateSigFigsWorksheet();
+                    break;
+                case 'electronics':
+                    html += generateElectronicsWorksheet();
+                    break;
+                case 'mixed':
+                    html += generateMixedWorksheet();
+                    break;
+            }
+
+            html += `
+                <div class="worksheet-score" id="worksheet-score">
+                    Score: <span id="score-display">Not yet calculated</span>
+                </div>
+                </div>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        function generateScientificWorksheet() {
+            let html = `
+                <h3>Part A: Convert to Scientific Notation</h3>
+                <div class="important-note">
+                    <strong>INSTRUCTIONS:</strong> Convert each number to scientific notation. <strong>Maintain the same number of significant figures as shown in the original number.</strong>
+                </div>
+            `;
+            
+            const problems = [
+                {
+                    number: '45,000',
+                    sigfigs: 2,
+                    answer: '4.5 × 10^4',
+                    explanation: 'The original number 45,000 has 2 significant figures (4 and 5). Moving the decimal point 4 places to the left gives 4.5 × 10^4.'
+                },
+                {
+                    number: '123,000',
+                    sigfigs: 3,
+                    answer: '1.23 × 10^5',
+                    explanation: 'The original number 123,000 has 3 significant figures (1, 2, and 3). Moving the decimal point 5 places to the left gives 1.23 × 10^5.'
+                },
+                {
+                    number: '7,500,000',
+                    sigfigs: 2,
+                    answer: '7.5 × 10^6',
+                    explanation: 'The original number 7,500,000 has 2 significant figures (7 and 5). Moving the decimal point 6 places to the left gives 7.5 × 10^6.'
+                },
+                {
+                    number: '2,340,000',
+                    sigfigs: 3,
+                    answer: '2.34 × 10^6',
+                    explanation: 'The original number 2,340,000 has 3 significant figures (2, 3, and 4). Moving the decimal point 6 places to the left gives 2.34 × 10^6.'
+                },
+                {
+                    number: '56,700',
+                    sigfigs: 3,
+                    answer: '5.67 × 10^4',
+                    explanation: 'The original number 56,700 has 3 significant figures (5, 6, and 7). Moving the decimal point 4 places to the left gives 5.67 × 10^4.'
+                }
+            ];
+
+            for (let i = 0; i < 5; i++) {
+                const prob = problems[i];
+                worksheetProblems.push({problem: prob.number, answer: prob.answer});
+                
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}:</h4>
+                        <p><strong>Convert to scientific notation:</strong> ${prob.number}</p>
+                        <p style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                            <strong>📏 Significant Figures Guidance:</strong> This number has <strong>${prob.sigfigs} significant figures</strong>. 
+                            Your scientific notation answer must maintain exactly <strong>${prob.sigfigs} significant figures</strong>.
+                        </p>
+                        <p>Answer: <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="e.g., 1.23 × 10^4"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${prob.answer}<br>
+                            <em>Explanation: ${prob.explanation}</em>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <h3>Part B: Convert from Scientific Notation</h3>
+                <div class="important-note">
+                    <strong>INSTRUCTIONS:</strong> Convert from scientific notation to standard form. <strong>Maintain the same number of significant figures shown in the scientific notation.</strong>
+                </div>
+            `;
+
+            const sciProblems = [
+                {
+                    scientific: '3.45 × 10^3',
+                    sigfigs: 3,
+                    answer: '3,450',
+                    explanation: 'The scientific notation 3.45 × 10^3 has 3 significant figures. Moving the decimal point 3 places to the right gives 3,450.'
+                },
+                {
+                    scientific: '7.2 × 10^-4',
+                    sigfigs: 2,
+                    answer: '0.00072',
+                    explanation: 'The scientific notation 7.2 × 10^-4 has 2 significant figures. Moving the decimal point 4 places to the left gives 0.00072.'
+                },
+                {
+                    scientific: '1.234 × 10^2',
+                    sigfigs: 4,
+                    answer: '123.4',
+                    explanation: 'The scientific notation 1.234 × 10^2 has 4 significant figures. Moving the decimal point 2 places to the right gives 123.4.'
+                },
+                {
+                    scientific: '6.78 × 10^-3',
+                    sigfigs: 3,
+                    answer: '0.00678',
+                    explanation: 'The scientific notation 6.78 × 10^-3 has 3 significant figures. Moving the decimal point 3 places to the left gives 0.00678.'
+                },
+                {
+                    scientific: '2.5 × 10^5',
+                    sigfigs: 2,
+                    answer: '250,000',
+                    explanation: 'The scientific notation 2.5 × 10^5 has 2 significant figures. Moving the decimal point 5 places to the right gives 250,000.'
+                }
+            ];
+
+            for (let i = 0; i < 5; i++) {
+                const prob = sciProblems[i];
+                worksheetProblems.push({problem: prob.scientific, answer: prob.answer});
+                
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 6}:</h4>
+                        <p><strong>Convert to standard notation:</strong> ${prob.scientific}</p>
+                        <p style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                            <strong>📏 Significant Figures Guidance:</strong> This scientific notation has <strong>${prob.sigfigs} significant figures</strong>. 
+                            Your standard notation answer must show exactly <strong>${prob.sigfigs} significant figures</strong>.
+                        </p>
+                        <p>Answer: <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Enter in standard form"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${prob.answer}<br>
+                            <em>Explanation: ${prob.explanation}</em>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function generateEngineeringWorksheet() {
+            let html = `
+                <h3>Part A: Convert to Engineering Notation</h3>
+                <div class="important-note">
+                    <strong>INSTRUCTIONS:</strong> Convert to engineering notation where the exponent must be a multiple of 3. <strong>Maintain the same number of significant figures as the original number.</strong>
+                </div>
+            `;
+
+            const problems = [
+                {
+                    number: '0.00047',
+                    sigfigs: 2,
+                    answer: '47 × 10^-6',
+                    explanation: 'The original 0.00047 has 2 significant figures. For engineering notation, use exponent -6 (multiple of 3), giving coefficient 47.'
+                },
+                {
+                    number: '4700',
+                    sigfigs: 2,
+                    answer: '4.7 × 10^3',
+                    explanation: 'The original 4700 has 2 significant figures. For engineering notation, use exponent 3 (multiple of 3), giving coefficient 4.7.'
+                },
+                {
+                    number: '0.0012',
+                    sigfigs: 2,
+                    answer: '1.2 × 10^-3',
+                    explanation: 'The original 0.0012 has 2 significant figures. The exponent -3 is already a multiple of 3, giving coefficient 1.2.'
+                },
+                {
+                    number: '47,000',
+                    sigfigs: 2,
+                    answer: '47 × 10^3',
+                    explanation: 'The original 47,000 has 2 significant figures. For engineering notation, use exponent 3, giving coefficient 47.'
+                },
+                {
+                    number: '0.000000047',
+                    sigfigs: 2,
+                    answer: '47 × 10^-9',
+                    explanation: 'The original has 2 significant figures. For engineering notation, use exponent -9 (multiple of 3), giving coefficient 47.'
+                }
+            ];
+
+            for (let i = 0; i < 5; i++) {
+                const prob = problems[i];
+                worksheetProblems.push({problem: prob.number, answer: prob.answer});
+                
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}:</h4>
+                        <p><strong>Convert to engineering notation:</strong> ${prob.number}</p>
+                        <p style="background: #d1ecf1; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                            <strong>⚙️ Engineering Notation Rules:</strong> This number has <strong>${prob.sigfigs} significant figures</strong>. 
+                            The exponent must be a multiple of 3, and you must maintain <strong>${prob.sigfigs} significant figures</strong>.
+                        </p>
+                        <p>Answer: <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="e.g., 47 × 10^3"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${prob.answer}<br>
+                            <em>Explanation: ${prob.explanation}</em>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function generateSigFigsWorksheet() {
+            let html = `
+                <h3>Part A: Count Significant Figures</h3>
+                <div class="important-note">
+                    <strong>RULES REMINDER:</strong><br>
+                    • All non-zero digits are significant<br>
+                    • Zeros between non-zero digits are significant<br>
+                    • Leading zeros are NOT significant<br>
+                    • Trailing zeros after decimal point ARE significant<br>
+                    • Trailing zeros without decimal point are ambiguous
+                </div>
+            `;
+
+            const sigProblems = [
+                {
+                    number: '0.0056',
+                    sigfigs: 2,
+                    explanation: 'Leading zeros are not significant. Only the digits 5 and 6 are significant.'
+                },
+                {
+                    number: '1.200',
+                    sigfigs: 4,
+                    explanation: 'All digits are significant. The trailing zeros after the decimal point are significant.'
+                },
+                {
+                    number: '100',
+                    sigfigs: 1,
+                    explanation: 'Ambiguous case. Without context, assume minimum significant figures (just the 1).'
+                },
+                {
+                    number: '1.05',
+                    sigfigs: 3,
+                    explanation: 'All digits are significant. The zero between non-zero digits is significant.'
+                },
+                {
+                    number: '0.000120',
+                    sigfigs: 3,
+                    explanation: 'Leading zeros are not significant. The digits 1, 2, and the trailing 0 after decimal are significant.'
+                }
+            ];
+
+            for (let i = 0; i < 5; i++) {
+                const prob = sigProblems[i];
+                worksheetProblems.push({problem: prob.number, answer: prob.sigfigs.toString()});
+                
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}:</h4>
+                        <p><strong>How many significant figures does <span style="font-family: monospace; background: #f0f0f0; padding: 2px; font-size: 1.2em;">${prob.number}</span> have?</strong></p>
+                        <p style="background: #f8d7da; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                            <strong>🔍 Think carefully:</strong> Apply the significant figures rules to count only the meaningful digits.
+                        </p>
+                        <p>Answer: <input type="number" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Number" style="width: 100px;"> significant figures</p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${prob.sigfigs} significant figures<br>
+                            <em>Explanation: ${prob.explanation}</em>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function generateElectronicsWorksheet() {
+            let html = `
+                <h3>Electronics Component Values and Calculations</h3>
+                <div class="important-note">
+                    <strong>ELECTRONICS CONTEXT:</strong> Component tolerances determine meaningful precision. Standard resistors (5% tolerance) justify 2 significant figures. Precision components (0.1% tolerance) justify 3-4 significant figures.
+                </div>
+            `;
+
+            const problems = [
+                {
+                    type: 'ohms_law',
+                    description: 'Calculate Current (I = V/R)',
+                    given: 'V = 12.0 V, R = 2.2 kΩ',
+                    vSigFigs: 3,
+                    rSigFigs: 2,
+                    limitingSigFigs: 2,
+                    answer: '5.5 mA',
+                    explanation: 'I = 12.0V ÷ 2200Ω = 0.00545A = 5.5 mA. Limited to 2 sig figs by the resistor value.'
+                },
+                {
+                    type: 'capacitor',
+                    description: 'Capacitor Value Interpretation',
+                    given: 'Capacitor marked "104"',
+                    answer: '0.10 μF',
+                    explanation: '104 means 10 × 10^4 pF = 100,000 pF = 0.10 μF. The "10" gives us 2 significant figures.'
+                },
+                {
+                    type: 'frequency',
+                    description: 'Calculate Period (T = 1/f)',
+                    given: 'f = 2.4 GHz',
+                    sigfigs: 2,
+                    answer: '417 ps',
+                    explanation: 'T = 1/(2.4×10^9 Hz) = 4.17×10^-10 s = 417 ps. Limited to 2 sig figs by the frequency specification.'
+                }
+            ];
+
+            for (let i = 0; i < 3; i++) {
+                const prob = problems[i];
+                worksheetProblems.push({problem: prob.given, answer: prob.answer});
+                
+                let guidanceText = '';
+                if (prob.type === 'ohms_law') {
+                    guidanceText = `Voltage has ${prob.vSigFigs} sig figs, resistance has ${prob.rSigFigs} sig figs. Result limited to ${prob.limitingSigFigs} sig figs.`;
+                } else if (prob.type === 'capacitor') {
+                    guidanceText = 'Capacitor codes: first two digits give significant figures, third digit is the multiplier.';
+                } else if (prob.type === 'frequency') {
+                    guidanceText = `Frequency specification has ${prob.sigfigs} sig figs. Period calculation must maintain this precision.`;
+                }
+                
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}: ${prob.description}</h4>
+                        <p><strong>Given:</strong> ${prob.given}</p>
+                        <p style="background: #d4edda; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                            <strong>🔧 Engineering Precision:</strong> ${guidanceText}
+                        </p>
+                        <p>Answer: <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Include units and proper sig figs"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${prob.answer}<br>
+                            <em>Explanation: ${prob.explanation}</em>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function generateMixedWorksheet() {
+            let html = `
+                <h3>Mixed Practice Problems</h3>
+                <div class="important-note">
+                    <strong>MIXED REVIEW:</strong> Each problem includes specific guidance about significant figures. Read the instructions carefully for each problem.
+                </div>
+            `;
+
+            const problems = [
+                {
+                    type: 'Scientific Notation',
+                    problem: '45,000',
+                    sigfigs: 2,
+                    answer: '4.5 × 10^4',
+                    guidance: 'Convert to scientific notation maintaining 2 significant figures'
+                },
+                {
+                    type: 'Engineering Notation',
+                    problem: '0.00047',
+                    sigfigs: 2,
+                    answer: '47 × 10^-6',
+                    guidance: 'Convert to engineering notation (exponent multiple of 3) with 2 sig figs'
+                },
+                {
+                    type: 'Sig Fig Count',
+                    problem: '1.200',
+                    answer: '4',
+                    guidance: 'Count significant figures (remember trailing zeros after decimal are significant)'
+                },
+                {
+                    type: 'Electronics Calculation',
+                    problem: 'V = 9.0 V, R = 4.7 kΩ, find I',
+                    answer: '1.9 mA',
+                    guidance: 'Calculate current with proper significant figures (limited by least precise measurement)'
+                }
+            ];
+
+            for (let i = 0; i < 4; i++) {
+                const prob = problems[i];
+                worksheetProblems.push({problem: prob.problem, answer: prob.answer});
+                
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}: ${prob.type}</h4>
+                        <p><strong>Problem:</strong> ${prob.problem}</p>
+                        <p style="background: #e7f3ff; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                            <strong>📋 Instructions:</strong> ${prob.guidance}
+                        </p>
+                        <p>Answer: <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Your answer with proper precision"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${prob.answer}
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function getWorksheetTitle(type) {
+            const titles = {
+                'scientific': 'Scientific Notation Conversions',
+                'engineering': 'Engineering Notation & Metric Prefixes',
+                'sigfigs': 'Significant Figures Practice',
+                'electronics': 'Electronics Applications',
+                'mixed': 'Mixed Practice Problems'
+            };
+            return titles[type] || 'Practice Worksheet';
+        }
+
+        function generateScientificNotationProblems() {
+            let html = '<h3>Part A: Convert to Scientific Notation</h3>';
+            
+            // Large numbers
+            for (let i = 0; i < 5; i++) {
+                const num = generateRandomLargeNumber();
+                const answer = num.toExponential(2);
+                worksheetProblems.push({type: 'sci_large', problem: num, answer: answer});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}:</h4>
+                        <p>${num.toLocaleString()} = <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Enter in scientific notation"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${answer}
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '<h3>Part B: Convert to Standard Notation</h3>';
+            
+            // Scientific to standard
+            for (let i = 0; i < 5; i++) {
+                const coeff = (Math.random() * 9 + 1).toFixed(2);
+                const exp = Math.floor(Math.random() * 8) - 4;
+                const sciNotation = `${coeff} × 10^${exp}`;
+                const answer = (parseFloat(coeff) * Math.pow(10, exp)).toString();
+                worksheetProblems.push({type: 'sci_standard', problem: sciNotation, answer: answer});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 6}:</h4>
+                        <p>${sciNotation} = <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Enter in standard notation"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${answer}
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function generateEngineeringNotationProblems() {
+            let html = '<h3>Part A: Convert to Engineering Notation</h3>';
+            
+            for (let i = 0; i < 5; i++) {
+                const num = generateRandomElectronicsValue();
+                const engNotation = convertToEngineering(num);
+                worksheetProblems.push({type: 'eng_convert', problem: num, answer: engNotation});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}:</h4>
+                        <p>${num} = <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Enter in engineering notation"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${engNotation}
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '<h3>Part B: Metric Prefix Practice</h3>';
+            
+            const prefixes = [
+                {name: 'kilo', symbol: 'k', value: 1000},
+                {name: 'mega', symbol: 'M', value: 1000000},
+                {name: 'milli', symbol: 'm', value: 0.001},
+                {name: 'micro', symbol: 'μ', value: 0.000001},
+                {name: 'nano', symbol: 'n', value: 0.000000001}
+            ];
+
+            for (let i = 0; i < 5; i++) {
+                const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+                const baseValue = (Math.random() * 9 + 1).toFixed(1);
+                const prefixedValue = `${baseValue}${prefix.symbol}`;
+                const standardValue = (parseFloat(baseValue) * prefix.value).toExponential(2);
+                worksheetProblems.push({type: 'prefix', problem: prefixedValue, answer: standardValue});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 6}:</h4>
+                        <p>${prefixedValue} = <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Enter in scientific notation"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${standardValue}
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function generateSigFigsProblems() {
+            let html = '<h3>Part A: Count Significant Figures</h3>';
+            
+            const testNumbers = [
+                '0.0056', '1.200', '100', '1.05', '0.000120',
+                '4.70 × 10³', '0.08000', '1500', '2.0', '0.00030'
+            ];
+
+            for (let i = 0; i < 5; i++) {
+                const num = testNumbers[Math.floor(Math.random() * testNumbers.length)];
+                const sigFigs = countSignificantFigures(num);
+                worksheetProblems.push({type: 'sigfig_count', problem: num, answer: sigFigs.toString()});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}:</h4>
+                        <p>How many significant figures does <strong>${num}</strong> have? <input type="number" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Number of sig figs" style="width: 100px;"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${sigFigs} significant figures
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '<h3>Part B: Calculations with Significant Figures</h3>';
+            
+            for (let i = 0; i < 5; i++) {
+                const prob = generateSigFigCalculation();
+                worksheetProblems.push({type: 'sigfig_calc', problem: prob.problem, answer: prob.answer});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 6}:</h4>
+                        <p>${prob.problem} = <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Answer with proper sig figs"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${prob.answer}
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function generateElectronicsProblems() {
+            let html = '<h3>Electronics Component Values and Calculations</h3>';
+            
+            // Ohm's law problems
+            for (let i = 0; i < 3; i++) {
+                const voltage = (Math.random() * 15 + 3).toFixed(1);
+                const resistance = generateRandomResistorValue();
+                const current = (parseFloat(voltage) / parseFloat(resistance.value)).toExponential(2);
+                const problem = `V = ${voltage} V, R = ${resistance.display}`;
+                const answer = `${current} A`;
+                
+                worksheetProblems.push({type: 'ohms_law', problem: problem, answer: answer});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}: Calculate Current (I = V/R)</h4>
+                        <p>${problem}</p>
+                        <p>I = <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Current with units"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${answer}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Capacitor value problems
+            for (let i = 0; i < 3; i++) {
+                const capCode = generateCapacitorCode();
+                worksheetProblems.push({type: 'capacitor', problem: capCode.code, answer: capCode.value});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 4}: Capacitor Value</h4>
+                        <p>A capacitor is marked "${capCode.code}". What is its value in microfarads (μF)?</p>
+                        <p>Value = <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Value in μF"> μF</p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${capCode.value} μF
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Frequency/Period problems
+            for (let i = 0; i < 4; i++) {
+                const freq = generateRandomFrequency();
+                const period = (1 / parseFloat(freq.value)).toExponential(2);
+                worksheetProblems.push({type: 'frequency', problem: freq.display, answer: `${period} s`});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 7}: Calculate Period (T = 1/f)</h4>
+                        <p>Frequency = ${freq.display}</p>
+                        <p>Period = <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Period with units"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${period} s
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function generateMixedProblems() {
+            let html = '<h3>Mixed Practice Problems</h3>';
+            
+            // Mix of all problem types
+            const problemTypes = ['scientific', 'engineering', 'sigfigs', 'electronics'];
+            
+            for (let i = 0; i < 10; i++) {
+                const type = problemTypes[Math.floor(Math.random() * problemTypes.length)];
+                let problem, answer, description;
+                
+                switch (type) {
+                    case 'scientific':
+                        const num = generateRandomLargeNumber();
+                        problem = num.toLocaleString();
+                        answer = num.toExponential(2);
+                        description = 'Convert to scientific notation:';
+                        break;
+                    case 'engineering':
+                        const engNum = generateRandomElectronicsValue();
+                        problem = engNum;
+                        answer = convertToEngineering(engNum);
+                        description = 'Convert to engineering notation:';
+                        break;
+                    case 'sigfigs':
+                        const testNum = ['0.0056', '1.200', '4.70 × 10³', '0.000120'][Math.floor(Math.random() * 4)];
+                        problem = testNum;
+                        answer = countSignificantFigures(testNum).toString();
+                        description = 'Count significant figures in:';
+                        break;
+                    case 'electronics':
+                        const res = generateRandomResistorValue();
+                        const volt = (Math.random() * 10 + 5).toFixed(1);
+                        problem = `V = ${volt} V, R = ${res.display}`;
+                        answer = ((parseFloat(volt) / parseFloat(res.value)) * 1000).toFixed(1) + ' mA';
+                        description = 'Calculate current (I = V/R):';
+                        break;
+                }
+                
+                worksheetProblems.push({type: 'mixed', problem: problem, answer: answer});
+                html += `
+                    <div class="worksheet-problem">
+                        <h4>Problem ${i + 1}:</h4>
+                        <p>${description} ${problem}</p>
+                        <p>Answer: <input type="text" class="worksheet-input" id="prob_${worksheetProblems.length - 1}" placeholder="Your answer"> </p>
+                        <div class="worksheet-solution" id="sol_${worksheetProblems.length - 1}">
+                            <strong>Solution:</strong> ${answer}
+                        </div>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        // Helper functions for worksheet generation
+        function generateRandomLargeNumber() {
+            const base = Math.random() * 900 + 100;
+            const exp = Math.floor(Math.random() * 6) + 3;
+            return Math.round(base * Math.pow(10, exp));
+        }
+
+        function generateRandomElectronicsValue() {
+            const values = [0.00047, 0.0012, 0.033, 4700, 47000, 470000, 0.000000047, 0.0000012];
+            return values[Math.floor(Math.random() * values.length)];
+        }
+
+        function convertToEngineering(num) {
+            if (num === 0) return '0';
+            
+            const exp = Math.floor(Math.log10(Math.abs(num)) / 3) * 3;
+            const coeff = num / Math.pow(10, exp);
+            
+            return `${coeff.toFixed(2)} × 10^${exp}`;
+        }
+
+        function countSignificantFigures(numStr) {
+            // Simplified sig fig counting for backward compatibility
+            const str = numStr.replace(/[×\s]/g, '').replace(/10\^-?\d+/, '');
+            let sigFigs = 0;
+            let foundNonZero = false;
+            let inDecimal = false;
+            
+            for (let char of str) {
+                if (char === '.') {
+                    inDecimal = true;
+                } else if (char >= '0' && char <= '9') {
+                    if (char !== '0') {
+                        foundNonZero = true;
+                        sigFigs++;
+                    } else if (foundNonZero) {
+                        sigFigs++;
+                    }
+                }
+            }
+            
+            return sigFigs;
+        }
+
+        function generateSigFigCalculation() {
+            // Backward compatibility function
+            const a = (Math.random() * 9 + 1).toFixed(2);
+            const b = (Math.random() * 9 + 1).toFixed(1);
+            const operation = Math.random() < 0.5 ? '+' : '×';
+            
+            if (operation === '+') {
+                const result = (parseFloat(a) + parseFloat(b)).toFixed(1);
+                return {
+                    problem: `${a} + ${b}`,
+                    answer: result
+                };
+            } else {
+                const result = (parseFloat(a) * parseFloat(b)).toFixed(2);
+                return {
+                    problem: `${a} × ${b}`,
+                    answer: result
+                };
+            }
+        }
+
+        function generateRandomResistorValue() {
+            const values = [
+                {value: '1000', display: '1.0 kΩ'},
+                {value: '2200', display: '2.2 kΩ'},
+                {value: '4700', display: '4.7 kΩ'},
+                {value: '10000', display: '10 kΩ'},
+                {value: '47000', display: '47 kΩ'},
+                {value: '100000', display: '100 kΩ'}
+            ];
+            return values[Math.floor(Math.random() * values.length)];
+        }
+
+        function generateCapacitorCode() {
+            const codes = [
+                {code: '104', value: '0.1'},
+                {code: '223', value: '0.022'},
+                {code: '474', value: '0.47'},
+                {code: '105', value: '1.0'},
+                {code: '225', value: '2.2'}
+            ];
+            return codes[Math.floor(Math.random() * codes.length)];
+        }
+
+        function generateRandomFrequency() {
+            const freqs = [
+                {value: '1000000', display: '1.0 MHz'},
+                {value: '2400000000', display: '2.4 GHz'},
+                {value: '100000', display: '100 kHz'},
+                {value: '50000000', display: '50 MHz'},
+                {value: '3200000000', display: '3.2 GHz'}
+            ];
+            return freqs[Math.floor(Math.random() * freqs.length)];
+        }
+
+        function checkAnswers() {
+            if (worksheetProblems.length === 0) {
+                alert('Please generate a worksheet first!');
+                return;
+            }
+
+            let correct = 0;
+            let total = worksheetProblems.length;
+
+            for (let i = 0; i < total; i++) {
+                const input = document.getElementById(`prob_${i}`);
+                const solution = document.getElementById(`sol_${i}`);
+                
+                if (input && solution) {
+                    const userAnswer = input.value.trim().toLowerCase().replace(/\s+/g, '');
+                    const correctAnswer = worksheetProblems[i].answer.toLowerCase().replace(/\s+/g, '');
+                    
+                    if (isAnswerCorrect(userAnswer, correctAnswer)) {
+                        input.classList.add('correct');
+                        input.classList.remove('incorrect');
+                        correct++;
+                    } else {
+                        input.classList.add('incorrect');
+                        input.classList.remove('correct');
+                        solution.style.display = 'block';
+                    }
+                }
+            }
+
+            const percentage = Math.round((correct / total) * 100);
+            const scoreDisplay = document.getElementById('worksheet-score');
+            const scoreValue = document.getElementById('score-display');
+            
+            scoreValue.textContent = `${correct}/${total} (${percentage}%)`;
+            scoreDisplay.style.display = 'block';
+
+            // Show all solutions after checking
+            setTimeout(() => {
+                for (let i = 0; i < total; i++) {
+                    const solution = document.getElementById(`sol_${i}`);
+                    if (solution) {
+                        solution.style.display = 'block';
+                    }
+                }
+            }, 2000);
+        }
+
+        function isAnswerCorrect(userAnswer, correctAnswer) {
+            // Remove common variations and normalize
+            const normalize = (str) => str.replace(/[×*]/g, 'x')
+                .replace(/\^/g, '')
+                .replace(/e\+?/g, 'x10')
+                .replace(/\s/g, '');
+            
+            const user = normalize(userAnswer);
+            const correct = normalize(correctAnswer);
+            
+            // Check exact match
+            if (user === correct) return true;
+            
+            // Check numerical equivalence for simple numbers
+            const userNum = parseFloat(userAnswer);
+            const correctNum = parseFloat(correctAnswer);
+            
+            if (!isNaN(userNum) && !isNaN(correctNum)) {
+                return Math.abs(userNum - correctNum) < 0.01 * correctNum;
+            }
+            
+            return false;
+        }
+
+        function printWorksheet() {
+            if (worksheetProblems.length === 0) {
+                alert('Please generate a worksheet first!');
+                return;
+            }
+
+            // Update print fields
+            document.getElementById('print-name').textContent = document.getElementById('studentName').value || '_________________________';
+            document.getElementById('print-date').textContent = document.getElementById('worksheetDate').value || '_____________';
+
+            // Hide solutions before printing
+            const solutions = document.querySelectorAll('.worksheet-solution');
+            solutions.forEach(sol => sol.style.display = 'none');
+
+            window.print();
+        }
+
+        async function downloadPDF() {
+            if (worksheetProblems.length === 0) {
+                alert('Please generate a worksheet first!');
+                return;
+            }
+
+            // Check if jsPDF is loaded
+            if (typeof window.jsPDF === 'undefined') {
+                alert('PDF library not loaded. Please try again or use the print function.');
+                return;
+            }
+
+            const { jsPDF } = window.jsPDF;
+            const doc = new jsPDF();
+            
+            // Title
+            doc.setFontSize(20);
+            doc.text('Scientific & Engineering Notation Practice', 20, 30);
+            
+            doc.setFontSize(16);
+            doc.text(getWorksheetTitle(currentWorksheetType), 20, 45);
+            
+            doc.setFontSize(12);
+            const studentName = document.getElementById('studentName').value || '_________________________';
+            const worksheetDate = document.getElementById('worksheetDate').value || '_____________';
+            doc.text(`Name: ${studentName}`, 20, 65);
+            doc.text(`Date: ${worksheetDate}`, 120, 65);
+            
+            // Problems
+            let yPosition = 85;
+            const problems = document.querySelectorAll('.worksheet-problem');
+            
+            problems.forEach((problem, index) => {
+                if (yPosition > 250) {
+                    doc.addPage();
+                    yPosition = 30;
+                }
+                
+                const h4 = problem.querySelector('h4');
+                const p = problem.querySelector('p');
+                
+                if (h4) {
+                    doc.setFontSize(12);
+                    doc.text(h4.textContent, 20, yPosition);
+                    yPosition += 8;
+                }
+                
+                if (p) {
+                    doc.setFontSize(10);
+                    const lines = doc.splitTextToSize(p.textContent.replace(/\s+/g, ' '), 170);
+                    doc.text(lines, 20, yPosition);
+                    yPosition += lines.length * 6 + 5;
+                }
+                
+                // Add answer line
+                doc.text('Answer: ____________________________', 20, yPosition);
+                yPosition += 15;
+            });
+            
+            // Save the PDF
+            const fileName = `${currentWorksheetType}_worksheet_${new Date().toISOString().split('T')[0]}.pdf`;
+            doc.save(fileName);
+        }
+
         // Initialize the lesson
         window.addEventListener('load', function() {
             updateTimer();
+            // Set today's date by default
+            document.getElementById('worksheetDate').value = new Date().toISOString().split('T')[0];
         });
     </script>
 </body>
