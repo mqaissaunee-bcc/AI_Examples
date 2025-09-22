@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generic 3D Flashcards</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .upload-section {
+            background: rgba(255,255,255,0.15);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(255,255,255,0.2);
+            margin-bottom: 30px;
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+
+        .upload-section h2 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .upload-area {
+            border: 3px dashed rgba(255,255,255,0.5);
+            padding: 40px 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-area:hover {
+            border-color: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.1);
+        }
+
+        .upload-area.dragover {
+            border-color: #ff6b6b;
+            background: rgba(255,107,107,0.2);
+        }
+
+        .upload-content {
+            color: white;
+            text-align: center;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .sample-section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .sample-section h3 {
+            color: white;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .prompt-box {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #ff6b6b;
+            margin-bottom: 15px;
+        }
+
+        .prompt-text {
+            color: #f0f8ff;
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .csv-example {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            color: #e8f4f8;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            overflow-x: auto;
+            white-space: pre;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.15);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(15px);
+            margin: 10px;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #ee5a24, #ff6b6b);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+            z-index: 10;
+        }
+
+        .header h1 {
+            font-size: clamp(2rem, 5vw, 3rem);
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            background: linear-gradient(45deg, #fff, #f0f8ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: clamp(1rem, 3vw, 1.2rem);
+            opacity: 0.95;
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.3);
+        }
+
+        .flashcard-section {
+            display: none;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .carousel-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            height: 400px;
+            perspective: 1200px;
+            margin: 0 auto 40px;
+        }
+
+        .carousel {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .flashcard {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: all 0.6s ease;
+            cursor: pointer;
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 30px 25px;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            border: 3px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .face-front {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24, #ff9ff3);
+            color: white;
+            background-size: 200% 200%;
+            animation: gradientPulse 8s ease infinite;
+        }
+
+        .face-definition {
+            background: linear-gradient(135deg, #4834d4, #686de0, #30336b);
+            color: white;
+            transform: rotateY(120deg);
+            background-size: 200% 200%;
+            animation: gradientPulse 10s ease infinite;
+        }
+
+        .face-example {
+            background: linear-gradient(135deg, #00d2d3, #54a0ff, #0abde3);
+            color: white;
+            transform: rotateY(240deg);
+            background-size: 200% 200%;
+            animation: gradientPulse 12s ease infinite;
+        }
+
+        @keyframes gradientPulse {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .flashcard.show-definition {
+            transform: rotateY(-120deg);
+        }
+
+        .flashcard.show-example {
+            transform: rotateY(-240deg);
+        }
+
+        .card-label {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: rgba(255,255,255,0.25);
+            padding: 8px 15px;
+            border-radius: 25px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .card-title {
+            font-size: clamp(1.3rem, 4vw, 2rem);
+            font-weight: 800;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+            line-height: 1.2;
+        }
+
+        .card-content {
+            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+            line-height: 1.5;
+            text-align: center;
+            max-width: 100%;
+            overflow-y: auto;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 25px;
+            z-index: 10;
+        }
+
+        .flip-btn {
+            background: linear-gradient(135deg, #ffecd2, #fcb69f);
+            color: #333;
+            font-weight: 700;
+        }
+
+        .flip-btn:hover {
+            background: linear-gradient(135deg, #fcb69f, #ffecd2);
+        }
+
+        .info-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin-bottom: 20px;
+            z-index: 10;
+        }
+
+        .counter {
+            font-size: clamp(1rem, 3vw, 1.3rem);
+            font-weight: bold;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .progress-container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto 25px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb);
+            transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .progress::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .concept-category {
+            position: absolute;
+            bottom: 15px;
+            left: 20px;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .auto-play-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+        }
+
+        .auto-play-controls input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #ff6b6b;
+        }
+
+        .features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            font-size: 0.9rem;
+            background: rgba(255,255,255,0.1);
+            padding: 8px 15px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .error-message {
+            background: rgba(255,0,0,0.2);
+            border: 1px solid rgba(255,0,0,0.5);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .success-message {
+            background: rgba(0,255,0,0.2);
+            border: 1px solid rgba(0,255,0,0.5);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .fade-in {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from { 
+                opacity: 0; 
+                transform: translateY(30px);
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0);
+            }
+        }
+
+        .copy-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        @media (max-width: 768px) {
+            .upload-section {
+                padding: 20px;
+            }
+            
+            .upload-area {
+                padding: 30px 15px;
+            }
+            
+            .carousel-container {
+                max-width: 400px;
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 id="mainTitle">🎓 Custom 3D Flashcards</h1>
+        <p id="mainSubtitle">Upload your CSV file to create interactive learning cards</p>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="upload-section" id="uploadSection">
+        <h2>Upload Your Flashcard Data</h2>
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-content">
+                <span class="upload-icon">📁</span>
+                <div class="upload-text">Drag and drop your CSV file here</div>
+                <div class="upload-subtext">or click to select a file</div>
+            </div>
+        </div>
+        <input type="file" id="fileInput" accept=".csv" />
+        
+        <div class="sample-section">
+            <h3>🤖 AI Prompt for Creating Your CSV</h3>
+            <div class="prompt-box">
+                <div class="prompt-text">Create a CSV file for 3D flashcards about [YOUR TOPIC]. Format:
+
+Row 1: Title for the flashcard set
+Row 2: Subtitle/description for the flashcard set  
+Row 3: Headers: Term,Category,Definition,Example
+Rows 4+: Your flashcard data
+
+Generate 10-20 flashcards about [YOUR TOPIC] with:
+- Term: The concept/term name
+- Category: A short category (e.g., "Foundation", "Advanced", "Application")
+- Definition: Clear, concise explanation (2-3 sentences)
+- Example: Real-world example or practical application
+
+Make sure definitions are educational and examples are relatable and specific.</div>
+                <button class="copy-btn" onclick="copyPrompt()">📋 Copy Prompt</button>
+            </div>
+            
+            <h3>📊 CSV Format Example</h3>
+            <div class="csv-example">Mathematics Fundamentals
+Essential Math Concepts for Students
+Term,Category,Definition,Example
+Algebra,Foundation,Mathematical method using letters and symbols to represent numbers and quantities in formulas and equations.,Solving for x in the equation 2x + 5 = 15 to find that x equals 5
+Calculus,Advanced,Branch of mathematics dealing with rates of change and accumulation of quantities.,Finding the speed of a car at any given moment by calculating the derivative of its position over time
+Geometry,Spatial,Study of shapes sizes and properties of figures and spaces.,Calculating the area of a circular garden using the formula π × radius²</div>
+            
+            <button class="btn btn-primary" onclick="loadSampleData()">📚 Load Sample AI Data</button>
+            <button class="btn" onclick="downloadSampleCSV()">⬇️ Download CSV Template</button>
+        </div>
+        
+        <div id="messageArea"></div>
+    </div>
+
+    <!-- Flashcard Section -->
+    <div class="flashcard-section" id="flashcardSection">
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress" id="progress"></div>
+            </div>
+        </div>
+
+        <div class="carousel-container">
+            <div class="carousel" id="carousel">
+                <div class="flashcard" id="currentCard">
+                    <div class="card-face face-front">
+                        <div class="card-label">TERM</div>
+                        <div class="card-title" id="termTitle"></div>
+                        <div class="concept-category" id="category"></div>
+                    </div>
+                    <div class="card-face face-definition">
+                        <div class="card-label">DEFINITION</div>
+                        <div class="card-title" id="defTitle"></div>
+                        <div class="card-content" id="definition"></div>
+                    </div>
+                    <div class="card-face face-example">
+                        <div class="card-label">EXAMPLE</div>
+                        <div class="card-title" id="exampleTitle"></div>
+                        <div class="card-content" id="example"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="navigateCard(-1)">⬅ Previous</button>
+            <button class="btn flip-btn" onclick="flipCard()">🔄 Flip</button>
+            <button class="btn" onclick="navigateCard(1)">Next ➡</button>
+        </div>
+
+        <div class="info-panel">
+            <div class="counter">
+                <span id="current">1</span> / <span id="total">0</span>
+            </div>
+            <div class="auto-play-controls">
+                <input type="checkbox" id="autoPlay" onchange="toggleAutoPlay()">
+                <label for="autoPlay">Auto-advance (6s)</label>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature-item">
+                <span>⌨️</span> Use arrow keys to navigate
+            </div>
+            <div class="feature-item">
+                <span>🖱️</span> Click card to flip
+            </div>
+            <div class="feature-item">
+                <span>📱</span> Mobile friendly
+            </div>
+        </div>
+
+        <div style="margin-top: 30px; text-align: center;">
+            <button class="btn" onclick="resetApp()">📁 Upload New CSV</button>
+        </div>
+    </div>
+
+    <script>
+        let flashcards = [];
+        let currentIndex = 0;
+        let currentFace = 0;
+        let autoPlayInterval = null;
+
+        // Sample AI concepts data
+        const sampleData = {
+            title: "AI Concepts Mastery",
+            subtitle: "Master the Top 20 Essential AI Concepts for 2025",
+            cards: [
+                {
+                    term: "Artificial Intelligence",
+                    category: "Foundation",
+                    definition: "Computer systems designed to perform tasks that typically require human intelligence, including learning, reasoning, problem-solving, perception, and language understanding.",
+                    example: "Voice assistants like Siri, Alexa, and Google Assistant that understand speech, process natural language, learn user preferences, and provide intelligent responses across diverse topics."
+                },
+                {
+                    term: "Machine Learning",
+                    category: "Core Method",
+                    definition: "A subset of AI that enables computers to automatically learn and improve from experience without being explicitly programmed for every specific task.",
+                    example: "Netflix's recommendation algorithm that analyzes your viewing history, ratings, and behavior patterns to suggest movies and shows you're likely to enjoy, improving suggestions over time."
+                },
+                {
+                    term: "Deep Learning",
+                    category: "Advanced ML",
+                    definition: "A subset of machine learning using artificial neural networks with multiple layers to automatically discover complex patterns in large datasets.",
+                    example: "Google's image search that can identify objects, people, animals, and scenes in photos with remarkable accuracy, even understanding context and relationships between elements."
+                },
+                {
+                    term: "Large Language Models",
+                    category: "Advanced AI",
+                    definition: "Massive AI models trained on vast amounts of text data to understand and generate human-like language across diverse topics and applications.",
+                    example: "ChatGPT, Claude, and Gemini that can write essays, answer complex questions, debug code, translate languages, and engage in nuanced conversations on virtually any topic."
+                },
+                {
+                    term: "Generative AI",
+                    category: "Creative AI",
+                    definition: "AI systems that can create new, original content including text, images, music, videos, and code by learning patterns from training data.",
+                    example: "DALL-E and Midjourney creating stunning original artwork from text descriptions like 'a futuristic cityscape in watercolor style' or 'a robot playing chess with a cat.'"
+                }
+            ]
+        };
+
+        // File upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            uploadArea.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            uploadArea.classList.remove('dragover');
+        }
+
+        uploadArea.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFileSelect, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    readCSVFile(file);
+                } else {
+                    showMessage('Please upload a CSV file.', 'error');
+                }
+            }
+        }
+
+        function readCSVFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    parseCSV(e.target.result);
+                } catch (error) {
+                    showMessage('Error parsing CSV: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.split('\n').map(line => line.trim()).filter(line => line);
+            
+            if (lines.length < 4) {
+                throw new Error('CSV must have at least 4 lines: title, subtitle, headers, and data');
+            }
+
+            const title = lines[0];
+            const subtitle = lines[1];
+            const headers = lines[2].split(',').map(h => h.trim());
+            
+            // Validate headers
+            const requiredHeaders = ['term', 'category', 'definition', 'example'];
+            const headerMap = {};
+            
+            headers.forEach((header, index) => {
+                const normalizedHeader = header.toLowerCase();
+                if (requiredHeaders.includes(normalizedHeader)) {
+                    headerMap[normalizedHeader] = index;
+                }
+            });
+
+            if (Object.keys(headerMap).length !== 4) {
+                throw new Error('CSV headers must include: Term, Category, Definition, Example (case insensitive)');
+            }
+
+            const cards = [];
+            for (let i = 3; i < lines.length; i++) {
+                const values = parseCSVLine(lines[i]);
+                if (values.length >= 4) {
+                    cards.push({
+                        term: values[headerMap.term] || '',
+                        category: values[headerMap.category] || '',
+                        definition: values[headerMap.definition] || '',
+                        example: values[headerMap.example] || ''
+                    });
+                }
+            }
+
+            if (cards.length === 0) {
+                throw new Error('No valid flashcard data found in CSV');
+            }
+
+            loadFlashcards({ title, subtitle, cards });
+            showMessage(`Successfully loaded ${cards.length} flashcards!`, 'success');
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            result.push(current.trim());
+            return result;
+        }
+
+        function loadFlashcards(data) {
+            flashcards = data.cards;
+            currentIndex = 0;
+            currentFace = 0;
+
+            // Update title and subtitle
+            document.getElementById('mainTitle').textContent = data.title;
+            document.getElementById('mainSubtitle').textContent = data.subtitle;
+
+            // Show flashcard section, hide upload section
+            document.getElementById('uploadSection').style.display = 'none';
+            document.getElementById('flashcardSection').style.display = 'block';
+
+            // Initialize first card
+            document.getElementById('total').textContent = flashcards.length;
+            updateCard();
+        }
+
+        function updateCard() {
+            if (flashcards.length === 0) return;
+
+            const card = flashcards[currentIndex];
+            
+            document.getElementById('termTitle').textContent = card.term;
+            document.getElementById('category').textContent = card.category;
+            document.getElementById('defTitle').textContent = card.term;
+            document.getElementById('definition').textContent = card.definition;
+            document.getElementById('exampleTitle').textContent = card.term;
+            document.getElementById('example').textContent = card.example;
+            
+            // Reset to front face
+            currentFace = 0;
+            const cardElement = document.getElementById('currentCard');
+            cardElement.className = 'flashcard fade-in';
+            
+            // Update counter and progress
+            document.getElementById('current').textContent = currentIndex + 1;
+            const progress = ((currentIndex + 1) / flashcards.length) * 100;
+            document.getElementById('progress').style.width = progress + '%';
+        }
+
+        function flipCard() {
+            const card = document.getElementById('currentCard');
+            currentFace = (currentFace + 1) % 3;
+            
+            card.classList.remove('show-definition', 'show-example');
+            
+            if (currentFace === 1) {
+                card.classList.add('show-definition');
+            } else if (currentFace === 2) {
+                card.classList.add('show-example');
+            }
+        }
+
+        function navigateCard(direction) {
+            if (flashcards.length === 0) return;
+            currentIndex = (currentIndex + direction + flashcards.length) % flashcards.length;
+            updateCard();
+        }
+
+        function toggleAutoPlay() {
+            const checkbox = document.getElementById('autoPlay');
+            if (checkbox.checked) {
+                autoPlayInterval = setInterval(() => {
+                    if (currentFace === 2) {
+                        navigateCard(1);
+                    } else {
+                        flipCard();
+                    }
+                }, 6000);
+            } else {
+                clearInterval(autoPlayInterval);
+                autoPlayInterval = null;
+            }
+        }
+
+        function resetApp() {
+            // Clear auto-play
+            if (autoPlayInterval) {
+                clearInterval(autoPlayInterval);
+                autoPlayInterval = null;
+                document.getElementById('autoPlay').checked = false;
+            }
+
+            // Reset data
+            flashcards = [];
+            currentIndex = 0;
+            currentFace = 0;
+
+            // Reset UI
+            document.getElementById('mainTitle').textContent = '🎓 Custom 3D Flashcards';
+            document.getElementById('mainSubtitle').textContent = 'Upload your CSV file to create interactive learning cards';
+            document.getElementById('uploadSection').style.display = 'block';
+            document.getElementById('flashcardSection').style.display = 'none';
+            document.getElementById('fileInput').value = '';
+            clearMessage();
+        }
+
+        function loadSampleData() {
+            loadFlashcards(sampleData);
+            showMessage('Sample AI concepts loaded successfully!', 'success');
+        }
+
+        function downloadSampleCSV() {
+            const csvContent = `Mathematics Fundamentals
+Essential Math Concepts for Students
+Term,Category,Definition,Example
+Algebra,Foundation,"Mathematical method using letters and symbols to represent numbers and quantities in formulas and equations.","Solving for x in the equation 2x + 5 = 15 to find that x equals 5"
+Calculus,Advanced,"Branch of mathematics dealing with rates of change and accumulation of quantities.","Finding the speed of a car at any given moment by calculating the derivative of its position over time"
+Geometry,Spatial,"Study of shapes, sizes, and properties of figures and spaces.","Calculating the area of a circular garden using the formula π × radius²"
+Statistics,Analysis,"Branch of mathematics dealing with collection, analysis, and interpretation of data.","Analyzing survey results to determine the average income in a city and the margin of error"
+Trigonometry,Functions,"Study of relationships between angles and sides of triangles.","Using sine and cosine functions to calculate the height of a building using angle measurements"`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'flashcards_template.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function copyPrompt() {
+            const promptText = `Create a CSV file for 3D flashcards about [YOUR TOPIC]. Format:
+
+Row 1: Title for the flashcard set
+Row 2: Subtitle/description for the flashcard set  
+Row 3: Headers: Term,Category,Definition,Example
+Rows 4+: Your flashcard data
+
+Generate 10-20 flashcards about [YOUR TOPIC] with:
+- Term: The concept/term name
+- Category: A short category (e.g., "Foundation", "Advanced", "Application")
+- Definition: Clear, concise explanation (2-3 sentences)
+- Example: Real-world example or practical application
+
+Make sure definitions are educational and examples are relatable and specific.`;
+
+            navigator.clipboard.writeText(promptText).then(() => {
+                showMessage('Prompt copied to clipboard!', 'success');
+            }).catch(() => {
+                showMessage('Could not copy to clipboard', 'error');
+            });
+        }
+
+        function showMessage(message, type) {
+            const messageArea = document.getElementById('messageArea');
+            const className = type === 'error' ? 'error-message' : 'success-message';
+            messageArea.innerHTML = `<div class="${className}">${message}</div>`;
+            
+            setTimeout(clearMessage, 5000);
+        }
+
+        function clearMessage() {
+            document.getElementById('messageArea').innerHTML = '';
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('flashcardSection').style.display === 'none') return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    navigateCard(-1);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    navigateCard(1);
+                    break;
+                case ' ':
+                case 'Enter':
+                    e.preventDefault();
+                    flipCard();
+                    break;
+                case 'Escape':
+                    if (autoPlayInterval) {
+                        document.getElementById('autoPlay').checked = false;
+                        toggleAutoPlay();
+                    }
+                    break;
+            }
+        });
+
+        // Touch/click events for flashcard
+        document.getElementById('currentCard').addEventListener('click', () => {
+            if (document.getElementById('flashcardSection').style.display !== 'none') {
+                flipCard();
+            }
+        });
+
+        // Mobile swipe gestures
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        document.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', e => {
+            if (document.getElementById('flashcardSection').style.display === 'none') return;
+            
+            touchEndX = e.changedTouches[0].screenX;
+            const swipeThreshold = 50;
+            const diff = touchStartX - touchEndX;
+            
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    navigateCard(1); // Swipe left - next card
+                } else {
+                    navigateCard(-1); // Swipe right - previous card
+                }
+            }
+        });
+    </script>
+</body>
+</html>
