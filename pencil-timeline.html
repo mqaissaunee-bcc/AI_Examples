@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Secret History of the Pencil - Interactive Timeline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: linear-gradient(135deg, #2c2416 0%, #3d3123 100%);
+            color: #2c2416;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #f4d03f 0%, #ffeb99 100%);
+            padding: 40px 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            color: #2c2416;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            color: #4a3b2a;
+            font-style: italic;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: #2c2416;
+            color: #f4d03f;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .control-btn:hover {
+            background: #4a3b2a;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+
+        .control-btn.active {
+            background: #8B4513;
+            color: white;
+        }
+
+        .timeline-container {
+            position: relative;
+            max-width: 1200px;
+            margin: 60px auto;
+            padding: 0 20px 100px 20px;
+        }
+
+        .timeline-line {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px;
+            height: 100%;
+            background: linear-gradient(to bottom, #f4d03f, #8B4513, #2c2416);
+            border-radius: 3px;
+        }
+
+        .pencil-marker {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            background: #f4d03f;
+            border-radius: 50%;
+            border: 4px solid #2c2416;
+            z-index: 10;
+            transition: all 0.5s ease;
+            box-shadow: 0 0 20px rgba(244, 208, 63, 0.5);
+        }
+
+        .pencil-marker.active {
+            width: 60px;
+            height: 60px;
+            background: #FFD700;
+            box-shadow: 0 0 40px rgba(255, 215, 0, 0.8);
+        }
+
+        .timeline-event {
+            position: relative;
+            margin-bottom: 80px;
+            opacity: 0;
+            transform: translateY(50px);
+            transition: all 0.6s ease;
+        }
+
+        .timeline-event.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .timeline-event.highlighted {
+            animation: pulse 1s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .event-content {
+            width: 45%;
+            padding: 25px;
+            background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            position: relative;
+            border: 3px solid #f4d03f;
+        }
+
+        .timeline-event:nth-child(even) .event-content {
+            margin-left: 55%;
+        }
+
+        .timeline-event:nth-child(odd) .event-content {
+            margin-left: 0;
+        }
+
+        .event-year {
+            font-size: 2em;
+            font-weight: bold;
+            color: #8B4513;
+            margin-bottom: 10px;
+            display: inline-block;
+            padding: 5px 15px;
+            background: #f4d03f;
+            border-radius: 8px;
+        }
+
+        .event-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2c2416;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+
+        .event-description {
+            font-size: 1.05em;
+            color: #4a3b2a;
+            line-height: 1.6;
+        }
+
+        .event-icon {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: #f4d03f;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            border: 4px solid #2c2416;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .timeline-event:nth-child(even) .event-icon {
+            left: -30px;
+        }
+
+        .timeline-event:nth-child(odd) .event-icon {
+            right: -30px;
+        }
+
+        .progress-indicator {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(44, 36, 22, 0.95);
+            padding: 15px 30px;
+            border-radius: 30px;
+            color: #f4d03f;
+            font-weight: bold;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            z-index: 100;
+        }
+
+        .era-label {
+            text-align: center;
+            font-size: 2.5em;
+            color: #f4d03f;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
+            margin: 60px 0 40px 0;
+            padding: 20px;
+            background: rgba(139, 69, 19, 0.7);
+            border-radius: 15px;
+        }
+
+        .fun-fact {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 5px solid #8B4513;
+            font-style: italic;
+        }
+
+        .fun-fact strong {
+            color: #8B4513;
+        }
+
+        @media (max-width: 768px) {
+            .timeline-event:nth-child(even) .event-content,
+            .timeline-event:nth-child(odd) .event-content {
+                width: 90%;
+                margin-left: 5%;
+            }
+
+            .timeline-line {
+                left: 30px;
+            }
+
+            .pencil-marker {
+                left: 30px;
+            }
+
+            .event-icon {
+                display: none;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .era-label {
+                font-size: 1.8em;
+            }
+        }
+
+        .scroll-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #8B4513;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.5em;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .scroll-to-top:hover {
+            background: #A0522D;
+            transform: translateY(-5px);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>✏️ The Secret History of the Pencil ✏️</h1>
+        <p>An Interactive Journey Through Time</p>
+        <div class="controls">
+            <button class="control-btn" id="playBtn">▶️ Auto-Play</button>
+            <button class="control-btn" id="pauseBtn">⏸️ Pause</button>
+            <button class="control-btn" id="resetBtn">🔄 Reset</button>
+            <button class="control-btn" id="jump1300s">1300s</button>
+            <button class="control-btn" id="jump1500s">1500s</button>
+            <button class="control-btn" id="jump1700s">1700s</button>
+            <button class="control-btn" id="jump1800s">1800s</button>
+            <button class="control-btn" id="jump1900s">1900s</button>
+        </div>
+    </div>
+
+    <div class="timeline-container">
+        <div class="timeline-line"></div>
+        
+        <div class="era-label">📜 The Early Days (1300s-1500s)</div>
+        
+        <div class="timeline-event" data-year="1325">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">📝</div>
+                <div class="event-year">1325</div>
+                <div class="event-title">The Word "Pencil" Enters English</div>
+                <div class="event-description">
+                    The word "pencil"—meaning "paintbrush"—enters the English language. By the 1680s, pencils are sometimes called "dry pencils" to distinguish them from ink pens and paintbrushes.
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> The word comes from Latin "penicillus," meaning "little tail"!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1560">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🌲</div>
+                <div class="event-year">1560</div>
+                <div class="event-title">First Wooden Pencil Created</div>
+                <div class="event-description">
+                    Italian couple Simonio and Lyndiana Bernacotti invent the first wooden pencil by hollowing out a flat rod of juniper wood. It was oval-shaped to prevent rolling—mainly used by carpenters.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1564">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">⛰️</div>
+                <div class="event-year">1564</div>
+                <div class="event-title">Graphite Discovery in England</div>
+                <div class="event-description">
+                    Shepherds in Cumberland, England, find a tree uprooted by a storm and notice a strange black substance clinging to its roots—the first major graphite deposit. They use it to mark sheep, and soon it becomes valuable for making cannonball molds.
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> This graphite was so pure it could be sawn into sticks. People called it "plumbago," thinking it was a kind of lead!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1565">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🔧</div>
+                <div class="event-year">1565</div>
+                <div class="event-title">First Lead Holder Described</div>
+                <div class="event-description">
+                    Swiss naturalist Conrad Gesner describes a lead holder pencil—an early mechanical pencil where graphite is inserted into a wooden handle. This is the ancestor of modern mechanical pencils.
+                </div>
+            </div>
+        </div>
+
+        <div class="era-label">🎨 The Age of Innovation (1600s-1700s)</div>
+
+        <div class="timeline-event" data-year="1612">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🦅</div>
+                <div class="event-year">1612</div>
+                <div class="event-title">Street Graphite Sales</div>
+                <div class="event-description">
+                    London artists, students, and other scribblers take up "plumbago drawing" as merchants hawk pieces of graphite on the street. The tools don't come with erasers, though. One unnamed 1612 writer recommends rubbing out the marks with "crums of wheate bred."
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1662">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🏭</div>
+                <div class="event-year">1662</div>
+                <div class="event-title">Mass Production Begins</div>
+                <div class="event-description">
+                    Nuremberg, Germany becomes the birthplace of the first mass-produced pencils. Though the graphite wasn't as pure as England's, German manufacturers found ways to work with crushed graphite.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1690">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🎭</div>
+                <div class="event-year">Late 1600s</div>
+                <div class="event-title">The Fake Pencil Scam</div>
+                <div class="event-description">
+                    Con artists called "stumplers" boost the fake pencil trade by blackening the tips of wooden sticks, making it look like there's graphite inside. Frustrated customers soon discover they've been duped into buying expensive kindling.
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> This might be history's first mass consumer fraud involving writing instruments!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1752">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">💣</div>
+                <div class="event-year">1752</div>
+                <div class="event-title">Graphite for War</div>
+                <div class="event-description">
+                    Noticing that graphite helps munitions slide from their casts, the British start using it to make cannonballs. The substance is so valuable that Cumberland mines are guarded by the Crown. Meanwhile, the British House of Commons makes it a felony to steal graphite.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1770">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🧽</div>
+                <div class="event-year">1770</div>
+                <div class="event-title">The Rubber Eraser Discovered</div>
+                <div class="event-description">
+                    Edward Nairne, in the middle of writing, absentmindedly reaches across his desk for a few morsels of bread. He mistakenly picks up a piece of rubber instead and discovers the rubber eraser.
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> Before rubber, people used bread crumbs to erase pencil marks!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1791">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">⚓</div>
+                <div class="event-year">1791</div>
+                <div class="event-title">Mechanical Pencil at Sea</div>
+                <div class="event-description">
+                    The HMS Pandora sinks. When discovered in 1977, aboard the wreckage was an early mechanical pencil—proving that mechanical pencils existed much earlier than previously thought.
+                </div>
+            </div>
+        </div>
+
+        <div class="era-label">🇫🇷 The Modern Pencil is Born (1795-1850)</div>
+
+        <div class="timeline-event" data-year="1795">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">💡</div>
+                <div class="event-year">1795</div>
+                <div class="event-title">The Modern Pencil Invented</div>
+                <div class="event-description">
+                    Thanks to Napoleon's blockade, quality British pencils become rare in France. The French minister of war asks Nicolas-Jacques Conté, an army officer and artist, to come up with a substitute. Conté reportedly solves the problem in eight days, mixing inferior French graphite with clay. The modern pencil is born.
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> Conté's method of mixing clay with graphite is still used today! More clay = harder pencil, more graphite = softer pencil.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1800">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🦢</div>
+                <div class="event-year">1800</div>
+                <div class="event-title">American Quill Pencils</div>
+                <div class="event-description">
+                    With high-quality European graphite hard to come by, American writers improvise. Quill pencils are made by poking a goose feather into a turnip and pouring a melted bullet inside. A few years later, a Massachusetts schoolgirl creates America's first graphite pencil by stuffing English graphite and glue into a twig she hollowed out with a knitting needle.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1812">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🇺🇸</div>
+                <div class="event-year">1812</div>
+                <div class="event-title">First American Wood Pencils</div>
+                <div class="event-description">
+                    William Monroe, a cabinetmaker in Concord, Massachusetts, makes the first American wood pencils. Around the same time, other pencil makers in Concord begin experimenting with local graphite.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1822">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">⚙️</div>
+                <div class="event-year">1822</div>
+                <div class="event-title">Mechanical Pencil Patent</div>
+                <div class="event-description">
+                    Sampson Mordan and John Isaac Hawkins patent the first refillable mechanical pencil with a lead-propelling mechanism in Britain. This "ever-pointed pencil" marks a major advancement in writing technology.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1832">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🏢</div>
+                <div class="event-year">1832</div>
+                <div class="event-title">First Pencil Factory</div>
+                <div class="event-description">
+                    The first pencil factory opens in Keswick, England under the name Banks, Son & Co (now the Derwent Cumberland Pencil Company). Cumberland pencils were considered the highest quality because the graphite left no dust and marked the paper clearly.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1844">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">📖</div>
+                <div class="event-year">1844</div>
+                <div class="event-title">Thoreau's Pencil Innovation</div>
+                <div class="event-description">
+                    Before escaping to Walden Pond, Henry David Thoreau works for his family's pencil biz. One day, he adds clay binder to the graphite—rediscovering the French secret to perfect pencils. By mid-century, his family is selling pencils of varying degrees of hardness, which they classify with a new system: numbers.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1847">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🌏</div>
+                <div class="event-year">1847</div>
+                <div class="event-title">Siberian Graphite Discovery</div>
+                <div class="event-description">
+                    A Frenchman panning for gold in Siberia finds the world's richest seam of graphite. Pencils made with it become the finest around—sensitively called "Mongol" and "Mikado" to conjure images of East Asia. By 1890, manufacturers begin painting pencils yellow—the Chinese color of royalty—to symbolize quality.
+                </div>
+            </div>
+        </div>
+
+        <div class="era-label">🏭 The Industrial Age (1850-1900)</div>
+
+        <div class="timeline-event" data-year="1858">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🎯</div>
+                <div class="event-year">1858</div>
+                <div class="event-title">Eraser Attached to Pencil</div>
+                <div class="event-description">
+                    Hymen Lipman patents the idea of attaching a rubber eraser to the end of a pencil. His original idea was to embed the rubber into the wood like graphite, but his design evolved to the familiar metal ferrule design we know today.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1870">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">⭐</div>
+                <div class="event-year">1870</div>
+                <div class="event-title">World's Largest Pencil Dealer</div>
+                <div class="event-description">
+                    The Joseph Dixon Crucible Company becomes the world's largest dealer and consumer of graphite. The company later becomes Dixon Ticonderoga, maker of the iconic yellow #2 pencil.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1877">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🔩</div>
+                <div class="event-year">1877</div>
+                <div class="event-title">Spring-Loaded Mechanical Pencil</div>
+                <div class="event-description">
+                    The first spring-loaded mechanical pencil is patented, marking a significant improvement in mechanical pencil technology. Between 1822 and 1877, more than 160 patents were registered for mechanical pencil improvements.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1879">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🔘</div>
+                <div class="event-year">1879</div>
+                <div class="event-title">Pushbutton Clutch Invented</div>
+                <div class="event-description">
+                    Joseph Hoffmann invents the pushbutton clutch mechanism in New York City. First used in the Eagle Automatic by the Eagle Pencil Company, this represents the first true modern mechanical pencil.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1889">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">💛</div>
+                <div class="event-year">1889</div>
+                <div class="event-title">Yellow Pencils Debut</div>
+                <div class="event-description">
+                    At the 1889 Paris World's Fair, the Hardtmuth Company introduces the Koh-I-Noor yellow pencil (named after a famous diamond). They painted pencils yellow to associate them with Chinese royalty and the newly discovered Siberian graphite. The yellow pencil becomes an instant hit!
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> In a 1950s experiment, Faber distributed 1,000 pencils—half yellow, half green. The green ones were returned with complaints, even though they were identical!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1895">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🔄</div>
+                <div class="event-year">1895</div>
+                <div class="event-title">Twist-Feed Mechanism</div>
+                <div class="event-description">
+                    The first twist-feed mechanical pencil is invented, advancing the lead by twisting a screw. This design becomes the most common type of mechanical pencil at the beginning of the 20th century.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1899">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">📋</div>
+                <div class="event-year">Late 1800s</div>
+                <div class="event-title">Copying Pencils Invented</div>
+                <div class="event-description">
+                    Copying pencils (or indelible pencils) with added dye are invented. When moistened, their markings dissolve into colored ink that can be pressed onto another piece of paper—widely used until ball pens replaced them in the mid-20th century.
+                </div>
+            </div>
+        </div>
+
+        <div class="era-label">🚀 The 20th Century and Beyond (1900-Present)</div>
+
+        <div class="timeline-event" data-year="1913">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">✨</div>
+                <div class="event-year">1913</div>
+                <div class="event-title">Eversharp Pencil</div>
+                <div class="event-description">
+                    Charles R. Keeran invents the Eversharp mechanical pencil, combining a simple propelling mechanism with large lead capacity. By the early 1920s, over 12 million Eversharp pencils had been sold!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1915">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🔪</div>
+                <div class="event-year">1915</div>
+                <div class="event-title">Sharp Corporation Founded</div>
+                <div class="event-description">
+                    Tokuji Hayakawa, a Japanese metalworker, invents the "Ever-Ready Sharp Pencil" with an improved screw-based mechanism. When orders pour in, he starts a company named after his pencil: Sharp. The company later becomes famous for electronics!
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> Yes, Sharp Electronics got its name from a pencil!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1930">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">📏</div>
+                <div class="event-year">1930s</div>
+                <div class="event-title">Thin Leads Introduced</div>
+                <div class="event-description">
+                    Very thin mechanical pencil leads appear, starting with 0.9mm. Later sizes include 0.3mm, 0.5mm, 0.7mm, and others. Today we even have leads as thin as 0.2mm!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1940">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🗺️</div>
+                <div class="event-year">1940s</div>
+                <div class="event-title">Secret Spy Pencils</div>
+                <div class="event-description">
+                    During World War II, the British develop pencils with silk maps and tiny compasses hidden under the eraser. Invented by Charles Fraser-Smith—the inspiration for "Q" in the James Bond movies—the secret compasses help pilots navigate over enemy territory.
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> Real-life James Bond gadgets started with pencils!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1955">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">💧</div>
+                <div class="event-year">1955</div>
+                <div class="event-title">Liquid Graphite Pencils</div>
+                <div class="event-description">
+                    Scripto and Parker Pens independently invent liquid graphite pencils that write like pens. To avoid a patent fight, the two companies agree to share their formulas.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1965">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🚀</div>
+                <div class="event-year">1965</div>
+                <div class="event-title">NASA Retires the Pencil</div>
+                <div class="event-description">
+                    NASA retires the pencil upon learning it isn't safe in space—it's flammable and fine wood flakes can harm equipment. The agency orders 34 special mechanical pencils from Tycam Engineering and pays $128.89 each. After a public outcry, the agency switches to the Fisher Space Pen.
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> The "space pen vs pencil" story is often told incorrectly—pencils really were dangerous in space!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1967">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🧪</div>
+                <div class="event-year">1967</div>
+                <div class="event-title">Plastic Pencils</div>
+                <div class="event-description">
+                    Harold Grossman invents plastic pencils for the Empire Pencil Company. These pencils were co-extruded, with a plasticized graphite mix within a wood-composite core.
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="1970">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">🔝</div>
+                <div class="event-year">Early 1970s</div>
+                <div class="event-title">Pop-A-Point Pencils</div>
+                <div class="event-description">
+                    Taiwanese manufacturer Bensia Pioneer invents Pop-A-Point Pencils (also called stackable or non-sharpening pencils). When a tip becomes blunt, you pull it out and reinsert it in the back, pushing a new tip forward!
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-event" data-year="2025">
+            <div class="pencil-marker"></div>
+            <div class="event-content">
+                <div class="event-icon">✏️</div>
+                <div class="event-year">Today</div>
+                <div class="event-title">The Pencil Endures</div>
+                <div class="event-description">
+                    Despite digital technology, the humble pencil remains beloved by artists, students, writers, and thinkers worldwide. Over 14 billion pencils are produced each year. From sketching masterpieces to taking standardized tests, the pencil continues to be an essential tool of human creativity and communication.
+                </div>
+                <div class="fun-fact">
+                    <strong>Fun Fact:</strong> A typical HB pencil can draw a line 35 miles long or write approximately 45,000 words!
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="progress-indicator" id="progressIndicator">
+        Event <span id="currentEvent">0</span> of <span id="totalEvents">0</span>
+    </div>
+
+    <div class="scroll-to-top" onclick="scrollToTop()">↑</div>
+
+    <script>
+        let autoPlayInterval;
+        let currentIndex = 0;
+        let isPlaying = false;
+        const events = document.querySelectorAll('.timeline-event');
+        const markers = document.querySelectorAll('.pencil-marker');
+        const totalEvents = events.length;
+
+        document.getElementById('totalEvents').textContent = totalEvents;
+
+        // Intersection Observer for scroll animations
+        const observerOptions = {
+            threshold: 0.3,
+            rootMargin: '0px 0px -100px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    const index = Array.from(events).indexOf(entry.target);
+                    updateProgress(index + 1);
+                }
+            });
+        }, observerOptions);
+
+        events.forEach(event => observer.observe(event));
+
+        // Auto-play functionality
+        function startAutoPlay() {
+            if (isPlaying) return;
+            isPlaying = true;
+            document.getElementById('playBtn').classList.add('active');
+            
+            autoPlayInterval = setInterval(() => {
+                if (currentIndex < events.length) {
+                    scrollToEvent(currentIndex);
+                    currentIndex++;
+                } else {
+                    stopAutoPlay();
+                    currentIndex = 0;
+                }
+            }, 4000);
+        }
+
+        function stopAutoPlay() {
+            isPlaying = false;
+            clearInterval(autoPlayInterval);
+            document.getElementById('playBtn').classList.remove('active');
+        }
+
+        function resetTimeline() {
+            stopAutoPlay();
+            currentIndex = 0;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            events.forEach(event => {
+                event.classList.remove('visible', 'highlighted');
+            });
+            markers.forEach(marker => {
+                marker.classList.remove('active');
+            });
+            updateProgress(0);
+        }
+
+        function scrollToEvent(index) {
+            if (index >= 0 && index < events.length) {
+                events[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                events[index].classList.add('highlighted');
+                markers[index].classList.add('active');
+                
+                setTimeout(() => {
+                    events[index].classList.remove('highlighted');
+                }, 1000);
+            }
+        }
+
+        function jumpToEra(year) {
+            stopAutoPlay();
+            let targetIndex = 0;
+            
+            events.forEach((event, index) => {
+                const eventYear = parseInt(event.getAttribute('data-year'));
+                if (eventYear >= year && targetIndex === 0) {
+                    targetIndex = index;
+                }
+            });
+            
+            scrollToEvent(targetIndex);
+            currentIndex = targetIndex + 1;
+        }
+
+        function updateProgress(current) {
+            document.getElementById('currentEvent').textContent = current;
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Event listeners
+        document.getElementById('playBtn').addEventListener('click', startAutoPlay);
+        document.getElementById('pauseBtn').addEventListener('click', stopAutoPlay);
+        document.getElementById('resetBtn').addEventListener('click', resetTimeline);
+        
+        document.getElementById('jump1300s').addEventListener('click', () => jumpToEra(1300));
+        document.getElementById('jump1500s').addEventListener('click', () => jumpToEra(1500));
+        document.getElementById('jump1700s').addEventListener('click', () => jumpToEra(1700));
+        document.getElementById('jump1800s').addEventListener('click', () => jumpToEra(1800));
+        document.getElementById('jump1900s').addEventListener('click', () => jumpToEra(1900));
+
+        // Show scroll-to-top button when scrolled
+        window.addEventListener('scroll', () => {
+            const scrollTop = document.querySelector('.scroll-to-top');
+            if (window.scrollY > 500) {
+                scrollTop.style.display = 'flex';
+            } else {
+                scrollTop.style.display = 'none';
+            }
+        });
+
+        // Initial setup
+        document.querySelector('.scroll-to-top').style.display = 'none';
+    </script>
+</body>
+</html>

@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive History of Communication Timeline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-card: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --accent-visual: #ff6b6b;
+            --accent-wired: #ffa500;
+            --accent-wireless: #8b0000;
+            --accent-cloud: #4a90e2;
+            --accent-future: #9b59b6;
+            --border-color: #e0e0e0;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --timeline-line: #d0d0d0;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-card: #1c2128;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            --timeline-line: #30363d;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: background 0.3s ease, color 0.3s ease;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--accent-visual) 0%, var(--accent-cloud) 100%);
+            padding: 2.5rem 2rem;
+            text-align: center;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: white;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            color: rgba(255,255,255,0.9);
+            font-size: 1.1rem;
+        }
+
+        /* Controls */
+        .controls {
+            background: var(--bg-secondary);
+            padding: 1.5rem 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 2px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 99;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            max-width: 400px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 25px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent-cloud);
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+
+        .era-filters {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .era-btn {
+            padding: 0.6rem 1.2rem;
+            border: 2px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .era-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .era-btn.active {
+            background: var(--accent-cloud);
+            color: white;
+            border-color: var(--accent-cloud);
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .icon-btn {
+            padding: 0.6rem 1rem;
+            border: none;
+            background: var(--accent-cloud);
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .icon-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        /* Timeline Container */
+        .timeline-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+            position: relative;
+        }
+
+        /* Timeline Line */
+        .timeline-line {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--timeline-line);
+            transform: translateX(-50%);
+        }
+
+        .progress-line {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            width: 4px;
+            background: linear-gradient(to bottom, var(--accent-visual), var(--accent-cloud));
+            transform: translateX(-50%);
+            transition: height 0.3s ease;
+        }
+
+        /* Timeline Item */
+        .timeline-item {
+            display: flex;
+            margin-bottom: 4rem;
+            position: relative;
+            opacity: 0;
+            transform: translateY(50px);
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .timeline-item:nth-child(even) {
+            flex-direction: row-reverse;
+        }
+
+        .timeline-content {
+            width: calc(50% - 50px);
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .timeline-content:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            border-color: var(--accent-cloud);
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: white;
+            border: 4px solid var(--accent-cloud);
+            box-shadow: var(--shadow);
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        .timeline-item:hover .timeline-dot {
+            transform: translateX(-50%) scale(1.3);
+            border-width: 5px;
+        }
+
+        .era-visual .timeline-dot { border-color: var(--accent-visual); }
+        .era-wired .timeline-dot { border-color: var(--accent-wired); }
+        .era-wireless .timeline-dot { border-color: var(--accent-wireless); }
+        .era-cloud .timeline-dot { border-color: var(--accent-cloud); }
+        .era-future .timeline-dot { border-color: var(--accent-future); }
+
+        .timeline-date {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent-cloud);
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .timeline-preview {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .timeline-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .tag {
+            padding: 0.3rem 0.8rem;
+            background: var(--bg-secondary);
+            border-radius: 15px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            overflow-y: auto;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            max-width: 800px;
+            margin: 3rem auto;
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: slideUp 0.4s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            font-size: 2rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transform: rotate(90deg);
+        }
+
+        .modal-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-date {
+            font-size: 1.2rem;
+            color: var(--accent-cloud);
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-title {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .modal-body h3 {
+            font-size: 1.3rem;
+            margin: 1.5rem 0 0.75rem 0;
+            color: var(--text-primary);
+        }
+
+        .modal-body p {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+
+        .modal-body strong {
+            color: var(--text-primary);
+        }
+
+        .modal-body ul {
+            margin-left: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .modal-body li {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* Quiz Mode */
+        .quiz-container {
+            max-width: 800px;
+            margin: 3rem auto;
+            padding: 2rem;
+            background: var(--bg-card);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .quiz-question {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
+        }
+
+        .quiz-options {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .quiz-option {
+            padding: 1rem 1.5rem;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .quiz-option:hover {
+            border-color: var(--accent-cloud);
+            transform: translateX(5px);
+        }
+
+        .quiz-option.correct {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .quiz-option.incorrect {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+
+        .quiz-result {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .timeline-line {
+                left: 30px;
+            }
+
+            .progress-line {
+                left: 30px;
+            }
+
+            .timeline-item {
+                flex-direction: column !important;
+                padding-left: 60px;
+            }
+
+            .timeline-content {
+                width: 100%;
+            }
+
+            .timeline-dot {
+                left: 30px;
+            }
+
+            .modal-content {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .search-box {
+                max-width: 100%;
+            }
+        }
+
+        /* Fun Facts */
+        .fun-fact {
+            background: linear-gradient(135deg, rgba(74, 144, 226, 0.1), rgba(155, 89, 182, 0.1));
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            border-left: 4px solid var(--accent-cloud);
+        }
+
+        .fun-fact::before {
+            content: "💡 Fun Fact: ";
+            font-weight: bold;
+            color: var(--accent-cloud);
+        }
+
+        /* Stats Box */
+        .stats-box {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .stat-item {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-cloud);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        /* Loading Animation */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+        }
+
+        /* No Results */
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .no-results h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <header class="header">
+        <h1>📱 A History of Communication</h1>
+        <p>Explore how humanity connected across time and space</p>
+    </header>
+
+    <div class="controls">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 Search milestones...">
+        </div>
+        
+        <div class="era-filters">
+            <button class="era-btn active" data-era="all">All Eras</button>
+            <button class="era-btn" data-era="visual">Visual Era</button>
+            <button class="era-btn" data-era="wired">Wired Era</button>
+            <button class="era-btn" data-era="wireless">Wireless Era</button>
+            <button class="era-btn" data-era="cloud">IP Cloud Era</button>
+            <button class="era-btn" data-era="future">Future</button>
+        </div>
+
+        <div class="control-buttons">
+            <button class="icon-btn" id="quizBtn">🎯 Quiz Mode</button>
+            <button class="icon-btn" id="randomBtn">🎲 Random Fact</button>
+            <button class="icon-btn" id="themeToggle">🌙 Dark Mode</button>
+        </div>
+    </div>
+
+    <div class="timeline-container" id="timelineContainer">
+        <div class="timeline-line">
+            <div class="progress-line" id="progressLine"></div>
+        </div>
+        <div id="timeline"></div>
+    </div>
+
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <span class="modal-close" id="modalClose">&times;</span>
+            <div class="modal-header">
+                <div class="modal-date" id="modalDate"></div>
+                <h2 class="modal-title" id="modalTitle"></h2>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        const timelineData = [
+            {
+                date: "Prehistoric",
+                year: -10000,
+                title: "Smoke Signals & Cave Paintings",
+                preview: "Early humans used visual signals and art to communicate across distances and time.",
+                era: "visual",
+                description: "The earliest forms of human communication included cave paintings, smoke signals, and drum beats. These methods allowed our ancestors to share information about hunting, danger, and important events.",
+                impact: "Enabled long-distance warning systems and preserved cultural knowledge through visual storytelling that has survived tens of thousands of years.",
+                funFacts: [
+                    "Cave paintings in Indonesia date back over 45,000 years",
+                    "Native American tribes could communicate complex messages using smoke signal patterns",
+                    "The oldest known cave paintings are in El Castillo, Spain, dating to 40,000 BCE"
+                ]
+            },
+            {
+                date: "8th Century",
+                year: 700,
+                title: "Pigeon Post",
+                preview: "Carrier pigeons revolutionized message delivery with their remarkable homing abilities.",
+                era: "visual",
+                description: "Pigeons were domesticated and trained to carry messages across long distances. Their natural homing instinct made them reliable messengers for military, commercial, and personal communications.",
+                impact: "Used extensively in warfare, business, and personal correspondence for over 1,000 years. During WWI, pigeons saved thousands of lives by delivering critical messages when other methods failed.",
+                funFacts: [
+                    "Pigeons can fly up to 600 miles in a single day",
+                    "Cher Ami, a WWI carrier pigeon, saved 194 soldiers and received a medal for bravery",
+                    "Pigeons remained in use by some militaries until the 1950s"
+                ]
+            },
+            {
+                date: "1450",
+                year: 1450,
+                title: "Printing Press",
+                preview: "Johannes Gutenberg's invention democratized knowledge and transformed mass communication.",
+                era: "visual",
+                description: "The mechanical movable-type printing press revolutionized the production of books, making written knowledge accessible to the masses for the first time in human history.",
+                impact: "Sparked the Renaissance, Reformation, Scientific Revolution, and Age of Enlightenment. Literacy rates exploded, and ideas could spread faster than ever before.",
+                funFacts: [
+                    "The Gutenberg Bible was the first major book printed using movable type",
+                    "By 1500, over 20 million books had been printed in Europe",
+                    "It took about 3 years to produce a single book before the printing press"
+                ],
+                keyFigures: ["Johannes Gutenberg"]
+            },
+            {
+                date: "1838",
+                year: 1838,
+                title: "Telegraph",
+                preview: "Samuel Morse's electromagnetic telegraph enabled instant long-distance communication for the first time.",
+                era: "wired",
+                description: "The telegraph used electrical signals transmitted over wires to send encoded messages. Morse code, developed by Samuel Morse and Alfred Vail, became the universal language of telegraph communication.",
+                impact: "Revolutionized business, journalism, diplomacy, and warfare. News that once took weeks to travel could now be transmitted in minutes. The telegraph created the first 'global network.'",
+                funFacts: [
+                    "The first telegraph message was 'What hath God wrought' sent on May 24, 1844",
+                    "By 1861, telegraph lines stretched across the entire United States",
+                    "The last telegram in the US was sent by Western Union in 2006"
+                ],
+                keyFigures: ["Samuel Morse", "Alfred Vail", "Joseph Henry"]
+            },
+            {
+                date: "1876",
+                year: 1876,
+                title: "Telephone",
+                preview: "Alexander Graham Bell's invention brought human voices across the wires.",
+                era: "wired",
+                description: "The telephone converted sound waves into electrical signals that could be transmitted over distances and then converted back into sound. This allowed real-time voice conversations between people far apart.",
+                impact: "Transformed personal and business communication. By enabling voice conversations, the telephone added emotional nuance and immediacy that written messages couldn't provide. It became essential infrastructure for modern society.",
+                funFacts: [
+                    "Bell's first words on the telephone were 'Mr. Watson, come here, I want to see you'",
+                    "The first long-distance call was made in 1876 between Boston and Cambridge, just 2 miles",
+                    "By 1900, there were over 1.3 million telephones in the US"
+                ],
+                keyFigures: ["Alexander Graham Bell", "Thomas Watson"]
+            },
+            {
+                date: "1930",
+                year: 1930,
+                title: "First Videophone",
+                preview: "AT&T demonstrated the first video telephone system, previewing the future of visual communication.",
+                era: "wired",
+                description: "The first commercial videophone system was demonstrated by AT&T in 1930, allowing users to see each other while talking. Though prohibitively expensive, it showcased what would become commonplace decades later.",
+                impact: "Pioneered visual telecommunications technology. While commercially unsuccessful due to cost and bandwidth limitations, it laid groundwork for future video conferencing and video calls.",
+                funFacts: [
+                    "The system cost about $500,000 in today's money to install",
+                    "Only three cities were initially connected: New York, Chicago, and Philadelphia",
+                    "A 3-minute call cost $16-27, equivalent to $250-420 today"
+                ]
+            },
+            {
+                date: "1959",
+                year: 1959,
+                title: "First Pager",
+                preview: "The motorized radio pager allowed one-way wireless messaging for the first time.",
+                era: "wireless",
+                description: "Motorola's first pager allowed instant notification over radio frequencies. Originally used by doctors and emergency services, pagers became ubiquitous in the 1980s and 90s.",
+                impact: "Created the concept of being 'always reachable' and paved the way for mobile communication. At their peak in the 1990s, over 60 million people used pagers worldwide.",
+                funFacts: [
+                    "The first pager weighed about 2 pounds and cost $300",
+                    "In the 1990s, having a pager was a status symbol",
+                    "Pagers are still used in hospitals today because they're more reliable than cell phones"
+                ]
+            },
+            {
+                date: "1964",
+                year: 1964,
+                title: "Xerox Fax Machine",
+                preview: "The commercial fax machine revolutionized document transmission across phone lines.",
+                era: "wireless",
+                description: "The Xerox Magnafax Telecopier could transmit a letter-sized document in about 6 minutes over standard telephone lines, making instant document sharing practical for businesses.",
+                impact: "Transformed business operations by enabling rapid sharing of signed contracts, technical drawings, and other documents. Remained essential until email adoption in the 1990s.",
+                funFacts: [
+                    "The first fax patent was filed in 1843, before the telephone existed!",
+                    "Japan was the biggest fax user, with millions still in use today",
+                    "The White House has a fax number that's publicly available"
+                ]
+            },
+            {
+                date: "1973",
+                year: 1973,
+                title: "Mobile Phone",
+                preview: "Martin Cooper made the first handheld mobile phone call, revolutionizing personal communication.",
+                era: "wireless",
+                description: "Motorola's Martin Cooper made the first mobile phone call on April 3, 1973, in New York City. The DynaTAC 8000X weighed 2.5 pounds and offered 30 minutes of talk time after a 10-hour charge.",
+                impact: "Initiated the mobile revolution that would eventually put a phone in nearly every person's pocket worldwide. Freed communication from fixed locations forever.",
+                funFacts: [
+                    "Cooper called a rival engineer at Bell Labs to demonstrate the technology",
+                    "The first commercial mobile phone cost $3,995 in 1983 ($11,000 today)",
+                    "It took 10 years from the first call to commercial availability"
+                ],
+                keyFigures: ["Martin Cooper"]
+            },
+            {
+                date: "1981",
+                year: 1981,
+                title: "First Mobile Phone Network",
+                preview: "The Nordic Mobile Telephone system launched the world's first automatic cellular network.",
+                era: "wireless",
+                description: "NMT became the first fully automatic cellular phone system, allowing roaming across Norway, Sweden, Finland, and Denmark. This proved that cellular networks could work on a large scale.",
+                impact: "Established the technical and business framework for modern cellular networks. Demonstrated that mobile phones could be practical for everyday use, not just emergency services.",
+                funFacts: [
+                    "NMT operated at 450 MHz, much lower than today's networks",
+                    "The system had 450,000 subscribers at its peak",
+                    "NMT remained in use until 2002, outlasting many newer systems"
+                ]
+            },
+            {
+                date: "1982",
+                year: 1982,
+                title: "SMTP Email",
+                preview: "Simple Mail Transfer Protocol standardized email, creating the foundation for modern electronic messaging.",
+                era: "wireless",
+                description: "SMTP became the standard protocol for sending email across networks. This standardization allowed different email systems to communicate with each other, creating a universal messaging platform.",
+                impact: "Email became the primary form of business communication, eventually replacing letters and memos. Today, over 330 billion emails are sent daily worldwide.",
+                funFacts: [
+                    "The @ symbol in email addresses was chosen by Ray Tomlinson in 1971",
+                    "The first email was sent in 1971, but SMTP made it universal",
+                    "Over 4 billion people use email today"
+                ]
+            },
+            {
+                date: "1992",
+                year: 1992,
+                title: "First Text Message",
+                preview: "Neil Papworth sent the first SMS message, saying 'Merry Christmas,' launching a communication revolution.",
+                era: "wireless",
+                description: "The first SMS was sent on December 3, 1992, from a computer to a mobile phone on Vodafone's UK network. Initially a free perk, texting would become a major revenue source for carriers.",
+                impact: "Created a new form of communication that's brief, informal, and immediate. At its peak, 8.6 trillion text messages were sent annually. Texting influenced language, spawning abbreviations like 'LOL' and 'OMG.'",
+                funFacts: [
+                    "SMS stands for Short Message Service",
+                    "The 160-character limit was chosen to fit messages on one screen",
+                    "In 2010, texting surpassed phone calls as the most common form of mobile communication"
+                ]
+            },
+            {
+                date: "2003",
+                year: 2003,
+                title: "Skype",
+                preview: "Skype launched, bringing free video calling to the masses through the internet.",
+                era: "cloud",
+                description: "Skype pioneered Voice over IP (VoIP) technology, allowing free voice and video calls over the internet. It democratized international communication, making distance irrelevant.",
+                impact: "Disrupted the telecommunications industry by offering free global calling. Paved the way for remote work, international relationships, and virtual meetings. Acquired by Microsoft for $8.5 billion in 2011.",
+                funFacts: [
+                    "The name 'Skype' is a shortened form of 'Sky peer-to-peer'",
+                    "At its peak, Skype had 663 million registered users",
+                    "Skype's first call was made on August 29, 2003"
+                ]
+            },
+            {
+                date: "2005",
+                year: 2005,
+                title: "High-Definition Video Conferencing",
+                preview: "HD video conferencing systems transformed business meetings with cinema-quality video and audio.",
+                era: "cloud",
+                description: "Companies like Polycom and Cisco introduced telepresence systems with HD video, spatial audio, and life-size displays. These systems created meeting experiences that rivaled being in the same room.",
+                impact: "Made remote collaboration truly effective for the first time. Companies saved millions on travel while increasing meeting frequency. Laid groundwork for the remote work revolution.",
+                funFacts: [
+                    "Early systems cost $200,000-$500,000 to install",
+                    "HD video conferencing uses 2-4 Mbps of bandwidth",
+                    "The COVID-19 pandemic made video conferencing usage increase by 2900%"
+                ]
+            },
+            {
+                date: "2007",
+                year: 2007,
+                title: "iPhone",
+                preview: "Apple's iPhone redefined mobile phones, putting the internet, media, and apps in everyone's pocket.",
+                era: "cloud",
+                description: "The iPhone combined a phone, iPod, and internet communicator into one revolutionary device with a multi-touch interface. It created the smartphone category and launched the app economy.",
+                impact: "Fundamentally transformed how humans communicate, work, and entertain themselves. Enabled the mobile internet era, spawned a trillion-dollar app economy, and changed social behavior worldwide.",
+                funFacts: [
+                    "The first iPhone cost $499 and had no App Store",
+                    "Apple has sold over 2.3 billion iPhones since 2007",
+                    "The iPhone didn't have copy/paste functionality until 2009"
+                ],
+                keyFigures: ["Steve Jobs", "Jony Ive"]
+            },
+            {
+                date: "2010",
+                year: 2010,
+                title: "Proliferation of Social Media",
+                preview: "Facebook, Twitter, Instagram, and other platforms created new forms of global public communication.",
+                era: "cloud",
+                description: "Social media platforms transformed communication from one-to-one and one-to-many into many-to-many. Anyone could broadcast their thoughts, photos, and videos to a global audience instantly.",
+                impact: "Changed journalism, politics, marketing, and social movements. Enabled phenomena like the Arab Spring, #MeToo, and influencer culture. Created both connection and controversy.",
+                funFacts: [
+                    "Facebook reached 1 billion users in 2012",
+                    "Instagram was bought by Facebook for $1 billion after just 18 months",
+                    "Over 500 million tweets are sent every day"
+                ]
+            },
+            {
+                date: "2013",
+                year: 2013,
+                title: "Zoom Launch",
+                preview: "Zoom Video Communications launched, later becoming synonymous with video meetings worldwide.",
+                era: "cloud",
+                description: "Founded by Eric Yuan, Zoom offered simple, reliable video conferencing. Its ease of use and freemium model made it accessible to everyone from Fortune 500 companies to families.",
+                impact: "Became essential infrastructure during the COVID-19 pandemic. From 10 million daily users in December 2019 to over 300 million by April 2020. 'Zoom' became a verb.",
+                funFacts: [
+                    "Zoom was created because founder Eric Yuan was in a long-distance relationship",
+                    "Zoom's stock price increased by 400% in 2020",
+                    "The word 'Zoom fatigue' was added to dictionaries in 2020"
+                ],
+                keyFigures: ["Eric Yuan"]
+            },
+            {
+                date: "2015",
+                year: 2015,
+                title: "Signal Messenger Launch",
+                preview: "Signal set new standards for encrypted messaging with true end-to-end encryption by default.",
+                era: "cloud",
+                description: "Signal provided open-source, end-to-end encrypted messaging, voice, and video calls. Its privacy-first approach attracted users concerned about surveillance and data collection.",
+                impact: "Influenced other messaging apps to adopt encryption. Endorsed by privacy advocates, including Edward Snowden. Proved that privacy and usability could coexist.",
+                funFacts: [
+                    "Signal is recommended by the FBI, CIA, and Department of Defense",
+                    "The Signal Protocol is used by WhatsApp, Facebook Messenger, and Google Messages",
+                    "Signal saw massive growth in 2021 after WhatsApp's privacy policy changes"
+                ],
+                keyFigures: ["Moxie Marlinspike", "Brian Acton"]
+            },
+            {
+                date: "2018",
+                year: 2018,
+                title: "5G Networks Begin Rollout",
+                preview: "Fifth-generation cellular networks launched, offering unprecedented speed and low latency.",
+                era: "cloud",
+                description: "5G networks provide speeds up to 100 times faster than 4G, with latency as low as 1 millisecond. They enable new applications like autonomous vehicles, remote surgery, and massive IoT deployments.",
+                impact: "Enabling the next generation of connected devices and applications. By 2025, 5G had over 2 billion connections globally. Supporting innovations in AI, AR/VR, and smart cities.",
+                funFacts: [
+                    "5G can theoretically reach speeds of 20 Gbps",
+                    "South Korea was the first country to launch nationwide 5G in 2019",
+                    "5G uses millimeter waves that can't penetrate walls as easily as 4G"
+                ]
+            },
+            {
+                date: "2020",
+                year: 2020,
+                title: "Remote Work Revolution",
+                preview: "COVID-19 pandemic forced the world's largest work-from-home experiment, transforming workplace communication.",
+                era: "cloud",
+                description: "The pandemic forced companies worldwide to adopt remote work overnight. Video conferencing, collaboration tools, and messaging apps became essential business infrastructure.",
+                impact: "Permanently changed work culture. Many companies adopted hybrid or fully remote models. Accelerated digital transformation by an estimated 5-10 years. Reshaped real estate, commuting, and work-life balance.",
+                funFacts: [
+                    "Zoom's daily users increased from 10 million to 300 million in 4 months",
+                    "Microsoft Teams gained 12 million users in one week in March 2020",
+                    "74% of companies plan to keep some form of remote work post-pandemic"
+                ]
+            },
+            {
+                date: "2021",
+                year: 2021,
+                title: "Telegram Hits 1 Billion Users",
+                preview: "Telegram reached 1 billion monthly active users, driven by privacy concerns and feature-rich platform.",
+                era: "cloud",
+                description: "Telegram grew rapidly as a WhatsApp alternative, offering cloud-based messaging, large groups (up to 200,000 members), channels, bots, and optional end-to-end encryption.",
+                impact: "Became a major platform for communities, news, and activism. Its open API enabled countless bots and integrations. Used widely in regions with heavy internet censorship.",
+                funFacts: [
+                    "Telegram adds 2.5 million new users daily",
+                    "Telegram channels can have unlimited subscribers",
+                    "Pavel Durov, Telegram's founder, previously created VKontakte (Russia's Facebook)"
+                ],
+                keyFigures: ["Pavel Durov", "Nikolai Durov"]
+            },
+            {
+                date: "2022",
+                year: 2022,
+                title: "ChatGPT Launch",
+                preview: "OpenAI's ChatGPT brought conversational AI to the mainstream, changing how humans interact with machines.",
+                era: "future",
+                description: "ChatGPT demonstrated that AI could engage in natural, helpful conversations. Within 5 days, it reached 1 million users, becoming the fastest-growing consumer application in history.",
+                impact: "Sparked an AI revolution. Every major tech company accelerated AI development. Changed content creation, education, programming, and communication. Raised questions about AI's role in society.",
+                funFacts: [
+                    "ChatGPT reached 100 million users in just 2 months",
+                    "It can communicate in over 80 languages",
+                    "ChatGPT's training used 45 terabytes of text data"
+                ],
+                keyFigures: ["Sam Altman", "OpenAI team"]
+            },
+            {
+                date: "2023",
+                year: 2023,
+                title: "AI Assistant Proliferation",
+                preview: "Google Gemini, Anthropic Claude, and other AI assistants joined ChatGPT in transforming human-AI communication.",
+                era: "future",
+                description: "Major tech companies launched advanced AI assistants: Google's Gemini (formerly Bard), Anthropic's Claude, Microsoft's Copilot, and others. Each brought unique capabilities in reasoning, creativity, and specialized tasks.",
+                impact: "AI became integrated into everyday tools: web browsers, productivity software, creative applications. Millions now use AI assistants for research, writing, coding, and decision-making daily.",
+                funFacts: [
+                    "Claude is known for longer context windows and nuanced responses",
+                    "Google Gemini can process text, images, audio, and video simultaneously",
+                    "Microsoft Copilot is integrated into Word, Excel, PowerPoint, and more"
+                ],
+                keyFigures: ["Dario Amodei (Anthropic)", "Demis Hassabis (Google DeepMind)"]
+            },
+            {
+                date: "2024",
+                year: 2024,
+                title: "Multimodal AI Communication",
+                preview: "AI systems gained ability to understand and generate text, images, audio, and video seamlessly.",
+                era: "future",
+                description: "Advanced AI models like GPT-4V, Gemini 1.5, and Claude 3 could process and generate multiple types of content. Users could now have conversations using any combination of text, images, voice, and video.",
+                impact: "Broke down barriers in human-AI interaction. Enabled more natural, intuitive communication with machines. Created new possibilities for accessibility, education, and creative expression.",
+                funFacts: [
+                    "GPT-4 can analyze images and explain what's in them",
+                    "AI voice cloning can now replicate someone's voice from just seconds of audio",
+                    "Sora and other AI can generate videos from text descriptions"
+                ]
+            },
+            {
+                date: "2025",
+                year: 2025,
+                title: "5G Advanced & AI Integration",
+                preview: "5G-Advanced (5.5G) and AI converge to create intelligent, self-optimizing communication networks.",
+                era: "future",
+                description: "5G-Advanced brings speeds up to 10 Gbps, reduced latency, and massive device connectivity. AI integration enables networks to predict and prevent issues, optimize resources in real-time, and provide personalized services.",
+                impact: "Powers emerging technologies like autonomous vehicles, smart cities, remote surgery, and immersive AR/VR experiences. AI-powered networks reduce energy consumption by 30% while improving performance.",
+                funFacts: [
+                    "5G-Advanced supports up to 100 billion connected devices",
+                    "AI network optimization can reduce maintenance costs by 40%",
+                    "Latency in 5G-Advanced can be as low as 0.5 milliseconds"
+                ]
+            },
+            {
+                date: "2025",
+                year: 2025,
+                title: "RCS Messaging Adoption",
+                preview: "Rich Communication Services (RCS) replaces SMS with modern features like typing indicators, read receipts, and high-quality media.",
+                era: "future",
+                description: "RCS brings modern messaging features to standard text messages: high-res photos/videos, group chats, read receipts, typing indicators, and end-to-end encryption. Google and Apple have finally embraced the standard.",
+                impact: "Bridges the messaging divide between iPhone and Android users. Provides modern features without requiring third-party apps. Maintains universal accessibility of SMS while adding rich features.",
+                funFacts: [
+                    "Apple announced RCS support for iPhone in 2024, effective in 2025",
+                    "RCS messages can be up to 100MB, compared to SMS's 160 characters",
+                    "Over 800 mobile operators support RCS worldwide"
+                ]
+            },
+            {
+                date: "Future",
+                year: 2030,
+                title: "6G Networks & Holographic Communication",
+                preview: "Sixth-generation networks will enable holographic calls, brain-computer interfaces, and seamless AR experiences.",
+                era: "future",
+                description: "6G networks promise speeds of 1 Tbps, sub-millisecond latency, and AI-native architecture. This will enable true holographic telepresence, where 3D projections of people appear in real time, indistinguishable from physical presence.",
+                impact: "Will revolutionize remote work, healthcare, education, and entertainment. Enable immersive experiences that blur the line between physical and digital worlds. Support brain-computer interfaces for thought-based communication.",
+                funFacts: [
+                    "6G will be 100 times faster than 5G",
+                    "Holographic calls will require 1-5 Tbps of bandwidth",
+                    "6G research began in 2020, with commercial deployment expected around 2030"
+                ]
+            },
+            {
+                date: "Future",
+                year: 2035,
+                title: "Contextual AI Communications",
+                preview: "AI will understand full context of your life, proactively managing communications and providing perfect translation.",
+                era: "future",
+                description: "Future AI systems will understand your preferences, schedule, relationships, and goals. They'll manage your communications intelligently, providing real-time translation, summarization, and contextual assistance.",
+                impact: "Language barriers will disappear. AI will filter and prioritize communications based on importance. Real-time emotion detection and cultural context will prevent misunderstandings.",
+                funFacts: [
+                    "AI translators will preserve tone, emotion, and cultural nuance",
+                    "Your AI assistant might attend meetings on your behalf",
+                    "Neural interfaces could allow direct thought-to-text communication"
+                ]
+            }
+        ];
+
+        let currentEra = 'all';
+        let currentSearch = '';
+
+        function initTimeline() {
+            renderTimeline();
+            setupEventListeners();
+            updateProgress();
+        }
+
+        function renderTimeline() {
+            const timeline = document.getElementById('timeline');
+            const filteredData = timelineData.filter(item => {
+                const matchesEra = currentEra === 'all' || item.era === currentEra;
+                const matchesSearch = item.title.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                                    item.preview.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                                    item.date.toLowerCase().includes(currentSearch.toLowerCase());
+                return matchesEra && matchesSearch;
+            });
+
+            if (filteredData.length === 0) {
+                timeline.innerHTML = `
+                    <div class="no-results">
+                        <h2>No Results Found</h2>
+                        <p>Try adjusting your filters or search terms</p>
+                    </div>
+                `;
+                return;
+            }
+
+            timeline.innerHTML = filteredData.map((item, index) => `
+                <div class="timeline-item era-${item.era}" style="animation-delay: ${index * 0.1}s" data-index="${timelineData.indexOf(item)}">
+                    <div class="timeline-content">
+                        <div class="timeline-date">${item.date}</div>
+                        <h3 class="timeline-title">${item.title}</h3>
+                        <p class="timeline-preview">${item.preview}</p>
+                        <div class="timeline-tags">
+                            <span class="tag">${item.era}</span>
+                            ${item.keyFigures ? `<span class="tag">👤 ${item.keyFigures[0]}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="timeline-dot"></div>
+                </div>
+            `).join('');
+
+            // Add click handlers
+            document.querySelectorAll('.timeline-content').forEach(content => {
+                content.addEventListener('click', function() {
+                    const index = this.parentElement.dataset.index;
+                    showModal(timelineData[index]);
+                });
+            });
+        }
+
+        function showModal(item) {
+            const modal = document.getElementById('modal');
+            const modalDate = document.getElementById('modalDate');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+
+            modalDate.textContent = item.date;
+            modalTitle.textContent = item.title;
+            
+            let bodyHTML = `
+                <p><strong>${item.preview}</strong></p>
+                <h3>📖 Overview</h3>
+                <p>${item.description}</p>
+                <h3>🌍 Impact</h3>
+                <p>${item.impact}</p>
+            `;
+
+            if (item.keyFigures && item.keyFigures.length > 0) {
+                bodyHTML += `
+                    <h3>👥 Key Figures</h3>
+                    <p>${item.keyFigures.join(', ')}</p>
+                `;
+            }
+
+            if (item.funFacts && item.funFacts.length > 0) {
+                bodyHTML += `<h3>🎉 Fun Facts</h3>`;
+                item.funFacts.forEach(fact => {
+                    bodyHTML += `<div class="fun-fact">${fact}</div>`;
+                });
+            }
+
+            modalBody.innerHTML = bodyHTML;
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function setupEventListeners() {
+            // Close modal
+            document.getElementById('modalClose').addEventListener('click', () => {
+                document.getElementById('modal').style.display = 'none';
+                document.body.style.overflow = 'auto';
+            });
+
+            // Click outside modal
+            document.getElementById('modal').addEventListener('click', (e) => {
+                if (e.target.id === 'modal') {
+                    document.getElementById('modal').style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }
+            });
+
+            // Search
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                currentSearch = e.target.value;
+                renderTimeline();
+            });
+
+            // Era filters
+            document.querySelectorAll('.era-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.era-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentEra = this.dataset.era;
+                    renderTimeline();
+                });
+            });
+
+            // Theme toggle
+            document.getElementById('themeToggle').addEventListener('click', () => {
+                const body = document.body;
+                const currentTheme = body.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                body.setAttribute('data-theme', newTheme);
+                document.getElementById('themeToggle').textContent = 
+                    newTheme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode';
+            });
+
+            // Random fact
+            document.getElementById('randomBtn').addEventListener('click', () => {
+                const randomItem = timelineData[Math.floor(Math.random() * timelineData.length)];
+                showModal(randomItem);
+            });
+
+            // Quiz mode
+            document.getElementById('quizBtn').addEventListener('click', () => {
+                startQuiz();
+            });
+
+            // Scroll progress
+            window.addEventListener('scroll', updateProgress);
+        }
+
+        function updateProgress() {
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight - windowHeight;
+            const scrolled = window.scrollY;
+            const progress = (scrolled / documentHeight) * 100;
+            document.getElementById('progressLine').style.height = progress + '%';
+        }
+
+        function startQuiz() {
+            const quizQuestions = [
+                {
+                    question: "Who invented the telegraph?",
+                    options: ["Alexander Graham Bell", "Samuel Morse", "Thomas Edison", "Nikola Tesla"],
+                    correct: 1
+                },
+                {
+                    question: "What year was the iPhone released?",
+                    options: ["2005", "2006", "2007", "2008"],
+                    correct: 2
+                },
+                {
+                    question: "What was the first text message sent?",
+                    options: ["Hello World", "Merry Christmas", "Testing", "Hi"],
+                    correct: 1
+                },
+                {
+                    question: "Which company launched 5G first?",
+                    options: ["USA", "China", "Japan", "South Korea"],
+                    correct: 3
+                },
+                {
+                    question: "What year did ChatGPT launch?",
+                    options: ["2020", "2021", "2022", "2023"],
+                    correct: 2
+                }
+            ];
+
+            const randomQuestion = quizQuestions[Math.floor(Math.random() * quizQuestions.length)];
+            
+            const modal = document.getElementById('modal');
+            const modalBody = document.getElementById('modalBody');
+            const modalDate = document.getElementById('modalDate');
+            const modalTitle = document.getElementById('modalTitle');
+
+            modalDate.textContent = '🎯 Quiz Time!';
+            modalTitle.textContent = 'Test Your Knowledge';
+            
+            let quizHTML = `
+                <div class="quiz-question">${randomQuestion.question}</div>
+                <div class="quiz-options">
+            `;
+
+            randomQuestion.options.forEach((option, index) => {
+                quizHTML += `
+                    <div class="quiz-option" data-index="${index}">
+                        ${option}
+                    </div>
+                `;
+            });
+
+            quizHTML += `</div><div class="quiz-result" id="quizResult" style="display: none;"></div>`;
+            
+            modalBody.innerHTML = quizHTML;
+            modal.style.display = 'block';
+
+            // Add quiz option handlers
+            document.querySelectorAll('.quiz-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const selectedIndex = parseInt(this.dataset.index);
+                    const resultDiv = document.getElementById('quizResult');
+                    
+                    document.querySelectorAll('.quiz-option').forEach(opt => {
+                        opt.style.pointerEvents = 'none';
+                    });
+
+                    if (selectedIndex === randomQuestion.correct) {
+                        this.classList.add('correct');
+                        resultDiv.innerHTML = `
+                            <h3 style="color: #28a745;">✅ Correct!</h3>
+                            <p>Great job! You know your communication history!</p>
+                        `;
+                    } else {
+                        this.classList.add('incorrect');
+                        document.querySelectorAll('.quiz-option')[randomQuestion.correct].classList.add('correct');
+                        resultDiv.innerHTML = `
+                            <h3 style="color: #dc3545;">❌ Not quite!</h3>
+                            <p>The correct answer was: ${randomQuestion.options[randomQuestion.correct]}</p>
+                        `;
+                    }
+                    
+                    resultDiv.style.display = 'block';
+                });
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', initTimeline);
+    </script>
+</body>
+</html>
