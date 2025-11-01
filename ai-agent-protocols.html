@@ -297,6 +297,16 @@
             display: block;
         }
 
+        /* Content Container for non-protocol views */
+        .content-container {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 3rem;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -697,6 +707,10 @@
                 padding: 1.5rem;
             }
 
+            .content-container {
+                padding: 1.5rem;
+            }
+
             .detail-header {
                 flex-direction: column;
                 text-align: center;
@@ -846,7 +860,7 @@
 
         <!-- Comparison View -->
         <div id="comparison-view" class="view-content" style="display: none;">
-            <div class="detail-view active">
+            <div class="content-container active">
                 <h2 class="section-title">📊 Protocol Comparison</h2>
                 
                 <div class="tabs" role="tablist">
@@ -869,7 +883,7 @@
 
         <!-- Timeline View -->
         <div id="timeline-view" class="view-content" style="display: none;">
-            <div class="detail-view active">
+            <div class="content-container active">
                 <h2 class="section-title">📅 Protocol Development Timeline</h2>
                 <div class="timeline" id="timeline">
                     <!-- Timeline will be generated here -->
@@ -879,7 +893,7 @@
 
         <!-- Resources View -->
         <div id="resources-view" class="view-content" style="display: none;">
-            <div class="detail-view active">
+            <div class="content-container active">
                 <h2 class="section-title">📚 Additional Resources & Emerging Protocols</h2>
                 <div id="resources-content">
                     <!-- Resources will be generated here -->
@@ -2278,7 +2292,18 @@ POST /tasks/delegate
         }
 
         function showView(viewName) {
-            // Hide all views
+            // If switching away from overview, hide any open protocol details
+            if (viewName !== 'overview') {
+                document.querySelectorAll('#overview-view .detail-view').forEach(view => {
+                    view.classList.remove('active');
+                });
+                document.getElementById('protocol-grid').style.display = 'grid';
+                document.querySelectorAll('.protocol-card').forEach(card => {
+                    card.classList.remove('active');
+                });
+            }
+
+            // Hide all main views
             document.querySelectorAll('.view-content').forEach(view => {
                 view.style.display = 'none';
             });
@@ -2297,15 +2322,23 @@ POST /tasks/delegate
             event.target.classList.add('active');
             event.target.setAttribute('aria-pressed', 'true');
 
-            // Hide any open protocol details
+            // Show instruction banner if returning to overview (unless dismissed)
             if (viewName === 'overview') {
-                hideProtocolDetail();
+                const banner = document.getElementById('instruction-banner');
+                if (banner && banner.dataset.dismissed !== 'true') {
+                    banner.style.display = 'block';
+                    banner.style.opacity = '1';
+                    banner.style.transform = 'translateY(0)';
+                }
             }
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function showProtocolDetail(protocolId) {
-            // Hide all detail views
-            document.querySelectorAll('.detail-view').forEach(view => {
+            // Hide all protocol detail views (only in overview)
+            document.querySelectorAll('#overview-view .detail-view').forEach(view => {
                 view.classList.remove('active');
             });
 
@@ -2323,12 +2356,15 @@ POST /tasks/delegate
             document.querySelectorAll('.protocol-card').forEach(card => {
                 card.classList.remove('active');
             });
-            document.querySelector(`[data-protocol="${protocolId}"]`).classList.add('active');
+            const activeCard = document.querySelector(`.protocol-card[data-protocol="${protocolId}"]`);
+            if (activeCard) {
+                activeCard.classList.add('active');
+            }
         }
 
         function hideProtocolDetail() {
-            // Hide all detail views
-            document.querySelectorAll('.detail-view').forEach(view => {
+            // Hide all protocol detail views (only in overview)
+            document.querySelectorAll('#overview-view .detail-view').forEach(view => {
                 view.classList.remove('active');
             });
 
