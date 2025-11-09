@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RHA134 Chapter 3: Analyze and Store Logs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #ee0000 0%, #cc0000 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+
+        nav {
+            background: #2c3e50;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        nav button {
+            background: transparent;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        nav button:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        nav button.active {
+            background: rgba(255,255,255,0.15);
+            border-bottom-color: #ee0000;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .module {
+            display: none;
+        }
+
+        .module.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            color: #2c3e50;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #ee0000;
+        }
+
+        h3 {
+            color: #34495e;
+            font-size: 1.5em;
+            margin: 30px 0 15px 0;
+        }
+
+        /* Architecture Visualizer Styles */
+        .architecture-container {
+            margin: 30px 0;
+        }
+
+        .arch-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            margin: 40px 0;
+        }
+
+        .arch-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            position: relative;
+        }
+
+        .arch-component {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            min-width: 250px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .arch-component:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .arch-component.active {
+            background: linear-gradient(135deg, #ee0000 0%, #cc0000 100%);
+            transform: scale(1.05);
+        }
+
+        .arch-component h4 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+
+        .arch-component p {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .arch-arrow {
+            font-size: 3em;
+            color: #667eea;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .arch-sources {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .arch-source {
+            background: #ecf0f1;
+            padding: 15px 25px;
+            border-radius: 10px;
+            border-left: 4px solid #3498db;
+            font-size: 0.95em;
+            transition: all 0.3s;
+        }
+
+        .arch-source:hover {
+            background: #3498db;
+            color: white;
+            transform: translateX(5px);
+        }
+
+        .detail-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 30px 0;
+            border-left: 5px solid #ee0000;
+            display: none;
+        }
+
+        .detail-panel.active {
+            display: block;
+            animation: slideIn 0.4s;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .detail-panel h4 {
+            color: #ee0000;
+            font-size: 1.4em;
+            margin-bottom: 15px;
+        }
+
+        .detail-panel ul {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+
+        .detail-panel li {
+            margin: 10px 0;
+        }
+
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            color: #3498db;
+        }
+
+        /* Syslog Matrix Styles */
+        .matrix-controls {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .matrix-controls input {
+            flex: 1;
+            min-width: 250px;
+            padding: 12px 20px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .matrix-controls input:focus {
+            outline: none;
+            border-color: #ee0000;
+        }
+
+        .matrix-controls select {
+            padding: 12px 20px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .matrix-controls select:focus {
+            outline: none;
+            border-color: #ee0000;
+        }
+
+        .matrix-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .matrix-tab {
+            background: transparent;
+            border: none;
+            padding: 15px 30px;
+            cursor: pointer;
+            font-size: 1.1em;
+            color: #7f8c8d;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .matrix-tab:hover {
+            color: #2c3e50;
+        }
+
+        .matrix-tab.active {
+            color: #ee0000;
+            border-bottom-color: #ee0000;
+        }
+
+        .matrix-content {
+            display: none;
+        }
+
+        .matrix-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        th {
+            padding: 18px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+
+        tbody tr {
+            transition: background 0.3s;
+            cursor: pointer;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        tbody tr:hover {
+            background: #e3f2fd;
+        }
+
+        td {
+            padding: 15px 18px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .code-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .priority-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .priority-0, .priority-1, .priority-2 {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .priority-3 {
+            background: #e67e22;
+            color: white;
+        }
+
+        .priority-4 {
+            background: #f39c12;
+            color: white;
+        }
+
+        .priority-5 {
+            background: #27ae60;
+            color: white;
+        }
+
+        .priority-6, .priority-7 {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .info-card {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info-card h4 {
+            color: #856404;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-card p {
+            color: #856404;
+            line-height: 1.6;
+        }
+
+        .example-section {
+            background: #e8f5e9;
+            border-left: 5px solid #4caf50;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .example-section h4 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+        }
+
+        .log-entry {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            margin: 10px 0;
+            word-wrap: break-word;
+        }
+
+        .log-entry .timestamp {
+            color: #3498db;
+        }
+
+        .log-entry .hostname {
+            color: #e74c3c;
+        }
+
+        .log-entry .process {
+            color: #f39c12;
+        }
+
+        .log-entry .message {
+            color: #2ecc71;
+        }
+
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
+        }
+
+        .highlight {
+            background: #fff59d;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            nav button {
+                padding: 15px 20px;
+                font-size: 1em;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .arch-row {
+                flex-direction: column;
+            }
+
+            .matrix-controls {
+                flex-direction: column;
+            }
+
+            .matrix-controls input {
+                width: 100%;
+            }
+
+            table {
+                font-size: 0.9em;
+            }
+
+            th, td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐧 RHA134 - Chapter 3</h1>
+            <p>Analyze and Store Logs - Interactive Learning Module</p>
+        </header>
+
+        <nav>
+            <button class="nav-btn active" data-module="architecture">System Logging Architecture</button>
+            <button class="nav-btn" data-module="matrix">Syslog Facilities & Priorities</button>
+        </nav>
+
+        <div class="content">
+            <!-- Module 1: Architecture Visualizer -->
+            <div class="module active" id="architecture">
+                <h2>📊 System Logging Architecture Visualizer</h2>
+                
+                <div class="info-card">
+                    <h4>💡 Overview</h4>
+                    <p>Red Hat Enterprise Linux 9 uses a comprehensive logging system based on the syslog protocol. This interactive visualization shows how log messages flow through the system from generation to storage. Click on any component to learn more about its role.</p>
+                </div>
+
+                <div class="architecture-container">
+                    <h3>Log Flow Architecture</h3>
+                    
+                    <div class="arch-diagram">
+                        <!-- Log Sources -->
+                        <div class="arch-row">
+                            <h4 style="width: 100%; text-align: center; color: #2c3e50; margin-bottom: 20px;">Log Sources</h4>
+                        </div>
+                        <div class="arch-row">
+                            <div class="arch-sources">
+                                <div class="arch-source">🖥️ System Kernel</div>
+                                <div class="arch-source">🚀 Boot Process</div>
+                                <div class="arch-source">⚙️ Daemons</div>
+                                <div class="arch-source">📝 Syslog Events</div>
+                            </div>
+                        </div>
+
+                        <div class="arch-row">
+                            <div class="arch-arrow">↓</div>
+                        </div>
+
+                        <!-- systemd-journald -->
+                        <div class="arch-row">
+                            <div class="arch-component" data-component="journald">
+                                <h4>systemd-journald</h4>
+                                <p>Core logging service</p>
+                                <p style="font-size: 0.8em; margin-top: 10px;">Click to learn more</p>
+                            </div>
+                        </div>
+
+                        <div class="arch-row">
+                            <div class="arch-arrow">↓</div>
+                        </div>
+
+                        <!-- rsyslog -->
+                        <div class="arch-row">
+                            <div class="arch-component" data-component="rsyslog">
+                                <h4>rsyslog</h4>
+                                <p>Processes and sorts syslog messages</p>
+                                <p style="font-size: 0.8em; margin-top: 10px;">Click to learn more</p>
+                            </div>
+                        </div>
+
+                        <div class="arch-row">
+                            <div class="arch-arrow">↓</div>
+                        </div>
+
+                        <!-- Storage -->
+                        <div class="arch-row">
+                            <div class="arch-component" data-component="journal-storage" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);">
+                                <h4>System Journal</h4>
+                                <p>/run/log (volatile) or /var/log/journal (persistent)</p>
+                                <p style="font-size: 0.8em; margin-top: 10px;">Click to learn more</p>
+                            </div>
+                            <div class="arch-component" data-component="log-files" style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%);">
+                                <h4>Log Files</h4>
+                                <p>/var/log/* directories</p>
+                                <p style="font-size: 0.8em; margin-top: 10px;">Click to learn more</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detail Panels -->
+                    <div class="detail-panel" id="detail-journald">
+                        <h4>systemd-journald Service</h4>
+                        <p><strong>Role:</strong> The heart of the operating system event logging architecture</p>
+                        
+                        <h4 style="margin-top: 20px;">Key Functions:</h4>
+                        <ul>
+                            <li><strong>Collects event messages from:</strong>
+                                <ul>
+                                    <li>System kernel</li>
+                                    <li>Early boot process output</li>
+                                    <li>Standard output and standard error from daemons</li>
+                                    <li>Syslog events</li>
+                                </ul>
+                            </li>
+                            <li><strong>Structured format:</strong> Logs stored in structured, indexed binary files (journal)</li>
+                            <li><strong>Extra information:</strong> Includes additional metadata like priority, facility, process ID, etc.</li>
+                            <li><strong>Forwarding:</strong> Forwards syslog messages to rsyslog for further processing</li>
+                        </ul>
+
+                        <h4 style="margin-top: 20px;">Storage Behavior:</h4>
+                        <ul>
+                            <li><strong>Default:</strong> Journals stored on volatile file system (/run/log) - cleared on reboot</li>
+                            <li><strong>Persistent:</strong> Can be configured to store in /var/log/journal (survives reboots)</li>
+                        </ul>
+
+                        <div class="code-block">
+<strong># View journal status</strong>
+<code>systemctl status systemd-journald</code>
+
+<strong># Check journal storage location</strong>
+<code>journalctl | grep -E 'Runtime Journal|System Journal'</code>
+                        </div>
+                    </div>
+
+                    <div class="detail-panel" id="detail-rsyslog">
+                        <h4>rsyslog Service</h4>
+                        <p><strong>Role:</strong> Reads syslog messages from journald and processes them according to configuration rules</p>
+                        
+                        <h4 style="margin-top: 20px;">Key Functions:</h4>
+                        <ul>
+                            <li><strong>Message sorting:</strong> Routes messages to specific log files based on facility and priority</li>
+                            <li><strong>Configuration:</strong> Rules defined in /etc/rsyslog.conf and /etc/rsyslog.d/*.conf</li>
+                            <li><strong>Persistent storage:</strong> Writes to files in /var/log that survive reboots</li>
+                            <li><strong>Log rotation:</strong> Works with logrotate to manage log file sizes</li>
+                            <li><strong>Forwarding:</strong> Can forward logs to remote systems</li>
+                        </ul>
+
+                        <h4 style="margin-top: 20px;">Configuration Format:</h4>
+                        <div class="code-block">
+<strong># Basic rsyslog rule format:</strong>
+<code>facility.priority    action</code>
+
+<strong># Example: Auth messages to secure log</strong>
+<code>authpriv.*    /var/log/secure</code>
+
+<strong># Example: Mail messages to maillog</strong>
+<code>mail.*    /var/log/maillog</code>
+
+<strong># Example: Emergency messages to all users</strong>
+<code>*.emerg    :omusrmsg:*</code>
+                        </div>
+                    </div>
+
+                    <div class="detail-panel" id="detail-journal-storage">
+                        <h4>System Journal Storage</h4>
+                        <p><strong>Location:</strong> /run/log/journal (volatile) or /var/log/journal (persistent)</p>
+                        
+                        <h4 style="margin-top: 20px;">Characteristics:</h4>
+                        <ul>
+                            <li><strong>Format:</strong> Structured, indexed binary files</li>
+                            <li><strong>Access:</strong> Use journalctl command to query</li>
+                            <li><strong>Advantages:</strong>
+                                <ul>
+                                    <li>Fast searching and filtering</li>
+                                    <li>Rich metadata included</li>
+                                    <li>Can view logs from current and previous boots</li>
+                                    <li>Powerful querying capabilities</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                        <h4 style="margin-top: 20px;">Making Journal Persistent:</h4>
+                        <div class="code-block">
+<strong># 1. Create the directory</strong>
+<code>mkdir /var/log/journal</code>
+
+<strong># 2. Edit /etc/systemd/journald.conf</strong>
+<code>[Journal]
+Storage=persistent</code>
+
+<strong># 3. Restart the service</strong>
+<code>systemctl restart systemd-journald</code>
+
+<strong># 4. Verify persistent storage</strong>
+<code>ls /var/log/journal/</code>
+                        </div>
+
+                        <div class="example-section">
+                            <h4>📝 Useful journalctl Commands</h4>
+                            <div class="code-block">
+<strong># View all logs</strong>
+<code>journalctl</code>
+
+<strong># View logs since last boot</strong>
+<code>journalctl -b</code>
+
+<strong># View logs for specific service</strong>
+<code>journalctl -u sshd.service</code>
+
+<strong># View logs with priority error or higher</strong>
+<code>journalctl -p err</code>
+
+<strong># Follow logs in real-time</strong>
+<code>journalctl -f</code>
+
+<strong># View logs from specific time range</strong>
+<code>journalctl --since "2022-03-15 10:00" --until "2022-03-15 11:00"</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-panel" id="detail-log-files">
+                        <h4>Log Files in /var/log</h4>
+                        <p><strong>Purpose:</strong> Persistent, text-based log files that survive reboots</p>
+                        
+                        <h4 style="margin-top: 20px;">Common Log Files:</h4>
+                        <ul>
+                            <li><strong>/var/log/messages</strong> - Most syslog messages (except auth, mail, cron, debug)</li>
+                            <li><strong>/var/log/secure</strong> - Security and authentication events</li>
+                            <li><strong>/var/log/maillog</strong> - Mail server messages</li>
+                            <li><strong>/var/log/cron</strong> - Scheduled job execution messages</li>
+                            <li><strong>/var/log/boot.log</strong> - Non-syslog console messages about system startup</li>
+                        </ul>
+
+                        <h4 style="margin-top: 20px;">Log File Management:</h4>
+                        <ul>
+                            <li><strong>Rotation:</strong> logrotate command rotates files to prevent disk space issues</li>
+                            <li><strong>Naming:</strong> Rotated files get date extensions (e.g., messages-20220320)</li>
+                            <li><strong>Retention:</strong> Old logs automatically deleted after ~4 weeks</li>
+                        </ul>
+
+                        <div class="example-section">
+                            <h4>📝 Viewing Log Files</h4>
+                            <div class="code-block">
+<strong># View last 10 lines</strong>
+<code>tail /var/log/messages</code>
+
+<strong># View and follow in real-time</strong>
+<code>tail -f /var/log/secure</code>
+
+<strong># View entire file with pagination</strong>
+<code>less /var/log/messages</code>
+
+<strong># Search for specific pattern</strong>
+<code>grep "Failed password" /var/log/secure</code>
+
+<strong># Count occurrences</strong>
+<code>grep -c "error" /var/log/messages</code>
+                            </div>
+                        </div>
+
+                        <div class="example-section">
+                            <h4>📋 Sample Log Entry Anatomy</h4>
+                            <div class="log-entry">
+<span class="timestamp">Mar 20 20:11:48</span> <span class="hostname">localhost</span> <span class="process">sshd[1433]:</span> <span class="message">Failed password for student from 172.25.0.10 port 59344 ssh2</span>
+                            </div>
+                            <ul style="margin-top: 10px;">
+                                <li><strong>Timestamp:</strong> When the event occurred</li>
+                                <li><strong>Hostname:</strong> System that generated the message</li>
+                                <li><strong>Process:</strong> Program and PID that sent the message</li>
+                                <li><strong>Message:</strong> The actual log content</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Module 2: Syslog Matrix -->
+            <div class="module" id="matrix">
+                <h2>🔍 Syslog Facilities & Priorities Reference</h2>
+                
+                <div class="info-card">
+                    <h4>💡 Understanding Syslog Classification</h4>
+                    <p>Syslog messages are categorized by two key attributes: <strong>Facility</strong> (the subsystem that produces the message) and <strong>Priority</strong> (the message severity). This classification allows administrators to route and filter messages effectively.</p>
+                </div>
+
+                <div class="matrix-controls">
+                    <input type="text" id="searchBox" placeholder="🔎 Search facilities, priorities, or descriptions...">
+                    <select id="priorityFilter">
+                        <option value="">All Priorities</option>
+                        <option value="0">emerg (0)</option>
+                        <option value="1">alert (1)</option>
+                        <option value="2">crit (2)</option>
+                        <option value="3">err (3)</option>
+                        <option value="4">warning (4)</option>
+                        <option value="5">notice (5)</option>
+                        <option value="6">info (6)</option>
+                        <option value="7">debug (7)</option>
+                    </select>
+                </div>
+
+                <div class="matrix-tabs">
+                    <button class="matrix-tab active" data-tab="facilities">Facilities</button>
+                    <button class="matrix-tab" data-tab="priorities">Priorities</button>
+                    <button class="matrix-tab" data-tab="examples">Real-World Examples</button>
+                </div>
+
+                <!-- Facilities Table -->
+                <div class="matrix-content active" id="facilities">
+                    <h3>Syslog Facilities</h3>
+                    <p style="margin-bottom: 20px;">Facilities identify the subsystem that produces log messages. Click on any row to see detailed information.</p>
+                    
+                    <table id="facilitiesTable">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Facility</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-facility="kern">
+                                <td class="code-cell">0</td>
+                                <td class="code-cell">kern</td>
+                                <td>Kernel messages</td>
+                            </tr>
+                            <tr data-facility="user">
+                                <td class="code-cell">1</td>
+                                <td class="code-cell">user</td>
+                                <td>User-level messages</td>
+                            </tr>
+                            <tr data-facility="mail">
+                                <td class="code-cell">2</td>
+                                <td class="code-cell">mail</td>
+                                <td>Mail system messages</td>
+                            </tr>
+                            <tr data-facility="daemon">
+                                <td class="code-cell">3</td>
+                                <td class="code-cell">daemon</td>
+                                <td>System daemon messages</td>
+                            </tr>
+                            <tr data-facility="auth">
+                                <td class="code-cell">4</td>
+                                <td class="code-cell">auth</td>
+                                <td>Authentication and security messages</td>
+                            </tr>
+                            <tr data-facility="syslog">
+                                <td class="code-cell">5</td>
+                                <td class="code-cell">syslog</td>
+                                <td>Internal syslog messages</td>
+                            </tr>
+                            <tr data-facility="lpr">
+                                <td class="code-cell">6</td>
+                                <td class="code-cell">lpr</td>
+                                <td>Printer messages</td>
+                            </tr>
+                            <tr data-facility="news">
+                                <td class="code-cell">7</td>
+                                <td class="code-cell">news</td>
+                                <td>Network news messages</td>
+                            </tr>
+                            <tr data-facility="uucp">
+                                <td class="code-cell">8</td>
+                                <td class="code-cell">uucp</td>
+                                <td>UUCP protocol messages</td>
+                            </tr>
+                            <tr data-facility="cron">
+                                <td class="code-cell">9</td>
+                                <td class="code-cell">cron</td>
+                                <td>Clock daemon messages</td>
+                            </tr>
+                            <tr data-facility="authpriv">
+                                <td class="code-cell">10</td>
+                                <td class="code-cell">authpriv</td>
+                                <td>Non-system authorization messages</td>
+                            </tr>
+                            <tr data-facility="ftp">
+                                <td class="code-cell">11</td>
+                                <td class="code-cell">ftp</td>
+                                <td>FTP protocol messages</td>
+                            </tr>
+                            <tr data-facility="local0-7">
+                                <td class="code-cell">16-23</td>
+                                <td class="code-cell">local0 to local7</td>
+                                <td>Custom local messages</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="example-section">
+                        <h4>📝 Facility Usage in rsyslog.conf</h4>
+                        <div class="code-block">
+<strong># Authentication messages to secure log</strong>
+<code>authpriv.*    /var/log/secure</code>
+
+<strong># All mail messages to maillog</strong>
+<code>mail.*    /var/log/maillog</code>
+
+<strong># Kernel messages of info level or higher</strong>
+<code>kern.info    /var/log/messages</code>
+
+<strong># Multiple facilities to one file</strong>
+<code>*.info;mail.none;authpriv.none;cron.none    /var/log/messages</code>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Priorities Table -->
+                <div class="matrix-content" id="priorities">
+                    <h3>Syslog Priorities (Severity Levels)</h3>
+                    <p style="margin-bottom: 20px;">Priorities indicate the severity or importance of log messages, from critical system failures to debug information.</p>
+                    
+                    <table id="prioritiesTable">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Priority</th>
+                                <th>Description</th>
+                                <th>Use Case</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="code-cell">0</td>
+                                <td><span class="priority-badge priority-0">emerg</span></td>
+                                <td>System is unusable</td>
+                                <td>Panic conditions - immediate action required</td>
+                            </tr>
+                            <tr>
+                                <td class="code-cell">1</td>
+                                <td><span class="priority-badge priority-1">alert</span></td>
+                                <td>Action must be taken immediately</td>
+                                <td>Critical conditions requiring prompt attention</td>
+                            </tr>
+                            <tr>
+                                <td class="code-cell">2</td>
+                                <td><span class="priority-badge priority-2">crit</span></td>
+                                <td>Critical condition</td>
+                                <td>Hard device errors, software failures</td>
+                            </tr>
+                            <tr>
+                                <td class="code-cell">3</td>
+                                <td><span class="priority-badge priority-3">err</span></td>
+                                <td>Non-critical error condition</td>
+                                <td>Errors that don't immediately threaten system</td>
+                            </tr>
+                            <tr>
+                                <td class="code-cell">4</td>
+                                <td><span class="priority-badge priority-4">warning</span></td>
+                                <td>Warning condition</td>
+                                <td>Potential problems, not errors yet</td>
+                            </tr>
+                            <tr>
+                                <td class="code-cell">5</td>
+                                <td><span class="priority-badge priority-5">notice</span></td>
+                                <td>Normal but significant event</td>
+                                <td>Important successful operations</td>
+                            </tr>
+                            <tr>
+                                <td class="code-cell">6</td>
+                                <td><span class="priority-badge priority-6">info</span></td>
+                                <td>Informational event</td>
+                                <td>Routine information messages</td>
+                            </tr>
+                            <tr>
+                                <td class="code-cell">7</td>
+                                <td><span class="priority-badge priority-7">debug</span></td>
+                                <td>Debugging-level message</td>
+                                <td>Detailed debugging information</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="info-card" style="background: #e8f5e9; border-color: #4caf50;">
+                        <h4 style="color: #2e7d32;">💡 Priority Selection Tips</h4>
+                        <p style="color: #2e7d32;"><strong>When specifying a priority in rsyslog rules:</strong> All messages at that priority level <strong>and higher</strong> (more severe) are matched. For example, <code>*.err</code> matches err, crit, alert, and emerg messages.</p>
+                    </div>
+
+                    <div class="example-section">
+                        <h4>📝 Priority Usage in rsyslog.conf</h4>
+                        <div class="code-block">
+<strong># All emergency messages to all logged-in users</strong>
+<code>*.emerg    :omusrmsg:*</code>
+
+<strong># Error level and higher to special file</strong>
+<code>*.err    /var/log/errors</code>
+
+<strong># Only info level messages (use '=' for exact match)</strong>
+<code>*.=info    /var/log/info-only</code>
+
+<strong># Warning and higher, except mail</strong>
+<code>*.warning;mail.none    /var/log/warnings</code>
+
+<strong># Debug messages for specific daemon</strong>
+<code>daemon.debug    /var/log/daemon-debug</code>
+                        </div>
+                    </div>
+
+                    <div class="example-section">
+                        <h4>🔧 Using Priorities with journalctl</h4>
+                        <div class="code-block">
+<strong># View only error messages and higher</strong>
+<code>journalctl -p err</code>
+
+<strong># View warning messages and higher since last boot</strong>
+<code>journalctl -b -p warning</code>
+
+<strong># View debug messages for specific service</strong>
+<code>journalctl -u sshd.service -p debug</code>
+
+<strong># View critical and above from today</strong>
+<code>journalctl --since today -p crit</code>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Examples Tab -->
+                <div class="matrix-content" id="examples">
+                    <h3>Real-World Examples</h3>
+                    <p style="margin-bottom: 20px;">See how facilities and priorities are used in actual log messages and rsyslog configurations.</p>
+
+                    <div class="example-section">
+                        <h4>🔐 Authentication Events (authpriv facility)</h4>
+                        <div class="log-entry">
+<span class="timestamp">Mar 20 09:01:13</span> <span class="hostname">host</span> <span class="process">sshd[2712]:</span> <span class="message">Accepted password for root from 172.25.254.254 port 56801 ssh2</span>
+                        </div>
+                        <p style="margin-top: 10px;"><strong>Facility:</strong> authpriv | <strong>Priority:</strong> notice | <strong>Log File:</strong> /var/log/secure</p>
+                        
+                        <div class="log-entry">
+<span class="timestamp">Mar 20 09:05:32</span> <span class="hostname">host</span> <span class="process">sshd[2845]:</span> <span class="message">Failed password for student from 172.25.0.10 port 59344 ssh2</span>
+                        </div>
+                        <p style="margin-top: 10px;"><strong>Facility:</strong> authpriv | <strong>Priority:</strong> notice | <strong>Log File:</strong> /var/log/secure</p>
+                    </div>
+
+                    <div class="example-section">
+                        <h4>⚙️ System Daemon Events (daemon facility)</h4>
+                        <div class="log-entry">
+<span class="timestamp">Mar 20 08:45:21</span> <span class="hostname">serverb</span> <span class="process">systemd[1]:</span> <span class="message">Started OpenSSH server daemon.</span>
+                        </div>
+                        <p style="margin-top: 10px;"><strong>Facility:</strong> daemon | <strong>Priority:</strong> info | <strong>Log File:</strong> /var/log/messages</p>
+                    </div>
+
+                    <div class="example-section">
+                        <h4>🖥️ Kernel Events (kern facility)</h4>
+                        <div class="log-entry">
+<span class="timestamp">Mar 16 07:10:58</span> <span class="hostname">localhost</span> <span class="process">kernel:</span> <span class="message">ACPI: Early table checksum verification disabled</span>
+                        </div>
+                        <p style="margin-top: 10px;"><strong>Facility:</strong> kern | <strong>Priority:</strong> info | <strong>Log File:</strong> /var/log/messages</p>
+                    </div>
+
+                    <div class="example-section">
+                        <h4>⏰ Cron Job Events (cron facility)</h4>
+                        <div class="log-entry">
+<span class="timestamp">Mar 15 05:01:01</span> <span class="hostname">serverb</span> <span class="process">CROND[2196]:</span> <span class="message">(root) CMD (run-parts /etc/cron.hourly)</span>
+                        </div>
+                        <p style="margin-top: 10px;"><strong>Facility:</strong> cron | <strong>Priority:</strong> info | <strong>Log File:</strong> /var/log/cron</p>
+                    </div>
+
+                    <div class="example-section">
+                        <h4>📧 Mail System Events (mail facility)</h4>
+                        <div class="log-entry">
+<span class="timestamp">Mar 20 10:15:42</span> <span class="hostname">mailserver</span> <span class="process">postfix[3421]:</span> <span class="message">message accepted for delivery</span>
+                        </div>
+                        <p style="margin-top: 10px;"><strong>Facility:</strong> mail | <strong>Priority:</strong> info | <strong>Log File:</strong> /var/log/maillog</p>
+                    </div>
+
+                    <h3 style="margin-top: 40px;">Sample rsyslog Configuration</h3>
+                    <div class="code-block" style="margin-top: 20px;">
+<strong>#### RULES ####</strong>
+
+<strong># Log all kernel messages to the console.</strong>
+<strong># Logging much else clutters up the screen.</strong>
+<code>#kern.*                                                 /dev/console</code>
+
+<strong># Log anything (except mail) of level info or higher.</strong>
+<strong># Don't log private authentication messages!</strong>
+<code>*.info;mail.none;authpriv.none;cron.none                /var/log/messages</code>
+
+<strong># The authpriv file has restricted access.</strong>
+<code>authpriv.*                                              /var/log/secure</code>
+
+<strong># Log all the mail messages in one place.</strong>
+<code>mail.*                                                  -/var/log/maillog</code>
+
+<strong># Log cron stuff</strong>
+<code>cron.*                                                  /var/log/cron</code>
+
+<strong># Everybody gets emergency messages</strong>
+<code>*.emerg                                                 :omusrmsg:*</code>
+
+<strong># Save news errors of level crit and higher in a special file.</strong>
+<code>uucp,news.crit                                          /var/log/spooler</code>
+
+<strong># Save boot messages also to boot.log</strong>
+<code>local7.*                                                /var/log/boot.log</code>
+
+<strong># Custom rule: Authentication errors to special file</strong>
+<code>authpriv.alert                                          /var/log/auth-errors</code>
+                    </div>
+
+                    <div class="info-card" style="margin-top: 30px;">
+                        <h4>🔧 Using the logger Command</h4>
+                        <p>You can manually send messages to the rsyslog service using the logger command. This is useful for testing configurations or adding custom log entries.</p>
+                    </div>
+
+                    <div class="code-block">
+<strong># Send a message with default priority (user.notice)</strong>
+<code>logger "Log entry created on host"</code>
+
+<strong># Send a message with specific priority</strong>
+<code>logger -p local7.notice "Log entry created on host"</code>
+
+<strong># Send authentication alert</strong>
+<code>logger -p authpriv.alert "Logging test authpriv.alert"</code>
+
+<strong># View the message in the appropriate log</strong>
+<code>sudo tail /var/log/auth-errors</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2025 RHA134 Interactive Learning Module | Red Hat Enterprise Linux Administration</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">💡 Click on components and table rows to explore detailed information</p>
+        </footer>
+    </div>
+
+    <script>
+        // Navigation between modules
+        const navButtons = document.querySelectorAll('.nav-btn');
+        const modules = document.querySelectorAll('.module');
+
+        navButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetModule = button.dataset.module;
+                
+                // Update active states
+                navButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                modules.forEach(module => {
+                    module.classList.remove('active');
+                    if (module.id === targetModule) {
+                        module.classList.add('active');
+                    }
+                });
+            });
+        });
+
+        // Architecture component interactions
+        const archComponents = document.querySelectorAll('.arch-component');
+        const detailPanels = document.querySelectorAll('.detail-panel');
+
+        archComponents.forEach(component => {
+            component.addEventListener('click', () => {
+                const componentName = component.dataset.component;
+                const detailPanel = document.getElementById(`detail-${componentName}`);
+                
+                // Remove active from all components
+                archComponents.forEach(c => c.classList.remove('active'));
+                component.classList.add('active');
+                
+                // Hide all detail panels
+                detailPanels.forEach(panel => panel.classList.remove('active'));
+                
+                // Show selected detail panel
+                if (detailPanel) {
+                    detailPanel.classList.add('active');
+                    detailPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            });
+        });
+
+        // Matrix tab switching
+        const matrixTabs = document.querySelectorAll('.matrix-tab');
+        const matrixContents = document.querySelectorAll('.matrix-content');
+
+        matrixTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+                
+                // Update active states
+                matrixTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                matrixContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === targetTab) {
+                        content.classList.add('active');
+                    }
+                });
+            });
+        });
+
+        // Search and filter functionality
+        const searchBox = document.getElementById('searchBox');
+        const priorityFilter = document.getElementById('priorityFilter');
+        const facilitiesTable = document.getElementById('facilitiesTable');
+        const prioritiesTable = document.getElementById('prioritiesTable');
+
+        function filterTables() {
+            const searchTerm = searchBox.value.toLowerCase();
+            const priorityValue = priorityFilter.value;
+
+            // Filter facilities table
+            const facilityRows = facilitiesTable.querySelectorAll('tbody tr');
+            facilityRows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const matchesSearch = text.includes(searchTerm);
+                row.style.display = matchesSearch ? '' : 'none';
+            });
+
+            // Filter priorities table
+            const priorityRows = prioritiesTable.querySelectorAll('tbody tr');
+            priorityRows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const code = row.querySelector('.code-cell').textContent;
+                const matchesSearch = text.includes(searchTerm);
+                const matchesPriority = !priorityValue || code === priorityValue;
+                row.style.display = (matchesSearch && matchesPriority) ? '' : 'none';
+            });
+        }
+
+        searchBox.addEventListener('input', filterTables);
+        priorityFilter.addEventListener('change', filterTables);
+
+        // Table row click for additional info
+        const allTableRows = document.querySelectorAll('tbody tr');
+        allTableRows.forEach(row => {
+            row.addEventListener('click', () => {
+                row.style.background = '#fff3cd';
+                setTimeout(() => {
+                    row.style.background = '';
+                }, 1000);
+            });
+        });
+
+        // Add smooth scrolling for all internal links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+
+        // Show first component detail on page load
+        window.addEventListener('load', () => {
+            const firstComponent = document.querySelector('.arch-component');
+            if (firstComponent) {
+                firstComponent.click();
+            }
+        });
+    </script>
+</body>
+</html>
