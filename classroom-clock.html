@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classroom Clock</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-color: #f5f5f5;
+            --text-color: #333;
+            --accent-color: #4a90e2;
+            --panel-bg: #ffffff;
+            --border-color: #ddd;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --warning-color: #f39c12;
+            --urgent-color: #e74c3c;
+            --safe-color: #27ae60;
+        }
+
+        body.dark-mode {
+            --bg-color: #1a1a1a;
+            --text-color: #e0e0e0;
+            --accent-color: #64b5f6;
+            --panel-bg: #2d2d2d;
+            --border-color: #444;
+            --shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+            overflow-x: hidden;
+        }
+
+        /* Settings Button */
+        .settings-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            z-index: 1000;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, background-color 0.3s;
+        }
+
+        .settings-btn:hover {
+            transform: scale(1.05);
+            background-color: #357abd;
+        }
+
+        .settings-btn:focus {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+
+        /* Settings Panel */
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: var(--panel-bg);
+            box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+            transition: right 0.3s ease;
+            z-index: 1001;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .settings-panel.open {
+            right: 0;
+        }
+
+        .settings-panel h2 {
+            margin-bottom: 20px;
+            color: var(--accent-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-color);
+            padding: 0;
+            width: 30px;
+            height: 30px;
+        }
+
+        .close-btn:hover {
+            color: var(--accent-color);
+        }
+
+        .setting-group {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .setting-group:last-child {
+            border-bottom: none;
+        }
+
+        .setting-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .setting-group input[type="checkbox"] {
+            margin-right: 8px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .setting-group input[type="text"],
+        .setting-group input[type="time"],
+        .setting-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 8px 0;
+        }
+
+        /* Main Clock Container */
+        .clock-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .clock-container.split-screen {
+            justify-content: space-between;
+            padding: 40px;
+        }
+
+        /* Clock Display */
+        .clock-display {
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .split-screen .clock-display {
+            flex: 1;
+            padding-right: 40px;
+        }
+
+        .time {
+            font-size: 8rem;
+            font-weight: 300;
+            line-height: 1;
+            letter-spacing: -0.02em;
+            margin-bottom: 20px;
+            transition: color 0.3s;
+        }
+
+        .date {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            opacity: 0.8;
+        }
+
+        .day {
+            font-size: 1.5rem;
+            opacity: 0.6;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .message {
+            font-size: 1.8rem;
+            margin-top: 30px;
+            font-style: italic;
+            opacity: 0.7;
+        }
+
+        /* Countdown Section */
+        .countdown-section {
+            margin-top: 40px;
+            padding: 30px;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .countdown-label {
+            font-size: 1.2rem;
+            opacity: 0.7;
+            margin-bottom: 10px;
+        }
+
+        .countdown-time {
+            font-size: 3rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .countdown-status {
+            font-size: 1.1rem;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: inline-block;
+            font-weight: 600;
+        }
+
+        .status-safe {
+            background: var(--safe-color);
+            color: white;
+        }
+
+        .status-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .status-urgent {
+            background: var(--urgent-color);
+            color: white;
+        }
+
+        /* Schedule Panel */
+        .schedule-panel {
+            flex: 1;
+            padding-left: 40px;
+            border-left: 2px solid var(--border-color);
+        }
+
+        .schedule-panel h3 {
+            font-size: 2rem;
+            margin-bottom: 30px;
+            color: var(--accent-color);
+        }
+
+        .schedule-item {
+            padding: 20px;
+            margin-bottom: 20px;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--accent-color);
+            transition: transform 0.2s;
+        }
+
+        .schedule-item:hover {
+            transform: translateX(5px);
+        }
+
+        .schedule-item.active {
+            border-left-color: var(--safe-color);
+            background: linear-gradient(to right, var(--safe-color)10, var(--panel-bg));
+        }
+
+        .schedule-item.upcoming {
+            border-left-color: var(--warning-color);
+        }
+
+        .schedule-time {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            margin-bottom: 8px;
+        }
+
+        .schedule-class {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .schedule-description {
+            font-size: 0.95rem;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        /* Fullscreen Mode */
+        .fullscreen-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            z-index: 999;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s;
+        }
+
+        .fullscreen-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Hidden Elements */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .clock-container.split-screen {
+                flex-direction: column;
+                padding: 20px;
+            }
+
+            .split-screen .clock-display {
+                padding-right: 0;
+                margin-bottom: 40px;
+            }
+
+            .schedule-panel {
+                padding-left: 0;
+                border-left: none;
+                border-top: 2px solid var(--border-color);
+                padding-top: 40px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .time {
+                font-size: 5rem;
+            }
+
+            .date {
+                font-size: 1.5rem;
+            }
+
+            .settings-panel {
+                width: 100%;
+                right: -100%;
+            }
+
+            .settings-btn {
+                padding: 10px 16px;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Schedule Editor */
+        .schedule-editor {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--bg-color);
+            border-radius: 8px;
+        }
+
+        .schedule-editor-item {
+            display: grid;
+            grid-template-columns: 1fr 2fr auto;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .schedule-editor-item input {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--panel-bg);
+            color: var(--text-color);
+        }
+
+        .remove-schedule-btn {
+            background: var(--urgent-color);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .add-schedule-btn {
+            background: var(--safe-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .add-schedule-btn:hover,
+        .remove-schedule-btn:hover {
+            opacity: 0.8;
+        }
+
+        /* World Clock Section */
+        .world-clocks-section {
+            margin-top: 40px;
+            padding: 30px;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .world-clocks-section h3 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: var(--accent-color);
+            text-align: center;
+        }
+
+        .world-clock-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .world-clock-item {
+            padding: 20px;
+            background: var(--bg-color);
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid var(--border-color);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .world-clock-item:hover {
+            transform: translateY(-3px);
+            border-color: var(--accent-color);
+        }
+
+        .world-clock-city {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--accent-color);
+        }
+
+        .world-clock-time {
+            font-size: 2.2rem;
+            font-weight: 300;
+            margin-bottom: 5px;
+        }
+
+        .world-clock-date {
+            font-size: 0.95rem;
+            opacity: 0.6;
+        }
+
+        /* World Clock Editor */
+        .world-clock-editor-item {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr auto;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .world-clock-editor-item input,
+        .world-clock-editor-item select {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--panel-bg);
+            color: var(--text-color);
+        }
+
+        .timezone-select {
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Settings Button -->
+    <button class="settings-btn" onclick="toggleSettings()" aria-label="Open settings">⚙️ Settings</button>
+
+    <!-- Fullscreen Button -->
+    <button class="fullscreen-btn" onclick="toggleFullscreen()" aria-label="Toggle fullscreen">⛶ Fullscreen</button>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settingsPanel">
+        <h2>
+            Clock Settings
+            <button class="close-btn" onclick="toggleSettings()" aria-label="Close settings">✕</button>
+        </h2>
+
+        <div class="setting-group">
+            <label>Display Mode</label>
+            <select id="layoutMode" onchange="updateSettings()">
+                <option value="centered">Centered</option>
+                <option value="split">Split Screen with Schedule</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <label>Theme</label>
+            <select id="theme" onchange="updateSettings()">
+                <option value="light">Light Mode</option>
+                <option value="dark">Dark Mode</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="show24Hour" onchange="updateSettings()">
+                Use 24-Hour Format
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="showDate" onchange="updateSettings()" checked>
+                Show Date
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="showDay" onchange="updateSettings()" checked>
+                Show Day of Week
+            </label>
+        </div>
+
+        <div class="setting-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="enableCountdown" onchange="updateSettings()">
+                Enable Countdown Timer
+            </label>
+            <div id="countdownSettings" class="hidden">
+                <label style="margin-top: 15px;">Class Start Time</label>
+                <input type="time" id="classStartTime" onchange="updateSettings()" value="10:00">
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="showMessage" onchange="updateSettings()">
+                Show Custom Message
+            </label>
+            <div id="messageSettings" class="hidden">
+                <label style="margin-top: 15px;">Message Text</label>
+                <input type="text" id="messageText" onchange="updateSettings()" placeholder="Enter your message..." value="Welcome to class!">
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <label>Class Schedule</label>
+            <p style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 10px;">Add your class schedule for split-screen mode</p>
+            <div class="schedule-editor" id="scheduleEditor">
+                <!-- Schedule items will be added here dynamically -->
+            </div>
+            <button class="add-schedule-btn" onclick="addScheduleItem()">+ Add Class</button>
+        </div>
+
+        <div class="setting-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="enableWorldClocks" onchange="updateSettings()">
+                Show World Clocks
+            </label>
+            <p style="font-size: 0.9rem; opacity: 0.7; margin: 10px 0;">Display time zones for international meetings</p>
+            <div id="worldClockSettings" class="hidden">
+                <div class="schedule-editor" id="worldClockEditor">
+                    <!-- World clock items will be added here dynamically -->
+                </div>
+                <button class="add-schedule-btn" onclick="addWorldClock()">+ Add Time Zone</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Clock Container -->
+    <div class="clock-container" id="clockContainer">
+        <div class="clock-display">
+            <div class="time" id="timeDisplay" role="timer" aria-live="polite">00:00:00</div>
+            <div class="date hidden" id="dateDisplay">January 1, 2025</div>
+            <div class="day hidden" id="dayDisplay">Monday</div>
+            <div class="message hidden" id="messageDisplay">Welcome to class!</div>
+            
+            <div class="countdown-section hidden" id="countdownSection">
+                <div class="countdown-label">Class starts in:</div>
+                <div class="countdown-time" id="countdownDisplay">--:--:--</div>
+                <div class="countdown-status status-safe" id="countdownStatus">On Time</div>
+            </div>
+
+            <div class="world-clocks-section hidden" id="worldClocksSection">
+                <h3>🌍 World Time Zones</h3>
+                <div class="world-clock-grid" id="worldClockGrid">
+                    <!-- World clocks will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="schedule-panel hidden" id="schedulePanel">
+            <h3>Today's Schedule</h3>
+            <div id="scheduleList">
+                <!-- Schedule items will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Default settings
+        const defaultSettings = {
+            layoutMode: 'centered',
+            theme: 'light',
+            show24Hour: false,
+            showDate: true,
+            showDay: true,
+            enableCountdown: false,
+            classStartTime: '10:00',
+            showMessage: false,
+            messageText: 'Welcome to class!',
+            schedule: [
+                { time: '09:00', name: 'NETW 107 - Introduction to Security', description: 'Room 201' },
+                { time: '11:00', name: 'NETW 110 - Networking Fundamentals', description: 'Room 203' },
+                { time: '14:00', name: 'CEH Certification Prep', description: 'Lab A' }
+            ],
+            enableWorldClocks: false,
+            worldClocks: [
+                { city: 'New York', timezone: 'America/New_York' },
+                { city: 'London', timezone: 'Europe/London' },
+                { city: 'Tokyo', timezone: 'Asia/Tokyo' }
+            ]
+        };
+
+        // Common time zones for easy selection
+        const commonTimezones = [
+            { label: 'Eastern Time (US)', value: 'America/New_York' },
+            { label: 'Central Time (US)', value: 'America/Chicago' },
+            { label: 'Mountain Time (US)', value: 'America/Denver' },
+            { label: 'Pacific Time (US)', value: 'America/Los_Angeles' },
+            { label: 'Alaska Time (US)', value: 'America/Anchorage' },
+            { label: 'Hawaii Time (US)', value: 'Pacific/Honolulu' },
+            { label: 'London (UK)', value: 'Europe/London' },
+            { label: 'Paris (France)', value: 'Europe/Paris' },
+            { label: 'Berlin (Germany)', value: 'Europe/Berlin' },
+            { label: 'Moscow (Russia)', value: 'Europe/Moscow' },
+            { label: 'Dubai (UAE)', value: 'Asia/Dubai' },
+            { label: 'Mumbai (India)', value: 'Asia/Kolkata' },
+            { label: 'Singapore', value: 'Asia/Singapore' },
+            { label: 'Hong Kong', value: 'Asia/Hong_Kong' },
+            { label: 'Tokyo (Japan)', value: 'Asia/Tokyo' },
+            { label: 'Sydney (Australia)', value: 'Australia/Sydney' },
+            { label: 'Auckland (New Zealand)', value: 'Pacific/Auckland' },
+            { label: 'Beijing (China)', value: 'Asia/Shanghai' },
+            { label: 'Seoul (South Korea)', value: 'Asia/Seoul' },
+            { label: 'Bangkok (Thailand)', value: 'Asia/Bangkok' },
+            { label: 'Toronto (Canada)', value: 'America/Toronto' },
+            { label: 'Mexico City (Mexico)', value: 'America/Mexico_City' },
+            { label: 'São Paulo (Brazil)', value: 'America/Sao_Paulo' },
+            { label: 'Buenos Aires (Argentina)', value: 'America/Argentina/Buenos_Aires' },
+            { label: 'Cairo (Egypt)', value: 'Africa/Cairo' },
+            { label: 'Johannesburg (South Africa)', value: 'Africa/Johannesburg' }
+        ];
+
+        // Load settings from localStorage or use defaults
+        let settings = JSON.parse(localStorage.getItem('clockSettings')) || defaultSettings;
+
+        // Initialize the clock
+        function init() {
+            loadSettings();
+            updateClock();
+            setInterval(updateClock, 1000);
+            renderScheduleEditor();
+            updateScheduleDisplay();
+            renderWorldClockEditor();
+            updateWorldClocksDisplay();
+        }
+
+        // Load settings into UI
+        function loadSettings() {
+            document.getElementById('layoutMode').value = settings.layoutMode;
+            document.getElementById('theme').value = settings.theme;
+            document.getElementById('show24Hour').checked = settings.show24Hour;
+            document.getElementById('showDate').checked = settings.showDate;
+            document.getElementById('showDay').checked = settings.showDay;
+            document.getElementById('enableCountdown').checked = settings.enableCountdown;
+            document.getElementById('classStartTime').value = settings.classStartTime;
+            document.getElementById('showMessage').checked = settings.showMessage;
+            document.getElementById('messageText').value = settings.messageText;
+            document.getElementById('enableWorldClocks').checked = settings.enableWorldClocks;
+
+            applySettings();
+        }
+
+        // Update settings
+        function updateSettings() {
+            settings.layoutMode = document.getElementById('layoutMode').value;
+            settings.theme = document.getElementById('theme').value;
+            settings.show24Hour = document.getElementById('show24Hour').checked;
+            settings.showDate = document.getElementById('showDate').checked;
+            settings.showDay = document.getElementById('showDay').checked;
+            settings.enableCountdown = document.getElementById('enableCountdown').checked;
+            settings.classStartTime = document.getElementById('classStartTime').value;
+            settings.showMessage = document.getElementById('showMessage').checked;
+            settings.messageText = document.getElementById('messageText').value;
+            settings.enableWorldClocks = document.getElementById('enableWorldClocks').checked;
+
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            applySettings();
+        }
+
+        // Apply settings to UI
+        function applySettings() {
+            // Theme
+            if (settings.theme === 'dark') {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+
+            // Layout
+            const container = document.getElementById('clockContainer');
+            const schedulePanel = document.getElementById('schedulePanel');
+            if (settings.layoutMode === 'split') {
+                container.classList.add('split-screen');
+                schedulePanel.classList.remove('hidden');
+            } else {
+                container.classList.remove('split-screen');
+                schedulePanel.classList.add('hidden');
+            }
+
+            // Date display
+            document.getElementById('dateDisplay').classList.toggle('hidden', !settings.showDate);
+
+            // Day display
+            document.getElementById('dayDisplay').classList.toggle('hidden', !settings.showDay);
+
+            // Message
+            document.getElementById('messageDisplay').classList.toggle('hidden', !settings.showMessage);
+            document.getElementById('messageDisplay').textContent = settings.messageText;
+            document.getElementById('messageSettings').classList.toggle('hidden', !settings.showMessage);
+
+            // Countdown
+            document.getElementById('countdownSection').classList.toggle('hidden', !settings.enableCountdown);
+            document.getElementById('countdownSettings').classList.toggle('hidden', !settings.enableCountdown);
+
+            // World Clocks
+            document.getElementById('worldClocksSection').classList.toggle('hidden', !settings.enableWorldClocks);
+            document.getElementById('worldClockSettings').classList.toggle('hidden', !settings.enableWorldClocks);
+        }
+
+        // Update clock display
+        function updateClock() {
+            const now = new Date();
+            
+            // Time
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+            let seconds = now.getSeconds();
+            let ampm = '';
+
+            if (!settings.show24Hour) {
+                ampm = hours >= 12 ? ' PM' : ' AM';
+                hours = hours % 12 || 12;
+            }
+
+            const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}${ampm}`;
+            document.getElementById('timeDisplay').textContent = timeString;
+
+            // Date
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('dateDisplay').textContent = now.toLocaleDateString('en-US', options);
+
+            // Day
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            document.getElementById('dayDisplay').textContent = days[now.getDay()];
+
+            // Countdown
+            if (settings.enableCountdown) {
+                updateCountdown(now);
+            }
+
+            // Update schedule highlights
+            if (settings.layoutMode === 'split') {
+                updateScheduleDisplay();
+            }
+
+            // Update world clocks
+            if (settings.enableWorldClocks) {
+                updateWorldClocksDisplay();
+            }
+        }
+
+        // Update countdown
+        function updateCountdown(now) {
+            const [targetHours, targetMinutes] = settings.classStartTime.split(':').map(Number);
+            const target = new Date(now);
+            target.setHours(targetHours, targetMinutes, 0, 0);
+
+            // If target time has passed today, set it for tomorrow
+            if (target < now) {
+                target.setDate(target.getDate() + 1);
+            }
+
+            const diff = target - now;
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+            const countdownString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('countdownDisplay').textContent = countdownString;
+
+            // Update status color
+            const timeDisplay = document.getElementById('timeDisplay');
+            const statusElement = document.getElementById('countdownStatus');
+            
+            statusElement.className = 'countdown-status';
+            
+            if (hours === 0 && minutes < 5) {
+                statusElement.classList.add('status-urgent');
+                statusElement.textContent = 'Class Starting Soon!';
+                timeDisplay.style.color = 'var(--urgent-color)';
+            } else if (hours === 0 && minutes < 15) {
+                statusElement.classList.add('status-warning');
+                statusElement.textContent = 'Get Ready';
+                timeDisplay.style.color = 'var(--warning-color)';
+            } else {
+                statusElement.classList.add('status-safe');
+                statusElement.textContent = 'On Time';
+                timeDisplay.style.color = 'var(--text-color)';
+            }
+        }
+
+        // Toggle settings panel
+        function toggleSettings() {
+            document.getElementById('settingsPanel').classList.toggle('open');
+        }
+
+        // Toggle fullscreen
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Schedule Editor Functions
+        function renderScheduleEditor() {
+            const editor = document.getElementById('scheduleEditor');
+            editor.innerHTML = '';
+            
+            settings.schedule.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'schedule-editor-item';
+                itemDiv.innerHTML = `
+                    <input type="time" value="${item.time}" onchange="updateScheduleItem(${index}, 'time', this.value)">
+                    <input type="text" value="${item.name}" onchange="updateScheduleItem(${index}, 'name', this.value)" placeholder="Class name">
+                    <button class="remove-schedule-btn" onclick="removeScheduleItem(${index})">✕</button>
+                `;
+                editor.appendChild(itemDiv);
+            });
+        }
+
+        function addScheduleItem() {
+            settings.schedule.push({ time: '12:00', name: 'New Class', description: '' });
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            renderScheduleEditor();
+            updateScheduleDisplay();
+        }
+
+        function removeScheduleItem(index) {
+            settings.schedule.splice(index, 1);
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            renderScheduleEditor();
+            updateScheduleDisplay();
+        }
+
+        function updateScheduleItem(index, field, value) {
+            settings.schedule[index][field] = value;
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            updateScheduleDisplay();
+        }
+
+        // Update schedule display
+        function updateScheduleDisplay() {
+            const scheduleList = document.getElementById('scheduleList');
+            scheduleList.innerHTML = '';
+
+            const now = new Date();
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+            // Sort schedule by time
+            const sortedSchedule = [...settings.schedule].sort((a, b) => {
+                const [aHours, aMinutes] = a.time.split(':').map(Number);
+                const [bHours, bMinutes] = b.time.split(':').map(Number);
+                return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+            });
+
+            sortedSchedule.forEach(item => {
+                const [hours, minutes] = item.time.split(':').map(Number);
+                const itemMinutes = hours * 60 + minutes;
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'schedule-item';
+                
+                // Determine if this is the current or upcoming class
+                if (Math.abs(itemMinutes - currentMinutes) < 60) {
+                    itemDiv.classList.add('active');
+                } else if (itemMinutes > currentMinutes && itemMinutes - currentMinutes < 120) {
+                    itemDiv.classList.add('upcoming');
+                }
+                
+                // Format time for display
+                let displayHours = hours;
+                let ampm = '';
+                if (!settings.show24Hour) {
+                    ampm = hours >= 12 ? ' PM' : ' AM';
+                    displayHours = hours % 12 || 12;
+                }
+                const timeString = `${displayHours}:${String(minutes).padStart(2, '0')}${ampm}`;
+                
+                itemDiv.innerHTML = `
+                    <div class="schedule-time">${timeString}</div>
+                    <div class="schedule-class">${item.name}</div>
+                    ${item.description ? `<div class="schedule-description">${item.description}</div>` : ''}
+                `;
+                scheduleList.appendChild(itemDiv);
+            });
+        }
+
+        // World Clock Functions
+        function renderWorldClockEditor() {
+            const editor = document.getElementById('worldClockEditor');
+            editor.innerHTML = '';
+            
+            if (!settings.worldClocks) {
+                settings.worldClocks = [];
+            }
+            
+            settings.worldClocks.forEach((clock, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'world-clock-editor-item';
+                
+                // Create timezone select options
+                const timezoneOptions = commonTimezones.map(tz => 
+                    `<option value="${tz.value}" ${clock.timezone === tz.value ? 'selected' : ''}>${tz.label}</option>`
+                ).join('');
+                
+                itemDiv.innerHTML = `
+                    <input type="text" value="${clock.city}" onchange="updateWorldClock(${index}, 'city', this.value)" placeholder="City name">
+                    <select class="timezone-select" onchange="updateWorldClock(${index}, 'timezone', this.value)">
+                        ${timezoneOptions}
+                    </select>
+                    <button class="remove-schedule-btn" onclick="removeWorldClock(${index})">✕</button>
+                `;
+                editor.appendChild(itemDiv);
+            });
+        }
+
+        function addWorldClock() {
+            if (!settings.worldClocks) {
+                settings.worldClocks = [];
+            }
+            settings.worldClocks.push({ city: 'New City', timezone: 'America/New_York' });
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            renderWorldClockEditor();
+            updateWorldClocksDisplay();
+        }
+
+        function removeWorldClock(index) {
+            settings.worldClocks.splice(index, 1);
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            renderWorldClockEditor();
+            updateWorldClocksDisplay();
+        }
+
+        function updateWorldClock(index, field, value) {
+            settings.worldClocks[index][field] = value;
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            updateWorldClocksDisplay();
+        }
+
+        function updateWorldClocksDisplay() {
+            const grid = document.getElementById('worldClockGrid');
+            grid.innerHTML = '';
+
+            if (!settings.worldClocks || settings.worldClocks.length === 0) {
+                return;
+            }
+
+            settings.worldClocks.forEach(clock => {
+                try {
+                    const now = new Date();
+                    
+                    // Get time in the specified timezone
+                    const timeOptions = {
+                        timeZone: clock.timezone,
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: !settings.show24Hour
+                    };
+                    
+                    const dateOptions = {
+                        timeZone: clock.timezone,
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric'
+                    };
+                    
+                    const timeString = now.toLocaleTimeString('en-US', timeOptions);
+                    const dateString = now.toLocaleDateString('en-US', dateOptions);
+                    
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'world-clock-item';
+                    itemDiv.innerHTML = `
+                        <div class="world-clock-city">${clock.city}</div>
+                        <div class="world-clock-time">${timeString}</div>
+                        <div class="world-clock-date">${dateString}</div>
+                    `;
+                    grid.appendChild(itemDiv);
+                } catch (error) {
+                    console.error(`Error displaying time for ${clock.city}:`, error);
+                }
+            });
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
