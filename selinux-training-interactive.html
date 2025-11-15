@@ -864,6 +864,23 @@
         .text-center { text-align: center; }
         .text-muted { color: var(--text-secondary); }
         .hidden { display: none !important; }
+
+        /* ========== TABLES ========== */
+        table {
+            font-size: 0.95rem;
+        }
+
+        table th {
+            font-weight: bold;
+        }
+
+        table code {
+            background: rgba(0,0,0,0.05);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: var(--font-mono);
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body>
@@ -902,7 +919,8 @@
 
         <!-- Navigation Tabs -->
         <div class="nav-tabs">
-            <div class="nav-tab active" onclick="switchTab('architecture')">Architecture</div>
+            <div class="nav-tab active" onclick="switchTab('introduction')">Introduction</div>
+            <div class="nav-tab" onclick="switchTab('architecture')">Architecture</div>
             <div class="nav-tab" onclick="switchTab('modes')">Enforcement Modes</div>
             <div class="nav-tab" onclick="switchTab('contexts')">File Contexts</div>
             <div class="nav-tab" onclick="switchTab('booleans')">Booleans</div>
@@ -911,8 +929,188 @@
             <div class="nav-tab" onclick="switchTab('cheatsheet')">Command Reference</div>
         </div>
 
+        <!-- Section 0: Introduction -->
+        <div id="introduction" class="content-section active">
+            <div class="card">
+                <h2>🔒 What is SELinux?</h2>
+                <p><strong>Security-Enhanced Linux (SELinux)</strong> is a powerful security architecture integrated into the Linux kernel. Originally developed by the National Security Agency (NSA) and released to the open-source community in 2000, SELinux provides a mechanism for supporting mandatory access control (MAC) security policies.</p>
+
+                <div class="alert alert-info">
+                    <strong>In Simple Terms:</strong> SELinux is like having a sophisticated security guard that checks every single action on your system. Even if someone gains unauthorized access to your system, SELinux limits what they can do by enforcing strict rules about which processes can access which resources.
+                </div>
+
+                <h3>🎯 Why Do We Use SELinux?</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin: 1.5rem 0;">
+                    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                        <h4 style="color: var(--primary-color); margin-bottom: 0.5rem;">🛡️ Defense in Depth</h4>
+                        <p>Traditional Linux permissions (DAC) control <em>who</em> can access files. But if an attacker compromises a user account or service, they gain all that user's permissions. SELinux adds an additional layer that controls <em>how</em> resources can be used, even by authorized users.</p>
+                    </div>
+
+                    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--success-color);">
+                        <h4 style="color: var(--success-color); margin-bottom: 0.5rem;">🔐 Contain Security Breaches</h4>
+                        <p>When a service like Apache is compromised, SELinux limits the damage. The attacker is confined to only what the Apache process is allowed to access—preventing them from reading sensitive files, accessing other services, or escalating privileges.</p>
+                    </div>
+
+                    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--warning-color);">
+                        <h4 style="color: var(--warning-color); margin-bottom: 0.5rem;">📜 Compliance Requirements</h4>
+                        <p>Many security standards and regulations (PCI-DSS, HIPAA, FIPS) require or strongly recommend mandatory access control systems. SELinux helps organizations meet these compliance requirements.</p>
+                    </div>
+
+                    <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--secondary-color);">
+                        <h4 style="color: var(--secondary-color); margin-bottom: 0.5rem;">🎯 Principle of Least Privilege</h4>
+                        <p>SELinux enforces that processes run with the minimum permissions necessary. This drastically reduces the attack surface and limits what malicious code can accomplish.</p>
+                    </div>
+                </div>
+
+                <h3>💡 Real-World Attack Prevention Examples</h3>
+
+                <div class="diagram-container">
+                    <div style="background: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <h4 style="color: var(--danger-color);">❌ Without SELinux: Web Server Compromise</h4>
+                        <ol style="margin-left: 1.5rem; line-height: 1.8;">
+                            <li>Attacker exploits a vulnerability in your web application</li>
+                            <li>Gains shell access as the Apache user (usually <code>apache</code> or <code>www-data</code>)</li>
+                            <li>Can read any file the Apache user can read: <code>/etc/passwd</code>, database configs, SSH keys</li>
+                            <li>Can write to web directories, upload malicious scripts</li>
+                            <li>Can potentially connect to other internal services</li>
+                            <li><strong>Result:</strong> Complete server compromise</li>
+                        </ol>
+                    </div>
+
+                    <div style="background: white; padding: 1.5rem; border-radius: 8px;">
+                        <h4 style="color: var(--success-color);">✅ With SELinux Enforcing: Breach Contained</h4>
+                        <ol style="margin-left: 1.5rem; line-height: 1.8;">
+                            <li>Attacker exploits the same vulnerability</li>
+                            <li>Gains shell access as Apache, but process runs with <code>httpd_t</code> context</li>
+                            <li><strong>Cannot</strong> read <code>/etc/shadow</code> or SSH keys—SELinux blocks access</li>
+                            <li><strong>Cannot</strong> write outside designated web directories</li>
+                            <li><strong>Cannot</strong> execute arbitrary binaries or scripts</li>
+                            <li><strong>Cannot</strong> connect to databases or services without explicit policy rules</li>
+                            <li><strong>Result:</strong> Attack contained, breach logged, administrator alerted</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <h3>🔍 How SELinux Differs from Traditional Permissions</h3>
+
+                <table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0; background: white;">
+                    <thead>
+                        <tr style="background: var(--primary-color); color: white;">
+                            <th style="padding: 1rem; text-align: left; border: 1px solid var(--border-color);">Aspect</th>
+                            <th style="padding: 1rem; text-align: left; border: 1px solid var(--border-color);">Traditional Permissions (DAC)</th>
+                            <th style="padding: 1rem; text-align: left; border: 1px solid var(--border-color);">SELinux (MAC)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);"><strong>Control Type</strong></td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Discretionary - users control access to their own files</td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Mandatory - system-wide policy cannot be overridden</td>
+                        </tr>
+                        <tr style="background: var(--light-bg);">
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);"><strong>Access Model</strong></td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Based on user/group/world permissions</td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Based on security context labels and policy rules</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);"><strong>Compromise Impact</strong></td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Attacker gains all permissions of compromised user</td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Attacker limited to process-specific policy rules</td>
+                        </tr>
+                        <tr style="background: var(--light-bg);">
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);"><strong>Root Override</strong></td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Root user can access everything</td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Even root processes must follow SELinux policy</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);"><strong>Default Behavior</strong></td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Permissions granted, must explicitly deny</td>
+                            <td style="padding: 1rem; border: 1px solid var(--border-color);">Access denied unless explicitly allowed</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>🎓 Key Concepts You'll Learn</h3>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin: 1.5rem 0;">
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🏗️</div>
+                        <h4 style="margin-bottom: 0.5rem;">Architecture</h4>
+                        <p style="font-size: 0.9rem; opacity: 0.9;">Security contexts, policy rules, and decision-making flow</p>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1.5rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚙️</div>
+                        <h4 style="margin-bottom: 0.5rem;">Modes</h4>
+                        <p style="font-size: 0.9rem; opacity: 0.9;">Enforcing, Permissive, and Disabled operational modes</p>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 1.5rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📁</div>
+                        <h4 style="margin-bottom: 0.5rem;">File Contexts</h4>
+                        <p style="font-size: 0.9rem; opacity: 0.9;">Managing security labels on files and directories</p>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 1.5rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎛️</div>
+                        <h4 style="margin-bottom: 0.5rem;">Booleans</h4>
+                        <p style="font-size: 0.9rem; opacity: 0.9;">Fine-tuning policy behavior without recompilation</p>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 1.5rem; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔧</div>
+                        <h4 style="margin-bottom: 0.5rem;">Troubleshooting</h4>
+                        <p style="font-size: 0.9rem; opacity: 0.9;">Diagnosing and resolving access denial issues</p>
+                    </div>
+                </div>
+
+                <h3>🚀 Getting Started</h3>
+
+                <div class="alert alert-info">
+                    <strong>👉 Ready to begin?</strong> This interactive training will guide you through each concept with:
+                    <ul style="margin: 0.5rem 0 0 1.5rem;">
+                        <li>Interactive diagrams and visual demonstrations</li>
+                        <li>Hands-on command builders and simulators</li>
+                        <li>A virtual terminal to practice real commands</li>
+                        <li>Knowledge checks to reinforce learning</li>
+                        <li>Comprehensive command reference</li>
+                    </ul>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
+                    <button class="btn btn-primary" onclick="navigateToTab('architecture')" style="font-size: 1.1rem; padding: 1rem 2rem;">
+                        Start Learning: Architecture →
+                    </button>
+                    <button class="btn btn-success" onclick="completeModule('introduction')" style="font-size: 1.1rem; padding: 1rem 2rem;">
+                        Mark Introduction Complete
+                    </button>
+                </div>
+
+                <h3 style="margin-top: 2rem;">📖 Additional Resources</h3>
+                <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 8px;">
+                    <p><strong>Want to dive deeper?</strong> After completing this training, explore these topics:</p>
+                    <ul style="margin-left: 1.5rem; line-height: 2;">
+                        <li><strong>Custom Policy Development:</strong> Creating your own SELinux modules</li>
+                        <li><strong>Multi-Level Security (MLS):</strong> Advanced security categorization</li>
+                        <li><strong>SELinux User Management:</strong> Mapping Linux users to SELinux users</li>
+                        <li><strong>Audit2allow:</strong> Automated policy generation from denials</li>
+                        <li><strong>SELinux in Containers:</strong> Securing Docker and Podman workloads</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white;">
+                <h2 style="color: white; border-bottom-color: rgba(255,255,255,0.3);">💭 Remember</h2>
+                <blockquote style="border-left: 4px solid white; padding-left: 1.5rem; margin: 1rem 0; font-size: 1.1rem; font-style: italic;">
+                    "SELinux is not about making your system harder to use—it's about making it harder to compromise. The investment in learning SELinux pays dividends in security and peace of mind."
+                </blockquote>
+                <p style="margin-top: 1.5rem; opacity: 0.9;">By the end of this training, you'll understand not just <em>how</em> to use SELinux, but <em>why</em> it's one of the most important security features in modern Linux systems.</p>
+            </div>
+        </div>
+
         <!-- Section 1: Architecture -->
-        <div id="architecture" class="content-section active">
+        <div id="architecture" class="content-section">
             <div class="card">
                 <h2>SELinux Architecture & Concepts</h2>
                 <p>Security Enhanced Linux (SELinux) is a critical security feature that provides mandatory access control (MAC). Unlike traditional discretionary access control (DAC), SELinux policies cannot be bypassed by users.</p>
@@ -1473,7 +1671,7 @@
     <script>
         // ========== STATE MANAGEMENT ==========
         const appState = {
-            currentTab: 'architecture',
+            currentTab: 'introduction',
             completedModules: new Set(),
             commandsPracticed: 0,
             quizScores: [],
@@ -1505,6 +1703,33 @@
         }
 
         // ========== NAVIGATION ==========
+        function navigateToTab(tabName) {
+            // Find the tab button and click it
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach((tab, index) => {
+                tab.classList.remove('active');
+                if ((index === 0 && tabName === 'introduction') ||
+                    (index === 1 && tabName === 'architecture') ||
+                    (index === 2 && tabName === 'modes') ||
+                    (index === 3 && tabName === 'contexts') ||
+                    (index === 4 && tabName === 'booleans') ||
+                    (index === 5 && tabName === 'troubleshooting') ||
+                    (index === 6 && tabName === 'terminal') ||
+                    (index === 7 && tabName === 'cheatsheet')) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            // Update active content
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            
+            appState.currentTab = tabName;
+            
+            // Scroll to top
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+
         function switchTab(tabName) {
             // Update active tab
             document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
@@ -1515,11 +1740,14 @@
             document.getElementById(tabName).classList.add('active');
             
             appState.currentTab = tabName;
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
         }
 
         // ========== PROGRESS TRACKING ==========
         function updateProgress() {
-            const totalModules = 5;
+            const totalModules = 6;
             const completed = appState.completedModules.size;
             const percentage = Math.round((completed / totalModules) * 100);
             
