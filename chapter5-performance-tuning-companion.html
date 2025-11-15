@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tune System Performance - Interactive Companion</title>
+    <title>Chapter 5: Tune System Performance - Interactive Companion</title>
     <style>
         * {
             margin: 0;
@@ -356,6 +356,7 @@
             padding: 20px;
             cursor: pointer;
             transition: all 0.3s ease;
+            position: relative;
         }
 
         .profile-card:hover {
@@ -367,6 +368,11 @@
         .profile-card.selected {
             border-color: var(--success);
             background: linear-gradient(135deg, var(--bg-dark) 0%, rgba(16, 185, 129, 0.1) 100%);
+        }
+
+        .profile-card.active-detail {
+            border-color: var(--primary);
+            background: linear-gradient(135deg, var(--bg-dark) 0%, rgba(37, 99, 235, 0.1) 100%);
         }
 
         .profile-card h4 {
@@ -408,7 +414,33 @@
         }
 
         .detail-panel.open {
-            max-height: 1000px;
+            max-height: 2000px;
+        }
+
+        .profile-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .detail-stat {
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .detail-stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+
+        .detail-stat-value {
+            color: var(--primary);
+            font-size: 1.3em;
+            font-weight: bold;
         }
 
         .controls {
@@ -883,7 +915,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🚀 Tune System Performance</h1>
+            <h1>🚀 Chapter 5: Tune System Performance</h1>
             <p>Interactive Learning Companion - Deep Dive into Linux Performance Optimization</p>
         </header>
 
@@ -1079,22 +1111,64 @@
                 <p>Explore and compare Linux tuning profiles to understand their characteristics and optimal use cases.</p>
 
                 <div class="info-box">
-                    <strong>💡 How to use:</strong> Click on any profile card to see detailed information. Select multiple profiles (Shift+Click) to compare them side-by-side.
+                    <strong>💡 How to use:</strong> Click on any profile card to see detailed information. Hold Shift and click to select multiple profiles for comparison.
                 </div>
 
                 <div class="controls">
                     <button onclick="filterProfiles('all')">Show All</button>
                     <button onclick="filterProfiles('performance')" class="secondary">Performance Profiles</button>
                     <button onclick="filterProfiles('power')" class="secondary">Power-Saving Profiles</button>
-                    <button onclick="clearComparison()" class="secondary">Clear Selection</button>
+                    <button onclick="clearSelection()" class="secondary">Clear Selection</button>
                 </div>
 
                 <div id="profileGrid" class="comparison-grid">
                     <!-- Profiles will be dynamically inserted here -->
                 </div>
 
+                <!-- Single Profile Detail Panel -->
+                <div id="profileDetailPanel" class="detail-panel">
+                    <h3 id="detailProfileName">Profile Details</h3>
+                    <p id="detailProfileDescription"></p>
+                    
+                    <div class="profile-detail-grid">
+                        <div class="detail-stat">
+                            <div class="detail-stat-label">Performance Level</div>
+                            <div class="detail-stat-value" id="detailPerformance">--</div>
+                        </div>
+                        <div class="detail-stat">
+                            <div class="detail-stat-label">Power Efficiency</div>
+                            <div class="detail-stat-value" id="detailPower">--</div>
+                        </div>
+                        <div class="detail-stat">
+                            <div class="detail-stat-label">Latency</div>
+                            <div class="detail-stat-value" id="detailLatency">--</div>
+                        </div>
+                        <div class="detail-stat">
+                            <div class="detail-stat-label">Throughput</div>
+                            <div class="detail-stat-value" id="detailThroughput">--</div>
+                        </div>
+                    </div>
+
+                    <h4 style="margin-top: 20px;">Best Use Cases</h4>
+                    <p id="detailUseCase" style="color: var(--text-secondary);"></p>
+
+                    <h4 style="margin-top: 20px;">Active Plugins</h4>
+                    <p id="detailPlugins" style="color: var(--text-secondary);"></p>
+
+                    <h4 style="margin-top: 20px;">Technical Details</h4>
+                    <p id="detailTechnical" style="color: var(--text-secondary);"></p>
+
+                    <h4 style="margin-top: 20px;">How to Activate</h4>
+                    <div class="command-preview">
+                        <strong>$</strong> <span id="detailCommand">tuned-adm profile balanced</span>
+                    </div>
+                    
+                    <button onclick="copyProfileCommand()" class="secondary" style="margin-top: 10px;">📋 Copy Command</button>
+                </div>
+
+                <!-- Comparison Panel -->
                 <div id="comparisonPanel" class="detail-panel">
-                    <h3>📋 Comparison Details</h3>
+                    <h3>📋 Profile Comparison</h3>
                     <table class="comparison-table">
                         <thead>
                             <tr>
@@ -1701,6 +1775,7 @@
         let processIdCounter = 1;
         let labProcesses = [];
         let labProcessIdCounter = 1000;
+        let currentDetailProfile = null;
 
         // ===== UTILITY FUNCTIONS =====
 
@@ -1738,6 +1813,9 @@
                 
                 this.classList.add('active');
                 document.getElementById(moduleName).classList.add('active');
+                
+                // Scroll to top
+                window.scrollTo(0, 0);
             });
         });
 
@@ -1751,7 +1829,7 @@
                 const card = document.createElement('div');
                 card.className = 'profile-card';
                 card.dataset.profile = profile.name;
-                card.onclick = (e) => toggleProfileSelection(profile.name, e.shiftKey);
+                card.onclick = (e) => handleProfileClick(profile.name, e.shiftKey);
 
                 const tags = [];
                 if (profile.performance >= 80) tags.push('<span class="tag performance">High Performance</span>');
@@ -1775,29 +1853,75 @@
             });
         }
 
-        function toggleProfileSelection(profileName, isShiftKey) {
+        function handleProfileClick(profileName, isShiftKey) {
+            if (isShiftKey) {
+                // Multi-selection for comparison
+                toggleProfileSelection(profileName);
+            } else {
+                // Single click - show detail
+                showProfileDetail(profileName);
+            }
+        }
+
+        function showProfileDetail(profileName) {
+            const profile = tunedProfiles.find(p => p.name === profileName);
+            if (!profile) return;
+
+            // Update card visual states
+            document.querySelectorAll('.profile-card').forEach(c => {
+                c.classList.remove('selected', 'active-detail');
+            });
+            document.querySelector(`[data-profile="${profileName}"]`).classList.add('active-detail');
+
+            // Hide comparison, show detail
+            hideComparison();
+            
+            // Populate detail panel
+            document.getElementById('detailProfileName').textContent = profile.name;
+            document.getElementById('detailProfileDescription').textContent = profile.description;
+            document.getElementById('detailPerformance').textContent = profile.performance + '%';
+            document.getElementById('detailPower').textContent = profile.power + '%';
+            document.getElementById('detailLatency').textContent = profile.latency;
+            document.getElementById('detailThroughput').textContent = profile.throughput;
+            document.getElementById('detailUseCase').textContent = profile.useCase;
+            document.getElementById('detailPlugins').textContent = profile.plugins.join(', ');
+            document.getElementById('detailTechnical').textContent = profile.details;
+            document.getElementById('detailCommand').textContent = `sudo tuned-adm profile ${profile.name}`;
+
+            // Show detail panel
+            document.getElementById('profileDetailPanel').classList.add('open');
+            currentDetailProfile = profileName;
+
+            // Clear comparison selections
+            selectedProfiles = [];
+        }
+
+        function toggleProfileSelection(profileName) {
             const card = document.querySelector(`[data-profile="${profileName}"]`);
             
-            if (!isShiftKey) {
-                // Single selection
-                selectedProfiles = [profileName];
-                document.querySelectorAll('.profile-card').forEach(c => c.classList.remove('selected'));
-                card.classList.add('selected');
+            // Hide detail panel when doing multi-select
+            document.getElementById('profileDetailPanel').classList.remove('open');
+            document.querySelectorAll('.profile-card').forEach(c => c.classList.remove('active-detail'));
+            
+            const index = selectedProfiles.indexOf(profileName);
+            if (index > -1) {
+                selectedProfiles.splice(index, 1);
+                card.classList.remove('selected');
             } else {
-                // Multi-selection
-                const index = selectedProfiles.indexOf(profileName);
-                if (index > -1) {
-                    selectedProfiles.splice(index, 1);
-                    card.classList.remove('selected');
+                if (selectedProfiles.length < 2) {
+                    selectedProfiles.push(profileName);
+                    card.classList.add('selected');
                 } else {
-                    if (selectedProfiles.length < 3) {
-                        selectedProfiles.push(profileName);
-                        card.classList.add('selected');
-                    }
+                    // Replace oldest selection
+                    const oldCard = document.querySelector(`[data-profile="${selectedProfiles[0]}"]`);
+                    oldCard.classList.remove('selected');
+                    selectedProfiles.shift();
+                    selectedProfiles.push(profileName);
+                    card.classList.add('selected');
                 }
             }
 
-            if (selectedProfiles.length >= 2) {
+            if (selectedProfiles.length === 2) {
                 showComparison();
             } else {
                 hideComparison();
@@ -1845,6 +1969,11 @@
                     <td>${profile1.plugins.join(', ')}</td>
                     <td>${profile2.plugins.join(', ')}</td>
                 </tr>
+                <tr>
+                    <td><strong>Technical Details</strong></td>
+                    <td>${profile1.details}</td>
+                    <td>${profile2.details}</td>
+                </tr>
             `;
 
             panel.classList.add('open');
@@ -1871,10 +2000,21 @@
             });
         }
 
-        function clearComparison() {
+        function clearSelection() {
             selectedProfiles = [];
-            document.querySelectorAll('.profile-card').forEach(c => c.classList.remove('selected'));
+            currentDetailProfile = null;
+            document.querySelectorAll('.profile-card').forEach(c => {
+                c.classList.remove('selected', 'active-detail');
+            });
             hideComparison();
+            document.getElementById('profileDetailPanel').classList.remove('open');
+        }
+
+        function copyProfileCommand() {
+            const commandText = document.getElementById('detailCommand').textContent;
+            navigator.clipboard.writeText(commandText).then(() => {
+                alert('Command copied to clipboard!');
+            });
         }
 
         function updateRecommendation() {
@@ -1887,18 +2027,43 @@
                 'desktop-performance': 'desktop',
                 'desktop-balanced': 'desktop',
                 'desktop-power': 'balanced',
+                'desktop-latency': 'desktop',
+                'desktop-throughput': 'desktop',
                 'server-performance': 'throughput-performance',
                 'server-latency': 'latency-performance',
                 'server-balanced': 'balanced',
+                'server-throughput': 'throughput-performance',
+                'server-power': 'balanced',
                 'database-performance': 'throughput-performance',
                 'database-latency': 'latency-performance',
+                'database-throughput': 'throughput-performance',
+                'database-balanced': 'latency-performance',
+                'database-power': 'balanced',
                 'web-throughput': 'network-throughput',
                 'web-latency': 'network-latency',
+                'web-performance': 'network-throughput',
+                'web-balanced': 'balanced',
+                'web-power': 'balanced',
                 'vm-guest-performance': 'virtual-guest',
+                'vm-guest-latency': 'virtual-guest',
+                'vm-guest-throughput': 'virtual-guest',
+                'vm-guest-balanced': 'virtual-guest',
+                'vm-guest-power': 'virtual-guest',
                 'vm-host-performance': 'virtual-host',
+                'vm-host-latency': 'virtual-host',
+                'vm-host-throughput': 'virtual-host',
+                'vm-host-balanced': 'virtual-host',
+                'vm-host-power': 'virtual-host',
                 'hpc-performance': 'hpc-compute',
+                'hpc-latency': 'hpc-compute',
+                'hpc-throughput': 'hpc-compute',
+                'hpc-balanced': 'hpc-compute',
+                'hpc-power': 'hpc-compute',
                 'laptop-power': 'powersave',
-                'laptop-balanced': 'balanced'
+                'laptop-balanced': 'balanced',
+                'laptop-performance': 'balanced',
+                'laptop-latency': 'balanced',
+                'laptop-throughput': 'balanced'
             };
 
             const key = `${systemType}-${concern}`;
@@ -2157,7 +2322,11 @@ Current active profile: virtual-guest`,
             schedulerProcesses = schedulerProcesses.filter(p => p.pid !== pid);
             renderSchedulerTree();
             renderSchedulerStats();
-            showProcessList();
+            if (schedulerProcesses.length === 0) {
+                document.getElementById('processList').style.display = 'none';
+            } else {
+                showProcessList();
+            }
         }
 
         function startScheduling() {
@@ -2254,7 +2423,7 @@ Current active profile: virtual-guest`,
                         <button onclick="removeNiceProcess('${processName}')">Remove</button>
                     `;
                     
-                    if (dropZone.querySelector('.info-box')) {
+                    if (dropZone.textContent.includes('Drop processes')) {
                         dropZone.innerHTML = '';
                     }
                     
@@ -2314,6 +2483,15 @@ Current active profile: virtual-guest`,
 
         function loadScenario(num) {
             const detailsDiv = document.getElementById('scenarioDetails');
+            
+            // Clear active state from all scenario cards
+            document.querySelectorAll('.scenario-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            
+            // Mark clicked scenario as active
+            event.target.closest('.scenario-card').classList.add('active');
+            
             const scenarios = {
                 1: {
                     title: 'Background Backup Job',
@@ -2429,9 +2607,10 @@ Current active profile: virtual-guest`,
                 return;
             }
             
+            const oldPriority = proc.nice + 20;
             proc.nice = niceValue;
             renderLabProcessList();
-            showLabOutput(`${pid} (process ID) old priority ${proc.nice + 20}, new priority ${niceValue + 20}`);
+            showLabOutput(`${pid} (process ID) old priority ${oldPriority}, new priority ${niceValue + 20}`);
         }
 
         function labKill(pid) {
@@ -2503,10 +2682,10 @@ Current active profile: virtual-guest`,
                 case 'nice':
                     const niceVal = document.getElementById('labNiceValue').value;
                     const cmd = document.getElementById('labCommand').value;
-                    output = `Starting: ${cmd}\nNice value: ${niceVal}\nProcess started with PID ${labProcessIdCounter}\n\n[1] ${labProcessIdCounter++}`;
+                    output = `Starting: ${cmd}\nNice value: ${niceVal}\nProcess started with PID ${labProcessIdCounter}\n\n[1] ${labProcessIdCounter}`;
                     
                     labProcesses.push({
-                        pid: labProcessIdCounter - 1,
+                        pid: labProcessIdCounter++,
                         command: cmd,
                         user: 'student',
                         nice: parseInt(niceVal),
