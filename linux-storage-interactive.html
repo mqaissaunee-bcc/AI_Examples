@@ -1,0 +1,2589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux Storage Management - Interactive Companion</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --success-color: #059669;
+            --warning-color: #d97706;
+            --danger-color: #dc2626;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f3f4f6;
+            --bg-tertiary: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border-color: #d1d5db;
+            --terminal-bg: #1e1e1e;
+            --terminal-text: #d4d4d4;
+            --terminal-prompt: #4ec9b0;
+            --terminal-error: #f48771;
+            --terminal-success: #89d185;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        /* Navigation */
+        nav {
+            background: var(--bg-primary);
+            border-bottom: 2px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            overflow-x: auto;
+            padding: 0;
+        }
+
+        .nav-btn {
+            padding: 1rem 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .nav-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .nav-btn.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .module {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .module.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-size: 1.75rem;
+        }
+
+        .card h3 {
+            color: var(--text-primary);
+            margin: 1.5rem 0 1rem;
+            font-size: 1.25rem;
+        }
+
+        /* Terminal Styles */
+        .terminal {
+            background: var(--terminal-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--terminal-text);
+            margin: 1rem 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #333;
+        }
+
+        .terminal-dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .terminal-dot.red { background: #ff5f56; }
+        .terminal-dot.yellow { background: #ffbd2e; }
+        .terminal-dot.green { background: #27c93f; }
+
+        .terminal-title {
+            margin-left: 1rem;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .terminal-output {
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+
+        .terminal-line {
+            margin: 0.25rem 0;
+        }
+
+        .terminal-prompt {
+            color: var(--terminal-prompt);
+        }
+
+        .terminal-error {
+            color: var(--terminal-error);
+        }
+
+        .terminal-success {
+            color: var(--terminal-success);
+        }
+
+        .terminal-input-wrapper {
+            display: flex;
+            align-items: center;
+        }
+
+        .terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--terminal-text);
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        /* Disk Visualization */
+        .disk-visual {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+        }
+
+        .disk-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .disk {
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .disk-name {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+
+        .disk-bar {
+            height: 60px;
+            display: flex;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .partition {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .partition:hover {
+            opacity: 0.8;
+            transform: scale(1.02);
+        }
+
+        .partition-info {
+            text-align: center;
+            font-size: 0.85rem;
+        }
+
+        .partition-primary { background: #3b82f6; }
+        .partition-extended { background: #8b5cf6; }
+        .partition-logical { background: #10b981; }
+        .partition-unused { background: #9ca3af; }
+        .partition-mbr { background: #ef4444; }
+        .partition-gpt-primary { background: #f59e0b; }
+        .partition-gpt-backup { background: #f59e0b; }
+
+        /* Form Elements */
+        .form-group {
+            margin: 1rem 0;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .form-textarea {
+            font-family: 'Courier New', Courier, monospace;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary-color);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #047857;
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        /* Comparison Table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .comparison-table th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .comparison-table tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        .comparison-table .feature {
+            font-weight: 500;
+        }
+
+        /* Code Block */
+        .code-block {
+            background: var(--terminal-bg);
+            color: var(--terminal-text);
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            overflow-x: auto;
+            margin: 1rem 0;
+            position: relative;
+        }
+
+        .code-block pre {
+            margin: 0;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.85rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .copy-btn:hover {
+            background: var(--border-color);
+        }
+
+        /* Alert Boxes */
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            border-color: var(--primary-color);
+            color: #1e40af;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            border-color: var(--success-color);
+            color: #065f46;
+        }
+
+        .alert-warning {
+            background: #fed7aa;
+            border-color: var(--warning-color);
+            color: #92400e;
+        }
+
+        .alert-danger {
+            background: #fee2e2;
+            border-color: var(--danger-color);
+            color: #991b1b;
+        }
+
+        /* Quiz Styles */
+        .quiz-question {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+        }
+
+        .quiz-options {
+            list-style: none;
+            margin-top: 1rem;
+        }
+
+        .quiz-option {
+            padding: 1rem;
+            margin: 0.5rem 0;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .quiz-option:hover {
+            border-color: var(--primary-color);
+            background: #eff6ff;
+        }
+
+        .quiz-option.selected {
+            border-color: var(--primary-color);
+            background: #dbeafe;
+        }
+
+        .quiz-option.correct {
+            border-color: var(--success-color);
+            background: #d1fae5;
+        }
+
+        .quiz-option.incorrect {
+            border-color: var(--danger-color);
+            background: #fee2e2;
+        }
+
+        .quiz-feedback {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .quiz-feedback.show {
+            display: block;
+        }
+
+        /* Slider */
+        .slider-container {
+            margin: 1.5rem 0;
+        }
+
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--bg-tertiary);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 0.5rem 0;
+        }
+
+        /* Checkbox */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        /* Command Reference */
+        .command-list {
+            list-style: none;
+        }
+
+        .command-item {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .command-name {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            color: var(--primary-color);
+            font-size: 1.1rem;
+        }
+
+        .command-description {
+            margin: 0.5rem 0;
+            color: var(--text-secondary);
+        }
+
+        .command-example {
+            background: var(--terminal-bg);
+            color: var(--terminal-text);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Workflow Steps */
+        .workflow-steps {
+            list-style: none;
+            counter-reset: step-counter;
+        }
+
+        .workflow-step {
+            counter-increment: step-counter;
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 8px;
+            position: relative;
+            padding-left: 4rem;
+        }
+
+        .workflow-step::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--primary-color);
+            color: white;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .workflow-step h4 {
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+
+        /* Grid Layouts */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            .nav-btn {
+                font-size: 0.85rem;
+                padding: 0.75rem 1rem;
+            }
+
+            main {
+                padding: 0 1rem;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            color: var(--primary-color);
+            border-bottom: 1px dotted var(--primary-color);
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 250px;
+            background-color: var(--terminal-bg);
+            color: var(--terminal-text);
+            text-align: center;
+            border-radius: 6px;
+            padding: 0.75rem;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -125px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.9rem;
+        }
+
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--terminal-bg) transparent transparent transparent;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            height: 20px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            height: 100%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin: 0 0.25rem;
+        }
+
+        .badge-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .badge-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .badge-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .badge-info {
+            background: #0ea5e9;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🗄️ Linux Storage Management</h1>
+            <p>Interactive Companion for Partitions, File Systems, and Swap Space</p>
+        </div>
+    </header>
+
+    <nav>
+        <div class="nav-container">
+            <button class="nav-btn active" onclick="showModule('parted-terminal')">parted Terminal</button>
+            <button class="nav-btn" onclick="showModule('fstab-builder')">fstab Builder</button>
+            <button class="nav-btn" onclick="showModule('swap-calculator')">Swap Calculator</button>
+            <button class="nav-btn" onclick="showModule('command-reference')">Command Reference</button>
+            <button class="nav-btn" onclick="showModule('mbr-gpt')">MBR vs GPT</button>
+            <button class="nav-btn" onclick="showModule('mkfs-builder')">mkfs Builder</button>
+            <button class="nav-btn" onclick="showModule('swap-workflow')">Swap Workflow</button>
+            <button class="nav-btn" onclick="showModule('quiz')">Knowledge Check</button>
+        </div>
+    </nav>
+
+    <main>
+        <!-- Module 2.1: Virtual parted Terminal -->
+        <div id="parted-terminal" class="module active">
+            <div class="card">
+                <h2>Virtual parted Terminal</h2>
+                <p>Practice partitioning commands in a safe, simulated environment. Try creating, viewing, and deleting partitions on a virtual disk.</p>
+
+                <div class="alert alert-info">
+                    <strong>Available Commands:</strong> print, mkpart, rm, quit, help, unit
+                </div>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span class="terminal-dot red"></span>
+                            <span class="terminal-dot yellow"></span>
+                            <span class="terminal-dot green"></span>
+                        </div>
+                        <div class="terminal-title">parted /dev/vdb</div>
+                    </div>
+                    <div class="terminal-output" id="parted-output">
+                        <div class="terminal-line">GNU Parted 3.4</div>
+                        <div class="terminal-line">Using /dev/vdb</div>
+                        <div class="terminal-line">Welcome to GNU Parted! Type 'help' to view a list of commands.</div>
+                    </div>
+                    <div class="terminal-input-wrapper">
+                        <span class="terminal-prompt">(parted) </span>
+                        <input type="text" class="terminal-input" id="parted-input" autocomplete="off" placeholder="Type a command...">
+                    </div>
+                </div>
+
+                <div class="disk-visual">
+                    <h3>Disk Visualization: /dev/vdb (5369MB)</h3>
+                    <div id="disk-visualization" class="disk-container">
+                        <div class="disk">
+                            <div class="disk-name">/dev/vdb - 5369MB - GPT</div>
+                            <div class="disk-bar" id="partition-bar">
+                                <div class="partition partition-unused" style="width: 100%;">
+                                    <div class="partition-info">Unallocated Space<br>5369MB</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="resetPartedDisk()">Reset Disk</button>
+                    <button class="btn btn-warning" onclick="showPartedHelp()">Show Help</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 4.1: fstab Entry Constructor -->
+        <div id="fstab-builder" class="module">
+            <div class="card">
+                <h2>fstab Entry Constructor</h2>
+                <p>Build properly formatted /etc/fstab entries with validation and helpful explanations for each field.</p>
+
+                <div class="grid-2">
+                    <div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                1. Device / UUID
+                                <span class="tooltip">ⓘ
+                                    <span class="tooltiptext">Use UUID for persistence. Device names like /dev/vdb1 can change on reboot.</span>
+                                </span>
+                            </label>
+                            <select class="form-select" id="fstab-device-type" onchange="updateFstabDeviceInput()">
+                                <option value="uuid">UUID</option>
+                                <option value="device">Device Name</option>
+                                <option value="label">Label</option>
+                            </select>
+                            <input type="text" class="form-input" id="fstab-device" placeholder="e.g., a8063676-44dd-409a-b584-68be2c9f5570" style="margin-top: 0.5rem;">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                2. Mount Point
+                                <span class="tooltip">ⓘ
+                                    <span class="tooltiptext">Directory where the filesystem will be accessible. Must exist before mounting.</span>
+                                </span>
+                            </label>
+                            <input type="text" class="form-input" id="fstab-mountpoint" placeholder="/mnt/data" value="/backup">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                3. File System Type
+                                <span class="tooltip">ⓘ
+                                    <span class="tooltiptext">The type of filesystem on the partition.</span>
+                                </span>
+                            </label>
+                            <select class="form-select" id="fstab-fstype">
+                                <option value="xfs">xfs</option>
+                                <option value="ext4">ext4</option>
+                                <option value="ext3">ext3</option>
+                                <option value="swap">swap</option>
+                                <option value="vfat">vfat</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                4. Mount Options
+                                <span class="tooltip">ⓘ
+                                    <span class="tooltiptext">defaults includes: rw, suid, dev, exec, auto, nouser, async</span>
+                                </span>
+                            </label>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <label class="checkbox-group">
+                                    <input type="checkbox" class="checkbox" value="defaults" checked onchange="updateFstabOptions()"> defaults
+                                </label>
+                                <label class="checkbox-group">
+                                    <input type="checkbox" class="checkbox" value="noauto" onchange="updateFstabOptions()"> noauto
+                                </label>
+                                <label class="checkbox-group">
+                                    <input type="checkbox" class="checkbox" value="ro" onchange="updateFstabOptions()"> ro (read-only)
+                                </label>
+                                <label class="checkbox-group">
+                                    <input type="checkbox" class="checkbox" value="noexec" onchange="updateFstabOptions()"> noexec
+                                </label>
+                            </div>
+                            <input type="text" class="form-input" id="fstab-options" value="defaults" placeholder="defaults">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                5. Dump
+                                <span class="tooltip">ⓘ
+                                    <span class="tooltiptext">0 = no backup, 1 = backup. Rarely used; typically set to 0.</span>
+                                </span>
+                            </label>
+                            <select class="form-select" id="fstab-dump">
+                                <option value="0">0 (no backup)</option>
+                                <option value="1">1 (backup)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                6. fsck Order
+                                <span class="tooltip">ⓘ
+                                    <span class="tooltiptext">0 = no check, 1 = root fs (first), 2 = other fs. XFS doesn't use fsck, so use 0.</span>
+                                </span>
+                            </label>
+                            <select class="form-select" id="fstab-fsck">
+                                <option value="0">0 (no check / XFS)</option>
+                                <option value="1">1 (root filesystem)</option>
+                                <option value="2">2 (other filesystems)</option>
+                            </select>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="generateFstabEntry()">Generate Entry</button>
+                    </div>
+
+                    <div>
+                        <h3>Generated fstab Entry</h3>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyFstabEntry()">Copy</button>
+                            <pre id="fstab-output">UUID=a8063676-44dd-409a-b584-68be2c9f5570  /backup  xfs  defaults  0 0</pre>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>Field Breakdown:</strong>
+                            <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                <li><strong>Field 1:</strong> Device identifier (UUID recommended)</li>
+                                <li><strong>Field 2:</strong> Mount point directory</li>
+                                <li><strong>Field 3:</strong> Filesystem type</li>
+                                <li><strong>Field 4:</strong> Mount options</li>
+                                <li><strong>Field 5:</strong> Dump flag (backup)</li>
+                                <li><strong>Field 6:</strong> fsck order</li>
+                            </ul>
+                        </div>
+
+                        <h3>Common Templates</h3>
+                        <div class="btn-group">
+                            <button class="btn btn-secondary" onclick="loadFstabTemplate('data')">Data Partition</button>
+                            <button class="btn btn-secondary" onclick="loadFstabTemplate('swap')">Swap Space</button>
+                            <button class="btn btn-secondary" onclick="loadFstabTemplate('backup')">Backup Drive</button>
+                        </div>
+
+                        <div style="margin-top: 1.5rem;">
+                            <h3>Verification Commands</h3>
+                            <div class="code-block">
+                                <pre># Verify syntax without mounting
+findmnt --verify
+
+# Test mount from fstab
+mount /backup
+
+# Check mounted filesystems
+mount | grep /backup</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 5.1: Swap Size Calculator -->
+        <div id="swap-calculator" class="module">
+            <div class="card">
+                <h2>Swap Space Calculator</h2>
+                <p>Calculate recommended swap space based on your system's RAM and whether hibernation is needed.</p>
+
+                <div class="grid-2">
+                    <div>
+                        <div class="form-group">
+                            <label class="form-label">System RAM (GB)</label>
+                            <input type="range" class="slider" id="ram-slider" min="1" max="128" value="4" oninput="calculateSwap()">
+                            <div class="slider-value" id="ram-value">4 GB</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-group">
+                                <input type="checkbox" class="checkbox" id="hibernation-check" onchange="calculateSwap()">
+                                Enable Hibernation Support
+                            </label>
+                            <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+                                Hibernation saves RAM contents to swap before powering off. Requires swap ≥ RAM.
+                            </p>
+                        </div>
+
+                        <div style="margin-top: 2rem;">
+                            <h3>Recommendation Guidelines</h3>
+                            <table class="comparison-table">
+                                <tr>
+                                    <th>RAM</th>
+                                    <th>Swap (No Hibernation)</th>
+                                    <th>Swap (With Hibernation)</th>
+                                </tr>
+                                <tr>
+                                    <td>≤ 2 GB</td>
+                                    <td>2x RAM</td>
+                                    <td>3x RAM</td>
+                                </tr>
+                                <tr>
+                                    <td>2-8 GB</td>
+                                    <td>= RAM</td>
+                                    <td>2x RAM</td>
+                                </tr>
+                                <tr>
+                                    <td>8-64 GB</td>
+                                    <td>≥ 4 GB</td>
+                                    <td>1.5x RAM</td>
+                                </tr>
+                                <tr>
+                                    <td>> 64 GB</td>
+                                    <td>≥ 4 GB</td>
+                                    <td>Not recommended</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="alert alert-success" id="swap-recommendation">
+                            <h3 style="margin-bottom: 0.5rem;">Recommended Swap Size</h3>
+                            <div style="font-size: 2rem; font-weight: bold; margin: 1rem 0;" id="swap-size">8 GB</div>
+                            <p id="swap-explanation">For a system with 4 GB RAM, we recommend 4 GB of swap space (equal to RAM).</p>
+                        </div>
+
+                        <div style="margin-top: 1.5rem;">
+                            <h3>Implementation Commands</h3>
+                            <div class="code-block">
+                                <pre id="swap-commands"># Create 4 GB swap partition
+parted /dev/vdb mkpart swap1 linux-swap 2048s 4096MB
+
+# Format as swap
+mkswap /dev/vdb2
+
+# Activate swap
+swapon /dev/vdb2
+
+# Make persistent in /etc/fstab
+UUID=<span id="swap-uuid-example">xxxxx</span>  swap  swap  defaults  0 0</pre>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning" style="margin-top: 1.5rem;">
+                            <strong>Important Notes:</strong>
+                            <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                                <li>Swap is slower than physical RAM</li>
+                                <li>Swap supplements RAM but doesn't replace it</li>
+                                <li>For systems > 64 GB RAM, hibernation is typically not recommended</li>
+                                <li>Modern SSDs reduce performance gap between swap and RAM</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 7.1: Interactive Command Cheat Sheet -->
+        <div id="command-reference" class="module">
+            <div class="card">
+                <h2>Command Reference</h2>
+                <p>Comprehensive reference for all storage management commands with examples and use cases.</p>
+
+                <div class="form-group">
+                    <input type="text" class="form-input" id="command-search" placeholder="Search commands..." oninput="filterCommands()">
+                </div>
+
+                <div id="command-container">
+                    <h3>Partitioning Commands</h3>
+                    <ul class="command-list">
+                        <li class="command-item" data-category="partitioning">
+                            <div class="command-name">parted [device]</div>
+                            <div class="command-description">Interactive partition editor supporting both MBR and GPT schemes</div>
+                            <div class="command-example">
+# Start parted on /dev/vdb
+parted /dev/vdb
+
+# Common subcommands:
+(parted) print              # Display partition table
+(parted) mklabel gpt        # Create GPT partition table
+(parted) mkpart primary xfs 2048s 2000MB
+(parted) rm 1               # Delete partition 1
+(parted) quit               # Exit parted
+                            </div>
+                        </li>
+
+                        <li class="command-item" data-category="partitioning">
+                            <div class="command-name">lsblk</div>
+                            <div class="command-description">List block devices and their partition layout</div>
+                            <div class="command-example">
+# Basic listing
+lsblk
+
+# Show filesystems and UUIDs
+lsblk --fs
+
+# Show all columns
+lsblk -o NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE,UUID
+                            </div>
+                        </li>
+
+                        <li class="command-item" data-category="partitioning">
+                            <div class="command-name">udevadm settle</div>
+                            <div class="command-description">Wait for system to detect new partitions and create device files</div>
+                            <div class="command-example">
+# Run after creating partitions
+parted /dev/vdb mkpart backup xfs 2048s 2GB
+udevadm settle
+
+# Now the device file exists
+ls -l /dev/vdb1
+                            </div>
+                        </li>
+                    </ul>
+
+                    <h3>File System Commands</h3>
+                    <ul class="command-list">
+                        <li class="command-item" data-category="filesystem">
+                            <div class="command-name">mkfs.xfs [device]</div>
+                            <div class="command-description">Create an XFS filesystem (Red Hat recommended default)</div>
+                            <div class="command-example">
+# Create XFS filesystem
+mkfs.xfs /dev/vdb1
+
+# With label
+mkfs.xfs -L backup /dev/vdb1
+                            </div>
+                        </li>
+
+                        <li class="command-item" data-category="filesystem">
+                            <div class="command-name">mkfs.ext4 [device]</div>
+                            <div class="command-description">Create an ext4 filesystem</div>
+                            <div class="command-example">
+# Create ext4 filesystem
+mkfs.ext4 /dev/vdb1
+
+# With label
+mkfs.ext4 -L mydata /dev/vdb1
+                            </div>
+                        </li>
+                    </ul>
+
+                    <h3>Mounting Commands</h3>
+                    <ul class="command-list">
+                        <li class="command-item" data-category="mounting">
+                            <div class="command-name">mount [device] [mount_point]</div>
+                            <div class="command-description">Mount a filesystem to make it accessible</div>
+                            <div class="command-example">
+# Manual mount
+mount /dev/vdb1 /mnt
+
+# Mount from /etc/fstab
+mount /backup
+
+# Mount with specific options
+mount -o ro,noexec /dev/vdb1 /mnt
+
+# View all mounts
+mount | grep vdb
+                            </div>
+                        </li>
+
+                        <li class="command-item" data-category="mounting">
+                            <div class="command-name">umount [device|mount_point]</div>
+                            <div class="command-description">Unmount a filesystem</div>
+                            <div class="command-example">
+# Unmount by mount point
+umount /backup
+
+# Unmount by device
+umount /dev/vdb1
+
+# Force unmount (use with caution)
+umount -f /backup
+                            </div>
+                        </li>
+
+                        <li class="command-item" data-category="mounting">
+                            <div class="command-name">findmnt</div>
+                            <div class="command-description">Display mounted filesystems in tree format</div>
+                            <div class="command-example">
+# Show all mounts
+findmnt
+
+# Verify /etc/fstab syntax
+findmnt --verify
+
+# Show specific mount point
+findmnt /backup
+                            </div>
+                        </li>
+                    </ul>
+
+                    <h3>Swap Commands</h3>
+                    <ul class="command-list">
+                        <li class="command-item" data-category="swap">
+                            <div class="command-name">mkswap [device]</div>
+                            <div class="command-description">Initialize a partition as swap space</div>
+                            <div class="command-example">
+# Create swap signature
+mkswap /dev/vdb2
+
+# The command displays the UUID for use in fstab
+                            </div>
+                        </li>
+
+                        <li class="command-item" data-category="swap">
+                            <div class="command-name">swapon [device]</div>
+                            <div class="command-description">Activate swap space</div>
+                            <div class="command-example">
+# Activate specific swap
+swapon /dev/vdb2
+
+# Activate all swap in /etc/fstab
+swapon -a
+
+# Show active swap spaces
+swapon --show
+                            </div>
+                        </li>
+
+                        <li class="command-item" data-category="swap">
+                            <div class="command-name">swapoff [device]</div>
+                            <div class="command-description">Deactivate swap space</div>
+                            <div class="command-example">
+# Deactivate specific swap
+swapoff /dev/vdb2
+
+# Deactivate all swap
+swapoff -a
+                            </div>
+                        </li>
+
+                        <li class="command-item" data-category="swap">
+                            <div class="command-name">free</div>
+                            <div class="command-description">Display memory and swap usage</div>
+                            <div class="command-example">
+# Show memory and swap in human-readable format
+free -h
+
+# Output:
+#              total   used   free   shared  buff/cache  available
+# Mem:          1.8G   134M   1.5G    16M     201M        1.6G
+# Swap:         249M     0B   249M
+                            </div>
+                        </li>
+                    </ul>
+
+                    <h3>System Configuration</h3>
+                    <ul class="command-list">
+                        <li class="command-item" data-category="config">
+                            <div class="command-name">systemctl daemon-reload</div>
+                            <div class="command-description">Reload systemd configuration after editing /etc/fstab</div>
+                            <div class="command-example">
+# After editing /etc/fstab
+vim /etc/fstab
+systemctl daemon-reload
+
+# Then test the mount
+mount /backup
+                            </div>
+                        </li>
+
+                        <li class="command-item" data-category="config">
+                            <div class="command-name">mkdir [directory]</div>
+                            <div class="command-description">Create mount point directory</div>
+                            <div class="command-example">
+# Create mount point
+mkdir /backup
+
+# Create with parent directories
+mkdir -p /mnt/data/backups
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 1.1: MBR vs GPT Interactive Comparison -->
+        <div id="mbr-gpt" class="module">
+            <div class="card">
+                <h2>MBR vs GPT: Partition Scheme Comparison</h2>
+                <p>Understand the key differences between Master Boot Record (MBR) and GUID Partition Table (GPT) partitioning schemes.</p>
+
+                <div class="disk-visual">
+                    <h3>MBR Partition Scheme</h3>
+                    <div class="disk">
+                        <div class="disk-name">Master Boot Record (MBR) - BIOS Systems</div>
+                        <div class="disk-bar">
+                            <div class="partition partition-mbr" style="width: 2%;">
+                                <div class="partition-info">MBR<br>512B</div>
+                            </div>
+                            <div class="partition partition-primary" style="width: 23%;">
+                                <div class="partition-info">vdb1<br>Primary</div>
+                            </div>
+                            <div class="partition partition-primary" style="width: 23%;">
+                                <div class="partition-info">vdb2<br>Primary</div>
+                            </div>
+                            <div class="partition partition-primary" style="width: 23%;">
+                                <div class="partition-info">vdb3<br>Primary</div>
+                            </div>
+                            <div class="partition partition-extended" style="width: 29%;">
+                                <div class="partition-info">vdb4 (Extended)<br>vdb5, vdb6 (Logical)</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                            <strong>Limitations:</strong> Max 4 primary partitions (or 3 primary + 1 extended), Max 2 TiB disk size
+                        </div>
+                    </div>
+                </div>
+
+                <div class="disk-visual">
+                    <h3>GPT Partition Scheme</h3>
+                    <div class="disk">
+                        <div class="disk-name">GUID Partition Table (GPT) - UEFI Systems</div>
+                        <div class="disk-bar">
+                            <div class="partition partition-gpt-primary" style="width: 1%;">
+                                <div class="partition-info" style="font-size: 0.7rem;">GPT<br>Header</div>
+                            </div>
+                            <div class="partition partition-primary" style="width: 19%;">
+                                <div class="partition-info">vdb1</div>
+                            </div>
+                            <div class="partition partition-primary" style="width: 19%;">
+                                <div class="partition-info">vdb2</div>
+                            </div>
+                            <div class="partition partition-primary" style="width: 19%;">
+                                <div class="partition-info">vdb3</div>
+                            </div>
+                            <div class="partition partition-primary" style="width: 19%;">
+                                <div class="partition-info">vdb4</div>
+                            </div>
+                            <div class="partition partition-primary" style="width: 19%;">
+                                <div class="partition-info">vdb5</div>
+                            </div>
+                            <div class="partition partition-unused" style="width: 3%;">
+                                <div class="partition-info" style="font-size: 0.7rem;">Free</div>
+                            </div>
+                            <div class="partition partition-gpt-backup" style="width: 1%;">
+                                <div class="partition-info" style="font-size: 0.7rem;">Backup<br>GPT</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                            <strong>Advantages:</strong> Up to 128 partitions, Max 8 ZiB disk size, Redundant partition tables
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Feature Comparison</h3>
+                <table class="comparison-table">
+                    <tr>
+                        <th class="feature">Feature</th>
+                        <th>MBR</th>
+                        <th>GPT</th>
+                    </tr>
+                    <tr>
+                        <td class="feature">Firmware Type</td>
+                        <td>BIOS</td>
+                        <td>UEFI (also supports BIOS)</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Maximum Partitions</td>
+                        <td>4 primary (or 3 + extended with multiple logical)</td>
+                        <td>128 partitions</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Maximum Disk Size</td>
+                        <td>2 TiB (with 512B sectors)</td>
+                        <td>8 ZiB (8 billion TiB)</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Partition Identifier</td>
+                        <td>Partition type code</td>
+                        <td>Globally Unique Identifier (GUID)</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Partition Table Location</td>
+                        <td>Beginning of disk only</td>
+                        <td>Beginning and end (redundant)</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Error Detection</td>
+                        <td>No checksums</td>
+                        <td>CRC32 checksums for validation</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Recovery</td>
+                        <td>Single point of failure</td>
+                        <td>Backup GPT at end of disk</td>
+                    </tr>
+                    <tr>
+                        <td class="feature">Linux Support</td>
+                        <td>Full support</td>
+                        <td>Full support (preferred)</td>
+                    </tr>
+                </table>
+
+                <div class="grid-2" style="margin-top: 2rem;">
+                    <div class="alert alert-info">
+                        <h4>When to Use MBR</h4>
+                        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                            <li>Legacy BIOS systems</li>
+                            <li>Disks smaller than 2 TiB</li>
+                            <li>Compatibility with very old systems</li>
+                            <li>Dual-booting with older Windows versions</li>
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-success">
+                        <h4>When to Use GPT</h4>
+                        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                            <li>UEFI systems (modern computers)</li>
+                            <li>Disks larger than 2 TiB</li>
+                            <li>Need for more than 4 partitions</li>
+                            <li>Enhanced data integrity requirements</li>
+                            <li><strong>Recommended for all new installations</strong></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3>Creating Partition Tables</h3>
+                <div class="code-block">
+                    <pre># Create MBR partition table
+parted /dev/vdb mklabel msdos
+
+# Create GPT partition table
+parted /dev/vdb mklabel gpt
+
+# Check current partition table type
+parted /dev/vdb print</pre>
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>⚠️ Warning:</strong> Creating a new partition table with <code>mklabel</code> destroys all existing partitions and data on the disk. Use this command only on new, empty disks or when you're certain you want to erase the disk.
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 3.1: mkfs Command Builder -->
+        <div id="mkfs-builder" class="module">
+            <div class="card">
+                <h2>mkfs Command Builder</h2>
+                <p>Construct file system creation commands with appropriate parameters for different use cases.</p>
+
+                <div class="grid-2">
+                    <div>
+                        <div class="form-group">
+                            <label class="form-label">Device/Partition</label>
+                            <input type="text" class="form-input" id="mkfs-device" placeholder="/dev/vdb1" value="/dev/vdb1">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">File System Type</label>
+                            <select class="form-select" id="mkfs-type" onchange="updateMkfsOptions()">
+                                <option value="xfs">XFS (Red Hat default)</option>
+                                <option value="ext4">ext4</option>
+                                <option value="ext3">ext3</option>
+                                <option value="vfat">vfat (FAT32)</option>
+                                <option value="swap">swap</option>
+                            </select>
+                        </div>
+
+                        <div id="mkfs-options-container">
+                            <div class="form-group">
+                                <label class="form-label">Label (optional)</label>
+                                <input type="text" class="form-input" id="mkfs-label" placeholder="backup">
+                            </div>
+
+                            <div class="form-group" id="mkfs-advanced">
+                                <h4>Advanced Options</h4>
+                                <label class="checkbox-group">
+                                    <input type="checkbox" class="checkbox" id="mkfs-force"> Force creation (overwrite existing filesystem)
+                                </label>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="generateMkfsCommand()">Generate Command</button>
+                    </div>
+
+                    <div>
+                        <h3>Generated Command</h3>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyMkfsCommand()">Copy</button>
+                            <pre id="mkfs-output">mkfs.xfs /dev/vdb1</pre>
+                        </div>
+
+                        <div id="fs-info" class="alert alert-info">
+                            <h4>XFS Filesystem</h4>
+                            <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                                <li>Red Hat Enterprise Linux default filesystem</li>
+                                <li>Excellent performance for large files</li>
+                                <li>Supports up to 8 EiB file size</li>
+                                <li>Online defragmentation and growth</li>
+                                <li>Does NOT support shrinking</li>
+                                <li>No fsck needed (uses journaling)</li>
+                            </ul>
+                        </div>
+
+                        <h3>File System Comparison</h3>
+                        <table class="comparison-table">
+                            <tr>
+                                <th>Feature</th>
+                                <th>XFS</th>
+                                <th>ext4</th>
+                            </tr>
+                            <tr>
+                                <td class="feature">Max File Size</td>
+                                <td>8 EiB</td>
+                                <td>16 TiB</td>
+                            </tr>
+                            <tr>
+                                <td class="feature">Max Volume Size</td>
+                                <td>8 EiB</td>
+                                <td>1 EiB</td>
+                            </tr>
+                            <tr>
+                                <td class="feature">Journaling</td>
+                                <td>Yes</td>
+                                <td>Yes</td>
+                            </tr>
+                            <tr>
+                                <td class="feature">Online Resize</td>
+                                <td>Grow only</td>
+                                <td>Grow and shrink</td>
+                            </tr>
+                            <tr>
+                                <td class="feature">Best For</td>
+                                <td>Large files, databases</td>
+                                <td>General purpose</td>
+                            </tr>
+                            <tr>
+                                <td class="feature">RHEL Default</td>
+                                <td><span class="badge badge-success">Yes</span></td>
+                                <td>No</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="margin-top: 2rem;">
+                    <h3>Common Use Cases</h3>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="loadMkfsTemplate('data-xfs')">Data Partition (XFS)</button>
+                        <button class="btn btn-secondary" onclick="loadMkfsTemplate('backup-ext4')">Backup Drive (ext4)</button>
+                        <button class="btn btn-secondary" onclick="loadMkfsTemplate('usb-vfat')">USB Drive (vfat)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 5.2: Swap Partition Creation Workflow -->
+        <div id="swap-workflow" class="module">
+            <div class="card">
+                <h2>Swap Partition Creation Workflow</h2>
+                <p>Step-by-step guide to create, format, and activate swap space with persistent configuration.</p>
+
+                <ol class="workflow-steps">
+                    <li class="workflow-step">
+                        <h4>Create Swap Partition</h4>
+                        <p>Use parted to create a partition with linux-swap type.</p>
+                        <div class="code-block">
+                            <pre># Start parted on the disk
+parted /dev/vdb
+
+# Create swap partition (512 MB example)
+(parted) mkpart swap1 linux-swap 2000MB 2512MB
+(parted) quit
+
+# Wait for system to detect partition
+udevadm settle</pre>
+                        </div>
+                        <div class="alert alert-info">
+                            <strong>Note:</strong> The partition name "swap1" is a label for GPT. The file-system type "linux-swap" helps identify the partition's purpose.
+                        </div>
+                    </li>
+
+                    <li class="workflow-step">
+                        <h4>Format as Swap Space</h4>
+                        <p>Use mkswap to write swap signature to the partition.</p>
+                        <div class="code-block">
+                            <pre># Format the partition as swap
+mkswap /dev/vdb2
+
+# Output shows:
+# Setting up swapspace version 1, size = 489 MiB
+# no label, UUID=87976166-4697-47b7-86d1-73a02f0fc803</pre>
+                        </div>
+                        <div class="alert alert-warning">
+                            <strong>Important:</strong> Copy the UUID from the mkswap output. You'll need it for /etc/fstab.
+                        </div>
+                    </li>
+
+                    <li class="workflow-step">
+                        <h4>Activate Swap (Temporary)</h4>
+                        <p>Test the swap space before making it permanent.</p>
+                        <div class="code-block">
+                            <pre># Check current swap (should show 0 if none active)
+free -h
+
+# Activate the new swap
+swapon /dev/vdb2
+
+# Verify activation
+free -h
+swapon --show</pre>
+                        </div>
+                        <div class="alert alert-success">
+                            <strong>Success:</strong> If <code>free -h</code> shows swap space, the activation worked!
+                        </div>
+                    </li>
+
+                    <li class="workflow-step">
+                        <h4>Make Swap Persistent</h4>
+                        <p>Add entry to /etc/fstab so swap activates at boot.</p>
+                        <div class="code-block">
+                            <pre># Edit /etc/fstab
+vim /etc/fstab
+
+# Add this line (use your UUID from step 2):
+UUID=87976166-4697-47b7-86d1-73a02f0fc803  swap  swap  defaults  0 0
+
+# Save and exit
+# Reload systemd
+systemctl daemon-reload</pre>
+                        </div>
+                        <div class="form-group" style="margin-top: 1rem;">
+                            <label class="form-label">Your Swap UUID</label>
+                            <input type="text" class="form-input" id="workflow-uuid" placeholder="Paste UUID from mkswap output">
+                            <button class="btn btn-primary" onclick="generateSwapFstab()" style="margin-top: 0.5rem;">Generate fstab Entry</button>
+                            <div class="code-block" style="margin-top: 1rem; display: none;" id="workflow-fstab-output">
+                                <button class="copy-btn" onclick="copyWorkflowFstab()">Copy</button>
+                                <pre id="workflow-fstab-text"></pre>
+                            </div>
+                        </div>
+                    </li>
+
+                    <li class="workflow-step">
+                        <h4>Verify Configuration</h4>
+                        <p>Test that everything works correctly.</p>
+                        <div class="code-block">
+                            <pre># Verify fstab syntax
+findmnt --verify
+
+# Deactivate current swap
+swapoff /dev/vdb2
+
+# Activate from fstab
+swapon -a
+
+# Confirm it's active
+swapon --show
+
+# Expected output:
+# NAME      TYPE      SIZE USED PRIO
+# /dev/vdb2 partition 489M   0B   -2</pre>
+                        </div>
+                    </li>
+
+                    <li class="workflow-step">
+                        <h4>Set Swap Priority (Optional)</h4>
+                        <p>Configure multiple swap spaces with priorities.</p>
+                        <div class="code-block">
+                            <pre># In /etc/fstab, add pri=N to options
+UUID=87976166-4697-47b7-86d1-73a02f0fc803  swap  swap  pri=10  0 0
+UUID=4d9b847b-98e0-4d4e-9ef7-dfaaf736b942  swap  swap  pri=20  0 0
+
+# Higher priority (20) is used first
+# Same priority uses round-robin</pre>
+                        </div>
+                        <div class="alert alert-info">
+                            <strong>Priority Tip:</strong> Set higher priority on faster disks (SSDs) and lower priority on slower disks (HDDs).
+                        </div>
+                    </li>
+                </ol>
+
+                <div class="alert alert-success">
+                    <h3>Complete Example</h3>
+                    <p>Here's a full example creating two 512 MB swap partitions with priorities:</p>
+                    <div class="code-block">
+                        <pre># Create two swap partitions
+parted /dev/vdb mkpart swap1 linux-swap 2000MB 2512MB
+parted /dev/vdb mkpart swap2 linux-swap 2512MB 3024MB
+udevadm settle
+
+# Format both
+mkswap /dev/vdb2  # Note the UUID
+mkswap /dev/vdb3  # Note the UUID
+
+# Add to /etc/fstab with priorities
+UUID=xxxxx  swap  swap  pri=10  0 0
+UUID=yyyyy  swap  swap  pri=20  0 0
+
+# Reload and activate
+systemctl daemon-reload
+swapon -a
+
+# Verify
+swapon --show</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 8.1: Progressive Knowledge Quizzes -->
+        <div id="quiz" class="module">
+            <div class="card">
+                <h2>Knowledge Check: Storage Management</h2>
+                <p>Test your understanding of Linux storage concepts with these interactive questions.</p>
+
+                <div class="progress-container">
+                    <div class="progress-bar" id="quiz-progress" style="width: 0%;">0%</div>
+                </div>
+
+                <div id="quiz-container">
+                    <!-- Quiz questions will be inserted here -->
+                </div>
+
+                <div class="btn-group" style="margin-top: 2rem;">
+                    <button class="btn btn-secondary" onclick="resetQuiz()">Reset Quiz</button>
+                    <button class="btn btn-primary" onclick="checkAllAnswers()">Check All Answers</button>
+                </div>
+
+                <div id="quiz-results" style="display: none; margin-top: 2rem;">
+                    <div class="alert alert-success">
+                        <h3>Quiz Results</h3>
+                        <p style="font-size: 1.5rem; font-weight: bold; margin: 1rem 0;">
+                            Score: <span id="quiz-score">0</span> / <span id="quiz-total">0</span>
+                        </p>
+                        <p id="quiz-message"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ============================================
+        // NAVIGATION
+        // ============================================
+        function showModule(moduleId) {
+            // Hide all modules
+            document.querySelectorAll('.module').forEach(module => {
+                module.classList.remove('active');
+            });
+            
+            // Show selected module
+            document.getElementById(moduleId).classList.add('active');
+            
+            // Update active nav button
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        // ============================================
+        // MODULE 2.1: PARTED TERMINAL
+        // ============================================
+        let partedDisk = {
+            name: '/dev/vdb',
+            size: 5369,
+            label: 'gpt',
+            partitions: []
+        };
+
+        let partedHistory = [];
+
+        const partedInput = document.getElementById('parted-input');
+        const partedOutput = document.getElementById('parted-output');
+
+        partedInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const command = this.value.trim();
+                if (command) {
+                    executePartedCommand(command);
+                    partedHistory.push(command);
+                    this.value = '';
+                }
+            }
+        });
+
+        function executePartedCommand(cmd) {
+            addPartedOutput(`<span class="terminal-prompt">(parted)</span> ${cmd}`);
+            
+            const parts = cmd.toLowerCase().split(/\s+/);
+            const mainCmd = parts[0];
+
+            switch(mainCmd) {
+                case 'help':
+                    showPartedHelp();
+                    break;
+                case 'print':
+                    printPartedTable();
+                    break;
+                case 'mkpart':
+                    createPartition(parts);
+                    break;
+                case 'rm':
+                    deletePartition(parts);
+                    break;
+                case 'unit':
+                    changeUnit(parts);
+                    break;
+                case 'quit':
+                case 'exit':
+                    addPartedOutput('<span class="terminal-success">Exiting parted...</span>');
+                    break;
+                default:
+                    addPartedOutput(`<span class="terminal-error">Error: Unknown command '${mainCmd}'. Type 'help' for assistance.</span>`);
+            }
+        }
+
+        function addPartedOutput(text) {
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            line.innerHTML = text;
+            partedOutput.appendChild(line);
+            partedOutput.scrollTop = partedOutput.scrollHeight;
+        }
+
+        function showPartedHelp() {
+            addPartedOutput(`
+Available commands:
+  print               Display partition table
+  mkpart NAME TYPE START END
+                      Create a new partition
+                      NAME: partition name (GPT)
+                      TYPE: xfs, ext4, linux-swap
+                      START/END: sector or size (2048s, 1000MB, 2GB)
+  rm NUMBER           Delete partition NUMBER
+  unit UNIT           Set default unit (s, MB, GB, MiB, GiB)
+  quit                Exit parted
+  help                Show this help
+            `);
+        }
+
+        function printPartedTable() {
+            addPartedOutput(`Model: Virtio Block Device (virtblk)`);
+            addPartedOutput(`Disk ${partedDisk.name}: ${partedDisk.size}MB`);
+            addPartedOutput(`Sector size (logical/physical): 512B/512B`);
+            addPartedOutput(`Partition Table: ${partedDisk.label}`);
+            addPartedOutput(`Disk Flags:`);
+            addPartedOutput(``);
+            addPartedOutput(`Number  Start   End     Size    File system  Name    Flags`);
+            
+            if (partedDisk.partitions.length === 0) {
+                addPartedOutput(`<span class="terminal-success">No partitions found.</span>`);
+            } else {
+                partedDisk.partitions.forEach((p, i) => {
+                    addPartedOutput(`${i + 1}      ${p.start}MB  ${p.end}MB  ${p.size}MB  ${p.type}        ${p.name}   ${p.flags || ''}`);
+                });
+            }
+            
+            updateDiskVisualization();
+        }
+
+        function createPartition(parts) {
+            // mkpart name type start end
+            if (parts.length < 5) {
+                addPartedOutput(`<span class="terminal-error">Error: mkpart requires NAME TYPE START END</span>`);
+                addPartedOutput(`Example: mkpart backup xfs 2048s 2000MB`);
+                return;
+            }
+
+            const name = parts[1];
+            const type = parts[2];
+            const start = parseSize(parts[3]);
+            const end = parseSize(parts[4]);
+
+            if (start >= end) {
+                addPartedOutput(`<span class="terminal-error">Error: Start position must be less than end position</span>`);
+                return;
+            }
+
+            if (end > partedDisk.size) {
+                addPartedOutput(`<span class="terminal-error">Error: End position exceeds disk size (${partedDisk.size}MB)</span>`);
+                return;
+            }
+
+            // Check for overlaps
+            for (let p of partedDisk.partitions) {
+                if ((start >= p.start && start < p.end) || (end > p.start && end <= p.end)) {
+                    addPartedOutput(`<span class="terminal-error">Error: Partition overlaps with existing partition</span>`);
+                    return;
+                }
+            }
+
+            const partition = {
+                name: name,
+                type: type,
+                start: start,
+                end: end,
+                size: end - start
+            };
+
+            partedDisk.partitions.push(partition);
+            partedDisk.partitions.sort((a, b) => a.start - b.start);
+
+            addPartedOutput(`<span class="terminal-success">Created partition successfully.</span>`);
+            addPartedOutput(`Information: You may need to update /etc/fstab.`);
+            
+            updateDiskVisualization();
+        }
+
+        function deletePartition(parts) {
+            if (parts.length < 2) {
+                addPartedOutput(`<span class="terminal-error">Error: rm requires partition NUMBER</span>`);
+                addPartedOutput(`Example: rm 1`);
+                return;
+            }
+
+            const num = parseInt(parts[1]) - 1;
+            
+            if (num < 0 || num >= partedDisk.partitions.length) {
+                addPartedOutput(`<span class="terminal-error">Error: Partition ${parts[1]} does not exist</span>`);
+                return;
+            }
+
+            partedDisk.partitions.splice(num, 1);
+            addPartedOutput(`<span class="terminal-success">Partition deleted successfully.</span>`);
+            
+            updateDiskVisualization();
+        }
+
+        function changeUnit(parts) {
+            if (parts.length < 2) {
+                addPartedOutput(`<span class="terminal-error">Error: unit requires UNIT (s, MB, GB, MiB, GiB)</span>`);
+                return;
+            }
+            addPartedOutput(`<span class="terminal-success">Unit set to ${parts[1]}</span>`);
+        }
+
+        function parseSize(sizeStr) {
+            sizeStr = sizeStr.toLowerCase();
+            
+            if (sizeStr.endsWith('s')) {
+                // Sectors (512 bytes each)
+                const sectors = parseInt(sizeStr);
+                return Math.round(sectors * 512 / 1024 / 1024); // Convert to MB
+            } else if (sizeStr.endsWith('mb')) {
+                return parseInt(sizeStr);
+            } else if (sizeStr.endsWith('gb')) {
+                return parseInt(sizeStr) * 1024;
+            } else if (sizeStr.endsWith('mib')) {
+                return Math.round(parseInt(sizeStr) * 1.048576);
+            } else if (sizeStr.endsWith('gib')) {
+                return Math.round(parseInt(sizeStr) * 1024 * 1.048576);
+            }
+            
+            return parseInt(sizeStr);
+        }
+
+        function updateDiskVisualization() {
+            const bar = document.getElementById('partition-bar');
+            bar.innerHTML = '';
+
+            if (partedDisk.partitions.length === 0) {
+                const unused = document.createElement('div');
+                unused.className = 'partition partition-unused';
+                unused.style.width = '100%';
+                unused.innerHTML = `<div class="partition-info">Unallocated Space<br>${partedDisk.size}MB</div>`;
+                bar.appendChild(unused);
+                return;
+            }
+
+            let lastEnd = 0;
+
+            partedDisk.partitions.forEach((p, i) => {
+                // Add unused space before partition
+                if (p.start > lastEnd) {
+                    const unused = document.createElement('div');
+                    unused.className = 'partition partition-unused';
+                    const unusedSize = p.start - lastEnd;
+                    unused.style.width = `${(unusedSize / partedDisk.size) * 100}%`;
+                    unused.innerHTML = `<div class="partition-info">Free<br>${unusedSize}MB</div>`;
+                    bar.appendChild(unused);
+                }
+
+                // Add partition
+                const part = document.createElement('div');
+                part.className = 'partition partition-primary';
+                part.style.width = `${(p.size / partedDisk.size) * 100}%`;
+                part.innerHTML = `<div class="partition-info">${partedDisk.name}${i + 1}<br>${p.name}<br>${p.size}MB</div>`;
+                bar.appendChild(part);
+
+                lastEnd = p.end;
+            });
+
+            // Add remaining unused space
+            if (lastEnd < partedDisk.size) {
+                const unused = document.createElement('div');
+                unused.className = 'partition partition-unused';
+                const unusedSize = partedDisk.size - lastEnd;
+                unused.style.width = `${(unusedSize / partedDisk.size) * 100}%`;
+                unused.innerHTML = `<div class="partition-info">Free<br>${unusedSize}MB</div>`;
+                bar.appendChild(unused);
+            }
+        }
+
+        function resetPartedDisk() {
+            partedDisk.partitions = [];
+            addPartedOutput(`<span class="terminal-success">Disk reset to initial state.</span>`);
+            updateDiskVisualization();
+        }
+
+        // ============================================
+        // MODULE 4.1: FSTAB BUILDER
+        // ============================================
+        function updateFstabDeviceInput() {
+            const deviceType = document.getElementById('fstab-device-type').value;
+            const deviceInput = document.getElementById('fstab-device');
+            
+            switch(deviceType) {
+                case 'uuid':
+                    deviceInput.placeholder = 'e.g., a8063676-44dd-409a-b584-68be2c9f5570';
+                    deviceInput.value = 'f74ed805-b1fc-401a-a5ee-140f97c6757d';
+                    break;
+                case 'device':
+                    deviceInput.placeholder = 'e.g., /dev/vdb1';
+                    deviceInput.value = '/dev/vdb1';
+                    break;
+                case 'label':
+                    deviceInput.placeholder = 'e.g., BACKUP';
+                    deviceInput.value = 'BACKUP';
+                    break;
+            }
+            generateFstabEntry();
+        }
+
+        function updateFstabOptions() {
+            const checkboxes = document.querySelectorAll('#fstab-builder .checkbox:checked');
+            const options = Array.from(checkboxes).map(cb => cb.value).join(',');
+            document.getElementById('fstab-options').value = options || 'defaults';
+            generateFstabEntry();
+        }
+
+        function generateFstabEntry() {
+            const deviceType = document.getElementById('fstab-device-type').value;
+            const device = document.getElementById('fstab-device').value;
+            const mountpoint = document.getElementById('fstab-mountpoint').value;
+            const fstype = document.getElementById('fstab-fstype').value;
+            const options = document.getElementById('fstab-options').value;
+            const dump = document.getElementById('fstab-dump').value;
+            const fsck = document.getElementById('fstab-fsck').value;
+
+            let deviceField = device;
+            if (deviceType === 'uuid') {
+                deviceField = `UUID=${device}`;
+            } else if (deviceType === 'label') {
+                deviceField = `LABEL=${device}`;
+            }
+
+            const entry = `${deviceField}  ${mountpoint}  ${fstype}  ${options}  ${dump} ${fsck}`;
+            document.getElementById('fstab-output').textContent = entry;
+        }
+
+        function copyFstabEntry() {
+            const text = document.getElementById('fstab-output').textContent;
+            navigator.clipboard.writeText(text);
+            alert('fstab entry copied to clipboard!');
+        }
+
+        function loadFstabTemplate(template) {
+            switch(template) {
+                case 'data':
+                    document.getElementById('fstab-device-type').value = 'uuid';
+                    document.getElementById('fstab-device').value = 'a8063676-44dd-409a-b584-68be2c9f5570';
+                    document.getElementById('fstab-mountpoint').value = '/data';
+                    document.getElementById('fstab-fstype').value = 'xfs';
+                    document.getElementById('fstab-options').value = 'defaults';
+                    document.getElementById('fstab-dump').value = '0';
+                    document.getElementById('fstab-fsck').value = '0';
+                    break;
+                case 'swap':
+                    document.getElementById('fstab-device-type').value = 'uuid';
+                    document.getElementById('fstab-device').value = '87976166-4697-47b7-86d1-73a02f0fc803';
+                    document.getElementById('fstab-mountpoint').value = 'swap';
+                    document.getElementById('fstab-fstype').value = 'swap';
+                    document.getElementById('fstab-options').value = 'defaults';
+                    document.getElementById('fstab-dump').value = '0';
+                    document.getElementById('fstab-fsck').value = '0';
+                    break;
+                case 'backup':
+                    document.getElementById('fstab-device-type').value = 'uuid';
+                    document.getElementById('fstab-device').value = 'f74ed805-b1fc-401a-a5ee-140f97c6757d';
+                    document.getElementById('fstab-mountpoint').value = '/backup';
+                    document.getElementById('fstab-fstype').value = 'xfs';
+                    document.getElementById('fstab-options').value = 'defaults';
+                    document.getElementById('fstab-dump').value = '0';
+                    document.getElementById('fstab-fsck').value = '0';
+                    break;
+            }
+            generateFstabEntry();
+        }
+
+        // ============================================
+        // MODULE 5.1: SWAP CALCULATOR
+        // ============================================
+        function calculateSwap() {
+            const ramGB = parseInt(document.getElementById('ram-slider').value);
+            const hibernation = document.getElementById('hibernation-check').checked;
+            
+            document.getElementById('ram-value').textContent = `${ramGB} GB`;
+            
+            let swapGB;
+            let explanation;
+            
+            if (ramGB <= 2) {
+                swapGB = hibernation ? ramGB * 3 : ramGB * 2;
+                explanation = `For systems with ${ramGB} GB or less RAM, recommend ${hibernation ? '3x' : '2x'} RAM for swap.`;
+            } else if (ramGB <= 8) {
+                swapGB = hibernation ? ramGB * 2 : ramGB;
+                explanation = `For systems with ${ramGB} GB RAM (2-8 GB range), recommend ${hibernation ? '2x' : 'equal to'} RAM for swap.`;
+            } else if (ramGB <= 64) {
+                swapGB = hibernation ? ramGB * 1.5 : 4;
+                explanation = `For systems with ${ramGB} GB RAM (8-64 GB range), recommend ${hibernation ? '1.5x RAM' : 'at least 4 GB'} for swap.`;
+            } else {
+                swapGB = 4;
+                explanation = `For systems with ${ramGB} GB RAM (>64 GB), recommend at least 4 GB for swap. ${hibernation ? 'Hibernation is not recommended for systems with this much RAM.' : ''}`;
+            }
+            
+            document.getElementById('swap-size').textContent = `${Math.round(swapGB)} GB`;
+            document.getElementById('swap-explanation').textContent = explanation;
+            
+            // Update commands
+            const swapMB = Math.round(swapGB * 1024);
+            document.getElementById('swap-commands').innerHTML = `# Create ${Math.round(swapGB)} GB swap partition
+parted /dev/vdb mkpart swap1 linux-swap 2048s ${swapMB}MB
+
+# Format as swap
+mkswap /dev/vdb2
+
+# Activate swap
+swapon /dev/vdb2
+
+# Make persistent in /etc/fstab
+UUID=<span id="swap-uuid-example">xxxxx-xxxxx-xxxxx</span>  swap  swap  defaults  0 0`;
+        }
+
+        // Initialize
+        calculateSwap();
+
+        // ============================================
+        // MODULE 7.1: COMMAND REFERENCE
+        // ============================================
+        function filterCommands() {
+            const searchTerm = document.getElementById('command-search').value.toLowerCase();
+            const items = document.querySelectorAll('.command-item');
+            
+            items.forEach(item => {
+                const name = item.querySelector('.command-name').textContent.toLowerCase();
+                const desc = item.querySelector('.command-description').textContent.toLowerCase();
+                const example = item.querySelector('.command-example').textContent.toLowerCase();
+                
+                if (name.includes(searchTerm) || desc.includes(searchTerm) || example.includes(searchTerm)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        // ============================================
+        // MODULE 3.1: MKFS BUILDER
+        // ============================================
+        function updateMkfsOptions() {
+            const fsType = document.getElementById('mkfs-type').value;
+            const fsInfo = document.getElementById('fs-info');
+            
+            // Update info panel based on filesystem type
+            switch(fsType) {
+                case 'xfs':
+                    fsInfo.innerHTML = `
+                        <h4>XFS Filesystem</h4>
+                        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                            <li>Red Hat Enterprise Linux default filesystem</li>
+                            <li>Excellent performance for large files</li>
+                            <li>Supports up to 8 EiB file size</li>
+                            <li>Online defragmentation and growth</li>
+                            <li>Does NOT support shrinking</li>
+                            <li>No fsck needed (uses journaling)</li>
+                        </ul>
+                    `;
+                    break;
+                case 'ext4':
+                    fsInfo.innerHTML = `
+                        <h4>ext4 Filesystem</h4>
+                        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                            <li>Mature and stable filesystem</li>
+                            <li>Supports up to 16 TiB file size</li>
+                            <li>Supports up to 1 EiB volume size</li>
+                            <li>Can grow and shrink (offline shrink)</li>
+                            <li>Journaling for crash recovery</li>
+                            <li>Wide compatibility</li>
+                        </ul>
+                    `;
+                    break;
+                case 'vfat':
+                    fsInfo.innerHTML = `
+                        <h4>vfat (FAT32) Filesystem</h4>
+                        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                            <li>Compatible with Windows, Mac, Linux</li>
+                            <li>Maximum file size: 4 GB</li>
+                            <li>Good for USB drives and removable media</li>
+                            <li>No permissions support</li>
+                            <li>No journaling</li>
+                        </ul>
+                    `;
+                    break;
+                case 'swap':
+                    fsInfo.innerHTML = `
+                        <h4>Swap Space</h4>
+                        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                            <li>Used as virtual memory extension</li>
+                            <li>Kernel swaps inactive memory pages to disk</li>
+                            <li>Size depends on RAM and hibernation needs</li>
+                            <li>Use mkswap instead of mkfs</li>
+                            <li>Activate with swapon command</li>
+                        </ul>
+                    `;
+                    break;
+            }
+            
+            generateMkfsCommand();
+        }
+
+        function generateMkfsCommand() {
+            const device = document.getElementById('mkfs-device').value;
+            const fsType = document.getElementById('mkfs-type').value;
+            const label = document.getElementById('mkfs-label').value;
+            const force = document.getElementById('mkfs-force').checked;
+            
+            let cmd = '';
+            
+            if (fsType === 'swap') {
+                cmd = `mkswap ${device}`;
+                if (label) {
+                    cmd += ` -L ${label}`;
+                }
+            } else {
+                cmd = `mkfs.${fsType} ${device}`;
+                if (label) {
+                    cmd += ` -L ${label}`;
+                }
+                if (force && fsType === 'xfs') {
+                    cmd += ` -f`;
+                }
+            }
+            
+            document.getElementById('mkfs-output').textContent = cmd;
+        }
+
+        function copyMkfsCommand() {
+            const text = document.getElementById('mkfs-output').textContent;
+            navigator.clipboard.writeText(text);
+            alert('Command copied to clipboard!');
+        }
+
+        function loadMkfsTemplate(template) {
+            switch(template) {
+                case 'data-xfs':
+                    document.getElementById('mkfs-device').value = '/dev/vdb1';
+                    document.getElementById('mkfs-type').value = 'xfs';
+                    document.getElementById('mkfs-label').value = 'data';
+                    break;
+                case 'backup-ext4':
+                    document.getElementById('mkfs-device').value = '/dev/vdb1';
+                    document.getElementById('mkfs-type').value = 'ext4';
+                    document.getElementById('mkfs-label').value = 'backup';
+                    break;
+                case 'usb-vfat':
+                    document.getElementById('mkfs-device').value = '/dev/sdc1';
+                    document.getElementById('mkfs-type').value = 'vfat';
+                    document.getElementById('mkfs-label').value = 'USB_DRIVE';
+                    break;
+            }
+            updateMkfsOptions();
+        }
+
+        // Initialize
+        updateMkfsOptions();
+
+        // ============================================
+        // MODULE 5.2: SWAP WORKFLOW
+        // ============================================
+        function generateSwapFstab() {
+            const uuid = document.getElementById('workflow-uuid').value.trim();
+            if (!uuid) {
+                alert('Please enter a UUID from the mkswap output');
+                return;
+            }
+            
+            const fstabLine = `UUID=${uuid}  swap  swap  defaults  0 0`;
+            document.getElementById('workflow-fstab-text').textContent = fstabLine;
+            document.getElementById('workflow-fstab-output').style.display = 'block';
+        }
+
+        function copyWorkflowFstab() {
+            const text = document.getElementById('workflow-fstab-text').textContent;
+            navigator.clipboard.writeText(text);
+            alert('fstab entry copied to clipboard!');
+        }
+
+        // ============================================
+        // MODULE 8.1: QUIZ
+        // ============================================
+        const quizQuestions = [
+            {
+                question: "What is the maximum number of primary partitions supported by the MBR partitioning scheme?",
+                options: [
+                    "2 partitions",
+                    "4 partitions",
+                    "8 partitions",
+                    "128 partitions"
+                ],
+                correct: 1,
+                explanation: "MBR supports a maximum of 4 primary partitions. To create more partitions, you must use 3 primary partitions and 1 extended partition containing multiple logical partitions."
+            },
+            {
+                question: "What is the maximum disk size supported by MBR with 512-byte sectors?",
+                options: [
+                    "1 TiB",
+                    "2 TiB",
+                    "4 TiB",
+                    "8 ZiB"
+                ],
+                correct: 1,
+                explanation: "MBR with 32-bit addressing and 512-byte sectors supports a maximum disk size of 2 TiB. GPT is required for larger disks."
+            },
+            {
+                question: "Which field in /etc/fstab specifies the filesystem type?",
+                options: [
+                    "Field 1 (device)",
+                    "Field 2 (mount point)",
+                    "Field 3 (filesystem type)",
+                    "Field 4 (options)"
+                ],
+                correct: 2,
+                explanation: "Field 3 in /etc/fstab specifies the filesystem type (xfs, ext4, swap, etc.)."
+            },
+            {
+                question: "What command is used to apply a swap signature to a partition?",
+                options: [
+                    "mkfs.swap",
+                    "mkswap",
+                    "swapon",
+                    "parted mkswap"
+                ],
+                correct: 1,
+                explanation: "mkswap is used to initialize a partition as swap space by writing a swap signature. After mkswap, use swapon to activate it."
+            },
+            {
+                question: "For a system with 6 GB of RAM without hibernation, what is the recommended swap size?",
+                options: [
+                    "3 GB (half of RAM)",
+                    "6 GB (equal to RAM)",
+                    "12 GB (2x RAM)",
+                    "At least 4 GB"
+                ],
+                correct: 1,
+                explanation: "For systems with 2-8 GB of RAM without hibernation, the recommendation is swap equal to RAM, which would be 6 GB."
+            },
+            {
+                question: "What is the default filesystem for Red Hat Enterprise Linux?",
+                options: [
+                    "ext4",
+                    "ext3",
+                    "XFS",
+                    "Btrfs"
+                ],
+                correct: 2,
+                explanation: "XFS is the default filesystem for Red Hat Enterprise Linux. It provides excellent performance for large files and is the recommended choice."
+            },
+            {
+                question: "What command waits for the system to detect a new partition and create the device file?",
+                options: [
+                    "partprobe",
+                    "udevadm settle",
+                    "systemctl daemon-reload",
+                    "sync"
+                ],
+                correct: 1,
+                explanation: "udevadm settle waits for the udev system to finish creating device files for newly created partitions. This ensures /dev/vdb1, etc., exist before formatting."
+            },
+            {
+                question: "Which mount option in /etc/fstab activates swap automatically at boot?",
+                options: [
+                    "auto",
+                    "defaults",
+                    "swap",
+                    "All of the above"
+                ],
+                correct: 1,
+                explanation: "The 'defaults' option includes 'auto', which causes the swap to activate automatically at boot time."
+            },
+            {
+                question: "What is the purpose of the 'pri' option in swap configuration?",
+                options: [
+                    "Set the primary partition flag",
+                    "Enable priority mode",
+                    "Set swap space priority (higher values used first)",
+                    "Make the swap private to a user"
+                ],
+                correct: 2,
+                explanation: "The 'pri=N' option sets swap space priority. The kernel uses higher priority swap spaces first. Equal priorities use round-robin."
+            },
+            {
+                question: "Why is UUID recommended over device names in /etc/fstab?",
+                options: [
+                    "UUIDs are shorter to type",
+                    "UUIDs are persistent across reboots even if device order changes",
+                    "UUIDs are required for swap partitions",
+                    "UUIDs provide better performance"
+                ],
+                correct: 1,
+                explanation: "UUIDs remain constant regardless of device detection order. Device names like /dev/vdb1 might change if disks are detected in a different order, potentially causing boot failures."
+            },
+            {
+                question: "Which command reloads systemd configuration after editing /etc/fstab?",
+                options: [
+                    "systemctl restart systemd",
+                    "systemctl daemon-reload",
+                    "systemctl reload fstab",
+                    "mount -a"
+                ],
+                correct: 1,
+                explanation: "systemctl daemon-reload tells systemd to re-read configuration files, including the mount units generated from /etc/fstab."
+            },
+            {
+                question: "What does the 6th field (fsck order) of '0' mean in /etc/fstab?",
+                options: [
+                    "Check filesystem first at boot",
+                    "Do not check filesystem at boot",
+                    "Check only if errors detected",
+                    "Check every 30 boots"
+                ],
+                correct: 1,
+                explanation: "An fsck order of 0 means do not check the filesystem at boot. This is appropriate for XFS (which doesn't use fsck) and swap spaces."
+            }
+        ];
+
+        let quizState = [];
+
+        function initializeQuiz() {
+            const container = document.getElementById('quiz-container');
+            container.innerHTML = '';
+            quizState = quizQuestions.map(() => ({ answered: false, correct: false }));
+            
+            quizQuestions.forEach((q, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'quiz-question';
+                questionDiv.innerHTML = `
+                    <h4>Question ${index + 1}</h4>
+                    <p><strong>${q.question}</strong></p>
+                    <ul class="quiz-options" id="quiz-options-${index}">
+                        ${q.options.map((opt, i) => `
+                            <li class="quiz-option" onclick="selectQuizOption(${index}, ${i})">
+                                ${opt}
+                            </li>
+                        `).join('')}
+                    </ul>
+                    <div class="quiz-feedback" id="quiz-feedback-${index}"></div>
+                `;
+                container.appendChild(questionDiv);
+            });
+        }
+
+        function selectQuizOption(questionIndex, optionIndex) {
+            if (quizState[questionIndex].answered) return;
+            
+            const options = document.querySelectorAll(`#quiz-options-${questionIndex} .quiz-option`);
+            options.forEach((opt, i) => {
+                if (i === optionIndex) {
+                    opt.classList.add('selected');
+                } else {
+                    opt.classList.remove('selected');
+                }
+            });
+            
+            const question = quizQuestions[questionIndex];
+            const feedback = document.getElementById(`quiz-feedback-${questionIndex}`);
+            const isCorrect = optionIndex === question.correct;
+            
+            quizState[questionIndex].answered = true;
+            quizState[questionIndex].correct = isCorrect;
+            
+            options[optionIndex].classList.add(isCorrect ? 'correct' : 'incorrect');
+            if (!isCorrect) {
+                options[question.correct].classList.add('correct');
+            }
+            
+            feedback.className = `quiz-feedback show alert ${isCorrect ? 'alert-success' : 'alert-danger'}`;
+            feedback.innerHTML = `
+                <strong>${isCorrect ? '✓ Correct!' : '✗ Incorrect'}</strong>
+                <p>${question.explanation}</p>
+            `;
+            
+            updateQuizProgress();
+        }
+
+        function updateQuizProgress() {
+            const answered = quizState.filter(q => q.answered).length;
+            const percentage = (answered / quizQuestions.length) * 100;
+            const progressBar = document.getElementById('quiz-progress');
+            progressBar.style.width = `${percentage}%`;
+            progressBar.textContent = `${Math.round(percentage)}%`;
+        }
+
+        function checkAllAnswers() {
+            const unanswered = quizState.filter(q => !q.answered).length;
+            if (unanswered > 0) {
+                alert(`Please answer all questions. ${unanswered} question(s) remaining.`);
+                return;
+            }
+            
+            const correct = quizState.filter(q => q.correct).length;
+            const total = quizQuestions.length;
+            const percentage = (correct / total) * 100;
+            
+            document.getElementById('quiz-score').textContent = correct;
+            document.getElementById('quiz-total').textContent = total;
+            
+            let message = '';
+            if (percentage === 100) {
+                message = '🎉 Perfect score! You have mastered Linux storage management!';
+            } else if (percentage >= 80) {
+                message = '👏 Excellent work! You have a strong understanding of storage concepts.';
+            } else if (percentage >= 60) {
+                message = '👍 Good job! Review the explanations for questions you missed.';
+            } else {
+                message = '📚 Keep studying! Review the material and try again.';
+            }
+            
+            document.getElementById('quiz-message').textContent = message;
+            document.getElementById('quiz-results').style.display = 'block';
+            
+            // Scroll to results
+            document.getElementById('quiz-results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function resetQuiz() {
+            initializeQuiz();
+            document.getElementById('quiz-results').style.display = 'none';
+            updateQuizProgress();
+        }
+
+        // Initialize quiz on load
+        initializeQuiz();
+
+        // Initialize fstab builder on load
+        generateFstabEntry();
+    </script>
+</body>
+</html>
