@@ -1,0 +1,2570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network-Attached Storage: NFS & Automounting - Interactive Lesson</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #7c3aed;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border-color: #475569;
+            --code-bg: #1e1e1e;
+            --terminal-green: #4ade80;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .nav-tab {
+            padding: 12px 24px;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .nav-tab:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 99, 235, 0.3);
+        }
+
+        .nav-tab.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .content-section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .card h2 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card h3 {
+            color: var(--secondary-color);
+            margin: 20px 0 10px 0;
+            font-size: 1.4em;
+        }
+
+        .icon {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+        }
+
+        .terminal {
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            color: var(--terminal-green);
+            margin: 15px 0;
+            border: 2px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        .terminal-header {
+            background: #2d2d2d;
+            padding: 8px 15px;
+            border-radius: 8px 8px 0 0;
+            margin: -20px -20px 15px -20px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .terminal-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .terminal-button.red { background: #ff5f56; }
+        .terminal-button.yellow { background: #ffbd2e; }
+        .terminal-button.green { background: #27c93f; }
+
+        .terminal-input {
+            background: transparent;
+            border: none;
+            color: var(--terminal-green);
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            width: 100%;
+            outline: none;
+            margin-top: 10px;
+        }
+
+        .terminal-output {
+            margin-top: 10px;
+            white-space: pre-wrap;
+            color: #e2e8f0;
+        }
+
+        .prompt {
+            color: #60a5fa;
+        }
+
+        .command {
+            color: var(--terminal-green);
+        }
+
+        .interactive-terminal {
+            margin: 20px 0;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+        }
+
+        .btn-danger {
+            background: var(--error-color);
+        }
+
+        .quiz-container {
+            background: var(--bg-tertiary);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .quiz-question {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: var(--text-primary);
+        }
+
+        .quiz-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .quiz-option {
+            padding: 15px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .quiz-option:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-primary);
+        }
+
+        .quiz-option.correct {
+            background: var(--success-color);
+            border-color: var(--success-color);
+            color: white;
+        }
+
+        .quiz-option.incorrect {
+            background: var(--error-color);
+            border-color: var(--error-color);
+            color: white;
+        }
+
+        .feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .feedback.show {
+            display: block;
+        }
+
+        .feedback.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid var(--success-color);
+            color: var(--success-color);
+        }
+
+        .feedback.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid var(--error-color);
+            color: var(--error-color);
+        }
+
+        .config-builder {
+            background: var(--bg-tertiary);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .config-input-group {
+            margin: 15px 0;
+        }
+
+        .config-input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .config-input-group input,
+        .config-input-group select {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .config-output {
+            background: var(--code-bg);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            color: var(--terminal-green);
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+
+        .comparison-table th {
+            background: var(--primary-color);
+            color: white;
+            font-weight: 600;
+        }
+
+        .comparison-table tr:nth-child(even) {
+            background: var(--bg-tertiary);
+        }
+
+        .visual-diagram {
+            background: var(--bg-tertiary);
+            padding: 30px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .diagram-element {
+            display: inline-block;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border: 3px solid var(--primary-color);
+            border-radius: 10px;
+            margin: 10px;
+            min-width: 150px;
+        }
+
+        .arrow {
+            display: inline-block;
+            color: var(--primary-color);
+            font-size: 2em;
+            margin: 0 10px;
+        }
+
+        .syntax-highlight {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            color: var(--terminal-green);
+        }
+
+        .info-box {
+            background: rgba(37, 99, 235, 0.1);
+            border-left: 4px solid var(--primary-color);
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid var(--warning-color);
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .success-box {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid var(--success-color);
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .practice-scenario {
+            background: var(--bg-tertiary);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .scenario-title {
+            color: var(--secondary-color);
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+
+        .step-indicator {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .step {
+            padding: 10px 20px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .step.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .step.completed {
+            background: var(--success-color);
+            border-color: var(--success-color);
+        }
+
+        .accordion {
+            margin: 20px 0;
+        }
+
+        .accordion-item {
+            background: var(--bg-tertiary);
+            margin-bottom: 10px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .accordion-header {
+            padding: 15px 20px;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s ease;
+        }
+
+        .accordion-header:hover {
+            background: var(--primary-color);
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding: 0 20px;
+        }
+
+        .accordion-content.active {
+            max-height: 2000px;
+            padding: 20px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: var(--bg-tertiary);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .mount-visualizer {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .mount-source,
+        .mount-target {
+            flex: 1;
+            min-width: 250px;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            border: 3px solid var(--border-color);
+        }
+
+        .mount-arrow {
+            display: flex;
+            align-items: center;
+            font-size: 3em;
+            color: var(--primary-color);
+        }
+
+        .file-tree {
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            background: var(--code-bg);
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .file-tree-item {
+            padding: 5px 0;
+            padding-left: 20px;
+            color: var(--text-secondary);
+        }
+
+        .file-tree-item.directory {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .badge.success { background: var(--success-color); }
+        .badge.warning { background: var(--warning-color); }
+        .badge.danger { background: var(--error-color); }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .nav-tabs {
+                flex-direction: column;
+            }
+
+            .mount-visualizer {
+                flex-direction: column;
+            }
+
+            .comparison-table {
+                font-size: 0.9em;
+            }
+        }
+
+        .copy-btn {
+            float: right;
+            padding: 5px 10px;
+            font-size: 0.9em;
+            margin-top: -5px;
+        }
+
+        .copied-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--success-color);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            display: none;
+            animation: slideIn 0.3s ease;
+            z-index: 1000;
+        }
+
+        .copied-notification.show {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖧 Network-Attached Storage</h1>
+            <p class="subtitle">Master NFS Mounting and Automounting Techniques</p>
+        </header>
+
+        <div class="nav-tabs">
+            <div class="nav-tab active" onclick="showSection('intro')">Introduction</div>
+            <div class="nav-tab" onclick="showSection('nfs-basics')">NFS Basics</div>
+            <div class="nav-tab" onclick="showSection('mounting')">Mounting NFS</div>
+            <div class="nav-tab" onclick="showSection('automount')">Automounting</div>
+            <div class="nav-tab" onclick="showSection('maps')">Map Files</div>
+            <div class="nav-tab" onclick="showSection('practice')">Interactive Practice</div>
+            <div class="nav-tab" onclick="showSection('troubleshooting')">Troubleshooting</div>
+            <div class="nav-tab" onclick="showSection('quiz')">Knowledge Check</div>
+        </div>
+
+        <!-- Introduction Section -->
+        <div id="intro" class="content-section active">
+            <div class="card">
+                <h2>🎯 Learning Objectives</h2>
+                <p>By the end of this interactive lesson, you will be able to:</p>
+                <ul style="margin: 20px 0 20px 30px; line-height: 2;">
+                    <li>Understand the Network File System (NFS) protocol and its versions</li>
+                    <li>Query NFS servers to discover exported directories</li>
+                    <li>Mount and unmount NFS exports manually using the mount command</li>
+                    <li>Configure persistent NFS mounts using /etc/fstab</li>
+                    <li>Implement automounting using the autofs service</li>
+                    <li>Create and configure direct and indirect map files</li>
+                    <li>Troubleshoot common NFS mounting issues</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>📚 What is Network-Attached Storage?</h2>
+                <p>Network-Attached Storage (NAS) allows multiple systems to access shared files over a network. The Network File System (NFS) is an internet standard protocol that enables this file sharing between Linux, UNIX, and similar operating systems.</p>
+
+                <div class="visual-diagram">
+                    <div class="diagram-element">
+                        <strong>NFS Server</strong>
+                        <div style="margin-top: 10px; color: var(--text-secondary);">Exports directories</div>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="diagram-element">
+                        <strong>Network</strong>
+                        <div style="margin-top: 10px; color: var(--text-secondary);">TCP/UDP</div>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="diagram-element">
+                        <strong>NFS Client</strong>
+                        <div style="margin-top: 10px; color: var(--text-secondary);">Mounts directories</div>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <strong>💡 Key Concept:</strong> NFS provides native Linux file system support, meaning it preserves Linux permissions, attributes, and ownership information across the network.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🔄 NFS Version Comparison</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>NFSv3</th>
+                            <th>NFSv4</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Transport Protocol</td>
+                            <td>TCP or UDP</td>
+                            <td>TCP only</td>
+                        </tr>
+                        <tr>
+                            <td>Server Discovery</td>
+                            <td>Uses RPC protocol (rpcbind service, port 111)</td>
+                            <td>No RPC needed - direct connection</td>
+                        </tr>
+                        <tr>
+                            <td>Export Tree</td>
+                            <td>Each export mounted separately</td>
+                            <td>Single export tree root - can browse all exports</td>
+                        </tr>
+                        <tr>
+                            <td>Security</td>
+                            <td>Basic authentication</td>
+                            <td>Supports Kerberos security</td>
+                        </tr>
+                        <tr>
+                            <td>Default in RHEL 9</td>
+                            <td>Supported</td>
+                            <td>✓ Default (v4.2)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- NFS Basics Section -->
+        <div id="nfs-basics" class="content-section">
+            <div class="card">
+                <h2>🔍 Querying NFS Server Exports</h2>
+                <p>Before you can mount an NFS export, you need to discover what directories the server is sharing.</p>
+
+                <h3>NFSv3 Server Query</h3>
+                <p>NFSv3 uses the RPC protocol. The <span class="syntax-highlight">showmount</span> command queries the rpcbind service on port 111:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">showmount --exports server</span>
+                    <div class="terminal-output">Export list for server
+/shares/test1
+/shares/test2</div>
+                </div>
+
+                <div class="warning-box">
+                    <strong>⚠️ Important:</strong> If you run <span class="syntax-highlight">showmount</span> against an NFSv4-only server, the command will time out because the rpcbind service is not running.
+                </div>
+
+                <h3>NFSv4 Server Query</h3>
+                <p>NFSv4 introduced the concept of an <strong>export tree</strong> - a pseudo-filesystem containing all exported directories. To view all exports, mount the server's root (/) of the export tree:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">mkdir /mountpoint</span>
+                    <span class="prompt">[root@host ~]# </span><span class="command">mount server:/ /mountpoint</span>
+                    <span class="prompt">[root@host ~]# </span><span class="command">ls /mountpoint</span>
+                    <div class="terminal-output">management  operation  production</div>
+                </div>
+
+                <div class="info-box">
+                    <strong>💡 Key Difference:</strong> Mounting the NFSv4 export tree root provides browseable paths but does NOT mount ("bind") the actual exported directories. You can see the structure but cannot access the content until you mount specific exports.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📦 Required Package</h2>
+                <p>To access NFS exports, you must install the <span class="syntax-highlight">nfs-utils</span> package:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">dnf install nfs-utils</span>
+                </div>
+
+                <p>This package provides essential tools including:</p>
+                <ul style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li><span class="syntax-highlight">mount</span> - Manual mounting of NFS exports</li>
+                    <li><span class="syntax-highlight">umount</span> - Unmounting NFS exports</li>
+                    <li><span class="syntax-highlight">showmount</span> - Querying NFSv3 servers</li>
+                    <li><span class="syntax-highlight">autofs</span> - Automounting service (when configured)</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>🌐 NFS and Windows Shares</h2>
+                <p>RHEL also supports mounting shared directories from Microsoft Windows systems using Server Message Block (SMB) or Common Internet File System (CIFS) protocols.</p>
+
+                <div class="info-box">
+                    <strong>💡 Note:</strong> The mounting process is similar to NFS, but uses protocol-specific options. SMB/CIFS mounting options depend on your Windows Server or Samba Server configuration.
+                </div>
+            </div>
+        </div>
+
+        <!-- Mounting Section -->
+        <div id="mounting" class="content-section">
+            <div class="card">
+                <h2>🔧 Manual NFS Mounting</h2>
+                <p>The <span class="syntax-highlight">mount</span> command allows you to temporarily mount NFS exports. Manual mounts are useful for testing and temporary access.</p>
+
+                <h3>Step 1: Create a Mount Point</h3>
+                <p>First, create a local directory to serve as the mount point:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">mkdir /mountpoint</span>
+                </div>
+
+                <div class="warning-box">
+                    <strong>⚠️ Best Practice:</strong> While <span class="syntax-highlight">/mnt</span> is available for temporary mounts, it's recommended NOT to use it for long-term or persistent mounting.
+                </div>
+
+                <h3>Step 2: Mount the NFS Export</h3>
+                <p>Use the mount command with the server:export syntax:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">mount -t nfs -o rw,sync server:/export /mountpoint</span>
+                </div>
+
+                <h3>Understanding Mount Options</h3>
+                <div class="accordion">
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>-t nfs</strong> - File System Type</span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p>Specifies the file system type as NFS. When the mount command detects the <span class="syntax-highlight">server:/export</span> syntax, it automatically defaults to NFS type, so this option is often optional.</p>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>-o</strong> - Mount Options</span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p>Introduces a comma-separated list of mount options. Common options include:</p>
+                            <ul style="margin: 10px 0 10px 20px; line-height: 2;">
+                                <li><strong>rw</strong> - Mount with read/write access</li>
+                                <li><strong>ro</strong> - Mount with read-only access</li>
+                                <li><strong>sync</strong> - Synchronous writes (recommended for production)</li>
+                                <li><strong>async</strong> - Asynchronous writes (faster but risky)</li>
+                                <li><strong>soft</strong> - Fail operations after timeout</li>
+                                <li><strong>hard</strong> - Retry operations indefinitely (default)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>sync</strong> - Synchronous Transactions</span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p>The <span class="syntax-highlight">sync</span> option ensures that write operations are immediately synchronized with the NFS server before returning success to the application.</p>
+                            <div class="success-box">
+                                <strong>✓ Recommended:</strong> This option is strongly recommended for all production network mounts to prevent data loss. Transactions must complete successfully or fail - there's no ambiguity.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-box" style="margin-top: 20px;">
+                    <strong>💡 Auto-Detection:</strong> If the mount command detects <span class="syntax-highlight">server:/export</span> syntax, it automatically defaults to NFS type. The options specified with <span class="syntax-highlight">-o</span> apply to the mounted file system.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📝 Persistent Mounting with /etc/fstab</h2>
+                <p>To ensure NFS exports are automatically mounted at boot time, add entries to <span class="syntax-highlight">/etc/fstab</span>.</p>
+
+                <h3>/etc/fstab Entry Format</h3>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/fstab</span>
+                    </div>
+                    <div class="terminal-output">server:/export  /mountpoint  nfs  rw  0 0</div>
+                </div>
+
+                <p style="margin-top: 20px;">Field breakdown:</p>
+                <ol style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li><strong>server:/export</strong> - The NFS server and exported directory</li>
+                    <li><strong>/mountpoint</strong> - Local mount point directory</li>
+                    <li><strong>nfs</strong> - File system type</li>
+                    <li><strong>rw</strong> - Mount options (read/write in this example)</li>
+                    <li><strong>0</strong> - Dump backup flag (always 0 for NFS)</li>
+                    <li><strong>0</strong> - fsck check order (always 0 for NFS)</li>
+                </ol>
+
+                <h3>Mounting After /etc/fstab Configuration</h3>
+                <p>After adding the entry to /etc/fstab, you can mount using just the mount point:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">mount /mountpoint</span>
+                </div>
+
+                <p>The mount command reads the /etc/fstab file to obtain the NFS server and mount options.</p>
+
+                <div class="warning-box">
+                    <strong>⚠️ Important:</strong> Manual mounts are NOT persistent. When the system reboots, manually mounted NFS exports are not automatically remounted. Use /etc/fstab for persistence.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🔓 Unmounting NFS Exports</h2>
+                <p>Use the <span class="syntax-highlight">umount</span> command to unmount NFS exports:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">umount /mountpoint</span>
+                </div>
+
+                <div class="warning-box">
+                    <strong>⚠️ Common Issue: Device is Busy</strong>
+                    <p style="margin-top: 10px;">A mounted directory may fail to unmount with an error that the device is busy. This occurs when:</p>
+                    <ul style="margin: 10px 0 10px 20px;">
+                        <li>An application has a file open in the mounted filesystem</li>
+                        <li>A user's shell has a working directory in the mounted filesystem</li>
+                    </ul>
+                </div>
+
+                <h3>Troubleshooting "Device is Busy"</h3>
+                <p><strong>Step 1:</strong> Check your active shell windows and use <span class="syntax-highlight">cd</span> to leave the mounted filesystem.</p>
+
+                <p><strong>Step 2:</strong> If unmounting still fails, use <span class="syntax-highlight">lsof</span> (list open files) to identify processes using the mount point:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">lsof /mountpoint</span>
+                    <div class="terminal-output">COMMAND  PID  USER  FD  TYPE  DEVICE  SIZE/OFF  NODE  NAME
+program  5534 user  txt  REG   252.4   910704   128   /home/user/program</div>
+                </div>
+
+                <p style="margin-top: 15px;"><strong>Step 3:</strong> Gracefully close processes, or in critical scenarios, use <span class="syntax-highlight">kill</span> to terminate the process.</p>
+
+                <p><strong>Step 4 (Last Resort):</strong> Force unmount using the <span class="syntax-highlight">-f</span> option:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">umount -f /mountpoint</span>
+                </div>
+
+                <div class="warning-box">
+                    <strong>⚠️ Danger:</strong> The <span class="syntax-highlight">-f</span> option can cause loss of unwritten data for all open files. Use only when necessary.
+                </div>
+
+                <h3>/etc/fstab Persistence</h3>
+                <p>Unmounting a share does NOT remove its entry from /etc/fstab. If the entry exists, the share will be remounted during boot. To prevent remounting, remove or comment out the /etc/fstab entry.</p>
+            </div>
+
+            <div class="card">
+                <h2>🛠️ Interactive Mount Command Builder</h2>
+                <div class="config-builder">
+                    <div class="config-input-group">
+                        <label>NFS Server Hostname/IP:</label>
+                        <input type="text" id="mount-server" placeholder="server.example.com" value="serverb.lab.example.com">
+                    </div>
+                    <div class="config-input-group">
+                        <label>Exported Directory Path:</label>
+                        <input type="text" id="mount-export" placeholder="/shares/data" value="/shares/management">
+                    </div>
+                    <div class="config-input-group">
+                        <label>Local Mount Point:</label>
+                        <input type="text" id="mount-point" placeholder="/mnt/data" value="/remote/management">
+                    </div>
+                    <div class="config-input-group">
+                        <label>Access Mode:</label>
+                        <select id="mount-access">
+                            <option value="rw">Read/Write (rw)</option>
+                            <option value="ro">Read-Only (ro)</option>
+                        </select>
+                    </div>
+                    <div class="config-input-group">
+                        <label>Synchronization:</label>
+                        <select id="mount-sync">
+                            <option value="sync">Synchronous (sync) - Recommended</option>
+                            <option value="async">Asynchronous (async)</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="generateMountCommand()">Generate Commands</button>
+                    <div class="config-output" id="mount-output"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Automount Section -->
+        <div id="automount" class="content-section">
+            <div class="card">
+                <h2>🤖 The Automounter (autofs)</h2>
+                <p>The <strong>automounter</strong> is a service that automatically mounts file systems and NFS exports on demand, and automatically unmounts them when they're no longer in use.</p>
+
+                <h3>Why Use Automounting?</h3>
+                <div class="success-box">
+                    <strong>✓ Problem Solved:</strong> Unprivileged users don't have permissions to use the mount command. They also cannot access removable media (CDs, DVDs, USB drives) or remote file systems if they're not mounted at boot via /etc/fstab.
+                </div>
+
+                <p style="margin-top: 20px;">The automounter provides several key benefits:</p>
+
+                <div class="accordion" style="margin-top: 20px;">
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>Efficient Resource Usage</strong></span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p>Automounted file systems use resources only when actively reading or writing files. When idle, they use almost no resources - similar to unmounted file systems.</p>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>Protection from Corruption</strong></span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p>By unmounting file systems when not in use, the automounter protects them from unexpected corruption. When remounted, the autofs service uses the most current configuration, unlike /etc/fstab which might use stale configurations from the last boot.</p>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>Automatic Failover</strong></span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p>If your NFS server configuration includes redundant servers and paths, the automounter can automatically select the fastest connection each time a file system is requested, providing built-in high availability.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>⚙️ How Automounter Works</h2>
+                <p>The automounter configuration uses map files with mount information, similar to /etc/fstab entries. However, automounter file systems don't mount during system boot. Instead:</p>
+
+                <ol style="margin: 20px 0 20px 30px; line-height: 2;">
+                    <li>File systems remain <strong>unmounted</strong> until a user or application attempts to access the mount point directory</li>
+                    <li>When accessed, the file system <strong>mounts immediately</strong></li>
+                    <li>The file system remains mounted <strong>while in use</strong></li>
+                    <li>After all files are closed and users leave the mount point, the automounter <strong>unmounts the file system after a timeout</strong></li>
+                </ol>
+
+                <div class="visual-diagram">
+                    <div class="diagram-element">
+                        <strong>User Access</strong>
+                        <div style="margin-top: 10px; color: var(--text-secondary);">cd /shares/work</div>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="diagram-element">
+                        <strong>Auto Mount</strong>
+                        <div style="margin-top: 10px; color: var(--text-secondary);">NFS mounted</div>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="diagram-element">
+                        <strong>File Operations</strong>
+                        <div style="margin-top: 10px; color: var(--text-secondary);">Read/Write files</div>
+                    </div>
+                    <span class="arrow">→</span>
+                    <div class="diagram-element">
+                        <strong>Timeout</strong>
+                        <div style="margin-top: 10px; color: var(--text-secondary);">Auto unmount</div>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <strong>💡 Key Behavior:</strong> Because automounter uses standard mount and umount commands, automounted file systems exhibit the same behavior as file systems mounted via /etc/fstab - the only difference is WHEN they mount and unmount.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📦 Installing Automounter</h2>
+                <p>To use the autofs service, install both required packages:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">dnf install autofs nfs-utils</span>
+                </div>
+
+                <ul style="margin: 20px 0 20px 30px; line-height: 2;">
+                    <li><strong>autofs</strong> - Provides the automounter service</li>
+                    <li><strong>nfs-utils</strong> - Provides NFS client tools for mounting/automounting</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>🗺️ Automounter Configuration Files</h2>
+                <p>The automounter uses two types of configuration files:</p>
+
+                <h3>1. Master Map File (/etc/auto.master.d/*.autofs)</h3>
+                <p>The master map identifies the base directory for mount points and specifies which map file contains mount details.</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/auto.master.d/demo.autofs</span>
+                        <button class="copy-btn btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+                    <div class="terminal-output">mount-point  map-file</div>
+                </div>
+
+                <p style="margin-top: 15px;">Example:</p>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/auto.master.d/shares.autofs</span>
+                    </div>
+                    <div class="terminal-output">/shares  /etc/auto.shares</div>
+                </div>
+
+                <ul style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li><strong>/shares</strong> - Base directory for automounts</li>
+                    <li><strong>/etc/auto.shares</strong> - Map file containing mount configurations</li>
+                </ul>
+
+                <div class="info-box">
+                    <strong>💡 Naming Convention:</strong> Master map files must have a <span class="syntax-highlight">.autofs</span> extension for the system to recognize them. The name itself is arbitrary but should be meaningful (e.g., shares.autofs, home.autofs).
+                </div>
+
+                <h3 style="margin-top: 30px;">2. Map Files (/etc/auto.*)</h3>
+                <p>Map files configure individual automount properties. The naming convention is <span class="syntax-highlight">/etc/auto.name</span> where "name" reflects the content.</p>
+
+                <div class="warning-box">
+                    <strong>⚠️ Important:</strong> Map files must be created BEFORE starting the autofs service. The service reads these files at startup.
+                </div>
+            </div>
+        </div>
+
+        <!-- Maps Section -->
+        <div id="maps" class="content-section">
+            <div class="card">
+                <h2>🗺️ Direct vs Indirect Maps</h2>
+                <p>The automounter supports two types of mount-point mapping:</p>
+
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Map Type</th>
+                            <th>Mount Point Location</th>
+                            <th>Use Case</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Direct Map</strong></td>
+                            <td>Known, unchanging absolute path</td>
+                            <td>Static mount points like /mnt/docs</td>
+                            <td>/mnt/docs always mounts to the same location</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Indirect Map</strong></td>
+                            <td>Dynamic, determined at access time</td>
+                            <td>User home directories, per-user shares</td>
+                            <td>/shares/$USERNAME where $USERNAME varies</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>📍 Direct Maps</h2>
+                <p>A <strong>direct map</strong> mounts a file system to an unchanging, known mount point location. The mount point exists as a permanent directory.</p>
+
+                <h3>Master Map Configuration</h3>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/direct.autofs</span>
+                    </div>
+                    <div class="terminal-output">/-  /etc/auto.direct</div>
+                </div>
+
+                <p style="margin-top: 15px;"><strong>Key Point:</strong> All direct map entries use <span class="syntax-highlight">/-</span> as the base directory. The <span class="syntax-highlight">/</span> indicates this is a direct map.</p>
+
+                <h3>Direct Map File Format</h3>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/auto.direct</span>
+                    </div>
+                    <div class="terminal-output">/mnt/docs  -rw,sync  hosta:/shares/docs</div>
+                </div>
+
+                <p style="margin-top: 15px;">Field breakdown:</p>
+                <ul style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li><strong>/mnt/docs</strong> - Absolute path mount point (must be full path)</li>
+                    <li><strong>-rw,sync</strong> - Mount options (note the leading dash)</li>
+                    <li><strong>hosta:/shares/docs</strong> - NFS server and export path</li>
+                </ul>
+
+                <div class="info-box">
+                    <strong>💡 Direct Map Behavior:</strong> In this example, the <span class="syntax-highlight">/mnt</span> directory exists, and the autofs service creates and removes the <span class="syntax-highlight">/mnt/docs</span> directory automatically when mounting/unmounting.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🔀 Indirect Maps</h2>
+                <p>An <strong>indirect map</strong> is used when the mount point location is not known until the mount demand occurs. This is perfect for scenarios like remote-mounted home directories where the username determines the path.</p>
+
+                <h3>Example Scenario</h3>
+                <p>A user's home directory includes their username in the path. When user "jsmith" logs in, their home directory should mount to <span class="syntax-highlight">/home/jsmith</span>. The automounter doesn't know which user will log in until it happens.</p>
+
+                <h3>Master Map Configuration</h3>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/auto.master.d/indirect.autofs</span>
+                    </div>
+                    <div class="terminal-output">/shares  /etc/auto.indirect</div>
+                </div>
+
+                <p style="margin-top: 15px;"><strong>/shares</strong> is the base mount point directory for indirect automounts.</p>
+
+                <h3>Indirect Map File Format</h3>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/auto.indirect</span>
+                    </div>
+                    <div class="terminal-output">work  -rw,sync  hosta:/shares/work</div>
+                </div>
+
+                <p style="margin-top: 15px;">Field breakdown:</p>
+                <ul style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li><strong>work</strong> - Subdirectory name (NOT a full path - this is the "key")</li>
+                    <li><strong>-rw,sync</strong> - Mount options</li>
+                    <li><strong>hosta:/shares/work</strong> - NFS server and export path</li>
+                </ul>
+
+                <div class="success-box">
+                    <strong>✓ How It Works:</strong> The autofs service automatically creates and removes mount point directories. The fully qualified mount point is <span class="syntax-highlight">/shares/work</span> (base directory + key). The autofs service creates and removes both <span class="syntax-highlight">/shares</span> and <span class="syntax-highlight">/shares/work</span> as needed.
+                </div>
+
+                <div class="warning-box">
+                    <strong>⚠️ Critical Difference:</strong> Indirect map keys are relative directory names (like "work"), NOT absolute paths (like "/shares/work"). The autofs service constructs the full path by combining the master map base directory with the map file key.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🔧 Mount Options in Map Files</h2>
+                <p>Mount options in map files work identically to options used in manual mounting:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Map File Format</span>
+                    </div>
+                    <div class="terminal-output">mount-point  mount-options  source-location</div>
+                </div>
+
+                <p style="margin-top: 20px;"><strong>Important Notes:</strong></p>
+                <ul style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li>Mount options start with a dash (<span class="syntax-highlight">-</span>)</li>
+                    <li>Options are comma-separated with NO whitespace (<span class="syntax-highlight">-rw,sync</span>)</li>
+                    <li>The same options available for manual mounting apply to automounting</li>
+                </ul>
+
+                <h3>Example with File System Type</h3>
+                <p>If you need to specify the file system type (like nfs4) or use strict error handling:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/auto.indirect</span>
+                    </div>
+                    <div class="terminal-output">work  -rw,sync,fstype=nfs4,strict  hosta:/shares/work</div>
+                </div>
+
+                <ul style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li><strong>fstype=nfs4</strong> - Explicitly specify NFS version 4</li>
+                    <li><strong>strict</strong> - Treat mount errors as fatal</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>🌐 Wildcards in Indirect Maps</h2>
+                <p>When an NFS server exports multiple subdirectories within a parent directory, wildcards can simplify configuration.</p>
+
+                <h3>Scenario</h3>
+                <p>Server <span class="syntax-highlight">hosta</span> exports <span class="syntax-highlight">/shares</span> with subdirectories:</p>
+                <ul style="margin: 10px 0 10px 30px;">
+                    <li>/shares/management</li>
+                    <li>/shares/production</li>
+                    <li>/shares/operation</li>
+                </ul>
+
+                <p style="margin-top: 15px;">All subdirectories use the same mount options.</p>
+
+                <h3>Without Wildcards (Verbose)</h3>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/auto.indirect</span>
+                    </div>
+                    <div class="terminal-output">management  -rw,sync  hosta:/shares/management
+production  -rw,sync  hosta:/shares/production
+operation   -rw,sync  hosta:/shares/operation</div>
+                </div>
+
+                <h3>With Wildcards (Simplified)</h3>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/auto.indirect</span>
+                    </div>
+                    <div class="terminal-output">*  -rw,sync  hosta:/shares/&</div>
+                </div>
+
+                <p style="margin-top: 20px;"><strong>How It Works:</strong></p>
+                <ul style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li><strong>*</strong> (asterisk) - The mount point/key is a wildcard</li>
+                    <li><strong>&</strong> (ampersand) - Replaced with the key name at runtime</li>
+                </ul>
+
+                <div class="info-box">
+                    <strong>💡 Example:</strong> When a user accesses <span class="syntax-highlight">/shares/work</span>, the <strong>*</strong> key matches "work", and the <strong>&</strong> in the source location is replaced with "work", so <span class="syntax-highlight">hosta:/shares/work</span> gets mounted.
+                </div>
+
+                <p style="margin-top: 20px;">The autofs service automatically creates and removes the <span class="syntax-highlight">work</span> directory as needed.</p>
+            </div>
+
+            <div class="card">
+                <h2>🛠️ Interactive Map File Generator</h2>
+                <div class="config-builder">
+                    <h3>Map Type</h3>
+                    <div class="config-input-group">
+                        <select id="map-type" onchange="updateMapBuilder()">
+                            <option value="indirect">Indirect Map</option>
+                            <option value="direct">Direct Map</option>
+                        </select>
+                    </div>
+
+                    <div id="indirect-config">
+                        <h3>Indirect Map Configuration</h3>
+                        <div class="config-input-group">
+                            <label>Base Directory (Master Map):</label>
+                            <input type="text" id="indirect-base" placeholder="/shares" value="/shares">
+                        </div>
+                        <div class="config-input-group">
+                            <label>Key/Subdirectory Name:</label>
+                            <input type="text" id="indirect-key" placeholder="work" value="work">
+                        </div>
+                        <div class="config-input-group">
+                            <label>NFS Server:</label>
+                            <input type="text" id="indirect-server" placeholder="hosta" value="hosta">
+                        </div>
+                        <div class="config-input-group">
+                            <label>Export Path:</label>
+                            <input type="text" id="indirect-export" placeholder="/shares/work" value="/shares/work">
+                        </div>
+                    </div>
+
+                    <div id="direct-config" style="display:none;">
+                        <h3>Direct Map Configuration</h3>
+                        <div class="config-input-group">
+                            <label>Absolute Mount Point:</label>
+                            <input type="text" id="direct-mount" placeholder="/mnt/docs" value="/mnt/docs">
+                        </div>
+                        <div class="config-input-group">
+                            <label>NFS Server:</label>
+                            <input type="text" id="direct-server" placeholder="hosta" value="hosta">
+                        </div>
+                        <div class="config-input-group">
+                            <label>Export Path:</label>
+                            <input type="text" id="direct-export" placeholder="/shares/docs" value="/shares/docs">
+                        </div>
+                    </div>
+
+                    <div class="config-input-group">
+                        <label>Mount Options:</label>
+                        <input type="text" id="map-options" placeholder="rw,sync" value="rw,sync">
+                    </div>
+
+                    <button class="btn" onclick="generateMapConfig()">Generate Configuration Files</button>
+                    <div class="config-output" id="map-output"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Practice Section -->
+        <div id="practice" class="content-section">
+            <div class="card">
+                <h2>🚀 Starting the Autofs Service</h2>
+                <p>After configuring master map and map files, use systemctl to start and enable the autofs service:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">systemctl enable --now autofs</span>
+                    <div class="terminal-output">Created symlink /etc/systemd/system/multi-user.target.wants/autofs.service → /usr/lib/systemd/system/autofs.service.</div>
+                </div>
+
+                <p style="margin-top: 20px;">This command both starts the service immediately (<span class="syntax-highlight">--now</span>) and enables it to start automatically at boot.</p>
+
+                <div class="info-box">
+                    <strong>💡 Configuration Changes:</strong> If you modify master map or map files after starting the service, reload the configuration:
+                    <div class="terminal" style="margin-top: 10px;">
+                        <span class="prompt">[root@host ~]# </span><span class="command">systemctl reload autofs</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🎓 Guided Hands-On Lab</h2>
+                <div class="practice-scenario">
+                    <div class="scenario-title">Scenario: Configure Automounter for IT Support Company</div>
+                    <p style="margin: 15px 0;">You work for an IT support company using central server <strong>serverb</strong> to host exported directories on <span class="syntax-highlight">/shares</span>. Configure automounting so users can access their department directories under <span class="syntax-highlight">/remote</span> on <strong>servera</strong>.</p>
+
+                    <div class="warning-box">
+                        <strong>Environment Setup:</strong>
+                        <ul style="margin: 10px 0 10px 20px;">
+                            <li>NFS Server: <strong>serverb</strong> exports /shares with subdirectories: management, production, operation</li>
+                            <li>Groups: managers, production, operators</li>
+                            <li>Users have read/write access to their department directories</li>
+                            <li>Mount point on servera: <strong>/remote</strong></li>
+                            <li>Use indirect map with master map: /etc/auto.master.d/shares.autofs</li>
+                            <li>Map file: /etc/auto.shares</li>
+                        </ul>
+                    </div>
+
+                    <div class="step-indicator">
+                        <div class="step active" id="lab-step-1">Step 1</div>
+                        <div class="step" id="lab-step-2">Step 2</div>
+                        <div class="step" id="lab-step-3">Step 3</div>
+                        <div class="step" id="lab-step-4">Step 4</div>
+                        <div class="step" id="lab-step-5">Step 5</div>
+                    </div>
+
+                    <div id="lab-content">
+                        <!-- Steps will be injected here -->
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <button class="btn" id="prev-step-btn" onclick="previousLabStep()" disabled>← Previous</button>
+                        <button class="btn btn-success" id="next-step-btn" onclick="nextLabStep()">Next →</button>
+                        <button class="btn btn-warning" onclick="resetLab()" style="float: right;">Reset Lab</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>⚡ Alternative: systemd.automount Units</h2>
+                <p>The systemd daemon can automatically create unit files for /etc/fstab entries that include the <span class="syntax-highlight">x-systemd.automount</span> option.</p>
+
+                <h3>Advantages</h3>
+                <ul style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li>Simpler than installing and configuring the autofs service</li>
+                    <li>Good for basic automounting needs</li>
+                </ul>
+
+                <h3>Limitations</h3>
+                <ul style="margin: 15px 0 15px 30px; line-height: 2;">
+                    <li>Only supports absolute path mount points (like autofs direct maps)</li>
+                    <li>Cannot use indirect maps or wildcards</li>
+                    <li>Less flexible than autofs for complex scenarios</li>
+                </ul>
+
+                <h3>Example</h3>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">/etc/fstab</span>
+                    </div>
+                    <div class="terminal-output">serverb:/shares/management  /remote/management  nfs  x-systemd.automount  0 0</div>
+                </div>
+
+                <p style="margin-top: 15px;">After adding this entry, reload systemd and start the generated unit:</p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-button red"></span>
+                        <span class="terminal-button yellow"></span>
+                        <span class="terminal-button green"></span>
+                        <span style="margin-left: 10px; color: #999;">Terminal</span>
+                    </div>
+                    <span class="prompt">[root@host ~]# </span><span class="command">systemctl daemon-reload</span>
+                    <span class="prompt">[root@host ~]# </span><span class="command">systemctl start remote-management.automount</span>
+                </div>
+
+                <div class="info-box">
+                    <strong>💡 Unit Naming:</strong> The unit file name is based on the mount point with slashes replaced by dashes: <span class="syntax-highlight">/remote/management</span> becomes <span class="syntax-highlight">remote-management.automount</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Troubleshooting Section -->
+        <div id="troubleshooting" class="content-section">
+            <div class="card">
+                <h2>🔧 Common NFS Troubleshooting Scenarios</h2>
+                <p>Learn to diagnose and resolve typical NFS mounting issues.</p>
+
+                <div class="accordion">
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>Issue: Mount Command Times Out</strong></span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p><strong>Symptoms:</strong> The mount command hangs and eventually times out.</p>
+                            <p><strong>Common Causes:</strong></p>
+                            <ul style="margin: 10px 0 10px 20px; line-height: 1.8;">
+                                <li>NFS server is down or unreachable</li>
+                                <li>Firewall blocking NFS ports</li>
+                                <li>Network connectivity issues</li>
+                                <li>Wrong server hostname or IP</li>
+                            </ul>
+                            <p><strong>Troubleshooting Steps:</strong></p>
+                            <div class="terminal">
+                                <span class="prompt"># </span><span class="command">Test network connectivity</span>
+                                <span class="prompt">[root@host ~]# </span><span class="command">ping serverb</span>
+                                <br>
+                                <span class="prompt"># </span><span class="command">Test NFS port accessibility (NFSv4 uses port 2049)</span>
+                                <span class="prompt">[root@host ~]# </span><span class="command">telnet serverb 2049</span>
+                                <br>
+                                <span class="prompt"># </span><span class="command">Check if NFS server service is running</span>
+                                <span class="prompt">[root@host ~]# </span><span class="command">ssh serverb "systemctl status nfs-server"</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>Issue: Permission Denied After Mounting</strong></span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p><strong>Symptoms:</strong> Mount succeeds, but you get "Permission denied" when accessing files.</p>
+                            <p><strong>Common Causes:</strong></p>
+                            <ul style="margin: 10px 0 10px 20px; line-height: 1.8;">
+                                <li>Server exports directory as read-only, but client mounted as read/write</li>
+                                <li>Linux file permissions don't allow access to your user</li>
+                                <li>SELinux context issues</li>
+                                <li>Export restrictions based on client IP/hostname</li>
+                            </ul>
+                            <p><strong>Solution:</strong></p>
+                            <div class="success-box">
+                                If the server exports read-only and you requested read/write, the client gets read-only access even if requested read/write. Check the actual mount options with:
+                                <div class="terminal" style="margin-top: 10px;">
+                                    <span class="prompt">[root@host ~]# </span><span class="command">mount | grep nfs</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>Issue: Autofs Not Mounting</strong></span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p><strong>Symptoms:</strong> Accessing mount point doesn't trigger automount.</p>
+                            <p><strong>Troubleshooting Checklist:</strong></p>
+                            <ol style="margin: 10px 0 10px 20px; line-height: 1.8;">
+                                <li>Verify autofs service is running:
+                                    <div class="terminal" style="margin: 10px 0;">
+                                        <span class="prompt">[root@host ~]# </span><span class="command">systemctl status autofs</span>
+                                    </div>
+                                </li>
+                                <li>Check master map file exists and has correct syntax:
+                                    <div class="terminal" style="margin: 10px 0;">
+                                        <span class="prompt">[root@host ~]# </span><span class="command">cat /etc/auto.master.d/shares.autofs</span>
+                                    </div>
+                                </li>
+                                <li>Check map file exists and has correct syntax:
+                                    <div class="terminal" style="margin: 10px 0;">
+                                        <span class="prompt">[root@host ~]# </span><span class="command">cat /etc/auto.shares</span>
+                                    </div>
+                                </li>
+                                <li>Check autofs logs for errors:
+                                    <div class="terminal" style="margin: 10px 0;">
+                                        <span class="prompt">[root@host ~]# </span><span class="command">journalctl -u autofs -f</span>
+                                    </div>
+                                </li>
+                                <li>Reload autofs after configuration changes:
+                                    <div class="terminal" style="margin: 10px 0;">
+                                        <span class="prompt">[root@host ~]# </span><span class="command">systemctl reload autofs</span>
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>Issue: "Device is Busy" When Unmounting</strong></span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p><strong>Symptoms:</strong> umount command fails with "device is busy" error.</p>
+                            <p><strong>Resolution Steps:</strong></p>
+                            <ol style="margin: 10px 0 10px 20px; line-height: 1.8;">
+                                <li>Check if any shell has working directory in the mount:
+                                    <div class="terminal" style="margin: 10px 0;">
+                                        <span class="prompt">[root@host ~]# </span><span class="command">cd</span>
+                                        <span class="comment"># Leave the mounted filesystem</span>
+                                    </div>
+                                </li>
+                                <li>Find processes using the mount point:
+                                    <div class="terminal" style="margin: 10px 0;">
+                                        <span class="prompt">[root@host ~]# </span><span class="command">lsof /mountpoint</span>
+                                    </div>
+                                </li>
+                                <li>Gracefully close applications or terminate processes</li>
+                                <li>As last resort, force unmount (may cause data loss):
+                                    <div class="terminal" style="margin: 10px 0;">
+                                        <span class="prompt">[root@host ~]# </span><span class="command">umount -f /mountpoint</span>
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <div class="accordion-header" onclick="toggleAccordion(this)">
+                            <span><strong>Issue: Stale NFS File Handle</strong></span>
+                            <span>▼</span>
+                        </div>
+                        <div class="accordion-content">
+                            <p><strong>Symptoms:</strong> Accessing files returns "Stale NFS file handle" error.</p>
+                            <p><strong>Causes:</strong></p>
+                            <ul style="margin: 10px 0 10px 20px; line-height: 1.8;">
+                                <li>Server exported directory was deleted or moved</li>
+                                <li>Server was rebooted and exports changed</li>
+                                <li>Network interruption caused handle invalidation</li>
+                            </ul>
+                            <p><strong>Solution:</strong></p>
+                            <div class="terminal">
+                                <span class="prompt"># </span><span class="command">Unmount and remount the NFS share</span>
+                                <span class="prompt">[root@host ~]# </span><span class="command">umount /mountpoint</span>
+                                <span class="prompt">[root@host ~]# </span><span class="command">mount /mountpoint</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🔍 Diagnostic Commands Reference</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Command</th>
+                            <th>Purpose</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="syntax-highlight">mount | grep nfs</span></td>
+                            <td>Show currently mounted NFS filesystems</td>
+                            <td>Verify mount options and status</td>
+                        </tr>
+                        <tr>
+                            <td><span class="syntax-highlight">showmount -e server</span></td>
+                            <td>List exports from NFSv3 server</td>
+                            <td>Discover available shares</td>
+                        </tr>
+                        <tr>
+                            <td><span class="syntax-highlight">lsof /mountpoint</span></td>
+                            <td>List open files in mount point</td>
+                            <td>Find processes preventing unmount</td>
+                        </tr>
+                        <tr>
+                            <td><span class="syntax-highlight">systemctl status autofs</span></td>
+                            <td>Check autofs service status</td>
+                            <td>Verify automounter is running</td>
+                        </tr>
+                        <tr>
+                            <td><span class="syntax-highlight">journalctl -u autofs</span></td>
+                            <td>View autofs logs</td>
+                            <td>Troubleshoot automount failures</td>
+                        </tr>
+                        <tr>
+                            <td><span class="syntax-highlight">nfsstat</span></td>
+                            <td>Display NFS statistics</td>
+                            <td>Monitor NFS performance</td>
+                        </tr>
+                        <tr>
+                            <td><span class="syntax-highlight">rpcinfo -p server</span></td>
+                            <td>Query RPC services (NFSv3)</td>
+                            <td>Verify RPC services are running</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>📋 Interactive Troubleshooting Simulator</h2>
+                <div class="practice-scenario">
+                    <div class="scenario-title">Scenario: Debug Failed NFS Mount</div>
+                    <p style="margin: 15px 0;">You're trying to mount an NFS share but encountering an error. Use the commands below to diagnose the issue.</p>
+
+                    <div class="interactive-terminal">
+                        <div class="terminal">
+                            <div class="terminal-header">
+                                <span class="terminal-button red"></span>
+                                <span class="terminal-button yellow"></span>
+                                <span class="terminal-button green"></span>
+                                <span style="margin-left: 10px; color: #999;">Interactive Terminal</span>
+                            </div>
+                            <div id="troubleshoot-output" class="terminal-output">Welcome to the troubleshooting simulator!
+Try commands like:
+  - ping serverb
+  - showmount -e serverb
+  - mount serverb:/shares /mnt/test
+  - systemctl status autofs
+  - lsof /mnt/test
+
+Type 'help' for more commands or 'reset' to restart.
+</div>
+                            <div style="display: flex; align-items: center;">
+                                <span class="prompt">[root@host ~]# </span>
+                                <input type="text" class="terminal-input" id="troubleshoot-input" placeholder="Enter command..." onkeypress="handleTroubleshootCommand(event)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quiz Section -->
+        <div id="quiz" class="content-section">
+            <div class="card">
+                <h2>📝 Knowledge Check Quiz</h2>
+                <p>Test your understanding of NFS and automounting concepts.</p>
+
+                <div class="progress-bar">
+                    <div class="progress-fill" id="quiz-progress" style="width: 0%">0%</div>
+                </div>
+
+                <div id="quiz-container">
+                    <!-- Quiz questions will be injected here -->
+                </div>
+
+                <div style="margin-top: 30px; text-align: center;">
+                    <button class="btn btn-success" onclick="submitQuiz()" id="submit-quiz-btn">Submit Quiz</button>
+                    <button class="btn btn-warning" onclick="resetQuiz()">Reset Quiz</button>
+                </div>
+
+                <div id="quiz-results" style="display: none; margin-top: 30px;">
+                    <!-- Results will be shown here -->
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🎯 Key Takeaways</h2>
+                <div class="success-box">
+                    <h3>NFS Fundamentals</h3>
+                    <ul style="margin: 10px 0 10px 20px; line-height: 2;">
+                        <li>NFS is an internet standard protocol for network file sharing</li>
+                        <li>NFSv4 is the default in RHEL 9 (version 4.2)</li>
+                        <li>NFSv4 uses TCP only and introduces the export tree concept</li>
+                        <li>Install <span class="syntax-highlight">nfs-utils</span> package for NFS client functionality</li>
+                    </ul>
+                </div>
+
+                <div class="info-box">
+                    <h3>Manual Mounting</h3>
+                    <ul style="margin: 10px 0 10px 20px; line-height: 2;">
+                        <li>Use <span class="syntax-highlight">mount -t nfs -o options server:/export /mountpoint</span></li>
+                        <li>The <span class="syntax-highlight">sync</span> option is strongly recommended for production</li>
+                        <li>Manual mounts are NOT persistent across reboots</li>
+                        <li>Add entries to /etc/fstab for persistent mounts</li>
+                    </ul>
+                </div>
+
+                <div class="warning-box">
+                    <h3>Automounting</h3>
+                    <ul style="margin: 10px 0 10px 20px; line-height: 2;">
+                        <li>Install <span class="syntax-highlight">autofs</span> package for automounter service</li>
+                        <li>Automounter mounts on-demand and unmounts when idle</li>
+                        <li>Direct maps use <span class="syntax-highlight">/-</span> in master map and absolute paths</li>
+                        <li>Indirect maps use base directory and relative keys</li>
+                        <li>Wildcards (*) and substitution (&) simplify multiple exports</li>
+                        <li>Always reload autofs after configuration changes</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="copied-notification" id="copy-notification">
+            ✓ Copied to clipboard!
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentLabStep = 1;
+        const totalLabSteps = 5;
+        let quizAnswers = {};
+        const totalQuizQuestions = 10;
+
+        // Lab steps content
+        const labSteps = {
+            1: {
+                title: "Step 1: Install Required Packages",
+                content: `
+                    <p>First, log in to servera and install the autofs package:</p>
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-button red"></span>
+                            <span class="terminal-button yellow"></span>
+                            <span class="terminal-button green"></span>
+                        </div>
+                        <span class="prompt">[root@servera ~]# </span><span class="command">dnf install autofs</span>
+                    </div>
+                    <div class="info-box" style="margin-top: 15px;">
+                        <strong>💡 Note:</strong> The nfs-utils package is likely already installed, but autofs requires it. The installation will verify or install both packages.
+                    </div>
+                `
+            },
+            2: {
+                title: "Step 2: Test NFS Server Before Configuration",
+                content: `
+                    <p>Before configuring the automounter, verify you can access the NFS server and see the exported directories:</p>
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-button red"></span>
+                            <span class="terminal-button yellow"></span>
+                            <span class="terminal-button green"></span>
+                        </div>
+                        <span class="prompt">[root@servera ~]# </span><span class="command">mount -t nfs serverb.lab.example.com:/shares /mnt</span>
+                        <span class="prompt">[root@servera ~]# </span><span class="command">ls -l /mnt</span>
+                        <div class="terminal-output">total 0
+drwxrwx---. 2 root managers    25 Apr  4 01:13 management
+drwxrwx---. 2 root operators   25 Apr  4 01:13 operation
+drwxrwx---. 2 root production  25 Apr  4 01:13 production</div>
+                        <span class="prompt">[root@servera ~]# </span><span class="command">umount /mnt</span>
+                    </div>
+                    <div class="success-box" style="margin-top: 15px;">
+                        <strong>✓ Verification:</strong> You should see three directories: management, production, and operation. This confirms the NFS server is working correctly.
+                    </div>
+                `
+            },
+            3: {
+                title: "Step 3: Create Master Map File",
+                content: `
+                    <p>Create the master map file that tells autofs where to mount the NFS shares:</p>
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-button red"></span>
+                            <span class="terminal-button yellow"></span>
+                            <span class="terminal-button green"></span>
+                        </div>
+                        <span class="prompt">[root@servera ~]# </span><span class="command">vim /etc/auto.master.d/shares.autofs</span>
+                    </div>
+                    <p style="margin-top: 15px;">Insert the following content:</p>
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-button red"></span>
+                            <span class="terminal-button yellow"></span>
+                            <span class="terminal-button green"></span>
+                            <button class="copy-btn btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                        <div class="terminal-output">/remote /etc/auto.shares</div>
+                    </div>
+                    <div class="info-box" style="margin-top: 15px;">
+                        <strong>💡 Explanation:</strong>
+                        <ul style="margin: 10px 0 0 20px;">
+                            <li><strong>/remote</strong> - Base directory for all automounts</li>
+                            <li><strong>/etc/auto.shares</strong> - Map file containing mount configurations</li>
+                        </ul>
+                    </div>
+                `
+            },
+            4: {
+                title: "Step 4: Create Indirect Map File",
+                content: `
+                    <p>Create the map file that specifies which NFS exports to mount:</p>
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-button red"></span>
+                            <span class="terminal-button yellow"></span>
+                            <span class="terminal-button green"></span>
+                        </div>
+                        <span class="prompt">[root@servera ~]# </span><span class="command">vim /etc/auto.shares</span>
+                    </div>
+                    <p style="margin-top: 15px;">Insert the following content using wildcards:</p>
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-button red"></span>
+                            <span class="terminal-button yellow"></span>
+                            <span class="terminal-button green"></span>
+                            <button class="copy-btn btn" onclick="copyCode(this)">Copy</button>
+                        </div>
+                        <div class="terminal-output">*  -rw,sync,fstype=nfs4  serverb.lab.example.com:/shares/&</div>
+                    </div>
+                    <div class="info-box" style="margin-top: 15px;">
+                        <strong>💡 Wildcard Explanation:</strong>
+                        <ul style="margin: 10px 0 0 20px;">
+                            <li><strong>*</strong> - Matches any subdirectory name (management, production, operation)</li>
+                            <li><strong>&</strong> - Replaced with the matched name at runtime</li>
+                            <li><strong>-rw,sync,fstype=nfs4</strong> - Mount options (read/write, synchronous, NFS version 4)</li>
+                        </ul>
+                    </div>
+                    <div class="warning-box" style="margin-top: 15px;">
+                        <strong>⚠️ Important:</strong> This single line replaces the need for three separate entries (one for each directory). When accessing /remote/management, the * matches "management" and & gets replaced with "management".
+                    </div>
+                `
+            },
+            5: {
+                title: "Step 5: Start and Test Autofs Service",
+                content: `
+                    <p>Enable and start the autofs service:</p>
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-button red"></span>
+                            <span class="terminal-button yellow"></span>
+                            <span class="terminal-button green"></span>
+                        </div>
+                        <span class="prompt">[root@servera ~]# </span><span class="command">systemctl enable --now autofs</span>
+                    </div>
+                    <p style="margin-top: 20px;"><strong>Test the configuration by switching to different users:</strong></p>
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-button red"></span>
+                            <span class="terminal-button yellow"></span>
+                            <span class="terminal-button green"></span>
+                        </div>
+                        <span class="prompt">[root@servera ~]# </span><span class="command">su - manager1</span>
+                        <span class="prompt">[manager1@servera ~]$ </span><span class="command">ls -l /remote/management/</span>
+                        <div class="terminal-output">total 4
+-rw-r--r--. 1 root managers 46 Apr  4 01:13 Welcome.txt</div>
+                        <span class="prompt">[manager1@servera ~]$ </span><span class="command">echo TEST1 > /remote/management/Test.txt</span>
+                        <span class="prompt">[manager1@servera ~]$ </span><span class="command">cat /remote/management/Test.txt</span>
+                        <div class="terminal-output">TEST1</div>
+                        <span class="prompt">[manager1@servera ~]$ </span><span class="command">exit</span>
+                    </div>
+                    <div class="success-box" style="margin-top: 15px;">
+                        <strong>✓ Success Indicators:</strong>
+                        <ul style="margin: 10px 0 0 20px;">
+                            <li>You can list files in /remote/management/</li>
+                            <li>You can create and read files</li>
+                            <li>The mount happened automatically without explicit mount command</li>
+                        </ul>
+                    </div>
+                    <p style="margin-top: 20px;"><strong>Verify mount options:</strong></p>
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-button red"></span>
+                            <span class="terminal-button yellow"></span>
+                            <span class="terminal-button green"></span>
+                        </div>
+                        <span class="prompt">[root@servera ~]# </span><span class="command">mount | grep nfs</span>
+                        <div class="terminal-output">serverb.lab.example.com:/shares/management on /remote/management type nfs4
+(rw,relatime,vers=4.2,rsize=262144,wsize=262144,namlen=255,
+sync,proto=tcp,timeo=600,retrans=2,sec=sys,clientaddr=172.25.250.10,
+local_lock=none,addr=172.25.250.11)</div>
+                    </div>
+                    <div class="success-box" style="margin-top: 15px;">
+                        <strong>🎉 Lab Complete!</strong> You've successfully configured automounting with an indirect map. The directories will automatically mount when accessed and unmount after a timeout period.
+                    </div>
+                `
+            }
+        };
+
+        // Quiz questions
+        const quizQuestions = [
+            {
+                id: 1,
+                question: "Which NFS version is the default in RHEL 9?",
+                options: [
+                    "NFSv2",
+                    "NFSv3",
+                    "NFSv4",
+                    "NFSv5"
+                ],
+                correct: 2,
+                explanation: "NFSv4 (specifically version 4.2) is the default in RHEL 9. It uses TCP only and introduces the export tree concept."
+            },
+            {
+                id: 2,
+                question: "Which command is used to query available exports from an NFSv3 server?",
+                options: [
+                    "nfsstat -e server",
+                    "showmount --exports server",
+                    "mount server:/",
+                    "exportfs -v server"
+                ],
+                correct: 1,
+                explanation: "The showmount --exports command queries the rpcbind service on an NFSv3 server to list available exports."
+            },
+            {
+                id: 3,
+                question: "What mount option ensures write operations are synchronized before returning success?",
+                options: [
+                    "async",
+                    "rw",
+                    "sync",
+                    "hard"
+                ],
+                correct: 2,
+                explanation: "The 'sync' option ensures synchronous transactions - write operations complete or fail before returning, preventing data loss."
+            },
+            {
+                id: 4,
+                question: "Which file is used to configure persistent NFS mounts at boot time?",
+                options: [
+                    "/etc/auto.master",
+                    "/etc/fstab",
+                    "/etc/nfs.conf",
+                    "/etc/exports"
+                ],
+                correct: 1,
+                explanation: "/etc/fstab is used to configure file systems that should be mounted at boot time, including NFS exports."
+            },
+            {
+                id: 5,
+                question: "In an indirect map, what does the asterisk (*) represent?",
+                options: [
+                    "All users",
+                    "All servers",
+                    "A wildcard matching any subdirectory name",
+                    "Root directory"
+                ],
+                correct: 2,
+                explanation: "In indirect maps, the asterisk (*) is a wildcard that matches any subdirectory name, allowing one entry to handle multiple directories."
+            },
+            {
+                id: 6,
+                question: "What symbol is used in the master map file to indicate a direct map?",
+                options: [
+                    "*",
+                    "&",
+                    "/-",
+                    "//"
+                ],
+                correct: 2,
+                explanation: "The /- symbol in the master map indicates a direct map, where mount points use absolute paths."
+            },
+            {
+                id: 7,
+                question: "Which package must be installed to use the automounter?",
+                options: [
+                    "nfs-server",
+                    "autofs",
+                    "automount",
+                    "nfs-automount"
+                ],
+                correct: 1,
+                explanation: "The 'autofs' package provides the automounter service for on-demand mounting of file systems."
+            },
+            {
+                id: 8,
+                question: "What command is used to find processes preventing an NFS mount from being unmounted?",
+                options: [
+                    "ps aux",
+                    "fuser",
+                    "lsof",
+                    "netstat"
+                ],
+                correct: 2,
+                explanation: "The 'lsof' (list open files) command shows which processes have files open on a mount point, helping identify what's preventing unmounting."
+            },
+            {
+                id: 9,
+                question: "In an indirect map file, what does the ampersand (&) represent?",
+                options: [
+                    "The server name",
+                    "The base directory",
+                    "The key/subdirectory name matched by the wildcard",
+                    "All mount options"
+                ],
+                correct: 2,
+                explanation: "The ampersand (&) is replaced at runtime with the key/subdirectory name that was matched by the wildcard (*)."
+            },
+            {
+                id: 10,
+                question: "After modifying autofs configuration files, what command should you run?",
+                options: [
+                    "systemctl restart autofs",
+                    "systemctl reload autofs",
+                    "autofs -r",
+                    "mount -a"
+                ],
+                correct: 1,
+                explanation: "systemctl reload autofs reloads the configuration without disrupting existing mounts, making it the preferred method after configuration changes."
+            }
+        ];
+
+        // Section navigation
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Accordion toggle
+        function toggleAccordion(header) {
+            const content = header.nextElementSibling;
+            const isActive = content.classList.contains('active');
+            
+            // Close all accordion items
+            document.querySelectorAll('.accordion-content').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Toggle clicked item
+            if (!isActive) {
+                content.classList.add('active');
+            }
+        }
+
+        // Mount command generator
+        function generateMountCommand() {
+            const server = document.getElementById('mount-server').value;
+            const exportPath = document.getElementById('mount-export').value;
+            const mountPoint = document.getElementById('mount-point').value;
+            const access = document.getElementById('mount-access').value;
+            const sync = document.getElementById('mount-sync').value;
+
+            if (!server || !exportPath || !mountPoint) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            const output = `# Step 1: Create mount point directory
+mkdir -p ${mountPoint}
+
+# Step 2: Mount NFS export manually
+mount -t nfs -o ${access},${sync} ${server}:${exportPath} ${mountPoint}
+
+# Step 3: Verify the mount
+mount | grep nfs
+ls -l ${mountPoint}
+
+# Step 4: For persistent mounting, add to /etc/fstab:
+echo "${server}:${exportPath}  ${mountPoint}  nfs  ${access},${sync}  0 0" >> /etc/fstab
+
+# Step 5: Test /etc/fstab entry
+umount ${mountPoint}
+mount ${mountPoint}`;
+
+            document.getElementById('mount-output').textContent = output;
+        }
+
+        // Map file generator
+        function updateMapBuilder() {
+            const mapType = document.getElementById('map-type').value;
+            document.getElementById('indirect-config').style.display = mapType === 'indirect' ? 'block' : 'none';
+            document.getElementById('direct-config').style.display = mapType === 'direct' ? 'block' : 'none';
+        }
+
+        function generateMapConfig() {
+            const mapType = document.getElementById('map-type').value;
+            const options = document.getElementById('map-options').value;
+            let output = '';
+
+            if (mapType === 'indirect') {
+                const base = document.getElementById('indirect-base').value;
+                const key = document.getElementById('indirect-key').value;
+                const server = document.getElementById('indirect-server').value;
+                const exportPath = document.getElementById('indirect-export').value;
+
+                output = `# Master Map File: /etc/auto.master.d/demo.autofs
+${base}  /etc/auto.demo
+
+# Map File: /etc/auto.demo
+${key}  -${options}  ${server}:${exportPath}
+
+# Full mount point will be: ${base}/${key}
+# To access: cd ${base}/${key}
+
+# Enable and start autofs:
+systemctl enable --now autofs`;
+            } else {
+                const mountPoint = document.getElementById('direct-mount').value;
+                const server = document.getElementById('direct-server').value;
+                const exportPath = document.getElementById('direct-export').value;
+
+                output = `# Master Map File: /etc/auto.master.d/direct.autofs
+/-  /etc/auto.direct
+
+# Map File: /etc/auto.direct
+${mountPoint}  -${options}  ${server}:${exportPath}
+
+# The mount point is: ${mountPoint}
+# To access: cd ${mountPoint}
+
+# Enable and start autofs:
+systemctl enable --now autofs`;
+            }
+
+            document.getElementById('map-output').textContent = output;
+        }
+
+        // Lab navigation
+        function showLabStep(step) {
+            const content = labSteps[step];
+            document.getElementById('lab-content').innerHTML = `
+                <h3>${content.title}</h3>
+                ${content.content}
+            `;
+
+            // Update step indicators
+            for (let i = 1; i <= totalLabSteps; i++) {
+                const stepElement = document.getElementById(`lab-step-${i}`);
+                stepElement.classList.remove('active', 'completed');
+                if (i < step) {
+                    stepElement.classList.add('completed');
+                } else if (i === step) {
+                    stepElement.classList.add('active');
+                }
+            }
+
+            // Update buttons
+            document.getElementById('prev-step-btn').disabled = step === 1;
+            document.getElementById('next-step-btn').textContent = step === totalLabSteps ? 'Complete Lab ✓' : 'Next →';
+        }
+
+        function nextLabStep() {
+            if (currentLabStep < totalLabSteps) {
+                currentLabStep++;
+                showLabStep(currentLabStep);
+            } else {
+                alert('🎉 Congratulations! You have completed the lab!');
+            }
+        }
+
+        function previousLabStep() {
+            if (currentLabStep > 1) {
+                currentLabStep--;
+                showLabStep(currentLabStep);
+            }
+        }
+
+        function resetLab() {
+            currentLabStep = 1;
+            showLabStep(currentLabStep);
+        }
+
+        // Troubleshooting simulator
+        const troubleshootState = {
+            serverReachable: true,
+            nfsRunning: true,
+            mountAttempted: false,
+            currentMount: null
+        };
+
+        function handleTroubleshootCommand(event) {
+            if (event.key === 'Enter') {
+                const input = document.getElementById('troubleshoot-input');
+                const command = input.value.trim();
+                const output = document.getElementById('troubleshoot-output');
+                
+                if (command) {
+                    const response = simulateCommand(command);
+                    output.textContent += `\n[root@host ~]# ${command}\n${response}`;
+                    input.value = '';
+                    
+                    // Scroll to bottom
+                    output.scrollTop = output.scrollHeight;
+                }
+            }
+        }
+
+        function simulateCommand(cmd) {
+            cmd = cmd.toLowerCase().trim();
+            
+            if (cmd === 'help') {
+                return `Available commands:
+  ping serverb               - Test network connectivity
+  showmount -e serverb       - List NFS exports
+  mount serverb:/shares /mnt - Mount NFS share
+  umount /mnt                - Unmount NFS share
+  systemctl status autofs    - Check autofs status
+  lsof /mnt                  - List open files
+  reset                      - Reset simulator
+  help                       - Show this help`;
+            }
+            
+            if (cmd === 'reset') {
+                troubleshootState.mountAttempted = false;
+                troubleshootState.currentMount = null;
+                return 'Simulator reset successfully.';
+            }
+            
+            if (cmd.includes('ping')) {
+                if (troubleshootState.serverReachable) {
+                    return 'PING serverb.lab.example.com (172.25.250.11) 56(84) bytes of data.\n64 bytes from serverb: icmp_seq=1 ttl=64 time=0.234 ms\n\n--- serverb ping statistics ---\n1 packets transmitted, 1 received, 0% packet loss';
+                } else {
+                    return 'ping: serverb: Name or service not known';
+                }
+            }
+            
+            if (cmd.includes('showmount')) {
+                if (troubleshootState.nfsRunning) {
+                    return 'Export list for serverb:\n/shares/management\n/shares/production\n/shares/operation';
+                } else {
+                    return 'clnt_create: RPC: Port mapper failure - Unable to receive: errno 111 (Connection refused)';
+                }
+            }
+            
+            if (cmd.includes('mount') && !cmd.includes('umount') && !cmd.includes('showmount')) {
+                if (cmd.includes('serverb:/shares')) {
+                    troubleshootState.mountAttempted = true;
+                    troubleshootState.currentMount = '/mnt';
+                    return 'Mount successful!';
+                }
+                return 'mount: no mount point specified';
+            }
+            
+            if (cmd.includes('umount')) {
+                if (troubleshootState.currentMount) {
+                    troubleshootState.currentMount = null;
+                    return 'Unmount successful!';
+                }
+                return 'umount: /mnt: not mounted';
+            }
+            
+            if (cmd.includes('systemctl status autofs')) {
+                return '● autofs.service - Automounts filesystems on demand\n   Loaded: loaded (/usr/lib/systemd/system/autofs.service; enabled; vendor preset: disabled)\n   Active: active (running) since Fri 2025-04-04 10:30:22 EDT; 2h 15min ago';
+            }
+            
+            if (cmd.includes('lsof')) {
+                if (troubleshootState.currentMount) {
+                    return 'No files currently open in /mnt';
+                }
+                return `lsof: WARNING: can't stat() nfs file system /mnt\n      Output information may be incomplete.`;
+            }
+            
+            return `Command not recognized. Type 'help' for available commands.`;
+        }
+
+        // Quiz functions
+        function initializeQuiz() {
+            const container = document.getElementById('quiz-container');
+            container.innerHTML = '';
+            
+            quizQuestions.forEach((q, index) => {
+                const quizDiv = document.createElement('div');
+                quizDiv.className = 'quiz-container';
+                quizDiv.innerHTML = `
+                    <div class="quiz-question">
+                        <strong>Question ${index + 1}:</strong> ${q.question}
+                    </div>
+                    <div class="quiz-options" id="quiz-${q.id}">
+                        ${q.options.map((opt, i) => `
+                            <div class="quiz-option" onclick="selectAnswer(${q.id}, ${i})">
+                                ${opt}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="feedback" id="feedback-${q.id}"></div>
+                `;
+                container.appendChild(quizDiv);
+            });
+        }
+
+        function selectAnswer(questionId, optionIndex) {
+            // Store the answer
+            quizAnswers[questionId] = optionIndex;
+            
+            // Remove previous selections for this question
+            const options = document.querySelectorAll(`#quiz-${questionId} .quiz-option`);
+            options.forEach(opt => {
+                opt.classList.remove('correct', 'incorrect');
+                opt.style.borderColor = 'var(--border-color)';
+            });
+            
+            // Highlight selected option
+            options[optionIndex].style.borderColor = 'var(--primary-color)';
+            
+            // Update progress
+            updateQuizProgress();
+        }
+
+        function updateQuizProgress() {
+            const answered = Object.keys(quizAnswers).length;
+            const percentage = (answered / totalQuizQuestions) * 100;
+            const progressBar = document.getElementById('quiz-progress');
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = Math.round(percentage) + '%';
+        }
+
+        function submitQuiz() {
+            if (Object.keys(quizAnswers).length < totalQuizQuestions) {
+                alert('Please answer all questions before submitting!');
+                return;
+            }
+            
+            let correctCount = 0;
+            
+            quizQuestions.forEach(q => {
+                const userAnswer = quizAnswers[q.id];
+                const isCorrect = userAnswer === q.correct;
+                
+                if (isCorrect) correctCount++;
+                
+                const options = document.querySelectorAll(`#quiz-${q.id} .quiz-option`);
+                const feedback = document.getElementById(`feedback-${q.id}`);
+                
+                // Show correct/incorrect
+                options[userAnswer].classList.add(isCorrect ? 'correct' : 'incorrect');
+                if (!isCorrect) {
+                    options[q.correct].classList.add('correct');
+                }
+                
+                // Show feedback
+                feedback.className = `feedback show ${isCorrect ? 'success' : 'error'}`;
+                feedback.innerHTML = `<strong>${isCorrect ? '✓ Correct!' : '✗ Incorrect'}</strong><br>${q.explanation}`;
+            });
+            
+            // Show results
+            const percentage = (correctCount / totalQuizQuestions) * 100;
+            const resultsDiv = document.getElementById('quiz-results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = `
+                <div class="card">
+                    <h3>Quiz Results</h3>
+                    <div style="text-align: center; font-size: 3em; margin: 20px 0;">
+                        ${percentage.toFixed(0)}%
+                    </div>
+                    <p style="text-align: center; font-size: 1.2em;">
+                        You answered ${correctCount} out of ${totalQuizQuestions} questions correctly.
+                    </p>
+                    <div class="${percentage >= 80 ? 'success-box' : percentage >= 60 ? 'warning-box' : 'feedback error'}" style="margin-top: 20px;">
+                        ${percentage >= 80 ? '<strong>🎉 Excellent!</strong> You have a strong understanding of NFS and automounting concepts.' :
+                          percentage >= 60 ? '<strong>👍 Good job!</strong> You have a decent understanding. Review the areas where you missed questions.' :
+                          '<strong>📚 Keep studying!</strong> Review the lesson material and try again.'}
+                    </div>
+                </div>
+            `;
+            
+            // Disable submit button
+            document.getElementById('submit-quiz-btn').disabled = true;
+            
+            // Scroll to results
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function resetQuiz() {
+            quizAnswers = {};
+            document.getElementById('quiz-results').style.display = 'none';
+            document.getElementById('submit-quiz-btn').disabled = false;
+            initializeQuiz();
+            updateQuizProgress();
+        }
+
+        // Copy code function
+        function copyCode(button) {
+            const terminal = button.closest('.terminal');
+            const output = terminal.querySelector('.terminal-output');
+            const text = output ? output.textContent : terminal.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                showCopyNotification();
+            });
+        }
+
+        function showCopyNotification() {
+            const notification = document.getElementById('copy-notification');
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 2000);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            showLabStep(1);
+            initializeQuiz();
+        });
+    </script>
+</body>
+</html>
