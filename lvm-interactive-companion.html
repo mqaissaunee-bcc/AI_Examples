@@ -1,0 +1,2821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LVM Interactive Companion - Storage Management Learning Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0066cc;
+            --secondary: #004999;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --dark: #2c3e50;
+            --light: #ecf0f1;
+            --terminal-bg: #1e1e1e;
+            --terminal-text: #d4d4d4;
+            --terminal-prompt: #4ec9b0;
+            --pv-color: #3498db;
+            --vg-color: #9b59b6;
+            --lv-color: #e74c3c;
+            --fs-color: #2ecc71;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: var(--dark);
+            overflow-x: auto;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .nav-tab {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px 20px;
+            background: var(--dark);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.3s;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        .nav-tab:hover {
+            background: #34495e;
+        }
+
+        .nav-tab.active {
+            background: white;
+            color: var(--primary);
+        }
+
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary);
+        }
+
+        .module {
+            display: none;
+            padding: 30px;
+            animation: fadeIn 0.3s;
+        }
+
+        .module.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .module h2 {
+            color: var(--primary);
+            margin-bottom: 20px;
+            font-size: 2rem;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 10px;
+        }
+
+        /* Module 1: Architecture Visualizer */
+        .architecture-container {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            margin: 30px 0;
+        }
+
+        .layer {
+            background: var(--light);
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .layer-title {
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: var(--dark);
+        }
+
+        .layer-content {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .component {
+            padding: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 150px;
+            text-align: center;
+            font-weight: 500;
+            color: white;
+            position: relative;
+        }
+
+        .component:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
+        .component.device { background: linear-gradient(135deg, #636363, #a2ab58); }
+        .component.pv { background: linear-gradient(135deg, var(--pv-color), #2980b9); }
+        .component.vg { background: linear-gradient(135deg, var(--vg-color), #8e44ad); }
+        .component.lv { background: linear-gradient(135deg, var(--lv-color), #c0392b); }
+        .component.fs { background: linear-gradient(135deg, var(--fs-color), #27ae60); }
+
+        .arrow {
+            text-align: center;
+            font-size: 2rem;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+
+        .info-panel {
+            background: white;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .info-panel.show {
+            display: block;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .info-panel h3 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .info-panel ul {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+
+        /* Module 2: Terminal Simulator */
+        .terminal {
+            background: var(--terminal-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', Courier, monospace;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+        }
+
+        .terminal-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .terminal-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+        }
+
+        .terminal-dot.red { background: #ff5f56; }
+        .terminal-dot.yellow { background: #ffbd2e; }
+        .terminal-dot.green { background: #27c93f; }
+
+        .terminal-title {
+            margin-left: 15px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .terminal-output {
+            color: var(--terminal-text);
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .terminal-line {
+            margin: 5px 0;
+        }
+
+        .prompt {
+            color: var(--terminal-prompt);
+            font-weight: bold;
+        }
+
+        .command {
+            color: #569cd6;
+        }
+
+        .success {
+            color: #89d185;
+        }
+
+        .error {
+            color: #f48771;
+        }
+
+        .warning {
+            color: #dcdcaa;
+        }
+
+        .terminal-input-area {
+            display: flex;
+            align-items: center;
+            background: #2d2d2d;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--terminal-text);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .terminal-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .state-display {
+            background: var(--light);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .state-display h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+
+        .state-section {
+            margin: 15px 0;
+        }
+
+        .state-section h4 {
+            color: var(--dark);
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .state-list {
+            list-style: none;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .state-list li {
+            padding: 5px 0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+        }
+
+        /* Module 5: Workflow Simulator */
+        .workflow-container {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .workflow-sidebar {
+            flex: 0 0 300px;
+            background: var(--light);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .workflow-step {
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 4px;
+            border-left: 4px solid #ccc;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .workflow-step:hover {
+            transform: translateX(5px);
+        }
+
+        .workflow-step.completed {
+            border-left-color: var(--success);
+            background: #d4edda;
+        }
+
+        .workflow-step.active {
+            border-left-color: var(--primary);
+            background: #d1ecf1;
+        }
+
+        .workflow-step.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .workflow-step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .workflow-step.completed .workflow-step-number {
+            background: var(--success);
+        }
+
+        .workflow-main {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            border: 2px solid var(--light);
+        }
+
+        .workflow-content h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+
+        .workflow-content p {
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+
+        .code-example {
+            background: var(--terminal-bg);
+            color: var(--terminal-text);
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+
+        .form-group {
+            margin: 20px 0;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--dark);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid var(--light);
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid var(--light);
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+            background: white;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border-color: var(--success);
+            color: #155724;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            border-color: var(--danger);
+            color: #721c24;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            border-color: var(--info);
+            color: #0c5460;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border-color: var(--warning);
+            color: #856404;
+        }
+
+        /* Module 9: Extend/Reduce Scenarios */
+        .scenario-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .scenario-card {
+            background: linear-gradient(135deg, var(--light), white);
+            border: 2px solid var(--light);
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .scenario-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+
+        .scenario-card h3 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .scenario-card p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .scenario-content {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .scenario-content.active {
+            display: block;
+        }
+
+        .visual-disk {
+            background: white;
+            border: 2px solid var(--dark);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .disk-bar {
+            height: 60px;
+            display: flex;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 2px solid var(--dark);
+            margin: 10px 0;
+        }
+
+        .disk-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: all 0.5s;
+        }
+
+        .segment-used {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .segment-free {
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+        }
+
+        .segment-new {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+        }
+
+        /* Module 13: fstab Constructor */
+        .fstab-builder {
+            background: var(--light);
+            border-radius: 8px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .fstab-output {
+            background: var(--terminal-bg);
+            color: var(--terminal-text);
+            padding: 20px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 20px 0;
+            min-height: 100px;
+            font-size: 1.1rem;
+            line-height: 1.8;
+        }
+
+        .field-explanation {
+            background: white;
+            border-left: 4px solid var(--info);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .field-explanation strong {
+            color: var(--primary);
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 10px 0;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* Module 11: Quiz */
+        .quiz-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .difficulty-selector {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+
+        .difficulty-btn {
+            padding: 15px 30px;
+            border: 2px solid var(--primary);
+            background: white;
+            color: var(--primary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .difficulty-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .difficulty-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .quiz-question {
+            background: white;
+            border: 2px solid var(--light);
+            border-radius: 8px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .quiz-question h3 {
+            color: var(--dark);
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .quiz-options {
+            list-style: none;
+        }
+
+        .quiz-option {
+            padding: 15px;
+            margin: 10px 0;
+            background: var(--light);
+            border: 2px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .quiz-option:hover {
+            border-color: var(--primary);
+            background: white;
+        }
+
+        .quiz-option.selected {
+            border-color: var(--primary);
+            background: #d1ecf1;
+        }
+
+        .quiz-option.correct {
+            border-color: var(--success);
+            background: #d4edda;
+        }
+
+        .quiz-option.incorrect {
+            border-color: var(--danger);
+            background: #f8d7da;
+        }
+
+        .quiz-feedback {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .quiz-feedback.show {
+            display: block;
+        }
+
+        .quiz-progress {
+            background: var(--light);
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .progress-bar-container {
+            background: #ddd;
+            border-radius: 4px;
+            height: 30px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            transition: width 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .quiz-results {
+            background: white;
+            border: 2px solid var(--success);
+            border-radius: 8px;
+            padding: 30px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .quiz-score {
+            font-size: 3rem;
+            color: var(--success);
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .workflow-container {
+                flex-direction: column;
+            }
+
+            .workflow-sidebar {
+                flex: 1;
+            }
+
+            .scenario-selector {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-tabs {
+                flex-direction: column;
+            }
+
+            .nav-tab {
+                border-right: none;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+            }
+        }
+
+        /* Helper classes */
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-20 {
+            margin-top: 20px;
+        }
+
+        .mb-20 {
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🗄️ LVM Interactive Companion</h1>
+            <p>Master Logical Volume Management through hands-on practice and interactive learning</p>
+        </header>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchModule('architecture')">Architecture</button>
+            <button class="nav-tab" onclick="switchModule('terminal')">Terminal</button>
+            <button class="nav-tab" onclick="switchModule('workflow')">Workflow</button>
+            <button class="nav-tab" onclick="switchModule('scenarios')">Extend/Reduce</button>
+            <button class="nav-tab" onclick="switchModule('fstab')">fstab Builder</button>
+            <button class="nav-tab" onclick="switchModule('quiz')">Quiz</button>
+        </div>
+
+        <!-- Module 1: Architecture Visualizer -->
+        <div id="architecture" class="module active">
+            <h2>LVM Architecture Visualizer</h2>
+            <p>Click on any component to learn more about its role in the LVM storage stack.</p>
+
+            <div class="architecture-container">
+                <div class="layer">
+                    <div class="layer-title">📀 Physical Devices</div>
+                    <div class="layer-content">
+                        <div class="component device" onclick="showInfo('device', '/dev/vdb')">
+                            /dev/vdb<br><small>5 GiB Disk</small>
+                        </div>
+                        <div class="component device" onclick="showInfo('device', '/dev/vdc')">
+                            /dev/vdc<br><small>5 GiB Disk</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="arrow">↓</div>
+
+                <div class="layer">
+                    <div class="layer-title">🔷 Physical Volumes (PVs)</div>
+                    <div class="layer-content">
+                        <div class="component pv" onclick="showInfo('pv', '/dev/vdb1')">
+                            /dev/vdb1<br><small>732 MiB PV</small>
+                        </div>
+                        <div class="component pv" onclick="showInfo('pv', '/dev/vdb2')">
+                            /dev/vdb2<br><small>512 MiB PV</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="arrow">↓</div>
+
+                <div class="layer">
+                    <div class="layer-title">📦 Volume Group (VG)</div>
+                    <div class="layer-content">
+                        <div class="component vg" onclick="showInfo('vg', 'vg01')">
+                            vg01<br><small>1012 MiB total<br>182 PEs @ 4 MiB each</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="arrow">↓</div>
+
+                <div class="layer">
+                    <div class="layer-title">💾 Logical Volumes (LVs)</div>
+                    <div class="layer-content">
+                        <div class="component lv" onclick="showInfo('lv', 'lv01')">
+                            lv01<br><small>300 MiB<br>75 LEs</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="arrow">↓</div>
+
+                <div class="layer">
+                    <div class="layer-title">🗂️ File System</div>
+                    <div class="layer-content">
+                        <div class="component fs" onclick="showInfo('fs', 'xfs')">
+                            XFS<br><small>Mounted at /mnt/data</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="info-panel" class="info-panel"></div>
+        </div>
+
+        <!-- Module 2: Terminal Simulator -->
+        <div id="terminal" class="module">
+            <h2>Virtual LVM Terminal</h2>
+            <p>Practice LVM commands in a safe, simulated environment. Try creating PVs, VGs, and LVs!</p>
+
+            <div class="terminal">
+                <div class="terminal-header">
+                    <div class="terminal-dots">
+                        <span class="terminal-dot red"></span>
+                        <span class="terminal-dot yellow"></span>
+                        <span class="terminal-dot green"></span>
+                    </div>
+                    <div class="terminal-title">root@serverb ~</div>
+                </div>
+                <div id="terminal-output" class="terminal-output">
+                    <div class="terminal-line success">LVM Terminal Simulator v2.0</div>
+                    <div class="terminal-line">Type 'help' for available commands or try: parted, pvcreate, vgcreate, lvcreate</div>
+                    <div class="terminal-line">Virtual disks available: /dev/vdb (5 GiB), /dev/vdc (5 GiB)</div>
+                    <div class="terminal-line">&nbsp;</div>
+                </div>
+                <div class="terminal-input-area">
+                    <span class="prompt">[root@serverb ~]# </span>
+                    <input type="text" id="terminal-input" class="terminal-input" placeholder="Enter command..." autocomplete="off">
+                </div>
+            </div>
+
+            <div class="terminal-controls">
+                <button class="btn btn-success" onclick="executeTerminalCommand()">Execute (Enter)</button>
+                <button class="btn btn-secondary" onclick="clearTerminal()">Clear</button>
+                <button class="btn btn-danger" onclick="resetTerminal()">Reset System</button>
+            </div>
+
+            <div class="state-display">
+                <h3>Current System State</h3>
+                <div class="state-section">
+                    <h4>Partitions</h4>
+                    <ul class="state-list" id="partitions-list">
+                        <li>No partitions created yet</li>
+                    </ul>
+                </div>
+                <div class="state-section">
+                    <h4>Physical Volumes</h4>
+                    <ul class="state-list" id="pvs-list">
+                        <li>No PVs created yet</li>
+                    </ul>
+                </div>
+                <div class="state-section">
+                    <h4>Volume Groups</h4>
+                    <ul class="state-list" id="vgs-list">
+                        <li>No VGs created yet</li>
+                    </ul>
+                </div>
+                <div class="state-section">
+                    <h4>Logical Volumes</h4>
+                    <ul class="state-list" id="lvs-list">
+                        <li>No LVs created yet</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 5: Workflow Simulator -->
+        <div id="workflow" class="module">
+            <h2>LVM Creation Workflow</h2>
+            <p>Follow this step-by-step guide to create a complete LVM storage solution from scratch.</p>
+
+            <div class="workflow-container">
+                <div class="workflow-sidebar">
+                    <h3>Progress</h3>
+                    <div id="workflow-step-1" class="workflow-step active" onclick="goToWorkflowStep(1)">
+                        <span class="workflow-step-number">1</span>
+                        <span>Create Partition</span>
+                    </div>
+                    <div id="workflow-step-2" class="workflow-step locked" onclick="goToWorkflowStep(2)">
+                        <span class="workflow-step-number">2</span>
+                        <span>Initialize PV</span>
+                    </div>
+                    <div id="workflow-step-3" class="workflow-step locked" onclick="goToWorkflowStep(3)">
+                        <span class="workflow-step-number">3</span>
+                        <span>Create VG</span>
+                    </div>
+                    <div id="workflow-step-4" class="workflow-step locked" onclick="goToWorkflowStep(4)">
+                        <span class="workflow-step-number">4</span>
+                        <span>Create LV</span>
+                    </div>
+                    <div id="workflow-step-5" class="workflow-step locked" onclick="goToWorkflowStep(5)">
+                        <span class="workflow-step-number">5</span>
+                        <span>Format Filesystem</span>
+                    </div>
+                    <div id="workflow-step-6" class="workflow-step locked" onclick="goToWorkflowStep(6)">
+                        <span class="workflow-step-number">6</span>
+                        <span>Mount & Configure</span>
+                    </div>
+                </div>
+
+                <div class="workflow-main">
+                    <div id="workflow-content"></div>
+                    <div id="workflow-actions" style="margin-top: 20px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 9: Extend/Reduce Scenarios -->
+        <div id="scenarios" class="module">
+            <h2>Extend & Reduce Practice Scenarios</h2>
+            <p>Practice extending volume groups and logical volumes with these interactive scenarios.</p>
+
+            <div class="scenario-selector">
+                <div class="scenario-card" onclick="loadScenario('extend-vg')">
+                    <h3>📈 Extend Volume Group</h3>
+                    <p>Add a new physical volume to an existing volume group to increase available space.</p>
+                </div>
+                <div class="scenario-card" onclick="loadScenario('extend-lv')">
+                    <h3>💪 Extend Logical Volume</h3>
+                    <p>Grow a logical volume using free space from its volume group.</p>
+                </div>
+                <div class="scenario-card" onclick="loadScenario('extend-xfs')">
+                    <h3>🌳 Extend XFS Filesystem</h3>
+                    <p>Expand an XFS filesystem after extending the logical volume.</p>
+                </div>
+                <div class="scenario-card" onclick="loadScenario('extend-swap')">
+                    <h3>🔄 Extend Swap Space</h3>
+                    <p>Increase swap space by extending a swap logical volume.</p>
+                </div>
+            </div>
+
+            <div id="scenario-extend-vg" class="scenario-content"></div>
+            <div id="scenario-extend-lv" class="scenario-content"></div>
+            <div id="scenario-extend-xfs" class="scenario-content"></div>
+            <div id="scenario-extend-swap" class="scenario-content"></div>
+        </div>
+
+        <!-- Module 13: fstab Constructor -->
+        <div id="fstab" class="module">
+            <h2>fstab Entry Builder</h2>
+            <p>Build properly formatted /etc/fstab entries for LVM volumes with validation and explanations.</p>
+
+            <div class="fstab-builder">
+                <div class="form-group">
+                    <label class="form-label">1. Device Specification</label>
+                    <select class="form-select" id="fstab-device-type" onchange="updateFstabPreview()">
+                        <option value="uuid">UUID (Recommended)</option>
+                        <option value="path">Device Path (/dev/mapper/...)</option>
+                        <option value="label">Label</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">UUID / Device Path / Label</label>
+                    <input type="text" class="form-input" id="fstab-device" 
+                           placeholder="e.g., FVmNel-u25R-dt3p-C5L6-VP2w-QRNP-scqrbq" 
+                           oninput="updateFstabPreview()">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">2. Mount Point</label>
+                    <input type="text" class="form-input" id="fstab-mountpoint" 
+                           placeholder="/mnt/data" value="/mnt/data"
+                           oninput="updateFstabPreview()">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">3. Filesystem Type</label>
+                    <select class="form-select" id="fstab-fstype" onchange="updateFstabPreview()">
+                        <option value="xfs">xfs</option>
+                        <option value="ext4">ext4</option>
+                        <option value="ext3">ext3</option>
+                        <option value="swap">swap</option>
+                        <option value="vfat">vfat</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">4. Mount Options</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="defaults" checked onchange="updateFstabPreview()"> defaults
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="noauto" onchange="updateFstabPreview()"> noauto
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="ro" onchange="updateFstabPreview()"> ro (read-only)
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" value="noexec" onchange="updateFstabPreview()"> noexec
+                        </label>
+                    </div>
+                    <input type="text" class="form-input" id="fstab-options" value="defaults" 
+                           oninput="updateFstabPreview()" placeholder="defaults">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">5. Dump (Backup)</label>
+                    <select class="form-select" id="fstab-dump" onchange="updateFstabPreview()">
+                        <option value="0">0 (no backup)</option>
+                        <option value="1">1 (backup)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">6. fsck Order</label>
+                    <select class="form-select" id="fstab-fsck" onchange="updateFstabPreview()">
+                        <option value="0">0 (no check / XFS)</option>
+                        <option value="1">1 (root filesystem)</option>
+                        <option value="2">2 (other filesystems)</option>
+                    </select>
+                </div>
+
+                <h3>Generated fstab Entry</h3>
+                <div class="fstab-output" id="fstab-output">
+                    /dev/vg01/lv01  /mnt/data  xfs  defaults  0 0
+                </div>
+
+                <button class="btn btn-primary" onclick="copyFstabToClipboard()">📋 Copy to Clipboard</button>
+                <button class="btn btn-success" onclick="validateFstab()">✓ Validate Entry</button>
+
+                <div id="fstab-validation"></div>
+
+                <h3 style="margin-top: 30px;">Field Explanations</h3>
+                <div class="field-explanation">
+                    <strong>Field 1 - Device:</strong> Identifies the device to mount. UUID is recommended because device names can change after reboot.
+                </div>
+                <div class="field-explanation">
+                    <strong>Field 2 - Mount Point:</strong> The directory where the filesystem will be accessible. Must exist before mounting.
+                </div>
+                <div class="field-explanation">
+                    <strong>Field 3 - Filesystem Type:</strong> The type of filesystem (xfs, ext4, swap, etc.).
+                </div>
+                <div class="field-explanation">
+                    <strong>Field 4 - Options:</strong> Mount options. "defaults" includes: rw, suid, dev, exec, auto, nouser, async.
+                </div>
+                <div class="field-explanation">
+                    <strong>Field 5 - Dump:</strong> Whether to back up with dump command. Usually 0 (not used much anymore).
+                </div>
+                <div class="field-explanation">
+                    <strong>Field 6 - fsck Order:</strong> Order for filesystem check at boot. 0=no check, 1=first (root), 2=after root. XFS uses 0.
+                </div>
+            </div>
+        </div>
+
+        <!-- Module 11: Quiz -->
+        <div id="quiz" class="module">
+            <h2>Knowledge Assessment</h2>
+            <p>Test your understanding of LVM concepts with this progressive quiz.</p>
+
+            <div class="quiz-container">
+                <div class="difficulty-selector">
+                    <button class="difficulty-btn active" onclick="setDifficulty('beginner')">Beginner</button>
+                    <button class="difficulty-btn" onclick="setDifficulty('intermediate')">Intermediate</button>
+                    <button class="difficulty-btn" onclick="setDifficulty('advanced')">Advanced</button>
+                </div>
+
+                <div class="quiz-progress">
+                    <div>Question <span id="current-question">1</span> of <span id="total-questions">5</span></div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="quiz-progress-bar" style="width: 0%;">0%</div>
+                    </div>
+                </div>
+
+                <div id="quiz-questions"></div>
+
+                <div class="terminal-controls text-center">
+                    <button class="btn btn-secondary" onclick="previousQuestion()" id="prev-btn">← Previous</button>
+                    <button class="btn btn-primary" onclick="nextQuestion()" id="next-btn">Next →</button>
+                    <button class="btn btn-success hidden" onclick="submitQuiz()" id="submit-btn">Submit Quiz</button>
+                </div>
+
+                <div id="quiz-results-container" class="hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // MODULE SWITCHING
+        // ========================================
+        function switchModule(moduleName) {
+            // Hide all modules
+            document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
+            // Show selected module
+            document.getElementById(moduleName).classList.add('active');
+            event.target.classList.add('active');
+
+            // Initialize module if needed
+            if (moduleName === 'workflow') {
+                initWorkflow();
+            } else if (moduleName === 'quiz') {
+                initQuiz();
+            }
+        }
+
+        // ========================================
+        // MODULE 1: ARCHITECTURE VISUALIZER
+        // ========================================
+        const componentInfo = {
+            device: {
+                '/dev/vdb': {
+                    title: 'Physical Device: /dev/vdb',
+                    content: `
+                        <h3>Physical Block Device</h3>
+                        <ul>
+                            <li><strong>Type:</strong> Virtual disk (5 GiB)</li>
+                            <li><strong>Purpose:</strong> Raw storage device that can be partitioned</li>
+                            <li><strong>Identifier:</strong> /dev/vdb (device name assigned by kernel)</li>
+                            <li><strong>Must be partitioned before use with LVM</strong></li>
+                            <li>Commands: <code>lsblk</code>, <code>parted /dev/vdb</code></li>
+                        </ul>
+                        <p>Physical devices are the foundation of LVM. They can be entire disks, RAID arrays, or SAN LUNs.</p>
+                    `
+                },
+                '/dev/vdc': {
+                    title: 'Physical Device: /dev/vdc',
+                    content: `
+                        <h3>Physical Block Device</h3>
+                        <ul>
+                            <li><strong>Type:</strong> Virtual disk (5 GiB)</li>
+                            <li><strong>Purpose:</strong> Additional storage for expanding volume groups</li>
+                            <li><strong>Can be added to existing VGs with vgextend</strong></li>
+                        </ul>
+                    `
+                }
+            },
+            pv: {
+                '/dev/vdb1': {
+                    title: 'Physical Volume: /dev/vdb1',
+                    content: `
+                        <h3>LVM Physical Volume</h3>
+                        <ul>
+                            <li><strong>Device:</strong> /dev/vdb1 (partition)</li>
+                            <li><strong>Size:</strong> 732 MiB (731.98 MiB usable)</li>
+                            <li><strong>PE Size:</strong> 4 MiB (default)</li>
+                            <li><strong>Total PEs:</strong> 182</li>
+                            <li><strong>Created with:</strong> <code>pvcreate /dev/vdb1</code></li>
+                        </ul>
+                        <p>PVs are initialized partitions or disks that LVM can use. They're divided into Physical Extents (PEs) - the smallest unit of storage LVM manages.</p>
+                        <p><strong>Key Commands:</strong></p>
+                        <ul>
+                            <li><code>pvdisplay /dev/vdb1</code> - Show detailed info</li>
+                            <li><code>pvs</code> - List all PVs</li>
+                        </ul>
+                    `
+                },
+                '/dev/vdb2': {
+                    title: 'Physical Volume: /dev/vdb2',
+                    content: `
+                        <h3>LVM Physical Volume</h3>
+                        <ul>
+                            <li><strong>Device:</strong> /dev/vdb2 (partition)</li>
+                            <li><strong>Size:</strong> 512 MiB</li>
+                            <li><strong>Created with:</strong> <code>pvcreate /dev/vdb2</code></li>
+                            <li><strong>Purpose:</strong> Can be used to extend VG</li>
+                        </ul>
+                    `
+                }
+            },
+            vg: {
+                'vg01': {
+                    title: 'Volume Group: vg01',
+                    content: `
+                        <h3>LVM Volume Group</h3>
+                        <ul>
+                            <li><strong>Name:</strong> vg01</li>
+                            <li><strong>Total Size:</strong> 1012 MiB</li>
+                            <li><strong>PE Size:</strong> 4 MiB</li>
+                            <li><strong>Total PEs:</strong> 253</li>
+                            <li><strong>Free PEs:</strong> 178</li>
+                            <li><strong>Contains PVs:</strong> /dev/vdb1, /dev/vdb2</li>
+                            <li><strong>Created with:</strong> <code>vgcreate vg01 /dev/vdb1 /dev/vdb2</code></li>
+                        </ul>
+                        <p>VGs are storage pools created from one or more PVs. They're like a virtual disk that can be carved into LVs.</p>
+                        <p><strong>Key Operations:</strong></p>
+                        <ul>
+                            <li><code>vgdisplay vg01</code> - Show detailed info</li>
+                            <li><code>vgs</code> - List all VGs</li>
+                            <li><code>vgextend vg01 /dev/vdb3</code> - Add PV to VG</li>
+                        </ul>
+                    `
+                }
+            },
+            lv: {
+                'lv01': {
+                    title: 'Logical Volume: lv01',
+                    content: `
+                        <h3>LVM Logical Volume</h3>
+                        <ul>
+                            <li><strong>Name:</strong> lv01</li>
+                            <li><strong>Volume Group:</strong> vg01</li>
+                            <li><strong>Size:</strong> 300 MiB</li>
+                            <li><strong>Logical Extents:</strong> 75 (at 4 MiB each)</li>
+                            <li><strong>Device Path:</strong> /dev/vg01/lv01</li>
+                            <li><strong>Created with:</strong> <code>lvcreate -n lv01 -L 300M vg01</code></li>
+                        </ul>
+                        <p>LVs are virtual partitions created from VG space. They appear as block devices and can be formatted with filesystems.</p>
+                        <p><strong>Key Operations:</strong></p>
+                        <ul>
+                            <li><code>lvdisplay /dev/vg01/lv01</code> - Show detailed info</li>
+                            <li><code>lvs</code> - List all LVs</li>
+                            <li><code>lvextend -L +500M /dev/vg01/lv01</code> - Extend LV</li>
+                        </ul>
+                    `
+                }
+            },
+            fs: {
+                'xfs': {
+                    title: 'XFS Filesystem',
+                    content: `
+                        <h3>XFS Filesystem</h3>
+                        <ul>
+                            <li><strong>Type:</strong> XFS (Red Hat default)</li>
+                            <li><strong>Mounted at:</strong> /mnt/data</li>
+                            <li><strong>Maximum file size:</strong> 8 EiB</li>
+                            <li><strong>Features:</strong> Journaling, online defragmentation, online growth</li>
+                            <li><strong>Limitation:</strong> Cannot be shrunk</li>
+                            <li><strong>Created with:</strong> <code>mkfs.xfs /dev/vg01/lv01</code></li>
+                        </ul>
+                        <p>XFS is optimized for large files and high performance. It's the recommended filesystem for RHEL.</p>
+                        <p><strong>Key Operations:</strong></p>
+                        <ul>
+                            <li><code>xfs_growfs /mnt/data</code> - Expand filesystem after LV extension</li>
+                            <li><code>xfs_info /mnt/data</code> - Display filesystem info</li>
+                            <li><code>mount /dev/vg01/lv01 /mnt/data</code> - Mount filesystem</li>
+                        </ul>
+                    `
+                }
+            }
+        };
+
+        function showInfo(type, name) {
+            const panel = document.getElementById('info-panel');
+            const info = componentInfo[type][name];
+            
+            panel.innerHTML = `
+                <h3>${info.title}</h3>
+                ${info.content}
+            `;
+            panel.classList.add('show');
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // ========================================
+        // MODULE 2: TERMINAL SIMULATOR
+        // ========================================
+        let terminalState = {
+            partitions: {},
+            pvs: {},
+            vgs: {},
+            lvs: {},
+            filesystems: {},
+            mounts: {}
+        };
+
+        const terminalInput = document.getElementById('terminal-input');
+        terminalInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                executeTerminalCommand();
+            }
+        });
+
+        function executeTerminalCommand() {
+            const input = document.getElementById('terminal-input');
+            const command = input.value.trim();
+            
+            if (!command) return;
+
+            addTerminalLine(`<span class="prompt">[root@serverb ~]#</span> <span class="command">${command}</span>`);
+            
+            processCommand(command);
+            
+            input.value = '';
+        }
+
+        function addTerminalLine(html) {
+            const output = document.getElementById('terminal-output');
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            line.innerHTML = html;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function processCommand(cmd) {
+            const parts = cmd.trim().split(/\s+/);
+            const mainCmd = parts[0];
+
+            switch(mainCmd) {
+                case 'help':
+                    showTerminalHelp();
+                    break;
+                case 'parted':
+                    handleParted(parts);
+                    break;
+                case 'pvcreate':
+                    handlePvcreate(parts);
+                    break;
+                case 'pvdisplay':
+                case 'pvs':
+                    handlePvDisplay(parts);
+                    break;
+                case 'vgcreate':
+                    handleVgcreate(parts);
+                    break;
+                case 'vgdisplay':
+                case 'vgs':
+                    handleVgDisplay(parts);
+                    break;
+                case 'vgextend':
+                    handleVgextend(parts);
+                    break;
+                case 'lvcreate':
+                    handleLvcreate(parts);
+                    break;
+                case 'lvdisplay':
+                case 'lvs':
+                    handleLvDisplay(parts);
+                    break;
+                case 'lvextend':
+                    handleLvextend(parts);
+                    break;
+                case 'mkfs.xfs':
+                case 'mkfs.ext4':
+                    handleMkfs(parts, mainCmd);
+                    break;
+                case 'mount':
+                    handleMount(parts);
+                    break;
+                case 'df':
+                    handleDf(parts);
+                    break;
+                case 'lsblk':
+                    handleLsblk();
+                    break;
+                case 'clear':
+                    clearTerminal();
+                    return;
+                default:
+                    addTerminalLine(`<span class="error">bash: ${mainCmd}: command not found</span>`);
+                    addTerminalLine(`<span class="warning">Try 'help' for available commands</span>`);
+            }
+
+            updateStateDisplay();
+        }
+
+        function showTerminalHelp() {
+            addTerminalLine('<span class="success">Available Commands:</span>');
+            addTerminalLine('  <strong>parted</strong> /dev/vdb mkpart primary START END - Create partition');
+            addTerminalLine('  <strong>pvcreate</strong> /dev/vdbX - Initialize physical volume');
+            addTerminalLine('  <strong>pvdisplay</strong>, <strong>pvs</strong> - Display physical volumes');
+            addTerminalLine('  <strong>vgcreate</strong> VG_NAME /dev/vdbX ... - Create volume group');
+            addTerminalLine('  <strong>vgdisplay</strong>, <strong>vgs</strong> - Display volume groups');
+            addTerminalLine('  <strong>vgextend</strong> VG_NAME /dev/vdbX - Extend volume group');
+            addTerminalLine('  <strong>lvcreate</strong> -n LV_NAME -L SIZE VG_NAME - Create logical volume');
+            addTerminalLine('  <strong>lvdisplay</strong>, <strong>lvs</strong> - Display logical volumes');
+            addTerminalLine('  <strong>lvextend</strong> -L +SIZE /dev/VG/LV - Extend logical volume');
+            addTerminalLine('  <strong>mkfs.xfs</strong>, <strong>mkfs.ext4</strong> /dev/VG/LV - Create filesystem');
+            addTerminalLine('  <strong>mount</strong> /dev/VG/LV /mnt/point - Mount filesystem');
+            addTerminalLine('  <strong>df</strong> -h - Show disk space');
+            addTerminalLine('  <strong>lsblk</strong> - List block devices');
+            addTerminalLine('  <strong>clear</strong> - Clear terminal');
+        }
+
+        function handleParted(parts) {
+            // parted /dev/vdb mkpart primary 1MiB 1000MiB
+            if (parts.length < 5) {
+                addTerminalLine('<span class="error">Usage: parted /dev/vdb mkpart primary START END</span>');
+                return;
+            }
+
+            const device = parts[1];
+            const start = parts[4];
+            const end = parts[5];
+
+            if (!device.match(/\/dev\/vd[bc]/)) {
+                addTerminalLine(`<span class="error">Error: Invalid device ${device}</span>`);
+                return;
+            }
+
+            const partNum = Object.keys(terminalState.partitions).filter(p => p.startsWith(device)).length + 1;
+            const partName = `${device}${partNum}`;
+
+            terminalState.partitions[partName] = {
+                device: device,
+                number: partNum,
+                start: start,
+                end: end,
+                type: 'primary'
+            };
+
+            addTerminalLine(`<span class="success">Information: You may need to update /etc/fstab.</span>`);
+            addTerminalLine(`<span class="success">Partition ${partName} created successfully.</span>`);
+        }
+
+        function handlePvcreate(parts) {
+            if (parts.length < 2) {
+                addTerminalLine('<span class="error">Usage: pvcreate /dev/vdbX</span>');
+                return;
+            }
+
+            const device = parts[1];
+
+            if (!terminalState.partitions[device]) {
+                addTerminalLine(`<span class="error">Error: Partition ${device} does not exist. Create it with parted first.</span>`);
+                return;
+            }
+
+            if (terminalState.pvs[device]) {
+                addTerminalLine(`<span class="error">Error: ${device} is already a physical volume.</span>`);
+                return;
+            }
+
+            terminalState.pvs[device] = {
+                device: device,
+                size: '512 MiB',
+                peSize: '4 MiB',
+                totalPE: 128,
+                freePE: 128,
+                allocPE: 0,
+                vg: null
+            };
+
+            addTerminalLine(`  Physical volume "${device}" successfully created.`);
+        }
+
+        function handlePvDisplay(parts) {
+            const pvs = Object.values(terminalState.pvs);
+            
+            if (pvs.length === 0) {
+                addTerminalLine('<span class="warning">No physical volumes found.</span>');
+                return;
+            }
+
+            if (parts[0] === 'pvs') {
+                addTerminalLine('  PV         VG   Fmt  Attr PSize   PFree');
+                pvs.forEach(pv => {
+                    const vg = pv.vg || '';
+                    addTerminalLine(`  ${pv.device.padEnd(10)} ${vg.padEnd(4)} lvm2 a--  ${pv.size.padEnd(7)} ${pv.size}`);
+                });
+            } else {
+                pvs.forEach(pv => {
+                    addTerminalLine(`  --- Physical volume ---`);
+                    addTerminalLine(`  PV Name               ${pv.device}`);
+                    addTerminalLine(`  VG Name               ${pv.vg || ''}`);
+                    addTerminalLine(`  PV Size               ${pv.size}`);
+                    addTerminalLine(`  PE Size               ${pv.peSize}`);
+                    addTerminalLine(`  Total PE              ${pv.totalPE}`);
+                    addTerminalLine(`  Free PE               ${pv.freePE}`);
+                    addTerminalLine(``);
+                });
+            }
+        }
+
+        function handleVgcreate(parts) {
+            // vgcreate vg01 /dev/vdb1
+            if (parts.length < 3) {
+                addTerminalLine('<span class="error">Usage: vgcreate VG_NAME /dev/vdbX [/dev/vdbY ...]</span>');
+                return;
+            }
+
+            const vgName = parts[1];
+            const pvDevices = parts.slice(2);
+
+            if (terminalState.vgs[vgName]) {
+                addTerminalLine(`<span class="error">Error: Volume group ${vgName} already exists.</span>`);
+                return;
+            }
+
+            // Check all PVs exist and are not in a VG
+            for (let pv of pvDevices) {
+                if (!terminalState.pvs[pv]) {
+                    addTerminalLine(`<span class="error">Error: Physical volume ${pv} not found.</span>`);
+                    return;
+                }
+                if (terminalState.pvs[pv].vg) {
+                    addTerminalLine(`<span class="error">Error: Physical volume ${pv} already in volume group ${terminalState.pvs[pv].vg}.</span>`);
+                    return;
+                }
+            }
+
+            let totalSize = pvDevices.length * 512; // Simplified: 512 MiB per PV
+            let totalPE = pvDevices.length * 128;
+
+            terminalState.vgs[vgName] = {
+                name: vgName,
+                pvs: [...pvDevices],
+                size: `${totalSize} MiB`,
+                peSize: '4 MiB',
+                totalPE: totalPE,
+                allocPE: 0,
+                freePE: totalPE,
+                lvs: []
+            };
+
+            // Update PVs
+            pvDevices.forEach(pv => {
+                terminalState.pvs[pv].vg = vgName;
+                terminalState.pvs[pv].freePE = terminalState.pvs[pv].totalPE;
+            });
+
+            addTerminalLine(`  Volume group "${vgName}" successfully created`);
+        }
+
+        function handleVgDisplay(parts) {
+            const vgs = Object.values(terminalState.vgs);
+            
+            if (vgs.length === 0) {
+                addTerminalLine('<span class="warning">No volume groups found.</span>');
+                return;
+            }
+
+            if (parts[0] === 'vgs') {
+                addTerminalLine('  VG   #PV #LV #SN Attr   VSize   VFree');
+                vgs.forEach(vg => {
+                    addTerminalLine(`  ${vg.name.padEnd(4)} ${vg.pvs.length}   ${vg.lvs.length}   0 wz--n- ${vg.size.padEnd(7)} ${vg.size}`);
+                });
+            } else {
+                vgs.forEach(vg => {
+                    addTerminalLine(`  --- Volume group ---`);
+                    addTerminalLine(`  VG Name               ${vg.name}`);
+                    addTerminalLine(`  VG Size               ${vg.size}`);
+                    addTerminalLine(`  PE Size               ${vg.peSize}`);
+                    addTerminalLine(`  Total PE              ${vg.totalPE}`);
+                    addTerminalLine(`  Alloc PE / Size       ${vg.allocPE} / ${(vg.allocPE * 4)} MiB`);
+                    addTerminalLine(`  Free  PE / Size       ${vg.freePE} / ${(vg.freePE * 4)} MiB`);
+                    addTerminalLine(``);
+                });
+            }
+        }
+
+        function handleVgextend(parts) {
+            // vgextend vg01 /dev/vdb2
+            if (parts.length < 3) {
+                addTerminalLine('<span class="error">Usage: vgextend VG_NAME /dev/vdbX</span>');
+                return;
+            }
+
+            const vgName = parts[1];
+            const pvDevice = parts[2];
+
+            if (!terminalState.vgs[vgName]) {
+                addTerminalLine(`<span class="error">Error: Volume group ${vgName} not found.</span>`);
+                return;
+            }
+
+            if (!terminalState.pvs[pvDevice]) {
+                addTerminalLine(`<span class="error">Error: Physical volume ${pvDevice} not found.</span>`);
+                return;
+            }
+
+            if (terminalState.pvs[pvDevice].vg) {
+                addTerminalLine(`<span class="error">Error: Physical volume ${pvDevice} already in volume group.</span>`);
+                return;
+            }
+
+            terminalState.vgs[vgName].pvs.push(pvDevice);
+            terminalState.vgs[vgName].totalPE += 128;
+            terminalState.vgs[vgName].freePE += 128;
+            terminalState.pvs[pvDevice].vg = vgName;
+
+            addTerminalLine(`  Volume group "${vgName}" successfully extended`);
+        }
+
+        function handleLvcreate(parts) {
+            // lvcreate -n lv01 -L 300M vg01
+            let lvName, size, vgName;
+            
+            for (let i = 0; i < parts.length; i++) {
+                if (parts[i] === '-n' && i + 1 < parts.length) {
+                    lvName = parts[i + 1];
+                }
+                if (parts[i] === '-L' && i + 1 < parts.length) {
+                    size = parts[i + 1];
+                }
+            }
+            vgName = parts[parts.length - 1];
+
+            if (!lvName || !size || !vgName) {
+                addTerminalLine('<span class="error">Usage: lvcreate -n LV_NAME -L SIZE VG_NAME</span>');
+                addTerminalLine('Example: lvcreate -n lv01 -L 300M vg01');
+                return;
+            }
+
+            if (!terminalState.vgs[vgName]) {
+                addTerminalLine(`<span class="error">Error: Volume group ${vgName} not found.</span>`);
+                return;
+            }
+
+            // Parse size (simplified)
+            let sizeInMB = parseInt(size);
+            if (size.includes('G')) {
+                sizeInMB = parseInt(size) * 1024;
+            }
+
+            let requiredPE = Math.ceil(sizeInMB / 4);
+
+            if (requiredPE > terminalState.vgs[vgName].freePE) {
+                addTerminalLine(`<span class="error">Error: Insufficient free space in volume group ${vgName}.</span>`);
+                return;
+            }
+
+            const lvPath = `/dev/${vgName}/${lvName}`;
+
+            terminalState.lvs[lvPath] = {
+                name: lvName,
+                vg: vgName,
+                size: sizeInMB,
+                le: requiredPE,
+                path: lvPath
+            };
+
+            terminalState.vgs[vgName].lvs.push(lvName);
+            terminalState.vgs[vgName].allocPE += requiredPE;
+            terminalState.vgs[vgName].freePE -= requiredPE;
+
+            addTerminalLine(`  Logical volume "${lvName}" created.`);
+        }
+
+        function handleLvDisplay(parts) {
+            const lvs = Object.values(terminalState.lvs);
+            
+            if (lvs.length === 0) {
+                addTerminalLine('<span class="warning">No logical volumes found.</span>');
+                return;
+            }
+
+            if (parts[0] === 'lvs') {
+                addTerminalLine('  LV   VG   Attr       LSize');
+                lvs.forEach(lv => {
+                    addTerminalLine(`  ${lv.name.padEnd(4)} ${lv.vg.padEnd(4)} -wi-a----- ${lv.size} MiB`);
+                });
+            } else {
+                lvs.forEach(lv => {
+                    addTerminalLine(`  --- Logical volume ---`);
+                    addTerminalLine(`  LV Path               ${lv.path}`);
+                    addTerminalLine(`  LV Name               ${lv.name}`);
+                    addTerminalLine(`  VG Name               ${lv.vg}`);
+                    addTerminalLine(`  LV Size               ${lv.size} MiB`);
+                    addTerminalLine(`  Current LE            ${lv.le}`);
+                    addTerminalLine(``);
+                });
+            }
+        }
+
+        function handleLvextend(parts) {
+            // lvextend -L +500M /dev/vg01/lv01
+            let size, lvPath;
+            
+            for (let i = 0; i < parts.length; i++) {
+                if (parts[i] === '-L' && i + 1 < parts.length) {
+                    size = parts[i + 1];
+                }
+            }
+            lvPath = parts[parts.length - 1];
+
+            if (!size || !lvPath) {
+                addTerminalLine('<span class="error">Usage: lvextend -L +SIZE /dev/VG/LV</span>');
+                return;
+            }
+
+            if (!terminalState.lvs[lvPath]) {
+                addTerminalLine(`<span class="error">Error: Logical volume ${lvPath} not found.</span>`);
+                return;
+            }
+
+            let sizeInMB = parseInt(size.replace('+', ''));
+            if (size.includes('G')) {
+                sizeInMB = parseInt(size.replace('+', '')) * 1024;
+            }
+
+            let requiredPE = Math.ceil(sizeInMB / 4);
+            const vgName = terminalState.lvs[lvPath].vg;
+
+            if (requiredPE > terminalState.vgs[vgName].freePE) {
+                addTerminalLine(`<span class="error">Error: Insufficient free space in volume group.</span>`);
+                return;
+            }
+
+            terminalState.lvs[lvPath].size += sizeInMB;
+            terminalState.lvs[lvPath].le += requiredPE;
+            terminalState.vgs[vgName].allocPE += requiredPE;
+            terminalState.vgs[vgName].freePE -= requiredPE;
+
+            addTerminalLine(`  Size of logical volume ${terminalState.lvs[lvPath].vg}/${terminalState.lvs[lvPath].name} changed from ${terminalState.lvs[lvPath].size - sizeInMB} MiB to ${terminalState.lvs[lvPath].size} MiB.`);
+            addTerminalLine(`  Logical volume ${terminalState.lvs[lvPath].vg}/${terminalState.lvs[lvPath].name} successfully resized.`);
+            addTerminalLine(`<span class="warning">Remember to resize the filesystem with xfs_growfs or resize2fs!</span>`);
+        }
+
+        function handleMkfs(parts, cmd) {
+            if (parts.length < 2) {
+                addTerminalLine(`<span class="error">Usage: ${cmd} /dev/VG/LV</span>`);
+                return;
+            }
+
+            const device = parts[1];
+            const fsType = cmd.includes('xfs') ? 'xfs' : 'ext4';
+
+            if (!terminalState.lvs[device]) {
+                addTerminalLine(`<span class="error">Error: Device ${device} not found.</span>`);
+                return;
+            }
+
+            terminalState.filesystems[device] = {
+                type: fsType,
+                device: device,
+                mounted: false,
+                mountpoint: null
+            };
+
+            addTerminalLine(`meta-data=${device}              isize=512    agcount=4, agsize=19200 blks`);
+            addTerminalLine(`data     =                       bsize=4096   blocks=76800, imaxpct=25`);
+            addTerminalLine(`naming   =version 2              bsize=4096   ascii-ci=0 ftype=1`);
+            addTerminalLine(`<span class="success">${fsType.toUpperCase()} filesystem created successfully.</span>`);
+        }
+
+        function handleMount(parts) {
+            if (parts.length < 3) {
+                addTerminalLine('<span class="error">Usage: mount /dev/VG/LV /mount/point</span>');
+                return;
+            }
+
+            const device = parts[1];
+            const mountpoint = parts[2];
+
+            if (!terminalState.filesystems[device]) {
+                addTerminalLine(`<span class="error">Error: No filesystem on ${device}. Create one with mkfs first.</span>`);
+                return;
+            }
+
+            terminalState.filesystems[device].mounted = true;
+            terminalState.filesystems[device].mountpoint = mountpoint;
+            terminalState.mounts[mountpoint] = device;
+
+            addTerminalLine(`<span class="success">${device} mounted on ${mountpoint}</span>`);
+        }
+
+        function handleDf(parts) {
+            addTerminalLine('Filesystem              Size  Used Avail Use% Mounted on');
+            
+            Object.values(terminalState.filesystems).forEach(fs => {
+                if (fs.mounted) {
+                    const lv = terminalState.lvs[fs.device];
+                    addTerminalLine(`${fs.device.padEnd(23)} ${lv.size}M  10M  ${lv.size - 10}M   1% ${fs.mountpoint}`);
+                }
+            });
+
+            if (Object.keys(terminalState.mounts).length === 0) {
+                addTerminalLine('<span class="warning">No filesystems mounted yet.</span>');
+            }
+        }
+
+        function handleLsblk() {
+            addTerminalLine('NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT');
+            addTerminalLine('vdb             252:16   0    5G  0 disk');
+            
+            Object.keys(terminalState.partitions).forEach(part => {
+                if (part.includes('vdb')) {
+                    const num = part.replace('/dev/vdb', '');
+                    const isPV = terminalState.pvs[part];
+                    addTerminalLine(`└─vdb${num}         252:17   0  512M  0 part ${isPV ? '(PV)' : ''}`);
+                    
+                    if (isPV) {
+                        const vgName = terminalState.pvs[part].vg;
+                        if (vgName) {
+                            const vg = terminalState.vgs[vgName];
+                            vg.lvs.forEach(lvName => {
+                                const lvPath = `/dev/${vgName}/${lvName}`;
+                                const lv = terminalState.lvs[lvPath];
+                                const fs = terminalState.filesystems[lvPath];
+                                const mount = fs && fs.mounted ? fs.mountpoint : '';
+                                addTerminalLine(`  └─${vgName}-${lvName} 253:0    0  ${lv.size}M  0 lvm  ${mount}`);
+                            });
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateStateDisplay() {
+            // Update partitions
+            const partList = document.getElementById('partitions-list');
+            if (Object.keys(terminalState.partitions).length === 0) {
+                partList.innerHTML = '<li>No partitions created yet</li>';
+            } else {
+                partList.innerHTML = Object.keys(terminalState.partitions).map(p => 
+                    `<li>${p} (${terminalState.partitions[p].type})</li>`
+                ).join('');
+            }
+
+            // Update PVs
+            const pvList = document.getElementById('pvs-list');
+            if (Object.keys(terminalState.pvs).length === 0) {
+                pvList.innerHTML = '<li>No PVs created yet</li>';
+            } else {
+                pvList.innerHTML = Object.keys(terminalState.pvs).map(pv => {
+                    const pvData = terminalState.pvs[pv];
+                    return `<li>${pv} - ${pvData.size} (VG: ${pvData.vg || 'none'})</li>`;
+                }).join('');
+            }
+
+            // Update VGs
+            const vgList = document.getElementById('vgs-list');
+            if (Object.keys(terminalState.vgs).length === 0) {
+                vgList.innerHTML = '<li>No VGs created yet</li>';
+            } else {
+                vgList.innerHTML = Object.keys(terminalState.vgs).map(vg => {
+                    const vgData = terminalState.vgs[vg];
+                    return `<li>${vg} - ${vgData.size} (Free: ${vgData.freePE * 4} MiB)</li>`;
+                }).join('');
+            }
+
+            // Update LVs
+            const lvList = document.getElementById('lvs-list');
+            if (Object.keys(terminalState.lvs).length === 0) {
+                lvList.innerHTML = '<li>No LVs created yet</li>';
+            } else {
+                lvList.innerHTML = Object.keys(terminalState.lvs).map(lv => {
+                    const lvData = terminalState.lvs[lv];
+                    const fs = terminalState.filesystems[lv];
+                    const fsInfo = fs ? `${fs.type}, ${fs.mounted ? 'mounted at ' + fs.mountpoint : 'not mounted'}` : 'no filesystem';
+                    return `<li>${lvData.path} - ${lvData.size} MiB (${fsInfo})</li>`;
+                }).join('');
+            }
+        }
+
+        function clearTerminal() {
+            document.getElementById('terminal-output').innerHTML = `
+                <div class="terminal-line success">LVM Terminal Simulator v2.0</div>
+                <div class="terminal-line">Type 'help' for available commands or try: parted, pvcreate, vgcreate, lvcreate</div>
+                <div class="terminal-line">Virtual disks available: /dev/vdb (5 GiB), /dev/vdc (5 GiB)</div>
+                <div class="terminal-line">&nbsp;</div>
+            `;
+        }
+
+        function resetTerminal() {
+            terminalState = {
+                partitions: {},
+                pvs: {},
+                vgs: {},
+                lvs: {},
+                filesystems: {},
+                mounts: {}
+            };
+            clearTerminal();
+            updateStateDisplay();
+            addTerminalLine('<span class="success">System state reset. All LVM components removed.</span>');
+        }
+
+        // ========================================
+        // MODULE 5: WORKFLOW SIMULATOR
+        // ========================================
+        let workflowStep = 1;
+        let workflowData = {
+            partition: null,
+            pv: null,
+            vg: null,
+            lv: null,
+            fs: null,
+            mount: null
+        };
+
+        const workflowSteps = {
+            1: {
+                title: 'Step 1: Create a Partition',
+                content: `
+                    <p>First, we need to create a partition on a physical disk. Partitions divide a disk into separate sections that can be used independently.</p>
+                    <div class="alert alert-info">
+                        <strong>Why partition first?</strong> LVM requires a partition (or whole disk) to work with. Partitioning allows you to use part of a disk for LVM while reserving other parts for different purposes.
+                    </div>
+                    <p>We'll use <code>parted</code> to create a partition on /dev/vdb:</p>
+                    <div class="code-example">parted /dev/vdb mkpart primary 1MiB 1000MiB<br>parted /dev/vdb set 1 lvm on<br>udevadm settle</div>
+                    <p>This creates a 999 MiB partition and sets the LVM flag.</p>
+                `,
+                action: 'Create Partition',
+                inputs: [
+                    { label: 'Device', id: 'wf-device', type: 'select', options: ['/dev/vdb', '/dev/vdc'], value: '/dev/vdb' },
+                    { label: 'Start (MiB)', id: 'wf-start', type: 'number', value: '1' },
+                    { label: 'End (MiB)', id: 'wf-end', type: 'number', value: '1000' }
+                ]
+            },
+            2: {
+                title: 'Step 2: Initialize Physical Volume (PV)',
+                content: `
+                    <p>Now we'll initialize the partition as an LVM Physical Volume. This prepares it for use with LVM.</p>
+                    <div class="alert alert-info">
+                        <strong>What is a PV?</strong> A Physical Volume is a partition or disk that has been initialized for use by LVM. It's divided into Physical Extents (PEs) - typically 4 MiB chunks.
+                    </div>
+                    <p>Command to create a PV:</p>
+                    <div class="code-example">pvcreate <span id="wf-partition-name">/dev/vdb1</span></div>
+                `,
+                action: 'Create Physical Volume',
+                inputs: []
+            },
+            3: {
+                title: 'Step 3: Create Volume Group (VG)',
+                content: `
+                    <p>A Volume Group is a storage pool created from one or more Physical Volumes. Think of it as a virtual disk.</p>
+                    <div class="alert alert-info">
+                        <strong>What is a VG?</strong> The VG combines multiple PVs into a single pool of storage. You can add or remove PVs from a VG, and create multiple Logical Volumes from this pool.
+                    </div>
+                    <p>Command to create a VG:</p>
+                    <div class="code-example">vgcreate <span id="wf-vg-name-display">vg01</span> <span id="wf-pv-name">/dev/vdb1</span></div>
+                `,
+                action: 'Create Volume Group',
+                inputs: [
+                    { label: 'VG Name', id: 'wf-vg-name', type: 'text', value: 'vg01' }
+                ]
+            },
+            4: {
+                title: 'Step 4: Create Logical Volume (LV)',
+                content: `
+                    <p>Logical Volumes are like virtual partitions carved from the Volume Group. They can be resized, moved, and managed flexibly.</p>
+                    <div class="alert alert-info">
+                        <strong>What is an LV?</strong> An LV appears as a block device (/dev/vg01/lv01) that you can format with a filesystem. Unlike traditional partitions, LVs can be easily resized.
+                    </div>
+                    <p>Command to create an LV:</p>
+                    <div class="code-example">lvcreate -n <span id="wf-lv-name-display">lv01</span> -L <span id="wf-lv-size-display">300</span>M <span id="wf-vg-name-lv">vg01</span></div>
+                `,
+                action: 'Create Logical Volume',
+                inputs: [
+                    { label: 'LV Name', id: 'wf-lv-name', type: 'text', value: 'lv01' },
+                    { label: 'Size (MiB)', id: 'wf-lv-size', type: 'number', value: '300' }
+                ]
+            },
+            5: {
+                title: 'Step 5: Create Filesystem',
+                content: `
+                    <p>Now we'll format the Logical Volume with a filesystem. This makes it usable for storing files.</p>
+                    <div class="alert alert-info">
+                        <strong>Why XFS?</strong> XFS is the default filesystem for RHEL. It's optimized for large files, supports online growth, and uses journaling for reliability.
+                    </div>
+                    <p>Command to create filesystem:</p>
+                    <div class="code-example">mkfs.xfs /dev/<span id="wf-vg-name-fs">vg01</span>/<span id="wf-lv-name-fs">lv01</span></div>
+                `,
+                action: 'Create Filesystem',
+                inputs: [
+                    { label: 'Filesystem Type', id: 'wf-fs-type', type: 'select', options: ['xfs', 'ext4'], value: 'xfs' }
+                ]
+            },
+            6: {
+                title: 'Step 6: Mount and Configure Persistence',
+                content: `
+                    <p>Finally, we'll mount the filesystem and configure it to mount automatically at boot using /etc/fstab.</p>
+                    <div class="alert alert-info">
+                        <strong>Persistent Mounting:</strong> Adding an entry to /etc/fstab ensures the filesystem mounts automatically when the system boots.
+                    </div>
+                    <p>Commands:</p>
+                    <div class="code-example">mkdir <span id="wf-mount-point-display">/mnt/data</span><br>mount /dev/<span id="wf-vg-name-mount">vg01</span>/<span id="wf-lv-name-mount">lv01</span> <span id="wf-mount-point-mount">/mnt/data</span></div>
+                    <p>Add to /etc/fstab:</p>
+                    <div class="code-example">/dev/<span id="wf-vg-name-fstab">vg01</span>/<span id="wf-lv-name-fstab">lv01</span>  <span id="wf-mount-point-fstab">/mnt/data</span>  xfs  defaults  0 0</div>
+                `,
+                action: 'Complete Setup',
+                inputs: [
+                    { label: 'Mount Point', id: 'wf-mount-point', type: 'text', value: '/mnt/data' }
+                ]
+            }
+        };
+
+        function initWorkflow() {
+            workflowStep = 1;
+            workflowData = {
+                partition: null,
+                pv: null,
+                vg: null,
+                lv: null,
+                fs: null,
+                mount: null
+            };
+            renderWorkflowStep();
+        }
+
+        function goToWorkflowStep(step) {
+            const stepEl = document.getElementById(`workflow-step-${step}`);
+            if (stepEl.classList.contains('locked')) {
+                return;
+            }
+            workflowStep = step;
+            renderWorkflowStep();
+        }
+
+        function renderWorkflowStep() {
+            const stepData = workflowSteps[workflowStep];
+            const contentDiv = document.getElementById('workflow-content');
+            const actionsDiv = document.getElementById('workflow-actions');
+
+            contentDiv.innerHTML = `
+                <h3>${stepData.title}</h3>
+                ${stepData.content}
+            `;
+
+            let inputsHTML = '';
+            if (stepData.inputs && stepData.inputs.length > 0) {
+                inputsHTML = stepData.inputs.map(input => {
+                    if (input.type === 'select') {
+                        const options = input.options.map(opt => 
+                            `<option value="${opt}" ${opt === input.value ? 'selected' : ''}>${opt}</option>`
+                        ).join('');
+                        return `
+                            <div class="form-group">
+                                <label class="form-label">${input.label}</label>
+                                <select class="form-select" id="${input.id}">${options}</select>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="form-group">
+                                <label class="form-label">${input.label}</label>
+                                <input type="${input.type}" class="form-input" id="${input.id}" value="${input.value}">
+                            </div>
+                        `;
+                    }
+                }).join('');
+            }
+
+            actionsDiv.innerHTML = `
+                ${inputsHTML}
+                <button class="btn btn-success" onclick="executeWorkflowStep()">${stepData.action}</button>
+                ${workflowStep > 1 ? '<button class="btn btn-secondary" onclick="goToWorkflowStep(' + (workflowStep - 1) + ')">← Previous</button>' : ''}
+            `;
+
+            // Update all display elements with current values
+            updateWorkflowDisplays();
+        }
+
+        function updateWorkflowDisplays() {
+            if (workflowData.partition) {
+                const els = document.querySelectorAll('#wf-partition-name, #wf-pv-name');
+                els.forEach(el => el.textContent = workflowData.partition);
+            }
+            if (workflowData.vg) {
+                const els = document.querySelectorAll('#wf-vg-name-display, #wf-vg-name-lv, #wf-vg-name-fs, #wf-vg-name-mount, #wf-vg-name-fstab');
+                els.forEach(el => el.textContent = workflowData.vg);
+            }
+            if (workflowData.lv) {
+                const els = document.querySelectorAll('#wf-lv-name-display, #wf-lv-name-fs, #wf-lv-name-mount, #wf-lv-name-fstab');
+                els.forEach(el => el.textContent = workflowData.lv.name);
+                const sizeEls = document.querySelectorAll('#wf-lv-size-display');
+                sizeEls.forEach(el => el.textContent = workflowData.lv.size);
+            }
+            if (workflowData.mount) {
+                const els = document.querySelectorAll('#wf-mount-point-display, #wf-mount-point-mount, #wf-mount-point-fstab');
+                els.forEach(el => el.textContent = workflowData.mount);
+            }
+        }
+
+        function executeWorkflowStep() {
+            switch(workflowStep) {
+                case 1:
+                    const device = document.getElementById('wf-device').value;
+                    const start = document.getElementById('wf-start').value;
+                    const end = document.getElementById('wf-end').value;
+                    workflowData.partition = `${device}1`;
+                    showWorkflowSuccess(`Partition ${workflowData.partition} created successfully!`);
+                    break;
+                case 2:
+                    workflowData.pv = workflowData.partition;
+                    showWorkflowSuccess(`Physical Volume ${workflowData.pv} created successfully!`);
+                    break;
+                case 3:
+                    workflowData.vg = document.getElementById('wf-vg-name').value;
+                    showWorkflowSuccess(`Volume Group ${workflowData.vg} created successfully!`);
+                    break;
+                case 4:
+                    workflowData.lv = {
+                        name: document.getElementById('wf-lv-name').value,
+                        size: document.getElementById('wf-lv-size').value
+                    };
+                    showWorkflowSuccess(`Logical Volume ${workflowData.lv.name} created successfully!`);
+                    break;
+                case 5:
+                    workflowData.fs = document.getElementById('wf-fs-type').value;
+                    showWorkflowSuccess(`${workflowData.fs.toUpperCase()} filesystem created successfully!`);
+                    break;
+                case 6:
+                    workflowData.mount = document.getElementById('wf-mount-point').value;
+                    showWorkflowSuccess(`Filesystem mounted at ${workflowData.mount}! LVM setup complete! 🎉`);
+                    break;
+            }
+
+            // Mark current step as completed
+            document.getElementById(`workflow-step-${workflowStep}`).classList.add('completed');
+            document.getElementById(`workflow-step-${workflowStep}`).classList.remove('active');
+
+            // Unlock and move to next step
+            if (workflowStep < 6) {
+                workflowStep++;
+                document.getElementById(`workflow-step-${workflowStep}`).classList.remove('locked');
+                document.getElementById(`workflow-step-${workflowStep}`).classList.add('active');
+                renderWorkflowStep();
+            }
+        }
+
+        function showWorkflowSuccess(message) {
+            const contentDiv = document.getElementById('workflow-content');
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success';
+            alert.innerHTML = `<strong>✓ Success!</strong> ${message}`;
+            contentDiv.insertBefore(alert, contentDiv.firstChild);
+        }
+
+        // ========================================
+        // MODULE 9: EXTEND/REDUCE SCENARIOS
+        // ========================================
+        function loadScenario(scenarioName) {
+            // Hide all scenarios
+            document.querySelectorAll('.scenario-content').forEach(s => s.classList.remove('active'));
+            
+            // Show selected scenario
+            const scenarioDiv = document.getElementById(`scenario-${scenarioName}`);
+            scenarioDiv.classList.add('active');
+            
+            // Load scenario content
+            if (scenarioDiv.innerHTML === '') {
+                renderScenario(scenarioName, scenarioDiv);
+            }
+
+            // Scroll to scenario
+            scenarioDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function renderScenario(name, container) {
+            const scenarios = {
+                'extend-vg': {
+                    title: 'Extend Volume Group',
+                    description: 'Your volume group is running low on space. Add a new physical volume to increase capacity.',
+                    initial: { vg: 'serverb_01_vg', size: 256, free: 0, pvs: ['/dev/vdb1'] },
+                    steps: [
+                        { action: 'Create new partition', cmd: 'parted /dev/vdb mkpart primary 514MiB 1026MiB' },
+                        { action: 'Set LVM type', cmd: 'parted /dev/vdb set 2 lvm on' },
+                        { action: 'Register partition', cmd: 'udevadm settle' },
+                        { action: 'Initialize PV', cmd: 'pvcreate /dev/vdb2' },
+                        { action: 'Extend VG', cmd: 'vgextend serverb_01_vg /dev/vdb2' }
+                    ],
+                    final: { vg: 'serverb_01_vg', size: 768, free: 512, pvs: ['/dev/vdb1', '/dev/vdb2'] }
+                },
+                'extend-lv': {
+                    title: 'Extend Logical Volume',
+                    description: 'Your logical volume needs more space. Extend it using free space from the volume group.',
+                    initial: { lv: 'serverb_01_lv', size: 256, vgFree: 512 },
+                    steps: [
+                        { action: 'Check VG free space', cmd: 'vgdisplay serverb_01_vg | grep "Free"' },
+                        { action: 'Extend LV by 500M', cmd: 'lvextend -L +500M /dev/serverb_01_vg/serverb_01_lv' },
+                        { action: 'Verify new size', cmd: 'lvdisplay /dev/serverb_01_vg/serverb_01_lv' }
+                    ],
+                    final: { lv: 'serverb_01_lv', size: 756, vgFree: 12 }
+                },
+                'extend-xfs': {
+                    title: 'Extend XFS Filesystem',
+                    description: 'After extending the LV, expand the XFS filesystem to use the new space.',
+                    initial: { lv: 768, fs: 256, mount: '/storage/data1' },
+                    steps: [
+                        { action: 'Verify mount', cmd: 'df -h /storage/data1' },
+                        { action: 'Extend filesystem', cmd: 'xfs_growfs /storage/data1' },
+                        { action: 'Verify expansion', cmd: 'df -h /storage/data1' }
+                    ],
+                    final: { lv: 768, fs: 768, mount: '/storage/data1' }
+                },
+                'extend-swap': {
+                    title: 'Extend Swap Space',
+                    description: 'Increase swap space by extending a swap logical volume.',
+                    initial: { swap: 500, active: true },
+                    steps: [
+                        { action: 'Deactivate swap', cmd: 'swapoff -v /dev/vg01/swap' },
+                        { action: 'Extend LV', cmd: 'lvextend -L +300M /dev/vg01/swap' },
+                        { action: 'Reformat swap', cmd: 'mkswap /dev/vg01/swap' },
+                        { action: 'Activate swap', cmd: 'swapon /dev/vg01/swap' },
+                        { action: 'Verify', cmd: 'swapon --show' }
+                    ],
+                    final: { swap: 800, active: true }
+                }
+            };
+
+            const scenario = scenarios[name];
+            
+            let html = `
+                <h3>${scenario.title}</h3>
+                <p>${scenario.description}</p>
+                
+                <div class="visual-disk">
+                    <h4>Before:</h4>
+                    ${renderDiskState(scenario.initial, name)}
+                </div>
+
+                <h4>Steps to Complete:</h4>
+                <ol class="workflow-steps">
+            `;
+
+            scenario.steps.forEach((step, i) => {
+                html += `
+                    <li class="workflow-step" style="padding-left: 3rem;">
+                        <h4>${step.action}</h4>
+                        <div class="code-example">${step.cmd}</div>
+                    </li>
+                `;
+            });
+
+            html += `
+                </ol>
+                
+                <div class="visual-disk">
+                    <h4>After:</h4>
+                    ${renderDiskState(scenario.final, name)}
+                </div>
+
+                <button class="btn btn-primary" onclick="completeScenario('${name}')">Mark as Complete ✓</button>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function renderDiskState(state, type) {
+            if (type === 'extend-vg') {
+                return `
+                    <div class="disk-bar">
+                        <div class="disk-segment segment-used" style="width: ${(state.size - state.free) / state.size * 100}%">
+                            Used: ${state.size - state.free} MiB
+                        </div>
+                        <div class="disk-segment segment-free" style="width: ${state.free / state.size * 100}%">
+                            Free: ${state.free} MiB
+                        </div>
+                    </div>
+                    <p><strong>VG:</strong> ${state.vg} | <strong>Size:</strong> ${state.size} MiB | <strong>PVs:</strong> ${state.pvs.join(', ')}</p>
+                `;
+            } else if (type === 'extend-lv') {
+                return `
+                    <div class="disk-bar">
+                        <div class="disk-segment segment-used" style="width: 60%">
+                            LV: ${state.lv} (${state.size} MiB)
+                        </div>
+                        <div class="disk-segment segment-free" style="width: 40%">
+                            VG Free: ${state.vgFree} MiB
+                        </div>
+                    </div>
+                `;
+            } else if (type === 'extend-xfs') {
+                const usedPct = (state.fs / state.lv) * 100;
+                return `
+                    <div class="disk-bar">
+                        <div class="disk-segment segment-used" style="width: ${usedPct}%">
+                            Filesystem: ${state.fs} MiB
+                        </div>
+                        <div class="disk-segment segment-free" style="width: ${100 - usedPct}%">
+                            Unformatted: ${state.lv - state.fs} MiB
+                        </div>
+                    </div>
+                    <p><strong>LV Size:</strong> ${state.lv} MiB | <strong>FS Size:</strong> ${state.fs} MiB | <strong>Mount:</strong> ${state.mount}</p>
+                `;
+            } else if (type === 'extend-swap') {
+                return `
+                    <div class="disk-bar">
+                        <div class="disk-segment ${state.active ? 'segment-used' : 'segment-free'}" style="width: 100%">
+                            Swap: ${state.swap} MiB ${state.active ? '(Active)' : '(Inactive)'}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function completeScenario(name) {
+            alert('Great job! You completed the ' + name.replace(/-/g, ' ') + ' scenario! 🎉');
+        }
+
+        // ========================================
+        // MODULE 13: FSTAB CONSTRUCTOR
+        // ========================================
+        function updateFstabPreview() {
+            const deviceType = document.getElementById('fstab-device-type').value;
+            const device = document.getElementById('fstab-device').value;
+            const mountpoint = document.getElementById('fstab-mountpoint').value;
+            const fstype = document.getElementById('fstab-fstype').value;
+            const dump = document.getElementById('fstab-dump').value;
+            const fsck = document.getElementById('fstab-fsck').value;
+
+            // Get options from checkboxes
+            const checkboxes = document.querySelectorAll('#fstab .checkbox-label input[type="checkbox"]:checked');
+            const options = Array.from(checkboxes).map(cb => cb.value).join(',') || 'defaults';
+            document.getElementById('fstab-options').value = options;
+
+            let deviceField = device;
+            if (deviceType === 'uuid') {
+                deviceField = `UUID=${device}`;
+            } else if (deviceType === 'path') {
+                deviceField = `/dev/mapper/${device}`;
+            } else {
+                deviceField = device;
+            }
+
+            const entry = `${deviceField}  ${mountpoint}  ${fstype}  ${options}  ${dump} ${fsck}`;
+            document.getElementById('fstab-output').textContent = entry;
+        }
+
+        function copyFstabToClipboard() {
+            const text = document.getElementById('fstab-output').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('fstab entry copied to clipboard!');
+            });
+        }
+
+        function validateFstab() {
+            const device = document.getElementById('fstab-device').value;
+            const mountpoint = document.getElementById('fstab-mountpoint').value;
+            const fstype = document.getElementById('fstab-fstype').value;
+            const validationDiv = document.getElementById('fstab-validation');
+
+            let errors = [];
+            let warnings = [];
+
+            if (!device) {
+                errors.push('Device/UUID is required');
+            }
+
+            if (!mountpoint) {
+                errors.push('Mount point is required');
+            } else if (!mountpoint.startsWith('/')) {
+                errors.push('Mount point must start with /');
+            }
+
+            if (fstype === 'swap' && mountpoint !== 'swap') {
+                warnings.push('For swap filesystems, mount point should be "swap"');
+            }
+
+            if (fstype === 'xfs') {
+                const fsck = document.getElementById('fstab-fsck').value;
+                if (fsck !== '0') {
+                    warnings.push('XFS filesystems should use fsck order 0 (XFS doesn\'t use fsck)');
+                }
+            }
+
+            if (errors.length === 0 && warnings.length === 0) {
+                validationDiv.innerHTML = '<div class="alert alert-success"><strong>✓ Valid!</strong> This fstab entry looks correct.</div>';
+            } else {
+                let html = '';
+                if (errors.length > 0) {
+                    html += '<div class="alert alert-error"><strong>Errors:</strong><ul>';
+                    errors.forEach(e => html += `<li>${e}</li>`);
+                    html += '</ul></div>';
+                }
+                if (warnings.length > 0) {
+                    html += '<div class="alert alert-warning"><strong>Warnings:</strong><ul>';
+                    warnings.forEach(w => html += `<li>${w}</li>`);
+                    html += '</ul></div>';
+                }
+                validationDiv.innerHTML = html;
+            }
+        }
+
+        // Initialize on page load
+        updateFstabPreview();
+
+        // Update when checkboxes change
+        document.querySelectorAll('#fstab .checkbox-label input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', updateFstabPreview);
+        });
+
+        // ========================================
+        // MODULE 11: QUIZ
+        // ========================================
+        let currentDifficulty = 'beginner';
+        let currentQuestionIndex = 0;
+        let quizAnswers = [];
+
+        const quizData = {
+            beginner: [
+                {
+                    question: 'What does LVM stand for?',
+                    options: ['Linux Volume Manager', 'Logical Volume Manager', 'Local Volume Management', 'Level Volume Mapper'],
+                    correct: 1,
+                    explanation: 'LVM stands for Logical Volume Manager, a system for managing disk storage in a flexible way.'
+                },
+                {
+                    question: 'What is the smallest unit of storage that LVM manages?',
+                    options: ['Logical Extent (LE)', 'Physical Extent (PE)', 'Volume Group (VG)', 'Block'],
+                    correct: 1,
+                    explanation: 'Physical Extents (PEs) are the smallest units of storage in LVM, typically 4 MiB in size.'
+                },
+                {
+                    question: 'Which command creates a physical volume?',
+                    options: ['lvcreate', 'vgcreate', 'pvcreate', 'mklvm'],
+                    correct: 2,
+                    explanation: 'The pvcreate command initializes a partition or disk as an LVM physical volume.'
+                },
+                {
+                    question: 'What is the default filesystem for RHEL?',
+                    options: ['ext4', 'XFS', 'Btrfs', 'ZFS'],
+                    correct: 1,
+                    explanation: 'XFS is the default filesystem for Red Hat Enterprise Linux due to its performance and scalability.'
+                },
+                {
+                    question: 'Can you shrink an XFS filesystem?',
+                    options: ['Yes, using xfs_shrink', 'Yes, using xfs_growfs with negative values', 'No, XFS cannot be shrunk', 'Yes, but only offline'],
+                    correct: 2,
+                    explanation: 'XFS filesystems cannot be shrunk. They can only be expanded using xfs_growfs.'
+                }
+            ],
+            intermediate: [
+                {
+                    question: 'What command extends a volume group with an additional physical volume?',
+                    options: ['vgadd', 'vgextend', 'vgcreate', 'vgmodify'],
+                    correct: 1,
+                    explanation: 'The vgextend command adds a physical volume to an existing volume group.'
+                },
+                {
+                    question: 'After extending a logical volume, what must you do to make the space available to an XFS filesystem?',
+                    options: ['Nothing, it happens automatically', 'Run xfs_growfs on the mount point', 'Unmount and remount', 'Run lvresize'],
+                    correct: 1,
+                    explanation: 'After extending an LV with an XFS filesystem, you must run xfs_growfs to expand the filesystem to use the new space.'
+                },
+                {
+                    question: 'What is the purpose of udevadm settle?',
+                    options: ['Format partitions', 'Wait for the system to detect new partitions', 'Mount filesystems', 'Create volume groups'],
+                    correct: 1,
+                    explanation: 'udevadm settle waits for the udev system to finish creating device files for newly created partitions.'
+                },
+                {
+                    question: 'Which field in /etc/fstab represents the fsck order?',
+                    options: ['Field 1', 'Field 3', 'Field 5', 'Field 6'],
+                    correct: 3,
+                    explanation: 'Field 6 in /etc/fstab specifies the fsck order. 0 means no check, 1 is for root filesystem, 2 is for other filesystems.'
+                },
+                {
+                    question: 'Why is UUID recommended over device names in /etc/fstab?',
+                    options: ['UUIDs are shorter', 'UUIDs persist across reboots even if device order changes', 'UUIDs are required for LVM', 'UUIDs provide better performance'],
+                    correct: 1,
+                    explanation: 'UUIDs remain constant regardless of device detection order, while device names like /dev/vdb1 can change if disks are detected differently.'
+                }
+            ],
+            advanced: [
+                {
+                    question: 'What is the difference between -L and -l options in lvcreate?',
+                    options: ['-L sets size in bytes, -l sets size in PEs', '-L is for label, -l is for size', '-L sets absolute size, -l sets size in number of extents', 'There is no difference'],
+                    correct: 2,
+                    explanation: 'The -L option specifies size in bytes/MB/GB, while -l specifies size as a number of logical extents (PEs).'
+                },
+                {
+                    question: 'What happens to data on a physical volume when you remove it from a volume group using vgreduce?',
+                    options: ['Data is automatically moved to other PVs', 'Data is lost if not moved first with pvmove', 'Data remains on the PV but is inaccessible', 'VG automatically fails'],
+                    correct: 1,
+                    explanation: 'You must use pvmove to relocate data before using vgreduce, or the data will be lost.'
+                },
+                {
+                    question: 'What is VDO in the context of LVM?',
+                    options: ['A backup system', 'A RAID implementation', 'Deduplication and compression for storage', 'A network storage protocol'],
+                    correct: 2,
+                    explanation: 'VDO (Virtual Data Optimizer) provides inline block-level deduplication and compression for LVM volumes.'
+                },
+                {
+                    question: 'Why should swap logical volumes be formatted with mkswap after extending?',
+                    options: ['To improve performance', 'To update the swap signature with the new size', 'To enable compression', 'It\'s optional'],
+                    correct: 1,
+                    explanation: 'After extending a swap LV, mkswap must be run to update the swap signature to reflect the new size.'
+                },
+                {
+                    question: 'What is thin provisioning in LVM?',
+                    options: ['Creating small partitions', 'Allocating space on-demand rather than upfront', 'Compressing data', 'Using SSDs'],
+                    correct: 1,
+                    explanation: 'Thin provisioning allocates physical storage space only when data is actually written, not when the volume is created.'
+                }
+            ]
+        };
+
+        function initQuiz() {
+            currentQuestionIndex = 0;
+            quizAnswers = [];
+            loadQuizQuestions();
+            updateQuizProgress();
+        }
+
+        function setDifficulty(level) {
+            currentDifficulty = level;
+            currentQuestionIndex = 0;
+            quizAnswers = [];
+            
+            document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            loadQuizQuestions();
+            updateQuizProgress();
+            
+            document.getElementById('quiz-results-container').classList.add('hidden');
+        }
+
+        function loadQuizQuestions() {
+            const questions = quizData[currentDifficulty];
+            const container = document.getElementById('quiz-questions');
+            
+            document.getElementById('total-questions').textContent = questions.length;
+            
+            // Initialize answers array
+            quizAnswers = new Array(questions.length).fill(null);
+            
+            // Show first question
+            showQuestion(0);
+        }
+
+        function showQuestion(index) {
+            const questions = quizData[currentDifficulty];
+            const question = questions[index];
+            const container = document.getElementById('quiz-questions');
+            
+            currentQuestionIndex = index;
+            document.getElementById('current-question').textContent = index + 1;
+            
+            let html = `
+                <div class="quiz-question">
+                    <h3>Question ${index + 1}</h3>
+                    <p>${question.question}</p>
+                    <ul class="quiz-options">
+            `;
+            
+            question.options.forEach((option, i) => {
+                const isSelected = quizAnswers[index] === i;
+                html += `
+                    <li class="quiz-option ${isSelected ? 'selected' : ''}" onclick="selectAnswer(${index}, ${i})">
+                        ${option}
+                    </li>
+                `;
+            });
+            
+            html += `
+                    </ul>
+                    <div id="feedback-${index}" class="quiz-feedback"></div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+            
+            // Update navigation buttons
+            document.getElementById('prev-btn').style.display = index === 0 ? 'none' : 'inline-block';
+            document.getElementById('next-btn').style.display = index === questions.length - 1 ? 'none' : 'inline-block';
+            document.getElementById('submit-btn').classList.toggle('hidden', index !== questions.length - 1);
+            
+            updateQuizProgress();
+        }
+
+        function selectAnswer(questionIndex, optionIndex) {
+            quizAnswers[questionIndex] = optionIndex;
+            
+            // Update visual selection
+            const options = document.querySelectorAll('.quiz-option');
+            options.forEach((opt, i) => {
+                if (i === optionIndex) {
+                    opt.classList.add('selected');
+                } else {
+                    opt.classList.remove('selected');
+                }
+            });
+            
+            updateQuizProgress();
+        }
+
+        function previousQuestion() {
+            if (currentQuestionIndex > 0) {
+                showQuestion(currentQuestionIndex - 1);
+            }
+        }
+
+        function nextQuestion() {
+            const questions = quizData[currentDifficulty];
+            if (currentQuestionIndex < questions.length - 1) {
+                showQuestion(currentQuestionIndex + 1);
+            }
+        }
+
+        function updateQuizProgress() {
+            const questions = quizData[currentDifficulty];
+            const answered = quizAnswers.filter(a => a !== null).length;
+            const percentage = (answered / questions.length) * 100;
+            
+            const progressBar = document.getElementById('quiz-progress-bar');
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = Math.round(percentage) + '%';
+        }
+
+        function submitQuiz() {
+            const questions = quizData[currentDifficulty];
+            const unanswered = quizAnswers.filter(a => a === null).length;
+            
+            if (unanswered > 0) {
+                alert(`Please answer all questions. ${unanswered} question(s) remaining.`);
+                return;
+            }
+            
+            let correct = 0;
+            quizAnswers.forEach((answer, i) => {
+                if (answer === questions[i].correct) {
+                    correct++;
+                }
+            });
+            
+            const percentage = (correct / questions.length) * 100;
+            
+            let message = '';
+            if (percentage === 100) {
+                message = '🎉 Perfect score! You\'ve mastered ' + currentDifficulty + ' level LVM concepts!';
+            } else if (percentage >= 80) {
+                message = '👏 Excellent work! You have a strong understanding of LVM.';
+            } else if (percentage >= 60) {
+                message = '👍 Good job! Review the questions you missed to improve.';
+            } else {
+                message = '📚 Keep studying! Try reviewing the material and retake the quiz.';
+            }
+            
+            const resultsContainer = document.getElementById('quiz-results-container');
+            resultsContainer.innerHTML = `
+                <div class="quiz-results">
+                    <h3>Quiz Results</h3>
+                    <div class="quiz-score">${correct} / ${questions.length}</div>
+                    <p style="font-size: 1.2rem; margin: 20px 0;">${message}</p>
+                    <button class="btn btn-primary" onclick="reviewAnswers()">Review Answers</button>
+                    <button class="btn btn-secondary" onclick="initQuiz()">Retake Quiz</button>
+                </div>
+            `;
+            resultsContainer.classList.remove('hidden');
+            resultsContainer.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function reviewAnswers() {
+            const questions = quizData[currentDifficulty];
+            const container = document.getElementById('quiz-questions');
+            
+            let html = '<h3>Answer Review</h3>';
+            
+            questions.forEach((q, qIndex) => {
+                const userAnswer = quizAnswers[qIndex];
+                const isCorrect = userAnswer === q.correct;
+                
+                html += `
+                    <div class="quiz-question">
+                        <h4>Question ${qIndex + 1}</h4>
+                        <p>${q.question}</p>
+                        <ul class="quiz-options">
+                `;
+                
+                q.options.forEach((option, i) => {
+                    let className = 'quiz-option';
+                    if (i === q.correct) {
+                        className += ' correct';
+                    } else if (i === userAnswer && !isCorrect) {
+                        className += ' incorrect';
+                    }
+                    
+                    html += `<li class="${className}">${option}</li>`;
+                });
+                
+                html += `
+                        </ul>
+                        <div class="quiz-feedback show ${isCorrect ? 'alert-success' : 'alert-error'}">
+                            <strong>${isCorrect ? '✓ Correct!' : '✗ Incorrect'}</strong>
+                            <p>${q.explanation}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+            
+            // Hide navigation buttons during review
+            document.getElementById('prev-btn').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'none';
+            document.getElementById('submit-btn').classList.add('hidden');
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initWorkflow();
+            initQuiz();
+        });
+    </script>
+</body>
+</html>
