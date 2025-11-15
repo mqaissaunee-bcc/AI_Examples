@@ -1,0 +1,3595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Interactive lesson on Linux network security management with firewalld and SELinux">
+    <title>Network Security Management - Interactive Lesson</title>
+    <style>
+        /* ===== CSS RESET & BASE STYLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #0066cc;
+            --primary-dark: #004c99;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --warning-color: #ffc107;
+            --bg-color: #f5f7fa;
+            --content-bg: #ffffff;
+            --text-color: #333333;
+            --text-light: #666666;
+            --border-color: #dee2e6;
+            --code-bg: #f8f9fa;
+            --terminal-bg: #1e1e1e;
+            --terminal-text: #00ff00;
+            --sidebar-width: 280px;
+            --header-height: 60px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+        }
+
+        /* ===== LAYOUT ===== */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ===== SIDEBAR NAVIGATION ===== */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--content-bg);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .nav-section {
+            padding: 10px 0;
+        }
+
+        .nav-section-title {
+            padding: 12px 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: var(--text-light);
+            letter-spacing: 0.5px;
+        }
+
+        .nav-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-color);
+        }
+
+        .nav-item.active {
+            background: var(--bg-color);
+            border-left-color: var(--primary-color);
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .nav-item.completed::after {
+            content: '✓';
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+        }
+
+        .top-bar {
+            height: var(--header-height);
+            background: var(--content-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .breadcrumb {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .breadcrumb-separator {
+            margin: 0 8px;
+        }
+
+        .progress-bar-container {
+            width: 200px;
+            height: 8px;
+            background: var(--border-color);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--success-color);
+            transition: width 0.3s;
+        }
+
+        .content-area {
+            padding: 30px;
+            max-width: 900px;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== TYPOGRAPHY ===== */
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            margin: 30px 0 15px 0;
+            color: var(--text-color);
+        }
+
+        h4 {
+            font-size: 1.2rem;
+            margin: 20px 0 10px 0;
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        ul, ol {
+            margin: 15px 0 15px 30px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        /* ===== CODE & TERMINAL ===== */
+        code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            color: var(--error-color);
+        }
+
+        .code-block {
+            background: var(--code-bg);
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid var(--primary-color);
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            background: transparent;
+            padding: 0;
+            color: var(--text-color);
+        }
+
+        .terminal {
+            background: var(--terminal-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', Courier, monospace;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .terminal-header {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 15px;
+        }
+
+        .terminal-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .terminal-button.close { background: #ff5f56; }
+        .terminal-button.minimize { background: #ffbd2e; }
+        .terminal-button.maximize { background: #27c93f; }
+
+        .terminal-output {
+            color: var(--terminal-text);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            min-height: 100px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .terminal-output-line {
+            margin: 5px 0;
+        }
+
+        .terminal-prompt {
+            color: #4a9eff;
+        }
+
+        .terminal-error {
+            color: #ff6b6b;
+        }
+
+        .terminal-success {
+            color: #51cf66;
+        }
+
+        .terminal-input-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .terminal-input-prompt {
+            color: #4a9eff;
+            white-space: nowrap;
+        }
+
+        .terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--terminal-text);
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        /* ===== CALLOUT BOXES ===== */
+        .callout {
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+
+        .callout-note {
+            background: #e7f3ff;
+            border-color: #0066cc;
+        }
+
+        .callout-important {
+            background: #fff3cd;
+            border-color: #ffc107;
+        }
+
+        .callout-warning {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+
+        .callout-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ===== QUIZ STYLES ===== */
+        .quiz {
+            background: var(--content-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+
+        .quiz-question {
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .quiz-options {
+            margin: 20px 0;
+        }
+
+        .quiz-option {
+            padding: 12px 15px;
+            margin: 10px 0;
+            border: 2px solid var(--border-color);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .quiz-option:hover:not(.correct):not(.incorrect) {
+            background: var(--bg-color);
+            border-color: var(--primary-color);
+        }
+
+        .quiz-option.selected {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .quiz-option.correct {
+            background: var(--success-color);
+            color: white;
+            border-color: var(--success-color);
+        }
+
+        .quiz-option.incorrect {
+            background: var(--error-color);
+            color: white;
+            border-color: var(--error-color);
+        }
+
+        .quiz-option.answered {
+            pointer-events: none;
+        }
+
+        .quiz-feedback {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .quiz-feedback.show {
+            display: block;
+        }
+
+        .quiz-feedback.correct {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .quiz-feedback.incorrect {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--border-color);
+            color: var(--text-color);
+        }
+
+        .btn-secondary:hover {
+            background: #c8ccd0;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        /* ===== EXERCISE STYLES ===== */
+        .exercise {
+            background: #f0f8ff;
+            border: 2px solid var(--primary-color);
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+
+        .exercise-header {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        .exercise-task {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+
+        .exercise-task-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text-color);
+        }
+
+        .validation-feedback {
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .validation-feedback.show {
+            display: block;
+        }
+
+        .validation-feedback.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .validation-feedback.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .validation-item {
+            margin: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .validation-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 4px;
+        }
+
+        .validation-item.pass::before {
+            content: '✓';
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        .validation-item.fail::before {
+            content: '✗';
+            color: var(--error-color);
+            font-weight: bold;
+        }
+
+        /* ===== TABLE STYLES ===== */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--bg-color);
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        tr:hover {
+            background: var(--bg-color);
+        }
+
+        /* ===== KEYBOARD NAVIGATION HINT ===== */
+        .keyboard-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 0.85rem;
+            display: none;
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        }
+
+        .keyboard-hint.show {
+            display: block;
+        }
+
+        .keyboard-hint kbd {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin: 0 2px;
+        }
+
+        /* ===== RESPONSIVE DESIGN ===== */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .content-area {
+                padding: 20px;
+            }
+
+            .progress-bar-container {
+                width: 150px;
+            }
+
+            .keyboard-hint {
+                display: none !important;
+            }
+        }
+
+        /* ===== UTILITY CLASSES ===== */
+        .mt-1 { margin-top: 10px; }
+        .mt-2 { margin-top: 20px; }
+        .mt-3 { margin-top: 30px; }
+        .mb-1 { margin-bottom: 10px; }
+        .mb-2 { margin-bottom: 20px; }
+        .mb-3 { margin-bottom: 30px; }
+        
+        .text-center { text-align: center; }
+        .text-success { color: var(--success-color); }
+        .text-error { color: var(--error-color); }
+        .text-muted { color: var(--text-light); }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1>Network Security Management</h1>
+            </div>
+            <nav>
+                <div class="nav-section">
+                    <div class="nav-section-title">Introduction</div>
+                    <div class="nav-item" data-section="introduction">Introduction & Overview</div>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Firewall Concepts</div>
+                    <div class="nav-item" data-section="netfilter">Linux Firewall Architecture</div>
+                    <div class="nav-item" data-section="nftables">The nftables Framework</div>
+                    <div class="nav-item" data-section="firewalld">Understanding firewalld</div>
+                    <div class="nav-item" data-section="zones">Firewall Zones Explained</div>
+                    <div class="nav-item" data-section="services">Predefined Services</div>
+                    <div class="nav-item" data-section="quiz-firewall">Quiz: Firewall Concepts</div>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Managing Firewalls</div>
+                    <div class="nav-item" data-section="web-console">Web Console Management</div>
+                    <div class="nav-item" data-section="firewall-cmd">Command-Line Management</div>
+                    <div class="nav-item" data-section="runtime-permanent">Runtime vs Permanent</div>
+                    <div class="nav-item" data-section="exercise-1">Exercise 1: Firewall Config</div>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">SELinux Port Labeling</div>
+                    <div class="nav-item" data-section="selinux-intro">SELinux Basics</div>
+                    <div class="nav-item" data-section="port-labels">Port Labeling Concepts</div>
+                    <div class="nav-item" data-section="semanage">Managing Port Bindings</div>
+                    <div class="nav-item" data-section="exercise-2">Exercise 2: Port Binding</div>
+                    <div class="nav-item" data-section="quiz-selinux">Quiz: SELinux</div>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Integration</div>
+                    <div class="nav-item" data-section="troubleshooting">Troubleshooting Guide</div>
+                    <div class="nav-item" data-section="exercise-3">Exercise 3: Integrated Lab</div>
+                    <div class="nav-item" data-section="conclusion">Conclusion</div>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <div class="top-bar">
+                <div class="breadcrumb">
+                    <span id="breadcrumb-text">Introduction & Overview</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <!-- Introduction Section -->
+                <section class="section active" id="introduction">
+                    <h2>Network Security Management in Linux</h2>
+                    
+                    <p>Welcome to this interactive lesson on managing network security in Linux systems. In this comprehensive guide, you'll learn how to control network access using two essential security technologies: <strong>firewalld</strong> for packet filtering and <strong>SELinux</strong> for port labeling.</p>
+
+                    <h3>What You Will Learn</h3>
+                    <p>By completing this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Understand the Linux netfilter framework and how it filters network traffic</li>
+                        <li>Configure firewall zones and manage services using both graphical and command-line tools</li>
+                        <li>Work with runtime and permanent firewall configurations</li>
+                        <li>Understand SELinux port labeling and its role in system security</li>
+                        <li>Manage port contexts to allow services to bind to non-standard ports</li>
+                        <li>Troubleshoot common firewall and SELinux issues</li>
+                        <li>Apply these concepts in real-world scenarios</li>
+                    </ul>
+
+                    <h3>Why Network Security Matters</h3>
+                    <p>Linux systems often serve as servers, hosting web applications, databases, file shares, and other services. Without proper network security, these services could be exposed to unauthorized access, attacks, or exploitation.</p>
+                    
+                    <p>Network security in Linux operates on multiple layers:</p>
+                    <ul>
+                        <li><strong>Packet filtering</strong> - Controls which network connections are allowed to reach services</li>
+                        <li><strong>Access control</strong> - Determines which processes can bind to network ports</li>
+                        <li><strong>Service configuration</strong> - Ensures services only listen on necessary interfaces</li>
+                    </ul>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">📘 Learning Approach</div>
+                        <p>This lesson combines explanatory content with hands-on practice. You'll use an interactive terminal simulator to execute real commands and complete exercises that validate your understanding. Take your time with each section and use the exercises to reinforce your learning.</p>
+                    </div>
+
+                    <h3>Prerequisites</h3>
+                    <p>This lesson assumes you have:</p>
+                    <ul>
+                        <li>Basic familiarity with Linux command-line interface</li>
+                        <li>Understanding of basic networking concepts (IP addresses, ports, protocols)</li>
+                        <li>Experience using sudo for administrative tasks</li>
+                    </ul>
+
+                    <h3>Time Commitment</h3>
+                    <p>Plan to spend approximately <strong>90-120 minutes</strong> completing this lesson, including all exercises and quizzes.</p>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">⌨️ Keyboard Navigation</div>
+                        <p>Use the <kbd>←</kbd> and <kbd>→</kbd> arrow keys to navigate between sections. Press <kbd>?</kbd> to toggle this help.</p>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="navigateToSection('netfilter')">Get Started →</button>
+                    </div>
+                </section>
+
+                <!-- Linux Firewall Architecture Section -->
+                <section class="section" id="netfilter">
+                    <h2>Linux Firewall Architecture</h2>
+                    
+                    <h3>The netfilter Framework</h3>
+                    <p>At the heart of Linux network security is <strong>netfilter</strong>, a framework built into the Linux kernel that provides the foundation for packet filtering, network address translation (NAT), and port translation.</p>
+
+                    <p>The netfilter framework works by intercepting network packets as they traverse the system's network stack. It provides specific <strong>hooks</strong> - points in the packet processing path where kernel modules can examine and make decisions about packets.</p>
+
+                    <h4>How netfilter Works</h4>
+                    <p>When a network packet enters or leaves a Linux system, it passes through several stages:</p>
+                    <ol>
+                        <li><strong>PREROUTING</strong> - Packet arrives on network interface (before routing decision)</li>
+                        <li><strong>INPUT</strong> - Packet destined for local system (after routing, going to local process)</li>
+                        <li><strong>FORWARD</strong> - Packet being routed through the system to another destination</li>
+                        <li><strong>OUTPUT</strong> - Packet generated by local process leaving the system</li>
+                        <li><strong>POSTROUTING</strong> - Packet about to leave via network interface (after routing decision)</li>
+                    </ol>
+
+                    <p>At each of these hooks, netfilter can:</p>
+                    <ul>
+                        <li><strong>Accept</strong> the packet - allow it to continue</li>
+                        <li><strong>Drop</strong> the packet - silently discard it</li>
+                        <li><strong>Reject</strong> the packet - discard and send error response</li>
+                        <li><strong>Modify</strong> the packet - change addresses or ports (NAT)</li>
+                        <li><strong>Queue</strong> the packet - send to userspace for processing</li>
+                    </ul>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Key Concept</div>
+                        <p>For typical server workloads, the most important hook is <strong>INPUT</strong> - this is where we filter incoming connections to services running on the server. When you configure a firewall to allow SSH or HTTP, you're creating rules that affect the INPUT chain.</p>
+                    </div>
+
+                    <h3>Packet Filtering in Practice</h3>
+                    <p>Consider what happens when a client tries to connect to a web server running on your Linux system:</p>
+                    <ol>
+                        <li>Client sends a TCP packet to port 80 (HTTP) on your server's IP address</li>
+                        <li>Packet arrives at your server's network interface</li>
+                        <li>Netfilter processes the packet at the <strong>PREROUTING</strong> hook</li>
+                        <li>Routing decision determines packet is for local system</li>
+                        <li>Packet reaches <strong>INPUT</strong> hook - <strong>firewall rules are checked here</strong></li>
+                        <li>If firewall allows port 80, packet continues to the web server process</li>
+                        <li>If firewall blocks port 80, packet is dropped or rejected</li>
+                    </ol>
+
+                    <div class="callout callout-important">
+                        <div class="callout-title">⚠️ Important</div>
+                        <p>Even if a service is running and listening on a port, the firewall can prevent external connections from reaching it. Both the service configuration AND the firewall must permit the connection.</p>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('introduction')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('nftables')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- nftables Framework Section -->
+                <section class="section" id="nftables">
+                    <h2>The nftables Framework</h2>
+                    
+                    <h3>Evolution of Linux Firewalls</h3>
+                    <p>Linux firewall technology has evolved significantly over the years:</p>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Framework</th>
+                                <th>Era</th>
+                                <th>Key Characteristics</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>iptables</strong></td>
+                                <td>1998-2014</td>
+                                <td>Separate tools for IPv4/IPv6, mature but complex syntax</td>
+                            </tr>
+                            <tr>
+                                <td><strong>nftables</strong></td>
+                                <td>2014-present</td>
+                                <td>Unified framework, improved performance, simplified syntax</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Why nftables?</h3>
+                    <p>Red Hat Enterprise Linux 9 uses <strong>nftables</strong> as the system firewall core. The nftables framework provides several advantages over the older iptables framework:</p>
+
+                    <h4>Unified IPv4 and IPv6 Support</h4>
+                    <p>With iptables, administrators needed separate tools:</p>
+                    <ul>
+                        <li><code>iptables</code> for IPv4 rules</li>
+                        <li><code>ip6tables</code> for IPv6 rules</li>
+                        <li><code>arptables</code> for ARP rules</li>
+                        <li><code>ebtables</code> for Ethernet bridge rules</li>
+                    </ul>
+                    <p>With nftables, a single <code>nft</code> command handles all protocols. Rules can even apply to both IPv4 and IPv6 simultaneously, reducing configuration duplication.</p>
+
+                    <h4>Improved Performance</h4>
+                    <p>nftables uses a more efficient rule evaluation system:</p>
+                    <ul>
+                        <li>Rules are compiled into bytecode for faster execution</li>
+                        <li>Better handling of large rule sets</li>
+                        <li>Atomic rule updates - entire rule sets can be replaced in one operation</li>
+                    </ul>
+
+                    <h4>Simplified Syntax</h4>
+                    <p>While iptables syntax could be verbose and confusing, nftables provides a cleaner, more consistent syntax. However, most administrators don't interact directly with nftables - they use higher-level tools like <strong>firewalld</strong>.</p>
+
+                    <h3>firewalld: The User-Friendly Frontend</h3>
+                    <p>While nftables provides powerful low-level capabilities, <strong>firewalld</strong> serves as a dynamic firewall manager that makes configuration much easier. firewalld provides:</p>
+                    <ul>
+                        <li><strong>Zone-based configuration</strong> - Group rules by trust level and network context</li>
+                        <li><strong>Service definitions</strong> - Pre-configured rules for common services</li>
+                        <li><strong>Runtime and permanent modes</strong> - Test configurations before making them persistent</li>
+                        <li><strong>Multiple interfaces</strong> - Web console, command-line, and GUI tools</li>
+                        <li><strong>Dynamic updates</strong> - Change rules without disrupting existing connections</li>
+                    </ul>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">📘 What You Need to Know</div>
+                        <p>As a system administrator, you'll primarily work with <strong>firewalld</strong> rather than nftables directly. firewalld translates your high-level zone and service configurations into the appropriate nftables rules. This abstraction makes firewall management much more approachable while still leveraging the power of nftables underneath.</p>
+                    </div>
+
+                    <div class="code-block">
+                        <code># Check that firewalld is using nftables backend
+# firewall-cmd --get-backend
+nftables</code>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('netfilter')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('firewalld')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- firewalld Service Section -->
+                <section class="section" id="firewalld">
+                    <h2>Understanding firewalld</h2>
+                    
+                    <h3>What is firewalld?</h3>
+                    <p>The <code>firewalld</code> service is a dynamic firewall manager included with Red Hat Enterprise Linux 9. It acts as a user-friendly front-end to the nftables framework, providing an intuitive way to manage firewall rules without dealing with low-level syntax.</p>
+
+                    <h3>Key Features</h3>
+                    
+                    <h4>Zone-Based Configuration</h4>
+                    <p>Instead of managing individual firewall rules, firewalld uses the concept of <strong>zones</strong>. A zone is a collection of firewall rules that define a specific trust level for network connections.</p>
+                    
+                    <p>The genius of zones is that you can assign different networks or interfaces to different zones based on how much you trust them:</p>
+                    <ul>
+                        <li>Home network → <code>home</code> zone (more permissive)</li>
+                        <li>Corporate network → <code>work</code> zone (moderate restrictions)</li>
+                        <li>Coffee shop WiFi → <code>public</code> zone (very restrictive)</li>
+                        <li>DMZ network → <code>dmz</code> zone (limited to specific services)</li>
+                    </ul>
+
+                    <h4>Dynamic Management</h4>
+                    <p>Unlike older firewall systems that required reload or restart to apply changes, firewalld is truly dynamic:</p>
+                    <ul>
+                        <li>Add or remove rules without disrupting existing connections</li>
+                        <li>Test configurations in runtime mode before making permanent</li>
+                        <li>Automatic integration with NetworkManager for zone assignment</li>
+                    </ul>
+
+                    <h4>Service Definitions</h4>
+                    <p>firewalld includes pre-configured service definitions for common network services. Instead of remembering that SSH uses port 22/TCP, you can simply add the "ssh" service to a zone.</p>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Example: SSH Service</div>
+                        <p>The SSH service definition includes port 22/TCP. When you add the SSH service to a zone, firewalld automatically creates the appropriate nftables rules to allow SSH traffic on that port.</p>
+                    </div>
+
+                    <h3>How Zones Work</h3>
+                    <p>When a packet arrives at your system, firewalld determines which zone to apply by checking in this order:</p>
+                    <ol>
+                        <li><strong>Source IP address</strong> - Is the packet's source IP assigned to a specific zone?</li>
+                        <li><strong>Incoming interface</strong> - Is the network interface assigned to a specific zone?</li>
+                        <li><strong>Default zone</strong> - If no match found, use the default zone</li>
+                    </ol>
+
+                    <p>Once the zone is determined, firewalld applies that zone's rules to decide whether to allow or block the packet.</p>
+
+                    <h3>Default Zone Behavior</h3>
+                    <p>firewalld always has a <strong>default zone</strong>. Initially, this is set to the <code>public</code> zone. The default zone is important because:</p>
+                    <ul>
+                        <li>It applies to any traffic that doesn't match a specific source or interface assignment</li>
+                        <li>Newly added network interfaces are assigned to the default zone unless specified otherwise</li>
+                        <li>The loopback interface (<code>lo</code>) is mapped to the <code>trusted</code> zone by default</li>
+                    </ul>
+
+                    <div class="callout callout-important">
+                        <div class="callout-title">⚠️ NetworkManager Integration</div>
+                        <p>For laptops and systems that frequently change networks, the NetworkManager service can automatically set firewall zones based on the network connection. This is useful when you connect to your home network (trusted) versus a public WiFi hotspot (untrusted).</p>
+                    </div>
+
+                    <h3>firewalld Package</h3>
+                    <p>The <code>firewalld</code> package provides:</p>
+                    <ul>
+                        <li><code>firewalld</code> daemon - The background service that manages rules</li>
+                        <li><code>firewall-cmd</code> - Command-line management tool</li>
+                        <li>Predefined zone and service configurations</li>
+                        <li>Integration with system services</li>
+                    </ul>
+
+                    <div class="code-block">
+                        <code># Check firewalld status
+# systemctl status firewalld
+
+# Check firewalld is enabled
+# systemctl is-enabled firewalld
+enabled</code>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('nftables')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('zones')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- Zones Section -->
+                <section class="section" id="zones">
+                    <h2>Firewall Zones Explained</h2>
+                    
+                    <h3>Understanding Zones</h3>
+                    <p>Zones are the cornerstone of firewalld's configuration model. Each zone represents a different level of trust and comes with a predefined set of allowed services and ports.</p>
+
+                    <h3>Predefined Zones</h3>
+                    <p>firewalld provides several predefined zones, arranged from most to least trusted:</p>
+
+                    <h4>trusted Zone</h4>
+                    <p><strong>Trust Level:</strong> Maximum</p>
+                    <p><strong>Default Behavior:</strong> Allow all incoming traffic</p>
+                    <p><strong>Use Case:</strong> Internal management interfaces, isolated private networks, loopback interface</p>
+                    <p>The trusted zone accepts all network connections. Use this only for networks you completely control, such as dedicated management interfaces or localhost.</p>
+
+                    <h4>home Zone</h4>
+                    <p><strong>Trust Level:</strong> High</p>
+                    <p><strong>Default Services:</strong> ssh, mdns, samba-client, dhcpv6-client</p>
+                    <p><strong>Use Case:</strong> Home networks where you trust the other computers</p>
+                    <p>Designed for home networks, this zone allows common home services like file sharing (Samba) and device discovery (mDNS).</p>
+
+                    <h4>internal Zone</h4>
+                    <p><strong>Trust Level:</strong> High</p>
+                    <p><strong>Default Services:</strong> ssh, mdns, samba-client, dhcpv6-client</p>
+                    <p><strong>Use Case:</strong> Internal corporate networks with trusted systems</p>
+                    <p>Similar to the home zone but intended for internal corporate networks. By default, it has the same services as home.</p>
+
+                    <h4>work Zone</h4>
+                    <p><strong>Trust Level:</strong> Medium</p>
+                    <p><strong>Default Services:</strong> ssh, dhcpv6-client</p>
+                    <p><strong>Use Case:</strong> Work networks where you trust most (but not all) computers</p>
+                    <p>Appropriate for corporate work environments. More restrictive than home/internal - only SSH and DHCPv6 are allowed by default.</p>
+
+                    <h4>public Zone</h4>
+                    <p><strong>Trust Level:</strong> Low</p>
+                    <p><strong>Default Services:</strong> ssh, dhcpv6-client</p>
+                    <p><strong>Use Case:</strong> Public networks, untrusted connections, default for new interfaces</p>
+                    <p>This is the default zone. It assumes you don't trust other computers on the network and only allows selected services.</p>
+
+                    <div class="callout callout-important">
+                        <div class="callout-title">⚠️ Default Zone</div>
+                        <p>The <code>public</code> zone is the default for newly added network interfaces. This conservative choice ensures that new interfaces aren't accidentally exposed with permissive rules.</p>
+                    </div>
+
+                    <h4>external Zone</h4>
+                    <p><strong>Trust Level:</strong> Low</p>
+                    <p><strong>Default Services:</strong> ssh</p>
+                    <p><strong>Special Feature:</strong> Masquerading enabled (for NAT routing)</p>
+                    <p><strong>Use Case:</strong> External networks when your system acts as a router/gateway</p>
+                    <p>Designed for external-facing interfaces when you're using the system as a router. IPv4 masquerading is enabled, making outgoing traffic appear to originate from the router's external IP.</p>
+
+                    <h4>dmz Zone</h4>
+                    <p><strong>Trust Level:</strong> Very Low</p>
+                    <p><strong>Default Services:</strong> ssh</p>
+                    <p><strong>Use Case:</strong> DMZ (demilitarized zone) with publicly accessible servers</p>
+                    <p>For systems in a DMZ that are accessible from the internet but need limited access to your internal network. Only SSH is allowed by default.</p>
+
+                    <h4>block Zone</h4>
+                    <p><strong>Trust Level:</strong> Minimal</p>
+                    <p><strong>Default Behavior:</strong> Reject all incoming connections with ICMP error</p>
+                    <p><strong>Use Case:</strong> Temporarily blocking specific sources while allowing diagnosis</p>
+                    <p>All incoming connections are rejected with an "icmp-host-prohibited" or "icmp6-adm-prohibited" message. Outgoing connections are still allowed.</p>
+
+                    <h4>drop Zone</h4>
+                    <p><strong>Trust Level:</strong> None</p>
+                    <p><strong>Default Behavior:</strong> Drop all incoming connections silently</p>
+                    <p><strong>Use Case:</strong> Maximum stealth, hostile networks</p>
+                    <p>The most restrictive zone. All incoming packets are dropped without any response (not even ICMP errors). Only outgoing connections are allowed. The system appears completely invisible on the network.</p>
+
+                    <h3>Zone Exception: Trusted</h3>
+                    <p>The <code>trusted</code> zone is unique - it permits <strong>all</strong> traffic by default, regardless of port or protocol. Most zones work on an "allowlist" basis where you explicitly permit specific services; the trusted zone is the opposite.</p>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Choosing the Right Zone</div>
+                        <p>When deciding which zone to use, ask yourself: "How much do I trust this network?" More trust means more permissive rules. For servers, the <code>public</code> zone is typically appropriate for internet-facing interfaces, while <code>internal</code> might be used for backend network interfaces.</p>
+                    </div>
+
+                    <h3>Common Zone Patterns</h3>
+                    <p>Here are typical zone assignments for different server scenarios:</p>
+
+                    <h4>Web Server</h4>
+                    <ul>
+                        <li>Public interface → <code>public</code> zone with HTTP/HTTPS services</li>
+                        <li>Internal interface → <code>internal</code> zone for administration</li>
+                    </ul>
+
+                    <h4>Database Server</h4>
+                    <ul>
+                        <li>Internal interface → <code>internal</code> zone with database service</li>
+                        <li>Management interface → <code>trusted</code> zone for administrators</li>
+                    </ul>
+
+                    <h4>Laptop</h4>
+                    <ul>
+                        <li>Home WiFi → <code>home</code> zone</li>
+                        <li>Work network → <code>work</code> zone</li>
+                        <li>Coffee shop → <code>public</code> zone</li>
+                    </ul>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('firewalld')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('services')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- Services Section -->
+                <section class="section" id="services">
+                    <h2>Predefined Services</h2>
+                    
+                    <h3>What are Service Definitions?</h3>
+                    <p>Instead of requiring you to remember that HTTP uses port 80/TCP and HTTPS uses port 443/TCP, firewalld provides <strong>predefined service configurations</strong>. A service definition includes:</p>
+                    <ul>
+                        <li>One or more ports and protocols (TCP/UDP)</li>
+                        <li>Optional helper modules for complex protocols</li>
+                        <li>Human-readable service names</li>
+                        <li>Descriptions of the service</li>
+                    </ul>
+
+                    <h3>Common Predefined Services</h3>
+                    <p>The firewalld package includes hundreds of predefined services. Here are some of the most commonly used:</p>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Service Name</th>
+                                <th>Ports/Protocol</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>ssh</strong></td>
+                                <td>22/tcp</td>
+                                <td>Secure Shell remote access</td>
+                            </tr>
+                            <tr>
+                                <td><strong>http</strong></td>
+                                <td>80/tcp</td>
+                                <td>HTTP web server</td>
+                            </tr>
+                            <tr>
+                                <td><strong>https</strong></td>
+                                <td>443/tcp</td>
+                                <td>HTTPS web server (encrypted)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>dhcpv6-client</strong></td>
+                                <td>546/udp (fe80::/64)</td>
+                                <td>DHCPv6 client for IPv6 networks</td>
+                            </tr>
+                            <tr>
+                                <td><strong>cockpit</strong></td>
+                                <td>9090/tcp</td>
+                                <td>Web console for system management</td>
+                            </tr>
+                            <tr>
+                                <td><strong>dns</strong></td>
+                                <td>53/tcp, 53/udp</td>
+                                <td>DNS name server</td>
+                            </tr>
+                            <tr>
+                                <td><strong>mysql</strong></td>
+                                <td>3306/tcp</td>
+                                <td>MySQL database server</td>
+                            </tr>
+                            <tr>
+                                <td><strong>postgresql</strong></td>
+                                <td>5432/tcp</td>
+                                <td>PostgreSQL database server</td>
+                            </tr>
+                            <tr>
+                                <td><strong>smtp</strong></td>
+                                <td>25/tcp</td>
+                                <td>Simple Mail Transfer Protocol</td>
+                            </tr>
+                            <tr>
+                                <td><strong>nfs</strong></td>
+                                <td>2049/tcp</td>
+                                <td>Network File System</td>
+                            </tr>
+                            <tr>
+                                <td><strong>samba</strong></td>
+                                <td>137/udp, 138/udp, 139/tcp, 445/tcp</td>
+                                <td>Windows file and print sharing</td>
+                            </tr>
+                            <tr>
+                                <td><strong>mdns</strong></td>
+                                <td>5353/udp</td>
+                                <td>Multicast DNS (local name resolution)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Viewing Available Services</h3>
+                    <p>You can list all available predefined services using the <code>firewall-cmd</code> command:</p>
+
+                    <div class="code-block">
+                        <code># firewall-cmd --get-services
+RH-Satellite-6 amanda-client amanda-k5-client amqp amqps apcupsd audit 
+bacula bacula-client bgp bitcoin bitcoin-rpc bitcoin-testnet ceph 
+cfengine cockpit condor-collector ctdb dhcp dhcpv6 dhcpv6-client dns 
+docker-registry docker-swarm dropbox-lansync elasticsearch etcd-client 
+etcd-server finger freeipa-ldap freeipa-ldaps ftp ganglia-client 
+ganglia-master git gre high-availability http https imap imaps ipp 
+ipp-client ipsec irc ircs iscsi-target jenkins kadmin kerberos kibana 
+klogin kpasswd kprop kshell ldap ldaps libvirt libvirt-tls managesieve 
+mdns minidlna mosh mountd ms-wbt mssql murmur mysql nfs nfs3 nmea-0183 
+nrpe ntp openvpn ovirt-imageio ovirt-storageconsole ovirt-vmconsole 
+pmcd pmproxy pmwebapi pmwebapis pop3 pop3s postgresql privoxy proxy-dhcp 
+ptp pulseaudio puppetmaster quassel radius redis rpc-bind rsh rsyncd 
+rtsp salt-master samba samba-client sane sip sips smtp smtp-submission 
+smtps snmp snmptrap spideroak-lansync squid ssh synergy syslog 
+syslog-tls telnet tftp tftp-client tinc tor-socks transmission-client 
+vdsm vnc-server wbem-https xdmcp xmpp-bosh xmpp-client xmpp-local 
+xmpp-server zabbix-agent zabbix-server</code>
+                    </div>
+
+                    <h3>When to Use Services vs. Ports</h3>
+                    <p>You have two options for allowing traffic through the firewall:</p>
+                    <ol>
+                        <li><strong>Add a predefined service</strong> - Use service name (recommended when available)</li>
+                        <li><strong>Add a specific port</strong> - Manually specify port number and protocol</li>
+                    </ol>
+
+                    <h4>Use Service Definitions When:</h4>
+                    <ul>
+                        <li>A predefined service exists for your application</li>
+                        <li>The service uses multiple ports or complex protocols</li>
+                        <li>You want self-documenting configuration</li>
+                    </ul>
+
+                    <div class="code-block">
+                        <code># Add HTTP service (recommended)
+# firewall-cmd --add-service=http
+
+# This is clearer than:
+# firewall-cmd --add-port=80/tcp</code>
+                    </div>
+
+                    <h4>Use Manual Ports When:</h4>
+                    <ul>
+                        <li>No predefined service exists</li>
+                        <li>Your application uses a non-standard port</li>
+                        <li>You're running a custom application</li>
+                    </ul>
+
+                    <div class="code-block">
+                        <code># Application running on custom port
+# firewall-cmd --add-port=8080/tcp</code>
+                    </div>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Service Configuration Files</div>
+                        <p>Service definitions are stored as XML files in <code>/usr/lib/firewalld/services/</code>. You can examine these files to see exactly which ports a service uses, or even create custom service definitions for your applications.</p>
+                    </div>
+
+                    <h3>Multi-Port Services</h3>
+                    <p>Some services require multiple ports. The <code>samba</code> service, for example, requires:</p>
+                    <ul>
+                        <li>137/udp - NetBIOS Name Service</li>
+                        <li>138/udp - NetBIOS Datagram Service</li>
+                        <li>139/tcp - NetBIOS Session Service</li>
+                        <li>445/tcp - Microsoft-DS (directory services)</li>
+                    </ul>
+
+                    <p>By using the predefined service, one command handles all required ports:</p>
+
+                    <div class="code-block">
+                        <code># One command opens all necessary ports
+# firewall-cmd --add-service=samba
+
+# Without service definition, you'd need:
+# firewall-cmd --add-port=137/udp
+# firewall-cmd --add-port=138/udp
+# firewall-cmd --add-port=139/tcp
+# firewall-cmd --add-port=445/tcp</code>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('zones')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('quiz-firewall')">Next: Quiz →</button>
+                    </div>
+                </section>
+
+                <!-- Quiz: Firewall Concepts -->
+                <section class="section" id="quiz-firewall">
+                    <h2>Quiz: Firewall Concepts</h2>
+                    
+                    <p>Test your understanding of firewall concepts before moving on to management tools.</p>
+
+                    <div class="quiz" data-quiz="firewall-concepts">
+                        <div class="quiz-question">1. Which netfilter hook processes packets destined for services running on the local system?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="wrong">PREROUTING</div>
+                            <div class="quiz-option" data-answer="correct">INPUT</div>
+                            <div class="quiz-option" data-answer="wrong">FORWARD</div>
+                            <div class="quiz-option" data-answer="wrong">OUTPUT</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz" data-quiz="firewall-concepts-2">
+                        <div class="quiz-question">2. What is the default zone in firewalld?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="wrong">trusted</div>
+                            <div class="quiz-option" data-answer="correct">public</div>
+                            <div class="quiz-option" data-answer="wrong">internal</div>
+                            <div class="quiz-option" data-answer="wrong">dmz</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz" data-quiz="firewall-concepts-3">
+                        <div class="quiz-question">3. Which zone allows ALL incoming traffic by default?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="wrong">home</div>
+                            <div class="quiz-option" data-answer="wrong">public</div>
+                            <div class="quiz-option" data-answer="correct">trusted</div>
+                            <div class="quiz-option" data-answer="wrong">work</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz" data-quiz="firewall-concepts-4">
+                        <div class="quiz-question">4. What advantage does nftables provide over iptables?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="wrong">It only works with IPv4</div>
+                            <div class="quiz-option" data-answer="correct">It provides a unified framework for IPv4 and IPv6</div>
+                            <div class="quiz-option" data-answer="wrong">It doesn't support firewalld</div>
+                            <div class="quiz-option" data-answer="wrong">It requires separate tools for each protocol</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz" data-quiz="firewall-concepts-5">
+                        <div class="quiz-question">5. What does the SSH predefined service allow?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="wrong">Port 80/tcp</div>
+                            <div class="quiz-option" data-answer="correct">Port 22/tcp</div>
+                            <div class="quiz-option" data-answer="wrong">Port 443/tcp</div>
+                            <div class="quiz-option" data-answer="wrong">Port 21/tcp</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="btn-group mt-3">
+                        <button class="btn btn-secondary" onclick="navigateToSection('services')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('web-console')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- Web Console Management Section -->
+                <section class="section" id="web-console">
+                    <h2>Managing Firewall with Web Console</h2>
+                    
+                    <h3>Introduction to the Web Console</h3>
+                    <p>Red Hat Enterprise Linux 9 includes <strong>Cockpit</strong>, a web-based interface for system administration. The web console provides a graphical way to manage firewall settings without using the command line.</p>
+
+                    <h3>Accessing the Web Console</h3>
+                    <p>To access the web console:</p>
+                    <ol>
+                        <li>Open a web browser</li>
+                        <li>Navigate to <code>https://SERVER_ADDRESS:9090</code></li>
+                        <li>Log in with your system credentials</li>
+                        <li>Accept the self-signed SSL certificate warning (if prompted)</li>
+                    </ol>
+
+                    <div class="callout callout-important">
+                        <div class="callout-title">⚠️ Privilege Escalation Required</div>
+                        <p>After logging in, you'll have limited access. To manage the firewall, you must click <strong>"Limited access"</strong> or <strong>"Turn on administrative access"</strong> and enter your password. This elevates your privileges based on your user's sudo configuration.</p>
+                    </div>
+
+                    <h3>Navigating to Firewall Settings</h3>
+                    <p>Once logged in with administrative access:</p>
+                    <ol>
+                        <li>Click <strong>Networking</strong> in the left sidebar</li>
+                        <li>In the Firewall section, click <strong>Edit rules and zones</strong></li>
+                        <li>The firewall configuration page displays active zones and their services</li>
+                    </ol>
+
+                    <h3>Managing Services via Web Console</h3>
+                    
+                    <h4>Adding a Service</h4>
+                    <p>To allow traffic for a service:</p>
+                    <ol>
+                        <li>On the Firewall page, locate the zone you want to modify (typically <code>public</code>)</li>
+                        <li>Click <strong>Add services</strong> button in the upper right corner of the zone</li>
+                        <li>A dialog displays available predefined services</li>
+                        <li>Use the <strong>Filter services</strong> text box to search for services</li>
+                        <li>Check the box next to the service you want to add (e.g., "http")</li>
+                        <li>Click <strong>Add services</strong> button to apply</li>
+                    </ol>
+
+                    <h4>Adding a Custom Port</h4>
+                    <p>If no predefined service exists for your application:</p>
+                    <ol>
+                        <li>Click <strong>Add services</strong> button</li>
+                        <li>Click the <strong>Custom ports</strong> radio button</li>
+                        <li>Enter the port numbers and select TCP or UDP protocol</li>
+                        <li>Click <strong>Add ports</strong> to apply</li>
+                    </ol>
+
+                    <h4>Removing a Service</h4>
+                    <p>To remove an allowed service:</p>
+                    <ol>
+                        <li>Locate the service in the zone's service list</li>
+                        <li>Click the <strong>trash can icon</strong> next to the service</li>
+                        <li>The service is immediately removed</li>
+                    </ol>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Real-Time Updates</div>
+                        <p>Changes made via the web console are applied immediately to the <strong>runtime</strong> configuration and are also saved to the <strong>permanent</strong> configuration. You don't need to manually reload the firewall.</p>
+                    </div>
+
+                    <h3>Viewing Zone Configuration</h3>
+                    <p>The web console displays for each zone:</p>
+                    <ul>
+                        <li><strong>Zone name</strong> (e.g., "public zone")</li>
+                        <li><strong>Interfaces</strong> assigned to the zone</li>
+                        <li><strong>Allowed services</strong> listed by name</li>
+                        <li><strong>TCP and UDP columns</strong> showing port numbers for each service</li>
+                    </ul>
+
+                    <h3>Web Console Example Workflow</h3>
+                    <p>Let's say you're setting up a web server and need to allow HTTP and HTTPS traffic:</p>
+
+                    <ol>
+                        <li>Access web console at <code>https://serverb.lab.example.com:9090</code></li>
+                        <li>Log in and escalate to administrative access</li>
+                        <li>Navigate to Networking → Firewall</li>
+                        <li>In the public zone, click <strong>Add services</strong></li>
+                        <li>Type "http" in the filter box</li>
+                        <li>Check both <strong>http</strong> and <strong>https</strong></li>
+                        <li>Click <strong>Add services</strong></li>
+                        <li>Verify both services now appear in the public zone list</li>
+                    </ol>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">📘 When to Use Web Console</div>
+                        <p>The web console is ideal when:</p>
+                        <ul>
+                            <li>You prefer graphical interfaces</li>
+                            <li>You're managing a remote system and want a visual overview</li>
+                            <li>You're unfamiliar with command-line syntax</li>
+                            <li>You want to explore available services</li>
+                        </ul>
+                        <p>However, for automation, scripting, or SSH-only access, the command line is more appropriate.</p>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('quiz-firewall')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('firewall-cmd')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- firewall-cmd Section -->
+                <section class="section" id="firewall-cmd">
+                    <h2>Command-Line Firewall Management</h2>
+                    
+                    <h3>The firewall-cmd Tool</h3>
+                    <p>The <code>firewall-cmd</code> command is the primary command-line interface for managing firewalld. It provides complete control over firewall configuration and is essential for:</p>
+                    <ul>
+                        <li>Remote management via SSH</li>
+                        <li>Automation and scripting</li>
+                        <li>Advanced configurations not available in the web console</li>
+                        <li>Systems without a graphical environment</li>
+                    </ul>
+
+                    <h3>Basic Command Syntax</h3>
+                    <div class="code-block">
+                        <code>firewall-cmd [--permanent] [--zone=ZONE] COMMAND</code>
+                    </div>
+
+                    <h3>Querying Firewall State</h3>
+                    
+                    <h4>Get Default Zone</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --get-default-zone
+public</code>
+                    </div>
+
+                    <h4>List All Available Zones</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --get-zones
+block dmz drop external home internal public trusted work</code>
+                    </div>
+
+                    <h4>List Active Zones</h4>
+                    <p>Shows zones that have interfaces or sources assigned:</p>
+                    <div class="code-block">
+                        <code># firewall-cmd --get-active-zones
+public
+  interfaces: eth0</code>
+                    </div>
+
+                    <h4>List All Configuration for a Zone</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --zone=public --list-all
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: eth0
+  sources:
+  services: cockpit dhcpv6-client ssh
+  ports:
+  protocols:
+  forward: yes
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:</code>
+                    </div>
+
+                    <h3>Managing Zone Assignment</h3>
+                    
+                    <h4>Set Default Zone</h4>
+                    <p>Changes both runtime and permanent configuration:</p>
+                    <div class="code-block">
+                        <code># firewall-cmd --set-default-zone=dmz
+success</code>
+                    </div>
+
+                    <h4>Assign Source IP to Zone</h4>
+                    <p>Route traffic from specific IP addresses or networks to a zone:</p>
+                    <div class="code-block">
+                        <code># firewall-cmd --permanent --zone=internal --add-source=192.168.0.0/24
+success</code>
+                    </div>
+
+                    <h4>Assign Interface to Zone</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --permanent --zone=internal --add-interface=eth1
+success</code>
+                    </div>
+
+                    <h4>Change Interface Zone</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --permanent --zone=public --change-interface=eth0
+success</code>
+                    </div>
+
+                    <h3>Managing Services and Ports</h3>
+                    
+                    <h4>Add a Service</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --add-service=http
+success
+
+# Add to specific zone
+# firewall-cmd --zone=dmz --add-service=https
+success</code>
+                    </div>
+
+                    <h4>Add a Custom Port</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --add-port=8080/tcp
+success
+
+# Multiple ports
+# firewall-cmd --add-port=8080-8090/tcp
+success</code>
+                    </div>
+
+                    <h4>Remove a Service</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --remove-service=http
+success</code>
+                    </div>
+
+                    <h4>Remove a Port</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --remove-port=8080/tcp
+success</code>
+                    </div>
+
+                    <h3>Important Options</h3>
+                    
+                    <h4>--permanent Flag</h4>
+                    <p>By default, <code>firewall-cmd</code> modifies the <strong>runtime</strong> configuration, which is active now but lost on reload or reboot. The <code>--permanent</code> flag modifies the permanent configuration instead:</p>
+                    <div class="code-block">
+                        <code># Runtime change (immediate but temporary)
+# firewall-cmd --add-service=mysql
+
+# Permanent change (survives reboot but not active until reload)
+# firewall-cmd --permanent --add-service=mysql</code>
+                    </div>
+
+                    <h4>--reload Command</h4>
+                    <p>Applies permanent configuration to runtime:</p>
+                    <div class="code-block">
+                        <code># firewall-cmd --reload
+success</code>
+                    </div>
+
+                    <div class="callout callout-important">
+                        <div class="callout-title">⚠️ Runtime vs Permanent</div>
+                        <p>A common workflow is:</p>
+                        <ol>
+                            <li>Test the change in runtime (without --permanent)</li>
+                            <li>Verify it works correctly</li>
+                            <li>Apply the same change with --permanent</li>
+                            <li>Reload to ensure permanent config is active</li>
+                        </ol>
+                        <p>Or use --permanent from the start and reload to activate.</p>
+                    </div>
+
+                    <h3>Common Command Patterns</h3>
+                    
+                    <h4>Allow a Service Permanently</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --permanent --add-service=http
+# firewall-cmd --reload</code>
+                    </div>
+
+                    <h4>Open Custom Port on Specific Zone</h4>
+                    <div class="code-block">
+                        <code># firewall-cmd --permanent --zone=internal --add-port=3306/tcp
+# firewall-cmd --reload</code>
+                    </div>
+
+                    <h4>Complete Service Configuration</h4>
+                    <div class="code-block">
+                        <code># Set default zone
+# firewall-cmd --set-default-zone=dmz
+
+# Add source network to internal zone
+# firewall-cmd --permanent --zone=internal --add-source=192.168.0.0/24
+
+# Add MySQL service to internal zone
+# firewall-cmd --permanent --zone=internal --add-service=mysql
+
+# Reload to apply permanent changes
+# firewall-cmd --reload
+
+# Verify configuration
+# firewall-cmd --zone=internal --list-all</code>
+                    </div>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Pro Tip: Command Completion</div>
+                        <p>The bash shell provides tab completion for firewall-cmd commands. Start typing a command and press TAB to see available options. This is especially helpful for remembering service names.</p>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('web-console')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('runtime-permanent')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- Runtime vs Permanent Section -->
+                <section class="section" id="runtime-permanent">
+                    <h2>Runtime vs Permanent Configuration</h2>
+                    
+                    <h3>Understanding Two Configuration Layers</h3>
+                    <p>firewalld maintains two separate configurations:</p>
+                    <ul>
+                        <li><strong>Runtime configuration</strong> - Currently active rules in memory</li>
+                        <li><strong>Permanent configuration</strong> - Saved rules on disk</li>
+                    </ul>
+
+                    <h3>Runtime Configuration</h3>
+                    <p>The runtime configuration is what's currently enforced by the firewall. Changes to runtime configuration:</p>
+                    <ul>
+                        <li>Take effect <strong>immediately</strong></li>
+                        <li>Do not require reloading the firewall</li>
+                        <li>Are <strong>lost</strong> when you reload firewalld or reboot the system</li>
+                        <li>Perfect for testing before making permanent</li>
+                    </ul>
+
+                    <div class="code-block">
+                        <code># Add service to runtime (effective now, lost on reload)
+# firewall-cmd --add-service=http
+success</code>
+                    </div>
+
+                    <h3>Permanent Configuration</h3>
+                    <p>The permanent configuration is stored on disk. Changes to permanent configuration:</p>
+                    <ul>
+                        <li>Are saved to configuration files in <code>/etc/firewalld/</code></li>
+                        <li>Survive system reboots</li>
+                        <li>Do <strong>not</strong> take effect until you reload firewalld</li>
+                        <li>Ensure configurations persist long-term</li>
+                    </ul>
+
+                    <div class="code-block">
+                        <code># Add service to permanent config (saved but not active yet)
+# firewall-cmd --permanent --add-service=http
+success
+
+# Reload to activate permanent config
+# firewall-cmd --reload
+success</code>
+                    </div>
+
+                    <h3>The Reload Process</h3>
+                    <p>When you run <code>firewall-cmd --reload</code>:</p>
+                    <ol>
+                        <li>firewalld reads the permanent configuration from disk</li>
+                        <li>Applies it as the new runtime configuration</li>
+                        <li>Any runtime-only changes are <strong>discarded</strong></li>
+                        <li>Existing connections typically remain unaffected</li>
+                    </ol>
+
+                    <div class="callout callout-important">
+                        <div class="callout-title">⚠️ Critical Understanding</div>
+                        <p>If you make a runtime change without --permanent, then reload the firewall, your change will be LOST. Always remember to make changes permanent if you want them to survive.</p>
+                    </div>
+
+                    <h3>Recommended Workflows</h3>
+                    
+                    <h4>Workflow 1: Test Then Commit (Safest)</h4>
+                    <div class="code-block">
+                        <code># 1. Test in runtime
+# firewall-cmd --add-service=mysql
+success
+
+# 2. Verify it works (test your application)
+# curl http://localhost:3306
+
+# 3. If working, make permanent
+# firewall-cmd --permanent --add-service=mysql
+success
+
+# 4. Reload to ensure permanent is active
+# firewall-cmd --reload
+success</code>
+                    </div>
+
+                    <h4>Workflow 2: Direct to Permanent (Faster)</h4>
+                    <div class="code-block">
+                        <code># 1. Add to permanent configuration
+# firewall-cmd --permanent --add-service=mysql
+success
+
+# 2. Reload to activate
+# firewall-cmd --reload
+success
+
+# 3. Test your application</code>
+                    </div>
+
+                    <h4>Workflow 3: Both at Once (Most Common)</h4>
+                    <p>Some administrators run the same command twice - once for runtime, once for permanent:</p>
+                    <div class="code-block">
+                        <code># Add to runtime (immediate effect)
+# firewall-cmd --add-service=mysql
+
+# Add to permanent (survives reboot)
+# firewall-cmd --permanent --add-service=mysql</code>
+                    </div>
+
+                    <h3>Configuration Files</h3>
+                    <p>Permanent configurations are stored in:</p>
+                    <ul>
+                        <li><code>/etc/firewalld/zones/</code> - Custom zone configurations</li>
+                        <li><code>/etc/firewalld/services/</code> - Custom service definitions</li>
+                        <li><code>/usr/lib/firewalld/</code> - System-provided defaults (do not edit)</li>
+                    </ul>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Why Two Layers?</div>
+                        <p>The separation between runtime and permanent allows you to:</p>
+                        <ul>
+                            <li>Test changes without commitment</li>
+                            <li>Quickly revert to known-good configuration with --reload</li>
+                            <li>Make temporary changes for troubleshooting</li>
+                            <li>Prevent accidental changes from becoming permanent</li>
+                        </ul>
+                    </div>
+
+                    <h3>Common Mistake: Forgetting --permanent</h3>
+                    <p>A frequent error is making runtime changes and thinking they're permanent:</p>
+                    <div class="code-block">
+                        <code># Admin adds service (runtime only)
+# firewall-cmd --add-service=http
+success
+
+# Months later, system reboots...
+# Service is now blocked! The change was never made permanent.
+
+# Correct approach:
+# firewall-cmd --permanent --add-service=http
+# firewall-cmd --reload</code>
+                    </div>
+
+                    <h3>Verifying Runtime vs Permanent</h3>
+                    <p>You can compare configurations:</p>
+                    <div class="code-block">
+                        <code># View runtime config
+# firewall-cmd --list-all
+
+# View permanent config
+# firewall-cmd --permanent --list-all
+
+# If they differ, you have uncommitted changes</code>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('firewall-cmd')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('exercise-1')">Next: Exercise 1 →</button>
+                    </div>
+                </section>
+
+                <!-- Exercise 1: Firewall Configuration -->
+                <section class="section" id="exercise-1">
+                    <h2>Exercise 1: Firewall Configuration</h2>
+                    
+                    <div class="exercise">
+                        <div class="exercise-header">🎯 Hands-On Exercise: Configure Firewall for Web Server</div>
+                        
+                        <p><strong>Scenario:</strong> You're setting up a web server that needs to accept HTTP connections on port 80. Currently, the firewall is blocking access. Configure the firewall to allow HTTP traffic permanently.</p>
+
+                        <h4>Your Tasks:</h4>
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 1: Check the current default zone</div>
+                            <p>Use the terminal below to determine what the default firewall zone is.</p>
+                        </div>
+
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 2: Add the HTTP service to the public zone</div>
+                            <p>Add the HTTP service to the public zone permanently and reload the firewall.</p>
+                        </div>
+
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 3: Verify the configuration</div>
+                            <p>List all services in the public zone to confirm HTTP is allowed.</p>
+                        </div>
+
+                        <div class="terminal" id="terminal-ex1">
+                            <div class="terminal-header">
+                                <div class="terminal-button close"></div>
+                                <div class="terminal-button minimize"></div>
+                                <div class="terminal-button maximize"></div>
+                            </div>
+                            <div class="terminal-output" id="output-ex1"></div>
+                            <div class="terminal-input-container">
+                                <span class="terminal-input-prompt">[root@serverb ~]# </span>
+                                <input type="text" class="terminal-input" id="input-ex1" autocomplete="off" spellcheck="false">
+                            </div>
+                        </div>
+
+                        <button class="btn btn-success" onclick="validateExercise1()">Validate Exercise</button>
+                        
+                        <div class="validation-feedback" id="validation-ex1"></div>
+                    </div>
+
+                    <div class="btn-group mt-3">
+                        <button class="btn btn-secondary" onclick="navigateToSection('runtime-permanent')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('selinux-intro')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- SELinux Introduction Section -->
+                <section class="section" id="selinux-intro">
+                    <h2>SELinux Basics for Port Management</h2>
+                    
+                    <h3>What is SELinux?</h3>
+                    <p><strong>Security-Enhanced Linux (SELinux)</strong> is a mandatory access control (MAC) security mechanism built into the Linux kernel. While traditional Linux uses discretionary access control (file permissions based on user/group/other), SELinux adds an additional layer of security.</p>
+
+                    <h3>Mandatory vs Discretionary Access Control</h3>
+                    
+                    <h4>Discretionary Access Control (DAC)</h4>
+                    <p>Traditional Linux file permissions:</p>
+                    <ul>
+                        <li>File owner decides who can access the file</li>
+                        <li>Users can change permissions on files they own</li>
+                        <li>If a process runs as root, it can access any file</li>
+                        <li>Compromised processes inherit user's full permissions</li>
+                    </ul>
+
+                    <h4>Mandatory Access Control (MAC)</h4>
+                    <p>SELinux enforces system-wide security policy:</p>
+                    <ul>
+                        <li>Security policy is centrally defined by administrators</li>
+                        <li>Even root processes are restricted by policy</li>
+                        <li>Processes can only access resources their policy allows</li>
+                        <li>Compromised processes have limited damage potential</li>
+                    </ul>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Defense in Depth</div>
+                        <p>SELinux and firewalls work together as complementary security layers:</p>
+                        <ul>
+                            <li><strong>Firewall</strong> - Controls which connections can reach services</li>
+                            <li><strong>SELinux</strong> - Controls what resources processes can access, including which ports they can bind to</li>
+                        </ul>
+                        <p>Both must permit an action for it to succeed.</p>
+                    </div>
+
+                    <h3>SELinux Contexts</h3>
+                    <p>SELinux labels every process, file, port, and system object with a <strong>security context</strong>. A context has four fields:</p>
+                    <div class="code-block">
+                        <code>user:role:type:level</code>
+                    </div>
+
+                    <p>For network port management, the most important field is the <strong>type</strong>:</p>
+                    <ul>
+                        <li><code>ssh_port_t</code> - SSH service ports</li>
+                        <li><code>http_port_t</code> - HTTP service ports</li>
+                        <li><code>mysqld_port_t</code> - MySQL database ports</li>
+                        <li>And hundreds more...</li>
+                    </ul>
+
+                    <h3>Targeted Policy</h3>
+                    <p>Red Hat Enterprise Linux uses the <strong>targeted policy</strong>, which:</p>
+                    <ul>
+                        <li>Protects network-facing services (like web servers, databases)</li>
+                        <li>Runs most user processes unconfined (without SELinux restrictions)</li>
+                        <li>Focuses enforcement on high-risk daemons</li>
+                        <li>Balances security with usability</li>
+                    </ul>
+
+                    <h3>How SELinux Controls Port Binding</h3>
+                    <p>When a service tries to bind to a network port:</p>
+                    <ol>
+                        <li>The service process has a SELinux type (e.g., <code>httpd_t</code> for Apache)</li>
+                        <li>The port has a SELinux type (e.g., <code>http_port_t</code> for ports 80, 443, 8080...)</li>
+                        <li>SELinux policy includes rules like: "processes with type <code>httpd_t</code> can bind to ports with type <code>http_port_t</code>"</li>
+                        <li>If the port doesn't have the correct type, binding is denied</li>
+                    </ol>
+
+                    <h3>Why Port Labeling Matters</h3>
+                    <p>Consider this scenario:</p>
+                    <div class="code-block">
+                        <code># Try to run Apache on port 8080
+# systemctl start httpd
+Job for httpd.service failed because the control process exited with error code.
+
+# Check the error
+# journalctl -xe
+SELinux is preventing /usr/sbin/httpd from name_bind access on tcp_socket port 8080.</code>
+                    </div>
+
+                    <p>The problem: Port 8080 doesn't have the <code>http_port_t</code> type that Apache needs. You must add that port to the allowed list.</p>
+
+                    <div class="callout callout-important">
+                        <div class="callout-title">⚠️ SELinux and Firewalls are Independent</div>
+                        <p>Remember: SELinux port labeling is separate from firewall rules. For a service to work:</p>
+                        <ol>
+                            <li>SELinux must allow the service to bind to the port</li>
+                            <li>The firewall must allow connections to reach the port</li>
+                        </ol>
+                        <p>If either blocks the port, the service won't work properly.</p>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('exercise-1')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('port-labels')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- Port Labels Section -->
+                <section class="section" id="port-labels">
+                    <h2>Port Labeling Concepts</h2>
+                    
+                    <h3>Understanding Port Types</h3>
+                    <p>Every network port in SELinux can have a <strong>port type</strong> assigned. This type determines which services are allowed to bind to (listen on) that port.</p>
+
+                    <h3>Common Port Type Examples</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Port Type</th>
+                                <th>Default Ports</th>
+                                <th>Service</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ssh_port_t</code></td>
+                                <td>22/tcp</td>
+                                <td>SSH server</td>
+                            </tr>
+                            <tr>
+                                <td><code>http_port_t</code></td>
+                                <td>80, 81, 443, 488, 8008, 8009, 8443, 9000/tcp</td>
+                                <td>Web servers (Apache, Nginx)</td>
+                            </tr>
+                            <tr>
+                                <td><code>mysqld_port_t</code></td>
+                                <td>1186, 3306, 63132-63164/tcp</td>
+                                <td>MySQL/MariaDB database</td>
+                            </tr>
+                            <tr>
+                                <td><code>postgresql_port_t</code></td>
+                                <td>5432, 5433/tcp</td>
+                                <td>PostgreSQL database</td>
+                            </tr>
+                            <tr>
+                                <td><code>dns_port_t</code></td>
+                                <td>53/tcp, 53/udp</td>
+                                <td>DNS name server</td>
+                            </tr>
+                            <tr>
+                                <td><code>smtp_port_t</code></td>
+                                <td>25, 465, 587/tcp</td>
+                                <td>Email server</td>
+                            </tr>
+                            <tr>
+                                <td><code>ftp_port_t</code></td>
+                                <td>20, 21, 989, 990/tcp</td>
+                                <td>FTP server</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Why Multiple Ports Have the Same Type</h3>
+                    <p>Notice that <code>http_port_t</code> includes many ports: 80, 81, 443, 488, 8008, 8009, 8443, 9000. This is because:</p>
+                    <ul>
+                        <li>Port 80 is standard HTTP</li>
+                        <li>Port 443 is standard HTTPS</li>
+                        <li>Ports 8008, 8080, 8443 are common alternatives for web servers</li>
+                        <li>Port 9000 is used by some web applications</li>
+                    </ul>
+
+                    <p>All these ports are pre-labeled with <code>http_port_t</code>, so web servers can use any of them without additional configuration.</p>
+
+                    <h3>Listing Port Labels</h3>
+                    <p>You can view all port type assignments using the <code>semanage port -l</code> command:</p>
+                    <div class="code-block">
+                        <code># semanage port -l
+SELinux Port Type         Proto    Port Number
+
+afs3_callback_port_t      tcp      7001
+afs3_callback_port_t      udp      7001
+afs_bos_port_t            udp      7007
+...output omitted...</code>
+                    </div>
+
+                    <p>This produces a long list. You typically filter it:</p>
+                    <div class="code-block">
+                        <code># List all HTTP-related ports
+# semanage port -l | grep http
+http_cache_port_t         tcp      8080, 8118, 8123, 10001-10010
+http_cache_port_t         udp      3130
+http_port_t               tcp      80, 81, 443, 488, 8008, 8009, 8443, 9000
+
+# List what port 22 is labeled as
+# semanage port -l | grep -w 22
+ssh_port_t                tcp      22</code>
+                    </div>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Important: Use -w with grep</div>
+                        <p>When searching by port number, use <code>grep -w</code> for word boundaries. Otherwise, <code>grep 22</code> would match ports like 22, 220, 2222, etc. The <code>-w</code> flag ensures exact matches only.</p>
+                    </div>
+
+                    <h3>Standard vs Custom Ports</h3>
+                    <p>There are two categories of port assignments:</p>
+
+                    <h4>Default Port Labels (from Policy)</h4>
+                    <p>These come from the SELinux policy modules installed on your system:</p>
+                    <ul>
+                        <li>Defined by Red Hat/distribution maintainers</li>
+                        <li>Cover well-known ports for common services</li>
+                        <li>Cannot be changed with <code>semanage</code></li>
+                        <li>Require policy module modification to change</li>
+                    </ul>
+
+                    <h4>Custom Port Labels (local additions)</h4>
+                    <p>These are ports you've added using <code>semanage</code>:</p>
+                    <ul>
+                        <li>Defined by local administrator</li>
+                        <li>For non-standard or custom configurations</li>
+                        <li>Can be added, modified, or removed with <code>semanage</code></li>
+                        <li>Stored in local SELinux policy</li>
+                    </ul>
+
+                    <h3>When You Need to Modify Port Labels</h3>
+                    <p>You typically need to modify port labels when:</p>
+                    <ul>
+                        <li>Running a service on a non-standard port (e.g., SSH on port 2222)</li>
+                        <li>Your web application uses port 8080 but it's not already labeled</li>
+                        <li>Setting up multiple instances of a service on different ports</li>
+                        <li>Security policy requires services on non-default ports</li>
+                    </ul>
+
+                    <div class="callout callout-important">
+                        <div class="callout-title">⚠️ One Port, One Type</div>
+                        <p>Each port can only be labeled with one type. You cannot assign a port to multiple types. If you need to change a port's type, you must remove the old assignment first or use the modify operation.</p>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('selinux-intro')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('semanage')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- semanage Command Section -->
+                <section class="section" id="semanage">
+                    <h2>Managing Port Bindings with semanage</h2>
+                    
+                    <h3>The semanage Command</h3>
+                    <p>The <code>semanage</code> command is the primary tool for managing SELinux policy configurations, including port labeling. The full command is <code>semanage port</code> for port-related operations.</p>
+
+                    <h3>Basic semanage port Syntax</h3>
+                    <div class="code-block">
+                        <code>semanage port -a -t PORT_TYPE -p PROTOCOL PORT_NUMBER</code>
+                    </div>
+
+                    <h3>Common Operations</h3>
+                    
+                    <h4>Adding a Port Label</h4>
+                    <p>To allow a service to bind to a new port, add the port with the appropriate type:</p>
+                    <div class="code-block">
+                        <code># Allow Apache to bind to port 8080
+# semanage port -a -t http_port_t -p tcp 8080
+
+# Allow SSH to bind to port 2222
+# semanage port -a -t ssh_port_t -p tcp 2222
+
+# Allow MySQL to bind to port 3307
+# semanage port -a -t mysqld_port_t -p tcp 3307</code>
+                    </div>
+
+                    <p>Options explained:</p>
+                    <ul>
+                        <li><code>-a</code> - Add a new port binding</li>
+                        <li><code>-t PORT_TYPE</code> - Specify the SELinux port type</li>
+                        <li><code>-p PROTOCOL</code> - Specify tcp or udp</li>
+                        <li>Last argument is the port number</li>
+                    </ul>
+
+                    <h4>Deleting a Port Label</h4>
+                    <p>To remove a custom port binding:</p>
+                    <div class="code-block">
+                        <code># Remove port 8080 from http_port_t
+# semanage port -d -t http_port_t -p tcp 8080</code>
+                    </div>
+
+                    <p>Note: You can only delete <strong>custom</strong> port bindings that you added. Default port assignments from the policy cannot be deleted this way.</p>
+
+                    <h4>Modifying a Port Label</h4>
+                    <p>To change a port's type assignment:</p>
+                    <div class="code-block">
+                        <code># Change port 8080 from one type to another
+# semanage port -m -t http_cache_port_t -p tcp 8080</code>
+                    </div>
+
+                    <p>The <code>-m</code> (modify) option changes an existing port's type.</p>
+
+                    <h4>Listing Port Labels</h4>
+                    <p>View all port type assignments:</p>
+                    <div class="code-block">
+                        <code># List all port types
+# semanage port -l
+
+# Filter for specific service
+# semanage port -l | grep http
+http_cache_port_t         tcp      8080, 8118, 8123, 10001-10010
+http_port_t               tcp      80, 81, 443, 488, 8008, 8009, 8443, 9000
+
+# Filter for specific port number
+# semanage port -l | grep -w 80
+http_port_t               tcp      80, 81, 443, 488, 8008, 8009, 8443, 9000</code>
+                    </div>
+
+                    <h4>Viewing Local Changes</h4>
+                    <p>To see only the custom port bindings you've added (not the defaults):</p>
+                    <div class="code-block">
+                        <code># semanage port -l -C
+SELinux Port Type         Proto    Port Number
+
+http_port_t               tcp      8080</code>
+                    </div>
+
+                    <p>The <code>-C</code> (customized) option shows only local modifications.</p>
+
+                    <h3>Common Scenarios</h3>
+                    
+                    <h4>Scenario 1: Web Server on Non-Standard Port</h4>
+                    <p>You want to run Apache on port 8888:</p>
+                    <div class="code-block">
+                        <code># Check if port already has a type
+# semanage port -l | grep -w 8888
+# (no output = not assigned)
+
+# Add port 8888 to http_port_t
+# semanage port -a -t http_port_t -p tcp 8888
+
+# Verify
+# semanage port -l | grep -w 8888
+http_port_t               tcp      8888
+
+# Now Apache can bind to port 8888</code>
+                    </div>
+
+                    <h4>Scenario 2: Multiple Web Server Instances</h4>
+                    <p>Running multiple web servers on ports 8001, 8002, 8003:</p>
+                    <div class="code-block">
+                        <code># Add all three ports
+# semanage port -a -t http_port_t -p tcp 8001
+# semanage port -a -t http_port_t -p tcp 8002
+# semanage port -a -t http_port_t -p tcp 8003
+
+# Verify
+# semanage port -l -C
+http_port_t               tcp      8001, 8002, 8003</code>
+                    </div>
+
+                    <h4>Scenario 3: Fixing "Permission Denied" Errors</h4>
+                    <p>When SELinux blocks a service from binding:</p>
+                    <div class="code-block">
+                        <code># Service fails to start
+# systemctl start httpd
+Job for httpd.service failed...
+
+# Check SELinux alerts
+# sealert -a /var/log/audit/audit.log
+SELinux is preventing /usr/sbin/httpd from name_bind access on tcp_socket port 1001.
+
+***** Plugin bind_ports suggests *************************
+
+If you want to allow /usr/sbin/httpd to bind to network port 1001
+Then you need to modify the port type.
+Do
+# semanage port -a -t http_port_t -p tcp 1001
+
+# Apply the suggested fix
+# semanage port -a -t http_port_t -p tcp 1001
+
+# Retry starting the service
+# systemctl start httpd
+# systemctl status httpd
+Active: active (running)</code>
+                    </div>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">💡 Finding the Correct Port Type</div>
+                        <p>If you're unsure which port type to use:</p>
+                        <ol>
+                            <li>Check the service's man page: <code>man httpd_selinux</code></li>
+                            <li>Look at existing ports for that service: <code>semanage port -l | grep http</code></li>
+                            <li>Use <code>sealert</code> - it often suggests the correct type</li>
+                        </ol>
+                    </div>
+
+                    <h3>Port Ranges</h3>
+                    <p>You can also assign ranges of ports:</p>
+                    <div class="code-block">
+                        <code># Allow HTTP on ports 8100-8199
+# semanage port -a -t http_port_t -p tcp 8100-8199</code>
+                    </div>
+
+                    <div class="callout callout-important">
+                        <div class="callout-title">⚠️ SELinux Policy Modules</div>
+                        <p>Remember: Default port assignments come from SELinux policy modules. You cannot use <code>semanage port</code> to change these defaults - you can only add new port bindings. To change a default port's type, you would need to modify and reload the policy module itself, which is an advanced topic beyond this lesson.</p>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('port-labels')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('exercise-2')">Next: Exercise 2 →</button>
+                    </div>
+                </section>
+
+                <!-- Exercise 2: SELinux Port Binding -->
+                <section class="section" id="exercise-2">
+                    <h2>Exercise 2: SELinux Port Binding</h2>
+                    
+                    <div class="exercise">
+                        <div class="exercise-header">🎯 Hands-On Exercise: Configure SELinux for Non-Standard Port</div>
+                        
+                        <p><strong>Scenario:</strong> You need to run a web application on port 1001 instead of the standard port 80. SELinux is currently preventing the web server from binding to this port. Configure SELinux to allow the web server to use port 1001.</p>
+
+                        <h4>Your Tasks:</h4>
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 1: Find the correct port type for web servers</div>
+                            <p>Use <code>semanage port -l</code> with grep to find which port type is used for HTTP services.</p>
+                        </div>
+
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 2: Add port 1001 to the HTTP port type</div>
+                            <p>Use the semanage command to bind port 1001/tcp to the http_port_t type.</p>
+                        </div>
+
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 3: Verify the configuration</div>
+                            <p>Check that port 1001 is now labeled correctly.</p>
+                        </div>
+
+                        <div class="terminal" id="terminal-ex2">
+                            <div class="terminal-header">
+                                <div class="terminal-button close"></div>
+                                <div class="terminal-button minimize"></div>
+                                <div class="terminal-button maximize"></div>
+                            </div>
+                            <div class="terminal-output" id="output-ex2"></div>
+                            <div class="terminal-input-container">
+                                <span class="terminal-input-prompt">[root@serverb ~]# </span>
+                                <input type="text" class="terminal-input" id="input-ex2" autocomplete="off" spellcheck="false">
+                            </div>
+                        </div>
+
+                        <button class="btn btn-success" onclick="validateExercise2()">Validate Exercise</button>
+                        
+                        <div class="validation-feedback" id="validation-ex2"></div>
+                    </div>
+
+                    <div class="btn-group mt-3">
+                        <button class="btn btn-secondary" onclick="navigateToSection('semanage')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('quiz-selinux')">Next: Quiz →</button>
+                    </div>
+                </section>
+
+                <!-- Quiz: SELinux -->
+                <section class="section" id="quiz-selinux">
+                    <h2>Quiz: SELinux Port Labeling</h2>
+                    
+                    <p>Test your understanding of SELinux port labeling concepts.</p>
+
+                    <div class="quiz" data-quiz="selinux-1">
+                        <div class="quiz-question">1. What command lists all SELinux port type assignments?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="wrong">semanage port -a</div>
+                            <div class="quiz-option" data-answer="correct">semanage port -l</div>
+                            <div class="quiz-option" data-answer="wrong">semanage port -d</div>
+                            <div class="quiz-option" data-answer="wrong">semanage port -m</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz" data-quiz="selinux-2">
+                        <div class="quiz-question">2. What SELinux port type is used for HTTP web servers?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="wrong">ssh_port_t</div>
+                            <div class="quiz-option" data-answer="correct">http_port_t</div>
+                            <div class="quiz-option" data-answer="wrong">web_port_t</div>
+                            <div class="quiz-option" data-answer="wrong">apache_port_t</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz" data-quiz="selinux-3">
+                        <div class="quiz-question">3. Which flag is used with semanage port to add a new port binding?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="correct">-a</div>
+                            <div class="quiz-option" data-answer="wrong">-l</div>
+                            <div class="quiz-option" data-answer="wrong">-d</div>
+                            <div class="quiz-option" data-answer="wrong">-m</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz" data-quiz="selinux-4">
+                        <div class="quiz-question">4. For a web service to work properly, what must be configured?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="wrong">Only the firewall</div>
+                            <div class="quiz-option" data-answer="wrong">Only SELinux port labels</div>
+                            <div class="quiz-option" data-answer="correct">Both firewall rules and SELinux port labels</div>
+                            <div class="quiz-option" data-answer="wrong">Neither - services work by default</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz" data-quiz="selinux-5">
+                        <div class="quiz-question">5. What does the -C flag do with semanage port -l?</div>
+                        <div class="quiz-options">
+                            <div class="quiz-option" data-answer="wrong">Creates a new port binding</div>
+                            <div class="quiz-option" data-answer="correct">Shows only customized (local) port bindings</div>
+                            <div class="quiz-option" data-answer="wrong">Clears all port bindings</div>
+                            <div class="quiz-option" data-answer="wrong">Checks port binding syntax</div>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="btn-group mt-3">
+                        <button class="btn btn-secondary" onclick="navigateToSection('exercise-2')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('troubleshooting')">Next →</button>
+                    </div>
+                </section>
+
+                <!-- Troubleshooting Section -->
+                <section class="section" id="troubleshooting">
+                    <h2>Troubleshooting Network Service Access</h2>
+                    
+                    <h3>Systematic Troubleshooting Approach</h3>
+                    <p>When a network service isn't accessible, follow this systematic approach to identify and fix the problem:</p>
+
+                    <h4>Step 1: Verify the Service is Running</h4>
+                    <div class="code-block">
+                        <code># Check service status
+# systemctl status httpd
+
+# If not running, start it
+# systemctl start httpd
+
+# Enable for automatic start
+# systemctl enable httpd</code>
+                    </div>
+
+                    <h4>Step 2: Check Firewall Configuration</h4>
+                    <div class="code-block">
+                        <code># Check if service/port is allowed in firewall
+# firewall-cmd --list-all
+
+# Look for the service in the "services:" line
+# Or check for the port in the "ports:" line
+
+# If missing, add it
+# firewall-cmd --add-service=http
+# firewall-cmd --permanent --add-service=http
+# firewall-cmd --reload</code>
+                    </div>
+
+                    <h4>Step 3: Check SELinux Port Labels</h4>
+                    <div class="code-block">
+                        <code># Check if port has correct SELinux type
+# semanage port -l | grep -w 80
+http_port_t               tcp      80, 81, 443, 488, 8008, 8009, 8443, 9000
+
+# If using non-standard port, check it's labeled
+# semanage port -l | grep -w 1001
+# (if no output, port isn't labeled)
+
+# Add the port label if needed
+# semanage port -a -t http_port_t -p tcp 1001</code>
+                    </div>
+
+                    <h4>Step 4: Check SELinux Audit Logs</h4>
+                    <p>If SELinux is denying access, check the audit logs:</p>
+                    <div class="code-block">
+                        <code># View SELinux alerts with user-friendly messages
+# sealert -a /var/log/audit/audit.log
+
+# Look for recent denials
+# ausearch -m AVC -ts recent
+
+# Use audit2why for quick analysis
+# grep httpd /var/log/audit/audit.log | audit2why</code>
+                    </div>
+
+                    <h3>Common Error Messages and Solutions</h3>
+                    
+                    <h4>Error: "Connection refused"</h4>
+                    <p><strong>Meaning:</strong> The firewall is blocking the connection, or the service isn't listening on that port.</p>
+                    <p><strong>Solution:</strong></p>
+                    <ul>
+                        <li>Check firewall rules: <code>firewall-cmd --list-all</code></li>
+                        <li>Verify service is running: <code>systemctl status SERVICE</code></li>
+                        <li>Check service is listening: <code>ss -tulpn | grep PORT</code></li>
+                    </ul>
+
+                    <h4>Error: "Permission denied" or "AH00072: make_sock: could not bind to address"</h4>
+                    <p><strong>Meaning:</strong> SELinux is preventing the service from binding to the port.</p>
+                    <p><strong>Solution:</strong></p>
+                    <ul>
+                        <li>Check SELinux alerts: <code>sealert -a /var/log/audit/audit.log</code></li>
+                        <li>Add port to correct type: <code>semanage port -a -t http_port_t -p tcp PORT</code></li>
+                    </ul>
+
+                    <h4>Error: "No route to host"</h4>
+                    <p><strong>Meaning:</strong> Network connectivity issue, or external firewall blocking.</p>
+                    <p><strong>Solution:</strong></p>
+                    <ul>
+                        <li>Check network connectivity: <code>ping SERVER</code></li>
+                        <li>Verify routing: <code>ip route</code></li>
+                        <li>Check for external firewalls (hardware, cloud security groups)</li>
+                    </ul>
+
+                    <h3>Diagnostic Commands Reference</h3>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>systemctl status SERVICE</code></td>
+                                <td>Check if service is running</td>
+                            </tr>
+                            <tr>
+                                <td><code>ss -tulpn</code></td>
+                                <td>Show listening ports and services</td>
+                            </tr>
+                            <tr>
+                                <td><code>firewall-cmd --list-all</code></td>
+                                <td>Show firewall configuration</td>
+                            </tr>
+                            <tr>
+                                <td><code>semanage port -l | grep PORT</code></td>
+                                <td>Check SELinux port label</td>
+                            </tr>
+                            <tr>
+                                <td><code>sealert -a /var/log/audit/audit.log</code></td>
+                                <td>View SELinux denials with solutions</td>
+                            </tr>
+                            <tr>
+                                <td><code>journalctl -xe</code></td>
+                                <td>View recent system logs</td>
+                            </tr>
+                            <tr>
+                                <td><code>curl http://localhost:PORT</code></td>
+                                <td>Test local connectivity</td>
+                            </tr>
+                            <tr>
+                                <td><code>curl http://SERVER:PORT</code></td>
+                                <td>Test remote connectivity</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Troubleshooting Flowchart</h3>
+                    <div class="callout callout-note">
+                        <div class="callout-title">🔍 Step-by-Step Diagnostic Process</div>
+                        <ol>
+                            <li><strong>Service running?</strong> → If no, start the service</li>
+                            <li><strong>Firewall allows port?</strong> → If no, add service/port to firewall</li>
+                            <li><strong>SELinux allows port binding?</strong> → If no, add port label</li>
+                            <li><strong>Service listening on correct port?</strong> → Check configuration file</li>
+                            <li><strong>Can connect locally?</strong> → Test with curl from localhost</li>
+                            <li><strong>Can connect remotely?</strong> → Test from another machine</li>
+                            <li><strong>External firewall blocking?</strong> → Check cloud/hardware firewalls</li>
+                        </ol>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="navigateToSection('quiz-selinux')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('exercise-3')">Next: Final Exercise →</button>
+                    </div>
+                </section>
+
+                <!-- Exercise 3: Integrated Lab -->
+                <section class="section" id="exercise-3">
+                    <h2>Exercise 3: Integrated Lab</h2>
+                    
+                    <div class="exercise">
+                        <div class="exercise-header">🎯 Comprehensive Exercise: Configure Web Server on Port 1001</div>
+                        
+                        <p><strong>Scenario:</strong> You need to configure a web server to run on ports 80 and 1001. Currently:</p>
+                        <ul>
+                            <li>The httpd service is installed but not running</li>
+                            <li>The firewall is blocking both ports</li>
+                            <li>SELinux doesn't have port 1001 labeled for HTTP</li>
+                        </ul>
+
+                        <p><strong>Your goal:</strong> Configure both the firewall and SELinux so that a web server can run successfully on port 1001, then start the service.</p>
+
+                        <h4>Complete These Tasks:</h4>
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 1: Configure SELinux for port 1001</div>
+                            <p>Add port 1001/tcp to the http_port_t type so the web server can bind to it.</p>
+                        </div>
+
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 2: Configure the firewall</div>
+                            <p>Add port 1001/tcp to the public zone permanently and reload the firewall.</p>
+                        </div>
+
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 3: Start and enable the httpd service</div>
+                            <p>Start the httpd service and enable it to start automatically at boot.</p>
+                        </div>
+
+                        <div class="exercise-task">
+                            <div class="exercise-task-title">Task 4: Verify everything works</div>
+                            <p>Check that the service is running and that both SELinux and firewall configurations are correct.</p>
+                        </div>
+
+                        <div class="terminal" id="terminal-ex3">
+                            <div class="terminal-header">
+                                <div class="terminal-button close"></div>
+                                <div class="terminal-button minimize"></div>
+                                <div class="terminal-button maximize"></div>
+                            </div>
+                            <div class="terminal-output" id="output-ex3"></div>
+                            <div class="terminal-input-container">
+                                <span class="terminal-input-prompt">[root@serverb ~]# </span>
+                                <input type="text" class="terminal-input" id="input-ex3" autocomplete="off" spellcheck="false">
+                            </div>
+                        </div>
+
+                        <button class="btn btn-success" onclick="validateExercise3()">Validate Exercise</button>
+                        
+                        <div class="validation-feedback" id="validation-ex3"></div>
+                    </div>
+
+                    <div class="btn-group mt-3">
+                        <button class="btn btn-secondary" onclick="navigateToSection('troubleshooting')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('conclusion')">Next: Conclusion →</button>
+                    </div>
+                </section>
+
+                <!-- Conclusion Section -->
+                <section class="section" id="conclusion">
+                    <h2>Conclusion</h2>
+                    
+                    <h3>Congratulations!</h3>
+                    <p>You've completed this interactive lesson on network security management in Linux. You now have practical knowledge of both firewalld and SELinux port labeling.</p>
+
+                    <h3>Key Takeaways</h3>
+                    
+                    <h4>Firewall Management</h4>
+                    <ul>
+                        <li>The netfilter framework provides the kernel-level packet filtering foundation</li>
+                        <li>nftables is the modern replacement for iptables, offering better performance and unified IPv4/IPv6 support</li>
+                        <li>firewalld is a dynamic firewall manager that makes configuration much easier through zones and services</li>
+                        <li>Zones represent different trust levels and contain sets of allowed services and ports</li>
+                        <li>Changes can be made to runtime (immediate but temporary) or permanent (saved but requires reload) configuration</li>
+                        <li>Both the web console and firewall-cmd provide effective management interfaces</li>
+                    </ul>
+
+                    <h4>SELinux Port Labeling</h4>
+                    <ul>
+                        <li>SELinux provides mandatory access control as an additional security layer</li>
+                        <li>Every port has a SELinux type that determines which services can bind to it</li>
+                        <li>The semanage port command manages port type assignments</li>
+                        <li>Custom ports must be explicitly labeled with the appropriate type</li>
+                        <li>Both firewall AND SELinux must permit a service for it to work</li>
+                    </ul>
+
+                    <h4>Integrated Security</h4>
+                    <ul>
+                        <li>Network security requires multiple layers: firewall, SELinux, and service configuration</li>
+                        <li>Systematic troubleshooting checks each layer in order</li>
+                        <li>The sealert tool helps identify and resolve SELinux denials</li>
+                        <li>Always test configurations before making them permanent</li>
+                    </ul>
+
+                    <h3>Best Practices</h3>
+                    <ol>
+                        <li><strong>Use the principle of least privilege</strong> - Only open ports that are actually needed</li>
+                        <li><strong>Test before committing</strong> - Use runtime changes to test, then make permanent</li>
+                        <li><strong>Document your changes</strong> - Keep track of custom ports and firewall rules</li>
+                        <li><strong>Use predefined services</strong> - When available, they're clearer than raw port numbers</li>
+                        <li><strong>Check both layers</strong> - Remember that firewall AND SELinux must both permit access</li>
+                        <li><strong>Review regularly</strong> - Periodically audit firewall rules and remove unused services</li>
+                    </ol>
+
+                    <h3>Next Steps</h3>
+                    <p>To deepen your knowledge, consider exploring:</p>
+                    <ul>
+                        <li><strong>Rich Rules</strong> - Advanced firewalld rules with more complex matching criteria</li>
+                        <li><strong>Direct Rules</strong> - Low-level nftables rules through firewalld</li>
+                        <li><strong>Custom Service Definitions</strong> - Creating your own service definitions for firewalld</li>
+                        <li><strong>SELinux Booleans</strong> - Runtime switches that enable/disable SELinux policy features</li>
+                        <li><strong>SELinux Policy Modules</strong> - Writing custom policies for your applications</li>
+                        <li><strong>Automation</strong> - Using Ansible or other tools to manage firewall configurations</li>
+                    </ul>
+
+                    <h3>Additional Resources</h3>
+                    <ul>
+                        <li><strong>Man Pages:</strong>
+                            <ul>
+                                <li><code>man firewalld</code></li>
+                                <li><code>man firewall-cmd</code></li>
+                                <li><code>man firewalld.zones</code></li>
+                                <li><code>man semanage-port</code></li>
+                                <li><code>man SERVICE_selinux</code> (e.g., httpd_selinux)</li>
+                            </ul>
+                        </li>
+                        <li><strong>Red Hat Documentation:</strong> docs.redhat.com</li>
+                        <li><strong>SELinux Project:</strong> selinuxproject.org</li>
+                    </ul>
+
+                    <div class="callout callout-note">
+                        <div class="callout-title">🎓 Your Progress</div>
+                        <p>You've completed:</p>
+                        <ul>
+                            <li>✓ All content sections</li>
+                            <li>✓ Knowledge check quizzes</li>
+                            <li>✓ Hands-on exercises with validation</li>
+                            <li>✓ Integrated lab scenario</li>
+                        </ul>
+                        <p id="completion-message"></p>
+                    </div>
+
+                    <div class="btn-group mt-3">
+                        <button class="btn btn-secondary" onclick="navigateToSection('exercise-3')">← Previous</button>
+                        <button class="btn btn-primary" onclick="navigateToSection('introduction')">Start Over</button>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Keyboard Navigation Hint -->
+    <div class="keyboard-hint" id="keyboard-hint">
+        Use <kbd>←</kbd> <kbd>→</kbd> arrow keys to navigate | Press <kbd>?</kbd> to hide
+    </div>
+
+    <script>
+        // ===== STATE MANAGEMENT =====
+        const appState = {
+            currentSection: 'introduction',
+            completedSections: new Set(),
+            sectionOrder: [],
+            firewall: {
+                defaultZone: 'public',
+                zones: {
+                    trusted: { interfaces: [], sources: [], services: [], ports: [] },
+                    home: { interfaces: [], sources: [], services: ['ssh', 'mdns', 'samba-client', 'dhcpv6-client'], ports: [] },
+                    internal: { interfaces: [], sources: [], services: ['ssh', 'mdns', 'samba-client', 'dhcpv6-client'], ports: [] },
+                    work: { interfaces: [], sources: [], services: ['ssh', 'dhcpv6-client'], ports: [] },
+                    public: { interfaces: ['eth0'], sources: [], services: ['ssh', 'dhcpv6-client', 'cockpit'], ports: [] },
+                    external: { interfaces: [], sources: [], services: ['ssh'], ports: [] },
+                    dmz: { interfaces: [], sources: [], services: ['ssh'], ports: [] },
+                    block: { interfaces: [], sources: [], services: [], ports: [] },
+                    drop: { interfaces: [], sources: [], services: [], ports: [] }
+                },
+                permanentConfig: null
+            },
+            selinux: {
+                portBindings: [
+                    { port: 22, protocol: 'tcp', type: 'ssh_port_t' },
+                    { port: 80, protocol: 'tcp', type: 'http_port_t' },
+                    { port: 81, protocol: 'tcp', type: 'http_port_t' },
+                    { port: 443, protocol: 'tcp', type: 'http_port_t' },
+                    { port: 488, protocol: 'tcp', type: 'http_port_t' },
+                    { port: 8008, protocol: 'tcp', type: 'http_port_t' },
+                    { port: 8009, protocol: 'tcp', type: 'http_port_t' },
+                    { port: 8443, protocol: 'tcp', type: 'http_port_t' },
+                    { port: 9000, protocol: 'tcp', type: 'http_port_t' },
+                    { port: 8080, protocol: 'tcp', type: 'http_cache_port_t' },
+                    { port: 8118, protocol: 'tcp', type: 'http_cache_port_t' },
+                    { port: 8123, protocol: 'tcp', type: 'http_cache_port_t' },
+                    { port: 3130, protocol: 'udp', type: 'http_cache_port_t' },
+                    { port: 3306, protocol: 'tcp', type: 'mysqld_port_t' },
+                    { port: 5432, protocol: 'tcp', type: 'postgresql_port_t' },
+                    { port: 53, protocol: 'tcp', type: 'dns_port_t' },
+                    { port: 53, protocol: 'udp', type: 'dns_port_t' },
+                    { port: 70, protocol: 'tcp', type: 'gopher_port_t' },
+                    { port: 70, protocol: 'udp', type: 'gopher_port_t' }
+                ],
+                customBindings: []
+            },
+            services: {
+                httpd: { running: false, enabled: false }
+            },
+            quizScores: {},
+            exerciseProgress: {
+                exercise1: { completed: false, steps: [] },
+                exercise2: { completed: false, steps: [] },
+                exercise3: { completed: false, steps: [] }
+            },
+            keyboardHintVisible: true
+        };
+
+        // Initialize permanent config as copy of zones
+        appState.firewall.permanentConfig = JSON.parse(JSON.stringify(appState.firewall.zones));
+
+        // ===== KEYBOARD NAVIGATION =====
+        function initializeSectionOrder() {
+            const navItems = document.querySelectorAll('.nav-item');
+            appState.sectionOrder = Array.from(navItems).map(item => item.dataset.section);
+        }
+
+        function navigateToNextSection() {
+            const currentIndex = appState.sectionOrder.indexOf(appState.currentSection);
+            if (currentIndex < appState.sectionOrder.length - 1) {
+                const nextSection = appState.sectionOrder[currentIndex + 1];
+                navigateToSection(nextSection);
+                showKeyboardHint();
+            }
+        }
+
+        function navigateToPreviousSection() {
+            const currentIndex = appState.sectionOrder.indexOf(appState.currentSection);
+            if (currentIndex > 0) {
+                const prevSection = appState.sectionOrder[currentIndex - 1];
+                navigateToSection(prevSection);
+                showKeyboardHint();
+            }
+        }
+
+        function toggleKeyboardHint() {
+            appState.keyboardHintVisible = !appState.keyboardHintVisible;
+            const hint = document.getElementById('keyboard-hint');
+            if (hint) {
+                hint.classList.toggle('show', appState.keyboardHintVisible);
+            }
+        }
+
+        function showKeyboardHint() {
+            const hint = document.getElementById('keyboard-hint');
+            if (hint && appState.keyboardHintVisible) {
+                hint.classList.add('show');
+                setTimeout(() => {
+                    hint.classList.remove('show');
+                }, 3000);
+            }
+        }
+
+        // Global keyboard event handler
+        document.addEventListener('keydown', (e) => {
+            const activeElement = document.activeElement;
+            const isInputField = activeElement.tagName === 'INPUT' || 
+                                 activeElement.tagName === 'TEXTAREA' ||
+                                 activeElement.isContentEditable;
+
+            if (isInputField) {
+                return;
+            }
+
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    navigateToPreviousSection();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    navigateToNextSection();
+                    break;
+                case '?':
+                    e.preventDefault();
+                    toggleKeyboardHint();
+                    break;
+            }
+        });
+
+        // ===== NAVIGATION =====
+        function navigateToSection(sectionId) {
+            if (!appState.sectionOrder.includes(sectionId)) {
+                console.warn('Section not found:', sectionId);
+                return;
+            }
+
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) {
+                targetSection.classList.add('active');
+                appState.currentSection = sectionId;
+
+                document.querySelectorAll('.nav-item').forEach(item => {
+                    item.classList.remove('active');
+                    if (item.dataset.section === sectionId) {
+                        item.classList.add('active');
+                        item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                });
+
+                updateBreadcrumb(sectionId);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                saveProgress();
+                updateProgress();
+            }
+        }
+
+        function updateBreadcrumb(sectionId) {
+            const breadcrumbText = document.getElementById('breadcrumb-text');
+            const navItem = document.querySelector(`[data-section="${sectionId}"]`);
+            if (navItem && breadcrumbText) {
+                breadcrumbText.textContent = navItem.textContent;
+            }
+        }
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const sectionId = item.dataset.section;
+                navigateToSection(sectionId);
+            });
+        });
+
+        // ===== PROGRESS TRACKING =====
+        function markSectionComplete(sectionId) {
+            appState.completedSections.add(sectionId);
+            const navItem = document.querySelector(`[data-section="${sectionId}"]`);
+            if (navItem) {
+                navItem.classList.add('completed');
+            }
+            saveProgress();
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const totalSections = appState.sectionOrder.length;
+            const completedCount = appState.completedSections.size;
+            const percentage = totalSections > 0 ? Math.round((completedCount / totalSections) * 100) : 0;
+            
+            const progressBar = document.getElementById('progress-bar');
+            if (progressBar) {
+                progressBar.style.width = percentage + '%';
+            }
+
+            const completionMessage = document.getElementById('completion-message');
+            if (completionMessage) {
+                completionMessage.textContent = `You have completed ${completedCount} of ${totalSections} sections (${percentage}%).`;
+            }
+        }
+
+        function saveProgress() {
+            try {
+                const progressData = {
+                    currentSection: appState.currentSection,
+                    completedSections: Array.from(appState.completedSections),
+                    quizScores: appState.quizScores,
+                    exerciseProgress: appState.exerciseProgress
+                };
+                localStorage.setItem('networkSecurityProgress', JSON.stringify(progressData));
+            } catch (e) {
+                console.warn('Could not save progress to localStorage:', e);
+            }
+        }
+
+        function loadProgress() {
+            try {
+                const saved = localStorage.getItem('networkSecurityProgress');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    appState.completedSections = new Set(data.completedSections || []);
+                    appState.quizScores = data.quizScores || {};
+                    appState.exerciseProgress = data.exerciseProgress || appState.exerciseProgress;
+                    
+                    appState.completedSections.forEach(sectionId => {
+                        const navItem = document.querySelector(`[data-section="${sectionId}"]`);
+                        if (navItem) {
+                            navItem.classList.add('completed');
+                        }
+                    });
+
+                    updateProgress();
+                }
+            } catch (e) {
+                console.warn('Error loading progress:', e);
+            }
+        }
+
+        // ===== TERMINAL SIMULATOR =====
+        class TerminalSimulator {
+            constructor(terminalId, outputId, inputId) {
+                this.terminal = document.getElementById(terminalId);
+                this.output = document.getElementById(outputId);
+                this.input = document.getElementById(inputId);
+                this.commandHistory = [];
+                this.historyIndex = -1;
+
+                if (this.input) {
+                    this.input.addEventListener('keydown', (e) => this.handleKeydown(e));
+                }
+            }
+
+            handleKeydown(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const command = this.input.value.trim();
+                    if (command) {
+                        this.executeCommand(command);
+                        this.commandHistory.push(command);
+                        this.historyIndex = this.commandHistory.length;
+                        this.input.value = '';
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (this.historyIndex > 0) {
+                        this.historyIndex--;
+                        this.input.value = this.commandHistory[this.historyIndex];
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (this.historyIndex < this.commandHistory.length - 1) {
+                        this.historyIndex++;
+                        this.input.value = this.commandHistory[this.historyIndex];
+                    } else {
+                        this.historyIndex = this.commandHistory.length;
+                        this.input.value = '';
+                    }
+                }
+            }
+
+            addOutput(text, className = '') {
+                const line = document.createElement('div');
+                line.className = 'terminal-output-line ' + className;
+                line.textContent = text;
+                this.output.appendChild(line);
+                this.output.scrollTop = this.output.scrollHeight;
+            }
+
+            addPromptLine(command) {
+                this.addOutput('[root@serverb ~]# ' + command, 'terminal-prompt');
+            }
+
+            executeCommand(command) {
+                this.addPromptLine(command);
+                
+                const result = this.parseCommand(command);
+                if (result.output) {
+                    result.output.forEach(line => {
+                        this.addOutput(line, result.className || '');
+                    });
+                }
+            }
+
+            parseCommand(command) {
+                command = command.trim().replace(/\s+/g, ' ');
+
+                if (command.startsWith('firewall-cmd')) {
+                    return this.handleFirewallCmd(command);
+                }
+                
+                if (command.startsWith('semanage')) {
+                    return this.handleSemanage(command);
+                }
+
+                if (command.startsWith('systemctl')) {
+                    return this.handleSystemctl(command);
+                }
+
+                if (command === 'clear') {
+                    this.output.innerHTML = '';
+                    return { output: [] };
+                }
+
+                return {
+                    output: [`bash: ${command.split(' ')[0]}: command not found`],
+                    className: 'terminal-error'
+                };
+            }
+
+            handleFirewallCmd(command) {
+                if (command.includes('--get-default-zone')) {
+                    return { output: [appState.firewall.defaultZone] };
+                }
+
+                const setDefaultMatch = command.match(/--set-default-zone=(\w+)/);
+                if (setDefaultMatch) {
+                    const zone = setDefaultMatch[1];
+                    if (appState.firewall.zones[zone]) {
+                        appState.firewall.defaultZone = zone;
+                        appState.firewall.permanentConfig = JSON.parse(JSON.stringify(appState.firewall.zones));
+                        return { output: ['success'], className: 'terminal-success' };
+                    }
+                    return { output: ['Error: Unknown zone'], className: 'terminal-error' };
+                }
+
+                if (command.includes('--get-zones')) {
+                    return { output: [Object.keys(appState.firewall.zones).join(' ')] };
+                }
+
+                if (command.includes('--get-active-zones')) {
+                    const output = [];
+                    for (const [zoneName, zoneData] of Object.entries(appState.firewall.zones)) {
+                        if (zoneData.interfaces.length > 0 || zoneData.sources.length > 0) {
+                            output.push(zoneName);
+                            if (zoneData.interfaces.length > 0) {
+                                output.push('  interfaces: ' + zoneData.interfaces.join(' '));
+                            }
+                            if (zoneData.sources.length > 0) {
+                                output.push('  sources: ' + zoneData.sources.join(' '));
+                            }
+                        }
+                    }
+                    return { output: output.length > 0 ? output : ['No active zones'] };
+                }
+
+                if (command.includes('--list-all')) {
+                    const zoneMatch = command.match(/--zone=(\w+)/);
+                    const zone = zoneMatch ? zoneMatch[1] : appState.firewall.defaultZone;
+                    
+                    if (!appState.firewall.zones[zone]) {
+                        return { output: ['Error: Unknown zone'], className: 'terminal-error' };
+                    }
+
+                    const config = command.includes('--permanent') 
+                        ? appState.firewall.permanentConfig[zone]
+                        : appState.firewall.zones[zone];
+
+                    const output = [
+                        `${zone}`,
+                        '  target: default',
+                        '  icmp-block-inversion: no',
+                        `  interfaces: ${config.interfaces.join(' ')}`,
+                        `  sources: ${config.sources.join(' ')}`,
+                        `  services: ${config.services.join(' ')}`,
+                        `  ports: ${config.ports.join(' ')}`,
+                        '  protocols:',
+                        '  forward: yes',
+                        '  masquerade: no',
+                        '  forward-ports:',
+                        '  source-ports:',
+                        '  icmp-blocks:',
+                        '  rich rules:'
+                    ];
+                    return { output };
+                }
+
+                const addServiceMatch = command.match(/--add-service=(\S+)/);
+                if (addServiceMatch) {
+                    const service = addServiceMatch[1];
+                    const zoneMatch = command.match(/--zone=(\w+)/);
+                    const zone = zoneMatch ? zoneMatch[1] : appState.firewall.defaultZone;
+                    const isPermanent = command.includes('--permanent');
+
+                    if (!appState.firewall.zones[zone]) {
+                        return { output: ['Error: Unknown zone'], className: 'terminal-error' };
+                    }
+
+                    if (isPermanent) {
+                        if (!appState.firewall.permanentConfig[zone].services.includes(service)) {
+                            appState.firewall.permanentConfig[zone].services.push(service);
+                        }
+                    } else {
+                        if (!appState.firewall.zones[zone].services.includes(service)) {
+                            appState.firewall.zones[zone].services.push(service);
+                        }
+                    }
+
+                    return { output: ['success'], className: 'terminal-success' };
+                }
+
+                const addPortMatch = command.match(/--add-port=(\d+)\/(tcp|udp)/);
+                if (addPortMatch) {
+                    const port = addPortMatch[1];
+                    const protocol = addPortMatch[2];
+                    const portSpec = `${port}/${protocol}`;
+                    const zoneMatch = command.match(/--zone=(\w+)/);
+                    const zone = zoneMatch ? zoneMatch[1] : appState.firewall.defaultZone;
+                    const isPermanent = command.includes('--permanent');
+
+                    if (!appState.firewall.zones[zone]) {
+                        return { output: ['Error: Unknown zone'], className: 'terminal-error' };
+                    }
+
+                    if (isPermanent) {
+                        if (!appState.firewall.permanentConfig[zone].ports.includes(portSpec)) {
+                            appState.firewall.permanentConfig[zone].ports.push(portSpec);
+                        }
+                    } else {
+                        if (!appState.firewall.zones[zone].ports.includes(portSpec)) {
+                            appState.firewall.zones[zone].ports.push(portSpec);
+                        }
+                    }
+
+                    return { output: ['success'], className: 'terminal-success' };
+                }
+
+                if (command.includes('--reload')) {
+                    appState.firewall.zones = JSON.parse(JSON.stringify(appState.firewall.permanentConfig));
+                    return { output: ['success'], className: 'terminal-success' };
+                }
+
+                return {
+                    output: ['Error: Invalid firewall-cmd syntax. Try --help for usage.'],
+                    className: 'terminal-error'
+                };
+            }
+
+            handleSemanage(command) {
+                if (command.includes('port -l') || command.includes('port --list')) {
+                    let output = ['SELinux Port Type              Proto    Port Number', ''];
+                    
+                    const allBindings = [...appState.selinux.portBindings, ...appState.selinux.customBindings];
+                    
+                    const grouped = {};
+                    allBindings.forEach(binding => {
+                        const key = `${binding.type}-${binding.protocol}`;
+                        if (!grouped[key]) {
+                            grouped[key] = {
+                                type: binding.type,
+                                protocol: binding.protocol,
+                                ports: []
+                            };
+                        }
+                        grouped[key].ports.push(binding.port);
+                    });
+
+                    Object.values(grouped).forEach(group => {
+                        const ports = group.ports.sort((a, b) => a - b).join(', ');
+                        const typePadded = group.type.padEnd(30, ' ');
+                        const protoPadded = group.protocol.padEnd(9, ' ');
+                        output.push(`${typePadded}${protoPadded}${ports}`);
+                    });
+
+                    if (command.includes('grep')) {
+                        const grepMatch = command.match(/grep\s+(?:-w\s+)?['"]?(\S+)['"]?/);
+                        if (grepMatch) {
+                            const searchTerm = grepMatch[1];
+                            const useWordBoundary = command.includes('-w');
+                            
+                            output = output.filter(line => {
+                                if (useWordBoundary) {
+                                    const regex = new RegExp(`(^|\\s|,)${searchTerm}($|\\s|,)`, 'i');
+                                    return regex.test(line);
+                                } else {
+                                    return line.toLowerCase().includes(searchTerm.toLowerCase());
+                                }
+                            });
+                        }
+                    }
+
+                    return { output: output.length > 2 ? output : [''] };
+                }
+
+                if ((command.includes('port -l -C') || command.includes('port --list -C')) || 
+                    (command.includes('port -l') && command.includes('-C'))) {
+                    let output = ['SELinux Port Type              Proto    Port Number', ''];
+                    
+                    if (appState.selinux.customBindings.length === 0) {
+                        return { output: [''] };
+                    }
+
+                    const grouped = {};
+                    appState.selinux.customBindings.forEach(binding => {
+                        const key = `${binding.type}-${binding.protocol}`;
+                        if (!grouped[key]) {
+                            grouped[key] = {
+                                type: binding.type,
+                                protocol: binding.protocol,
+                                ports: []
+                            };
+                        }
+                        grouped[key].ports.push(binding.port);
+                    });
+
+                    Object.values(grouped).forEach(group => {
+                        const ports = group.ports.sort((a, b) => a - b).join(', ');
+                        const typePadded = group.type.padEnd(30, ' ');
+                        const protoPadded = group.protocol.padEnd(9, ' ');
+                        output.push(`${typePadded}${protoPadded}${ports}`);
+                    });
+
+                    return { output };
+                }
+
+                const addMatch = command.match(/port\s+(?:-a|--add)\s+-t\s+(\S+)\s+-p\s+(tcp|udp)\s+(\d+)/);
+                if (addMatch) {
+                    const type = addMatch[1];
+                    const protocol = addMatch[2];
+                    const port = parseInt(addMatch[3]);
+
+                    const exists = [...appState.selinux.portBindings, ...appState.selinux.customBindings]
+                        .some(b => b.port === port && b.protocol === protocol);
+
+                    if (exists) {
+                        return {
+                            output: [`/usr/sbin/semanage: Port ${protocol}/${port} already defined`],
+                            className: 'terminal-error'
+                        };
+                    }
+
+                    appState.selinux.customBindings.push({ port, protocol, type });
+                    return { output: [''], className: 'terminal-success' };
+                }
+
+                const modifyMatch = command.match(/port\s+(?:-m|--modify)\s+-t\s+(\S+)\s+-p\s+(tcp|udp)\s+(\d+)/);
+                if (modifyMatch) {
+                    const type = modifyMatch[1];
+                    const protocol = modifyMatch[2];
+                    const port = parseInt(modifyMatch[3]);
+
+                    let found = false;
+                    appState.selinux.customBindings = appState.selinux.customBindings.map(b => {
+                        if (b.port === port && b.protocol === protocol) {
+                            found = true;
+                            return { ...b, type };
+                        }
+                        return b;
+                    });
+
+                    if (!found) {
+                        return {
+                            output: [`/usr/sbin/semanage: Port ${protocol}/${port} is not defined`],
+                            className: 'terminal-error'
+                        };
+                    }
+
+                    return { output: [''], className: 'terminal-success' };
+                }
+
+                const deleteMatch = command.match(/port\s+(?:-d|--delete)\s+-t\s+(\S+)\s+-p\s+(tcp|udp)\s+(\d+)/);
+                if (deleteMatch) {
+                    const type = deleteMatch[1];
+                    const protocol = deleteMatch[2];
+                    const port = parseInt(deleteMatch[3]);
+
+                    const initialLength = appState.selinux.customBindings.length;
+                    appState.selinux.customBindings = appState.selinux.customBindings.filter(
+                        b => !(b.port === port && b.protocol === protocol && b.type === type)
+                    );
+
+                    if (appState.selinux.customBindings.length === initialLength) {
+                        return {
+                            output: [`/usr/sbin/semanage: Port ${protocol}/${port} is not defined`],
+                            className: 'terminal-error'
+                        };
+                    }
+
+                    return { output: [''], className: 'terminal-success' };
+                }
+
+                return {
+                    output: ['Error: Invalid semanage syntax. Try semanage port --help'],
+                    className: 'terminal-error'
+                };
+            }
+
+            handleSystemctl(command) {
+                if (command.includes('status')) {
+                    const serviceMatch = command.match(/status\s+(\S+)/);
+                    if (serviceMatch) {
+                        const service = serviceMatch[1];
+                        if (appState.services[service] !== undefined) {
+                            const status = appState.services[service].running ? 'active (running)' : 'inactive (dead)';
+                            const enabled = appState.services[service].enabled ? 'enabled' : 'disabled';
+                            return {
+                                output: [
+                                    `● ${service}.service`,
+                                    `   Loaded: loaded (/usr/lib/systemd/system/${service}.service; ${enabled})`,
+                                    `   Active: ${status}`
+                                ]
+                            };
+                        }
+                    }
+                    return { output: ['Error: Service not found'], className: 'terminal-error' };
+                }
+
+                if (command.includes('start') && !command.includes('restart')) {
+                    const serviceMatch = command.match(/start\s+(\S+)/);
+                    if (serviceMatch) {
+                        const service = serviceMatch[1];
+                        if (appState.services[service] !== undefined) {
+                            if (service === 'httpd') {
+                                const hasPort1001 = [...appState.selinux.portBindings, ...appState.selinux.customBindings]
+                                    .some(b => b.port === 1001 && b.protocol === 'tcp' && b.type === 'http_port_t');
+                                
+                                if (!hasPort1001) {
+                                    return {
+                                        output: [
+                                            'Job for httpd.service failed because the control process exited with error code.',
+                                            'See "systemctl status httpd.service" and "journalctl -xe" for details.',
+                                            '',
+                                            'Hint: SELinux is preventing httpd from binding to port 1001.',
+                                            'Use: semanage port -a -t http_port_t -p tcp 1001'
+                                        ],
+                                        className: 'terminal-error'
+                                    };
+                                }
+                            }
+                            
+                            appState.services[service].running = true;
+                            return { output: [''], className: 'terminal-success' };
+                        }
+                    }
+                    return { output: ['Error: Service not found'], className: 'terminal-error' };
+                }
+
+                if (command.includes('enable') && !command.includes('--now')) {
+                    const serviceMatch = command.match(/enable\s+(\S+)/);
+if (serviceMatch) {
+                        const service = serviceMatch[1];
+                        if (appState.services[service] !== undefined) {
+                            appState.services[service].enabled = true;
+                            return {
+                                output: [`Created symlink /etc/systemd/system/multi-user.target.wants/${service}.service → /usr/lib/systemd/system/${service}.service.`],
+                                className: 'terminal-success'
+                            };
+                        }
+                    }
+                    return { output: ['Error: Service not found'], className: 'terminal-error' };
+                }
+
+                if (command.includes('enable') && command.includes('--now')) {
+                    const serviceMatch = command.match(/enable\s+--now\s+(\S+)/);
+                    if (serviceMatch) {
+                        const service = serviceMatch[1];
+                        if (appState.services[service] !== undefined) {
+                            if (service === 'httpd') {
+                                const hasPort1001 = [...appState.selinux.portBindings, ...appState.selinux.customBindings]
+                                    .some(b => b.port === 1001 && b.protocol === 'tcp' && b.type === 'http_port_t');
+                                
+                                if (!hasPort1001) {
+                                    return {
+                                        output: [
+                                            'Job for httpd.service failed because the control process exited with error code.',
+                                            'See "systemctl status httpd.service" and "journalctl -xe" for details.',
+                                            '',
+                                            'Hint: SELinux is preventing httpd from binding to port 1001.',
+                                            'Use: semanage port -a -t http_port_t -p tcp 1001'
+                                        ],
+                                        className: 'terminal-error'
+                                    };
+                                }
+                            }
+
+                            appState.services[service].enabled = true;
+                            appState.services[service].running = true;
+                            return {
+                                output: [`Created symlink /etc/systemd/system/multi-user.target.wants/${service}.service → /usr/lib/systemd/system/${service}.service.`],
+                                className: 'terminal-success'
+                            };
+                        }
+                    }
+                    return { output: ['Error: Service not found'], className: 'terminal-error' };
+                }
+
+                if (command.includes('is-active')) {
+                    const serviceMatch = command.match(/is-active\s+(\S+)/);
+                    if (serviceMatch) {
+                        const service = serviceMatch[1];
+                        if (appState.services[service] !== undefined) {
+                            return {
+                                output: [appState.services[service].running ? 'active' : 'inactive']
+                            };
+                        }
+                    }
+                    return { output: ['unknown'] };
+                }
+
+                if (command.includes('is-enabled')) {
+                    const serviceMatch = command.match(/is-enabled\s+(\S+)/);
+                    if (serviceMatch) {
+                        const service = serviceMatch[1];
+                        if (appState.services[service] !== undefined) {
+                            return {
+                                output: [appState.services[service].enabled ? 'enabled' : 'disabled']
+                            };
+                        }
+                    }
+                    return { output: ['unknown'] };
+                }
+
+                return {
+                    output: ['Error: Invalid systemctl command'],
+                    className: 'terminal-error'
+                };
+            }
+        }
+
+        // Initialize terminals for exercises
+        let terminal1, terminal2, terminal3;
+
+        // ===== QUIZ FUNCTIONALITY =====
+        function initializeQuizzes() {
+            document.querySelectorAll('.quiz').forEach(quiz => {
+                const options = quiz.querySelectorAll('.quiz-option');
+                const feedback = quiz.querySelector('.quiz-feedback');
+                const quizId = quiz.dataset.quiz;
+                let answered = false;
+
+                options.forEach(option => {
+                    option.addEventListener('click', () => {
+                        if (answered) return;
+
+                        options.forEach(opt => {
+                            opt.classList.remove('selected', 'correct', 'incorrect');
+                        });
+
+                        option.classList.add('selected');
+
+                        const isCorrect = option.dataset.answer === 'correct';
+                        
+                        if (isCorrect) {
+                            option.classList.add('correct');
+                            if (feedback) {
+                                feedback.textContent = '✓ Correct! Well done.';
+                                feedback.className = 'quiz-feedback correct show';
+                            }
+                            appState.quizScores[quizId] = true;
+                            
+                            const sectionId = quiz.closest('.section').id;
+                            markSectionComplete(sectionId);
+                        } else {
+                            option.classList.add('incorrect');
+                            options.forEach(opt => {
+                                if (opt.dataset.answer === 'correct') {
+                                    opt.classList.add('correct');
+                                }
+                            });
+                            if (feedback) {
+                                feedback.textContent = '✗ Incorrect. The correct answer is highlighted above.';
+                                feedback.className = 'quiz-feedback incorrect show';
+                            }
+                            appState.quizScores[quizId] = false;
+                        }
+
+                        answered = true;
+                        options.forEach(opt => opt.classList.add('answered'));
+
+                        saveProgress();
+                    });
+                });
+            });
+        }
+
+        // ===== EXERCISE VALIDATION =====
+        function validateExercise1() {
+            const feedback = document.getElementById('validation-ex1');
+            if (!feedback) return;
+
+            const checks = [];
+
+            const httpInPublic = appState.firewall.permanentConfig.public.services.includes('http');
+            checks.push({
+                test: httpInPublic,
+                message: 'HTTP service added to public zone (permanent)'
+            });
+
+            const httpInRuntime = appState.firewall.zones.public.services.includes('http');
+            checks.push({
+                test: httpInRuntime,
+                message: 'Firewall configuration reloaded (HTTP service active)'
+            });
+
+            const allPassed = checks.every(check => check.test);
+            let html = '<div class="validation-item ' + (checks[0].test ? 'pass' : 'fail') + '">' + checks[0].message + '</div>';
+            html += '<div class="validation-item ' + (checks[1].test ? 'pass' : 'fail') + '">' + checks[1].message + '</div>';
+
+            if (allPassed) {
+                feedback.innerHTML = '<strong>✓ Exercise Complete!</strong><br>' + html;
+                feedback.className = 'validation-feedback success show';
+                appState.exerciseProgress.exercise1.completed = true;
+                markSectionComplete('exercise-1');
+            } else {
+                feedback.innerHTML = '<strong>Not all requirements met:</strong><br>' + html + '<br><em>Hint: Make sure to use --permanent and --reload</em>';
+                feedback.className = 'validation-feedback error show';
+            }
+
+            saveProgress();
+        }
+
+        function validateExercise2() {
+            const feedback = document.getElementById('validation-ex2');
+            if (!feedback) return;
+
+            const checks = [];
+
+            const port1001Bound = [...appState.selinux.portBindings, ...appState.selinux.customBindings]
+                .some(b => b.port === 1001 && b.protocol === 'tcp' && b.type === 'http_port_t');
+            
+            checks.push({
+                test: port1001Bound,
+                message: 'Port 1001/tcp bound to http_port_t type'
+            });
+
+            const allPassed = checks.every(check => check.test);
+            let html = '<div class="validation-item ' + (checks[0].test ? 'pass' : 'fail') + '">' + checks[0].message + '</div>';
+
+            if (allPassed) {
+                feedback.innerHTML = '<strong>✓ Exercise Complete!</strong><br>' + html;
+                feedback.className = 'validation-feedback success show';
+                appState.exerciseProgress.exercise2.completed = true;
+                markSectionComplete('exercise-2');
+            } else {
+                feedback.innerHTML = '<strong>Not all requirements met:</strong><br>' + html + '<br><em>Hint: Use semanage port -a -t http_port_t -p tcp 1001</em>';
+                feedback.className = 'validation-feedback error show';
+            }
+
+            saveProgress();
+        }
+
+        function validateExercise3() {
+            const feedback = document.getElementById('validation-ex3');
+            if (!feedback) return;
+
+            const checks = [];
+
+            const selinuxConfigured = [...appState.selinux.portBindings, ...appState.selinux.customBindings]
+                .some(b => b.port === 1001 && b.protocol === 'tcp' && b.type === 'http_port_t');
+            checks.push({
+                test: selinuxConfigured,
+                message: 'SELinux: Port 1001/tcp bound to http_port_t'
+            });
+
+            const firewallPermanent = appState.firewall.permanentConfig.public.ports.includes('1001/tcp');
+            checks.push({
+                test: firewallPermanent,
+                message: 'Firewall: Port 1001/tcp added to public zone (permanent)'
+            });
+
+            const firewallRuntime = appState.firewall.zones.public.ports.includes('1001/tcp');
+            checks.push({
+                test: firewallRuntime,
+                message: 'Firewall: Configuration reloaded (port active in runtime)'
+            });
+
+            const httpdRunning = appState.services.httpd.running;
+            checks.push({
+                test: httpdRunning,
+                message: 'Service: httpd is running'
+            });
+
+            const httpdEnabled = appState.services.httpd.enabled;
+            checks.push({
+                test: httpdEnabled,
+                message: 'Service: httpd is enabled for automatic start'
+            });
+
+            const allPassed = checks.every(check => check.test);
+            let html = '';
+            checks.forEach(check => {
+                html += '<div class="validation-item ' + (check.test ? 'pass' : 'fail') + '">' + check.message + '</div>';
+            });
+
+            if (allPassed) {
+                feedback.innerHTML = '<strong>🎉 Excellent Work! All Requirements Met!</strong><br>' + html + '<br><em>You have successfully configured both SELinux and the firewall, and started the web server.</em>';
+                feedback.className = 'validation-feedback success show';
+                appState.exerciseProgress.exercise3.completed = true;
+                markSectionComplete('exercise-3');
+            } else {
+                feedback.innerHTML = '<strong>Not all requirements met:</strong><br>' + html + '<br><em>Review the tasks and try again.</em>';
+                feedback.className = 'validation-feedback error show';
+            }
+
+            saveProgress();
+        }
+
+        // ===== INITIALIZATION =====
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeSectionOrder();
+            loadProgress();
+            updateProgress();
+            initializeQuizzes();
+
+            terminal1 = new TerminalSimulator('terminal-ex1', 'output-ex1', 'input-ex1');
+            terminal2 = new TerminalSimulator('terminal-ex2', 'output-ex2', 'input-ex2');
+            terminal3 = new TerminalSimulator('terminal-ex3', 'output-ex3', 'input-ex3');
+
+            setTimeout(() => {
+                showKeyboardHint();
+            }, 2000);
+            
+            setTimeout(() => {
+                markSectionComplete('introduction');
+            }, 3000);
+        });
+
+        // Auto-mark sections as complete when user reads them
+        const sectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && entry.target.classList.contains('active')) {
+                    const sectionId = entry.target.id;
+                    if (!sectionId.includes('exercise') && !sectionId.includes('quiz')) {
+                        setTimeout(() => {
+                            markSectionComplete(sectionId);
+                        }, 5000);
+                    }
+                }
+            });
+        }, { threshold: 0.3 });
+
+        document.querySelectorAll('.section').forEach(section => {
+            sectionObserver.observe(section);
+        });
+    </script>
+</body>
+</html>                    
+                   
