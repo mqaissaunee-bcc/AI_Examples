@@ -46,6 +46,127 @@
             font-size: 1.1em;
         }
 
+        .search-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .search-wrapper {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 12px 15px;
+            font-size: 1em;
+            border: 2px solid #2193b0;
+            border-radius: 10px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            border-color: #6dd5ed;
+            box-shadow: 0 0 10px rgba(33, 147, 176, 0.3);
+        }
+
+        .search-btn {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(33, 147, 176, 0.4);
+        }
+
+        .clear-btn {
+            padding: 12px 25px;
+            background: #f8f9fa;
+            color: #2193b0;
+            border: 2px solid #2193b0;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .clear-btn:hover {
+            background: #2193b0;
+            color: white;
+        }
+
+        .search-results {
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+            border: 2px solid #2193b0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .search-results.active {
+            display: block;
+        }
+
+        .search-result-item {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-item:hover {
+            background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%);
+            color: white;
+        }
+
+        .search-result-command {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .search-result-mode {
+            font-size: 0.9em;
+            font-style: italic;
+            color: #666;
+        }
+
+        .search-result-item:hover .search-result-mode {
+            color: #f0f0f0;
+        }
+
+        .search-stats {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-size: 1.1em;
+        }
+
         .progress-bar {
             width: 100%;
             height: 8px;
@@ -280,6 +401,25 @@
             animation: slideIn 0.5s ease;
         }
 
+        /* Custom scrollbar for search results */
+        .search-results::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .search-results::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .search-results::-webkit-scrollbar-thumb {
+            background: #2193b0;
+            border-radius: 10px;
+        }
+
+        .search-results::-webkit-scrollbar-thumb:hover {
+            background: #6dd5ed;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 20px;
@@ -287,6 +427,10 @@
 
             .header h1 {
                 font-size: 1.8em;
+            }
+
+            .search-wrapper {
+                flex-direction: column;
             }
 
             .card-container {
@@ -309,6 +453,11 @@
                 padding: 12px 20px;
                 font-size: 1em;
             }
+
+            .search-btn, .clear-btn {
+                padding: 10px 20px;
+                font-size: 0.9em;
+            }
         }
     </style>
 </head>
@@ -317,6 +466,21 @@
         <div class="header">
             <h1>⚙️ CCNA Command Reference</h1>
             <p>Complete CCNA 200-301 Commands - 100 Commands</p>
+        </div>
+
+        <!-- Search Section -->
+        <div class="search-container">
+            <div class="search-wrapper">
+                <input type="text" 
+                       id="searchInput" 
+                       class="search-input" 
+                       placeholder="Search commands (e.g., 'vlan', 'ospf', 'interface')..."
+                       onkeypress="handleSearchKeyPress(event)">
+                <button class="search-btn" onclick="performSearch()">🔍 Search</button>
+                <button class="clear-btn" onclick="clearSearch()">✕ Clear</button>
+            </div>
+            <div id="searchStats" class="search-stats"></div>
+            <div id="searchResults" class="search-results"></div>
         </div>
 
         <div class="progress-bar">
@@ -993,6 +1157,89 @@
         let currentCommandIndex = 0;
         let currentCardState = 0; // 0: command, 1: explanation, 2: example
 
+        // Search functionality
+        function performSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput.value.trim().toLowerCase();
+            
+            if (searchTerm === '') {
+                alert('Please enter a search term');
+                return;
+            }
+
+            const searchResults = commands.filter((cmd, index) => {
+                const commandMatch = cmd.command.toLowerCase().includes(searchTerm);
+                const modeMatch = cmd.mode.toLowerCase().includes(searchTerm);
+                const explanationMatch = cmd.explanation.toLowerCase().includes(searchTerm);
+                const exampleMatch = cmd.example.toLowerCase().includes(searchTerm);
+                
+                if (commandMatch || modeMatch || explanationMatch || exampleMatch) {
+                    cmd.index = index; // Store the original index
+                    return true;
+                }
+                return false;
+            });
+
+            displaySearchResults(searchResults, searchTerm);
+        }
+
+        function displaySearchResults(results, searchTerm) {
+            const searchResultsDiv = document.getElementById('searchResults');
+            const searchStatsDiv = document.getElementById('searchStats');
+            
+            if (results.length === 0) {
+                searchStatsDiv.textContent = `No results found for "${searchTerm}"`;
+                searchResultsDiv.innerHTML = `
+                    <div class="no-results">
+                        No commands found matching "${searchTerm}"<br>
+                        Try searching for: vlan, ospf, interface, nat, dhcp, acl, etc.
+                    </div>
+                `;
+                searchResultsDiv.classList.add('active');
+                return;
+            }
+
+            searchStatsDiv.textContent = `Found ${results.length} command${results.length !== 1 ? 's' : ''} matching "${searchTerm}"`;
+            
+            let resultsHTML = '';
+            results.forEach(result => {
+                resultsHTML += `
+                    <div class="search-result-item" onclick="navigateToCommand(${result.index})">
+                        <div class="search-result-command">${result.command}</div>
+                        <div class="search-result-mode">${result.mode}</div>
+                    </div>
+                `;
+            });
+            
+            searchResultsDiv.innerHTML = resultsHTML;
+            searchResultsDiv.classList.add('active');
+        }
+
+        function navigateToCommand(index) {
+            currentCommandIndex = index;
+            updateCard();
+            clearSearch();
+            
+            // Scroll to the card
+            document.getElementById('cardContainer').scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
+            });
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').classList.remove('active');
+            document.getElementById('searchResults').innerHTML = '';
+            document.getElementById('searchStats').textContent = '';
+        }
+
+        function handleSearchKeyPress(event) {
+            if (event.key === 'Enter') {
+                performSearch();
+            }
+        }
+
         function updateCard() {
             const card = document.getElementById('card');
             const cardFront = document.getElementById('cardFront');
@@ -1099,6 +1346,11 @@
 
         // Keyboard navigation
         document.addEventListener('keydown', function(event) {
+            // Don't trigger keyboard shortcuts when typing in search box
+            if (document.activeElement === document.getElementById('searchInput')) {
+                return;
+            }
+
             // Arrow Right - Next Command
             if (event.key === 'ArrowRight') {
                 event.preventDefault();
