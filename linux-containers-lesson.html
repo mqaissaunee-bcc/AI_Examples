@@ -295,33 +295,38 @@
            CODE BLOCKS
            ============================================ */
         .code-block {
-            background: var(--code-bg);
-            color: var(--code-text);
+            background: #1E1E1E;
+            color: #FFFFFF;
             padding: 20px 24px;
             border-radius: 8px;
             overflow-x: auto;
             margin: 16px 0;
             font-family: 'Source Code Pro', 'Consolas', 'Monaco', monospace;
             font-size: 0.95rem;
-            line-height: 1.5;
+            line-height: 1.6;
             position: relative;
         }
 
         .code-block code {
             font-family: inherit;
+            background: transparent;
+            color: #FFFFFF;
+            padding: 0;
+            font-size: inherit;
         }
 
         .copy-btn {
             position: absolute;
             top: 12px;
             right: 12px;
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--code-text);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: #444444;
+            color: #FFFFFF;
+            border: 1px solid #666666;
             padding: 8px 16px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 0.85rem;
+            font-weight: 600;
             min-width: 44px;
             min-height: 44px;
             display: flex;
@@ -331,38 +336,45 @@
         }
 
         .copy-btn:hover, .copy-btn:focus {
-            background: rgba(255, 255, 255, 0.2);
+            background: #555555;
         }
 
         .copy-btn.copied {
             background: var(--accent-green);
         }
 
+        /* Inline code (outside code blocks) */
         code {
             font-family: 'Source Code Pro', 'Consolas', 'Monaco', monospace;
-            background: #EEEEEE;
+            background: #E8E8E8;
+            color: #1A1A1A;
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 0.9em;
         }
 
+        /* Ensure inline code in dark contexts is readable */
+        .code-block code,
+        .command-card code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+        }
+
         /* ============================================
            TOOLTIPS (Enhanced for WCAG 1.4.13)
+           Using fixed positioning to prevent clipping
            ============================================ */
         .tooltip-term {
             border-bottom: 2px dotted var(--primary-blue);
             cursor: help;
-            position: relative;
             display: inline;
             color: var(--primary-blue);
             font-weight: 500;
         }
 
         .tooltip-content {
-            position: absolute;
-            bottom: calc(100% + 10px);
-            left: 50%;
-            transform: translateX(-50%);
+            position: fixed;
             background: var(--tooltip-bg);
             color: var(--tooltip-text);
             padding: 12px 16px;
@@ -372,41 +384,37 @@
             line-height: 1.5;
             width: max-content;
             max-width: 300px;
-            z-index: 1000;
+            z-index: 10000;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             opacity: 0;
             visibility: hidden;
+            pointer-events: none;
             transition: opacity 0.2s, visibility 0.2s;
+        }
+
+        .tooltip-content.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
         }
 
         .tooltip-content::after {
             content: '';
             position: absolute;
-            top: 100%;
             left: 50%;
             transform: translateX(-50%);
             border: 8px solid transparent;
+        }
+
+        /* Arrow pointing down (tooltip above term) */
+        .tooltip-content.arrow-down::after {
+            top: 100%;
             border-top-color: var(--tooltip-bg);
         }
 
-        /* Enhanced: Tooltip stays visible when hovered */
-        .tooltip-term:hover .tooltip-content,
-        .tooltip-term:focus .tooltip-content,
-        .tooltip-content:hover {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        /* Viewport-aware positioning */
-        .tooltip-term.tooltip-bottom .tooltip-content {
-            bottom: auto;
-            top: calc(100% + 10px);
-        }
-
-        .tooltip-term.tooltip-bottom .tooltip-content::after {
-            top: auto;
+        /* Arrow pointing up (tooltip below term) */
+        .tooltip-content.arrow-up::after {
             bottom: 100%;
-            border-top-color: transparent;
             border-bottom-color: var(--tooltip-bg);
         }
 
@@ -679,8 +687,8 @@
 
         .command-card code {
             display: block;
-            background: var(--code-bg);
-            color: var(--code-text);
+            background: #1E1E1E;
+            color: #FFFFFF;
             padding: 12px;
             border-radius: 4px;
             margin: 12px 0;
@@ -725,15 +733,16 @@
 
         .diagram-layer {
             background: var(--primary-blue);
-            color: var(--bg-white);
+            color: #FFFFFF;
             padding: 10px;
             margin: 4px 0;
             border-radius: 4px;
             font-size: 0.85rem;
+            font-weight: 600;
         }
 
         .diagram-layer.hardware {
-            background: #666666;
+            background: #444444;
         }
 
         .diagram-layer.os {
@@ -745,7 +754,7 @@
         }
 
         .diagram-layer.app {
-            background: var(--accent-red);
+            background: #B82800;
         }
 
         /* ============================================
@@ -1889,52 +1898,89 @@ systemctl --user status container-mywebserver.service</code>
         });
 
         // ============================================
-        // TOOLTIP POSITIONING (Viewport Aware)
+        // TOOLTIP POSITIONING (Fixed, Viewport Aware)
         // ============================================
         document.querySelectorAll('.tooltip-term').forEach(term => {
             const tooltip = term.querySelector('.tooltip-content');
-            
-            const positionTooltip = () => {
-                const rect = term.getBoundingClientRect();
-                const tooltipRect = tooltip.getBoundingClientRect();
-                
-                // Check if tooltip would go above viewport
-                if (rect.top < tooltipRect.height + 20) {
-                    term.classList.add('tooltip-bottom');
-                } else {
-                    term.classList.remove('tooltip-bottom');
-                }
-
-                // Check horizontal positioning
-                if (rect.left < tooltipRect.width / 2) {
-                    tooltip.style.left = '0';
-                    tooltip.style.transform = 'translateX(0)';
-                } else if (rect.right + tooltipRect.width / 2 > window.innerWidth) {
-                    tooltip.style.left = 'auto';
-                    tooltip.style.right = '0';
-                    tooltip.style.transform = 'translateX(0)';
-                }
-            };
-
-            term.addEventListener('mouseenter', positionTooltip);
-            term.addEventListener('focus', positionTooltip);
-
-            // Enhanced: Keep tooltip visible when hovering over it
             let hideTimeout;
             
-            term.addEventListener('mouseleave', () => {
+            const showTooltip = () => {
+                clearTimeout(hideTimeout);
+                
+                // Get term position relative to viewport
+                const rect = term.getBoundingClientRect();
+                
+                // Temporarily show tooltip to measure it
+                tooltip.style.visibility = 'hidden';
+                tooltip.style.opacity = '0';
+                tooltip.classList.add('visible');
+                
+                const tooltipRect = tooltip.getBoundingClientRect();
+                const tooltipHeight = tooltipRect.height;
+                const tooltipWidth = tooltipRect.width;
+                
+                // Calculate horizontal position (centered on term)
+                let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                
+                // Keep tooltip within viewport horizontally
+                const padding = 10;
+                if (left < padding) {
+                    left = padding;
+                } else if (left + tooltipWidth > window.innerWidth - padding) {
+                    left = window.innerWidth - tooltipWidth - padding;
+                }
+                
+                // Calculate vertical position
+                let top;
+                const spaceAbove = rect.top;
+                const spaceBelow = window.innerHeight - rect.bottom;
+                
+                // Remove existing arrow classes
+                tooltip.classList.remove('arrow-up', 'arrow-down');
+                
+                if (spaceAbove >= tooltipHeight + 15) {
+                    // Position above the term
+                    top = rect.top - tooltipHeight - 10;
+                    tooltip.classList.add('arrow-down');
+                } else if (spaceBelow >= tooltipHeight + 15) {
+                    // Position below the term
+                    top = rect.bottom + 10;
+                    tooltip.classList.add('arrow-up');
+                } else {
+                    // Default to above, even if cramped
+                    top = Math.max(padding, rect.top - tooltipHeight - 10);
+                    tooltip.classList.add('arrow-down');
+                }
+                
+                // Apply positioning
+                tooltip.style.left = left + 'px';
+                tooltip.style.top = top + 'px';
+                
+                // Now actually show it
+                tooltip.style.visibility = '';
+                tooltip.style.opacity = '';
+            };
+            
+            const hideTooltip = () => {
                 hideTimeout = setTimeout(() => {
-                    // Tooltip will hide via CSS
-                }, 100);
-            });
-
+                    tooltip.classList.remove('visible');
+                }, 150);
+            };
+            
+            // Show on hover/focus
+            term.addEventListener('mouseenter', showTooltip);
+            term.addEventListener('focus', showTooltip);
+            
+            // Hide on leave/blur
+            term.addEventListener('mouseleave', hideTooltip);
+            term.addEventListener('blur', hideTooltip);
+            
+            // Keep visible when hovering tooltip itself
             tooltip.addEventListener('mouseenter', () => {
                 clearTimeout(hideTimeout);
             });
-
-            tooltip.addEventListener('mouseleave', () => {
-                // Allow CSS to handle hiding
-            });
+            
+            tooltip.addEventListener('mouseleave', hideTooltip);
         });
 
         // ============================================
