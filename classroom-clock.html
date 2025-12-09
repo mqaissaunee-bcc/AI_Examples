@@ -756,6 +756,89 @@
             opacity: 0.7;
         }
 
+        /* To-Do List Styles */
+        .todo-item {
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            background: var(--panel-bg);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--accent-color);
+            transition: transform 0.2s;
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .todo-item:hover {
+            transform: translateX(5px);
+        }
+
+        .todo-item.completed {
+            opacity: 0.6;
+            border-left-color: var(--safe-color);
+        }
+
+        .todo-checkbox {
+            width: 24px;
+            height: 24px;
+            margin-top: 2px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .todo-content {
+            flex: 1;
+        }
+
+        .todo-task {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .todo-item.completed .todo-task {
+            text-decoration: line-through;
+        }
+
+        .todo-notes {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .todo-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: var(--accent-color);
+            color: white;
+            border-radius: 50%;
+            font-weight: 600;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .todo-item.completed .todo-number {
+            background: var(--safe-color);
+        }
+
+        /* To-Do Editor */
+        .todo-editor-item {
+            display: grid;
+            grid-template-columns: 2fr 1.5fr auto;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .todo-editor-item {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .info-text {
             font-size: 0.85rem;
             opacity: 0.6;
@@ -1242,12 +1325,13 @@
         </div>
 
         <div class="setting-group">
-            <label>Schedule / Agenda</label>
-            <p style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 10px;">Choose between class schedule or meeting agenda</p>
+            <label>Schedule / Agenda / To-Do</label>
+            <p style="font-size: 0.9rem; opacity: 0.7; margin-bottom: 10px;">Choose between class schedule, meeting agenda, or to-do list</p>
             
             <div class="mode-toggle">
                 <button id="scheduleMode" onclick="setScheduleMode('schedule')">📅 Schedule</button>
                 <button id="agendaMode" onclick="setScheduleMode('agenda')">📝 Agenda</button>
+                <button id="todoMode" onclick="setScheduleMode('todo')">✅ To-Do</button>
             </div>
 
             <div id="scheduleSettings">
@@ -1280,6 +1364,27 @@
                 <input type="file" id="agendaFileInput" accept=".csv" onchange="importAgenda(event)">
                 
                 <p class="info-text">CSV format: Time, Item, Description</p>
+            </div>
+
+            <div id="todoSettings" class="hidden">
+                <label style="margin-top: 15px; display: block;">To-Do List</label>
+                <div class="schedule-editor" id="todoEditor">
+                    <!-- To-do items will be added here dynamically -->
+                </div>
+                <div class="button-group">
+                    <button class="add-schedule-btn" onclick="addTodoItem()">+ Add Task</button>
+                    <button class="clear-schedule-btn" onclick="clearTodo()">🗑️ Clear All</button>
+                </div>
+                
+                <div class="file-controls">
+                    <label for="todoFileInput" class="import-btn">
+                        📤 Import CSV
+                    </label>
+                    <button class="export-btn" onclick="exportTodo()">📥 Export CSV</button>
+                </div>
+                <input type="file" id="todoFileInput" accept=".csv" onchange="importTodo(event)">
+                
+                <p class="info-text">CSV format: Task, Notes</p>
             </div>
         </div>
 
@@ -1360,6 +1465,11 @@
                 { time: '09:15', item: 'Main presentation', description: '30 minutes', completed: false },
                 { time: '09:45', item: 'Q&A Session', description: '15 minutes', completed: false }
             ],
+            todo: [
+                { task: 'Review homework submissions', notes: 'Check Canvas gradebook', completed: false },
+                { task: 'Prepare lab equipment', notes: 'Routers and cables', completed: false },
+                { task: 'Update course materials', notes: 'Add new CEH module', completed: false }
+            ],
             enableWorldClocks: false,
             worldClocks: [
                 { city: 'New York', timezone: 'America/New_York' },
@@ -1408,6 +1518,7 @@
             setInterval(updateClock, 1000);
             renderScheduleEditor();
             renderAgendaEditor();
+            renderTodoEditor();
             updateScheduleDisplay();
             renderWorldClockEditor();
             updateWorldClocksDisplay();
@@ -1470,8 +1581,10 @@
         function updateModeButtons() {
             document.getElementById('scheduleMode').classList.toggle('active', settings.scheduleMode === 'schedule');
             document.getElementById('agendaMode').classList.toggle('active', settings.scheduleMode === 'agenda');
+            document.getElementById('todoMode').classList.toggle('active', settings.scheduleMode === 'todo');
             document.getElementById('scheduleSettings').classList.toggle('hidden', settings.scheduleMode !== 'schedule');
             document.getElementById('agendaSettings').classList.toggle('hidden', settings.scheduleMode !== 'agenda');
+            document.getElementById('todoSettings').classList.toggle('hidden', settings.scheduleMode !== 'todo');
         }
 
         // Apply settings to UI
@@ -1515,7 +1628,13 @@
 
             // Update panel title based on mode
             const panelTitle = document.getElementById('schedulePanelTitle');
-            panelTitle.textContent = settings.scheduleMode === 'schedule' ? 'Today\'s Schedule' : 'Today\'s Agenda';
+            if (settings.scheduleMode === 'schedule') {
+                panelTitle.textContent = 'Today\'s Schedule';
+            } else if (settings.scheduleMode === 'agenda') {
+                panelTitle.textContent = 'Today\'s Agenda';
+            } else if (settings.scheduleMode === 'todo') {
+                panelTitle.textContent = 'To-Do List';
+            }
         }
 
         // Update clock display
@@ -1675,8 +1794,10 @@
 
             if (settings.scheduleMode === 'schedule') {
                 displaySchedule(scheduleList);
-            } else {
+            } else if (settings.scheduleMode === 'agenda') {
                 displayAgenda(scheduleList);
+            } else if (settings.scheduleMode === 'todo') {
+                displayTodo(scheduleList);
             }
         }
 
@@ -1917,6 +2038,182 @@
             const dateStr = now.toISOString().split('T')[0];
             link.setAttribute('href', url);
             link.setAttribute('download', `agenda-${dateStr}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // To-Do List Functions
+        function renderTodoEditor() {
+            const editor = document.getElementById('todoEditor');
+            editor.innerHTML = '';
+            
+            if (!settings.todo) {
+                settings.todo = [];
+            }
+            
+            settings.todo.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'todo-editor-item';
+                itemDiv.innerHTML = `
+                    <input type="text" value="${item.task}" onchange="updateTodoItem(${index}, 'task', this.value)" placeholder="Task description">
+                    <input type="text" value="${item.notes || ''}" onchange="updateTodoItem(${index}, 'notes', this.value)" placeholder="Notes (optional)">
+                    <button class="remove-schedule-btn" onclick="removeTodoItem(${index})">✕</button>
+                `;
+                editor.appendChild(itemDiv);
+            });
+        }
+
+        function addTodoItem() {
+            if (!settings.todo) {
+                settings.todo = [];
+            }
+            settings.todo.push({ task: 'New task', notes: '', completed: false });
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            renderTodoEditor();
+            updateScheduleDisplay();
+        }
+
+        function removeTodoItem(index) {
+            settings.todo.splice(index, 1);
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            renderTodoEditor();
+            updateScheduleDisplay();
+        }
+
+        function updateTodoItem(index, field, value) {
+            settings.todo[index][field] = value;
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            updateScheduleDisplay();
+        }
+
+        // Clear all to-do items
+        function clearTodo() {
+            if (!settings.todo || settings.todo.length === 0) {
+                alert('To-do list is already empty.');
+                return;
+            }
+            
+            if (confirm(`Are you sure you want to clear all ${settings.todo.length} to-do items? This cannot be undone.`)) {
+                settings.todo = [];
+                localStorage.setItem('clockSettings', JSON.stringify(settings));
+                renderTodoEditor();
+                updateScheduleDisplay();
+                alert('✓ To-do list cleared successfully.');
+            }
+        }
+
+        // Toggle to-do item completion
+        function toggleTodoItem(index) {
+            settings.todo[index].completed = !settings.todo[index].completed;
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            updateScheduleDisplay();
+        }
+
+        // Display to-do items
+        function displayTodo(container) {
+            if (!settings.todo || settings.todo.length === 0) {
+                container.innerHTML = '<p style="text-align: center; opacity: 0.6; padding: 20px;">No to-do items yet. Add tasks in settings.</p>';
+                return;
+            }
+
+            settings.todo.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'todo-item';
+                if (item.completed) {
+                    itemDiv.classList.add('completed');
+                }
+                
+                itemDiv.innerHTML = `
+                    <input type="checkbox" class="todo-checkbox" ${item.completed ? 'checked' : ''} onchange="toggleTodoItem(${index})">
+                    <div class="todo-number">${index + 1}</div>
+                    <div class="todo-content">
+                        <div class="todo-task">${item.task}</div>
+                        ${item.notes ? `<div class="todo-notes">${item.notes}</div>` : ''}
+                    </div>
+                `;
+                container.appendChild(itemDiv);
+            });
+        }
+
+        // Import to-do from CSV
+        function importTodo(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = text.split('\n').filter(line => line.trim());
+                    
+                    // Skip header if present
+                    let startIndex = 0;
+                    if (lines[0].toLowerCase().includes('task') || lines[0].toLowerCase().includes('item')) {
+                        startIndex = 1;
+                    }
+
+                    const newTodo = [];
+                    for (let i = startIndex; i < lines.length; i++) {
+                        const parts = lines[i].split(',').map(p => p.trim().replace(/^["']|["']$/g, ''));
+                        if (parts.length >= 1 && parts[0]) {
+                            newTodo.push({
+                                task: parts[0],
+                                notes: parts[1] || '',
+                                completed: false
+                            });
+                        }
+                    }
+
+                    if (newTodo.length > 0) {
+                        settings.todo = newTodo;
+                        localStorage.setItem('clockSettings', JSON.stringify(settings));
+                        renderTodoEditor();
+                        updateScheduleDisplay();
+                        alert(`✓ Successfully imported ${newTodo.length} to-do items!`);
+                    } else {
+                        alert('No valid to-do items found in the CSV file. Please check the format:\nTask, Notes\nReview homework, Check Canvas');
+                    }
+                } catch (error) {
+                    alert('Error reading CSV file. Please ensure it\'s properly formatted:\nTask, Notes\nReview homework, Check Canvas');
+                    console.error('Import error:', error);
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset file input
+            event.target.value = '';
+        }
+
+        // Export to-do to CSV
+        function exportTodo() {
+            if (!settings.todo || settings.todo.length === 0) {
+                alert('No to-do items to export. Add some tasks first!');
+                return;
+            }
+
+            // Create CSV content
+            let csvContent = 'Task,Notes,Status\n';
+            settings.todo.forEach(item => {
+                // Escape commas and quotes in fields
+                const task = `"${item.task.replace(/"/g, '""')}"`;
+                const notes = `"${(item.notes || '').replace(/"/g, '""')}"`;
+                const status = item.completed ? 'Completed' : 'Pending';
+                csvContent += `${task},${notes},${status}\n`;
+            });
+
+            // Create download link
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            // Generate filename with current date
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0];
+            link.setAttribute('href', url);
+            link.setAttribute('download', `todo-${dateStr}.csv`);
             link.style.visibility = 'hidden';
             
             document.body.appendChild(link);
