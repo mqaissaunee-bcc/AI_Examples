@@ -934,6 +934,9 @@
                 </div>
             </div>
             <p style="font-size: 0.9rem; color: var(--text-secondary);">Complete each section and quiz to track your progress</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                <strong>Tip:</strong> Use <kbd style="background: var(--border-color); padding: 2px 6px; border-radius: 3px; font-family: monospace;">←</kbd> and <kbd style="background: var(--border-color); padding: 2px 6px; border-radius: 3px; font-family: monospace;">→</kbd> arrow keys to navigate between sections
+            </p>
         </div>
 
         <!-- Section 1: Inflation and CPI -->
@@ -1992,6 +1995,8 @@
             drawSDGraph();
             drawGDPPieChart();
             setupNavigation();
+            setupScrollSpy();
+            setupKeyboardNavigation();
             updateProgress();
         });
 
@@ -1999,14 +2004,136 @@
         // NAVIGATION AND PROGRESS TRACKING
         // ============================================
 
+        // Define section order for navigation
+        const sectionOrder = ['inflation', 'supply-demand', 'gdp', 'quiz'];
+        let currentSectionIndex = 0;
+
         function setupNavigation() {
             const navLinks = document.querySelectorAll('nav a');
             navLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
-                    navLinks.forEach(l => l.setAttribute('aria-current', 'false'));
-                    this.setAttribute('aria-current', 'true');
+                    // Update current section index based on clicked link
+                    const href = this.getAttribute('href').substring(1); // Remove #
+                    currentSectionIndex = sectionOrder.indexOf(href);
+                    updateActiveNavLink(href);
                 });
             });
+        }
+
+        function updateActiveNavLink(sectionId) {
+            const navLinks = document.querySelectorAll('nav a');
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href').substring(1);
+                if (href === sectionId) {
+                    link.setAttribute('aria-current', 'true');
+                } else {
+                    link.setAttribute('aria-current', 'false');
+                }
+            });
+        }
+
+        function setupScrollSpy() {
+            const sections = sectionOrder.map(id => document.getElementById(id)).filter(Boolean);
+            const navHeight = document.querySelector('nav')?.offsetHeight || 60;
+            
+            // Throttle scroll events for performance
+            let ticking = false;
+            
+            function updateOnScroll() {
+                const scrollPosition = window.scrollY + navHeight + 100; // Offset for nav height + buffer
+                
+                let currentSection = sectionOrder[0];
+                
+                sections.forEach((section, index) => {
+                    if (section) {
+                        const sectionTop = section.offsetTop;
+                        const sectionBottom = sectionTop + section.offsetHeight;
+                        
+                        // Check if scroll position is within this section
+                        if (scrollPosition >= sectionTop && scrollPosition < sectionBottom) {
+                            currentSection = sectionOrder[index];
+                        }
+                        // Also check if we've scrolled past the last section
+                        else if (index === sections.length - 1 && scrollPosition >= sectionTop) {
+                            currentSection = sectionOrder[index];
+                        }
+                    }
+                });
+                
+                // Update navigation and current index
+                currentSectionIndex = sectionOrder.indexOf(currentSection);
+                updateActiveNavLink(currentSection);
+                
+                ticking = false;
+            }
+            
+            window.addEventListener('scroll', function() {
+                if (!ticking) {
+                    window.requestAnimationFrame(updateOnScroll);
+                    ticking = true;
+                }
+            });
+            
+            // Initial check
+            updateOnScroll();
+        }
+
+        function setupKeyboardNavigation() {
+            document.addEventListener('keydown', function(e) {
+                // Only respond to arrow keys when not focused on form elements
+                const activeElement = document.activeElement;
+                const isFormElement = activeElement.tagName === 'INPUT' || 
+                                     activeElement.tagName === 'TEXTAREA' || 
+                                     activeElement.tagName === 'SELECT' ||
+                                     activeElement.getAttribute('role') === 'slider' ||
+                                     activeElement.type === 'range';
+                
+                if (isFormElement) return;
+                
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    navigateToSection(1); // Next section
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    navigateToSection(-1); // Previous section
+                }
+            });
+        }
+
+        function navigateToSection(direction) {
+            const newIndex = currentSectionIndex + direction;
+            
+            // Bounds checking
+            if (newIndex < 0 || newIndex >= sectionOrder.length) {
+                // Announce that we're at the boundary
+                if (newIndex < 0) {
+                    announceToScreenReader('You are at the first section');
+                } else {
+                    announceToScreenReader('You are at the last section');
+                }
+                return;
+            }
+            
+            currentSectionIndex = newIndex;
+            const targetSectionId = sectionOrder[currentSectionIndex];
+            const targetSection = document.getElementById(targetSectionId);
+            
+            if (targetSection) {
+                // Scroll to section
+                targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                // Update navigation
+                updateActiveNavLink(targetSectionId);
+                
+                // Announce section change for screen readers
+                const sectionNames = {
+                    'inflation': 'Inflation and CPI',
+                    'supply-demand': 'Supply and Demand',
+                    'gdp': 'Gross Domestic Product',
+                    'quiz': 'Knowledge Check'
+                };
+                announceToScreenReader(`Navigated to ${sectionNames[targetSectionId]} section`);
+            }
         }
 
         function markSectionComplete(sectionId) {
