@@ -1,0 +1,2227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bloomberg Terminal Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bb-black: #000000;
+            --bb-dark: #0a0a0a;
+            --bb-panel: #111111;
+            --bb-border: #333333;
+            --bb-amber: #FF8C00;
+            --bb-amber-dim: #CC7000;
+            --bb-white: #FFFFFF;
+            --bb-blue: #00A3E0;
+            --bb-blue-dark: #003366;
+            --bb-green: #00FF00;
+            --bb-red: #FF3333;
+            --bb-yellow: #FFFF00;
+            --bb-gold: #D4AF37;
+            --bb-grey: #888888;
+            --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Consolas', monospace;
+        }
+
+        body {
+            font-family: var(--font-mono);
+            background-color: var(--bb-black);
+            color: var(--bb-amber);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        /* Header / Command Bar */
+        .header {
+            background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+            padding: 6px 12px;
+            border-bottom: 2px solid var(--bb-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .panel-indicator {
+            background: var(--bb-panel);
+            border: 1px solid var(--bb-border);
+            padding: 4px 10px;
+            font-weight: 600;
+            color: var(--bb-white);
+            font-size: 12px;
+        }
+
+        .panel-indicator span {
+            color: var(--bb-amber);
+        }
+
+        .command-input-wrapper {
+            flex-grow: 1;
+            max-width: 700px;
+        }
+
+        #command-input {
+            width: 100%;
+            background: var(--bb-blue-dark);
+            border: 1px solid #005599;
+            color: var(--bb-white);
+            padding: 8px 14px;
+            font-family: var(--font-mono);
+            font-size: 15px;
+            font-weight: 500;
+            text-transform: uppercase;
+            outline: none;
+            letter-spacing: 0.5px;
+        }
+
+        #command-input::placeholder {
+            color: #6699BB;
+            text-transform: none;
+        }
+
+        #command-input:focus {
+            border-color: var(--bb-blue);
+            box-shadow: 0 0 0 1px var(--bb-blue);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 11px;
+            color: var(--bb-grey);
+        }
+
+        .header-right .time {
+            color: var(--bb-amber);
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--bb-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main Layout */
+        .main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bb-dark);
+            border-right: 1px solid var(--bb-border);
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .security-header {
+            border-bottom: 1px solid var(--bb-border);
+            padding-bottom: 15px;
+        }
+
+        .ticker-display {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--bb-white);
+            letter-spacing: 1px;
+        }
+
+        .ticker-name {
+            font-size: 11px;
+            color: var(--bb-grey);
+            margin-top: 2px;
+        }
+
+        .price-display {
+            margin-top: 12px;
+        }
+
+        .price-main {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--bb-white);
+        }
+
+        .price-change {
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .price-change.positive { color: var(--bb-green); }
+        .price-change.negative { color: var(--bb-red); }
+
+        /* Function Menu */
+        .function-menu h3 {
+            font-size: 11px;
+            color: var(--bb-blue);
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--bb-border);
+            padding-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .function-list {
+            list-style: none;
+        }
+
+        .function-list li {
+            padding: 6px 0;
+            cursor: pointer;
+            display: flex;
+            gap: 10px;
+            transition: all 0.15s;
+        }
+
+        .function-list li:hover {
+            color: var(--bb-white);
+            padding-left: 5px;
+        }
+
+        .function-list .fn-key {
+            color: var(--bb-white);
+            font-weight: 600;
+            min-width: 50px;
+        }
+
+        .function-list .fn-desc {
+            color: var(--bb-amber-dim);
+        }
+
+        /* Educational Panel */
+        .edu-panel {
+            background: rgba(0, 163, 224, 0.1);
+            border: 1px solid var(--bb-blue);
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: auto;
+        }
+
+        .edu-panel h4 {
+            color: var(--bb-blue);
+            font-size: 10px;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .edu-panel p {
+            font-size: 11px;
+            color: var(--bb-grey);
+            line-height: 1.5;
+        }
+
+        /* Main Content Area */
+        .content-area {
+            background: var(--bb-black);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .view-panel {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .view-panel.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel-header {
+            border-bottom: 2px solid var(--bb-amber);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header h2 {
+            color: var(--bb-white);
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .panel-header .timestamp {
+            color: var(--bb-grey);
+            font-size: 11px;
+        }
+
+        /* Data Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .data-table th {
+            text-align: left;
+            color: var(--bb-blue);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--bb-border);
+            letter-spacing: 0.5px;
+        }
+
+        .data-table td {
+            padding: 8px 12px;
+            color: var(--bb-white);
+            border-bottom: 1px solid #1a1a1a;
+            font-size: 12px;
+        }
+
+        .data-table tr:hover {
+            background: rgba(255, 140, 0, 0.05);
+        }
+
+        .data-table .positive { color: var(--bb-green); }
+        .data-table .negative { color: var(--bb-red); }
+        .data-table .highlight { color: var(--bb-amber); }
+
+        /* News Items */
+        .news-item {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--bb-border);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .news-item:hover {
+            padding-left: 10px;
+            background: rgba(255, 140, 0, 0.05);
+        }
+
+        .news-time {
+            color: var(--bb-amber);
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .news-headline {
+            color: var(--bb-white);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .news-source {
+            color: var(--bb-grey);
+            font-size: 10px;
+            margin-top: 4px;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: var(--bb-panel);
+            border: 1px solid var(--bb-border);
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            height: 300px;
+            position: relative;
+        }
+
+        .chart-title {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            color: var(--bb-grey);
+            font-size: 11px;
+            z-index: 10;
+        }
+
+        /* Key Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: var(--bb-panel);
+            border: 1px solid var(--bb-border);
+            padding: 15px;
+        }
+
+        .stat-label {
+            color: var(--bb-grey);
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            color: var(--bb-white);
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .stat-value.positive { color: var(--bb-green); }
+        .stat-value.negative { color: var(--bb-red); }
+
+        /* Yield Curve */
+        .yield-curve-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+
+        .curve-data {
+            background: var(--bb-panel);
+            border: 1px solid var(--bb-border);
+            padding: 15px;
+        }
+
+        /* Virtual Keyboard */
+        .keyboard {
+            background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+            padding: 12px 20px;
+            border-top: 2px solid var(--bb-border);
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .kb-key {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 3px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.1s;
+            position: relative;
+            box-shadow: 0 3px 0 rgba(0,0,0,0.5);
+        }
+
+        .kb-key:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 rgba(0,0,0,0.5);
+        }
+
+        .kb-key:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .kb-key.red { background: #CC0000; color: white; }
+        .kb-key.green { background: #009900; color: white; }
+        .kb-key.yellow { background: var(--bb-gold); color: black; }
+        .kb-key.grey { background: #444; color: white; }
+
+        .tooltip {
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #EEE;
+            color: #000;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 400;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            z-index: 100;
+        }
+
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #EEE;
+        }
+
+        /* Command History */
+        .cmd-history {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bb-panel);
+            border: 1px solid var(--bb-border);
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .cmd-history.active {
+            display: block;
+        }
+
+        .cmd-history-item {
+            padding: 8px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--bb-border);
+        }
+
+        .cmd-history-item:hover {
+            background: var(--bb-blue-dark);
+        }
+
+        /* Practice Mode Banner */
+        .practice-banner {
+            background: linear-gradient(90deg, rgba(0,163,224,0.2), rgba(0,163,224,0.05));
+            border: 1px solid var(--bb-blue);
+            border-radius: 4px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .practice-banner h3 {
+            color: var(--bb-blue);
+            font-size: 13px;
+        }
+
+        .practice-banner p {
+            color: var(--bb-grey);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .practice-btn {
+            background: var(--bb-blue);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-weight: 600;
+        }
+
+        .practice-btn:hover {
+            background: #0093C0;
+        }
+
+        /* Exercise Modal */
+        .exercise-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 60px;
+            overflow-y: auto;
+        }
+
+        .exercise-modal-overlay.active {
+            display: flex;
+        }
+
+        .exercise-modal {
+            background: var(--bb-dark);
+            border: 2px solid var(--bb-blue);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 550px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 163, 224, 0.3);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .exercise-modal-header {
+            background: linear-gradient(90deg, var(--bb-blue-dark), rgba(0, 51, 102, 0.5));
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--bb-blue);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .exercise-modal-header h3 {
+            color: var(--bb-white);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .exercise-counter {
+            background: var(--bb-blue);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        .exercise-modal-close {
+            background: transparent;
+            border: 1px solid var(--bb-grey);
+            color: var(--bb-grey);
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .exercise-modal-close:hover {
+            border-color: var(--bb-red);
+            color: var(--bb-red);
+        }
+
+        .exercise-modal-body {
+            padding: 16px;
+        }
+
+        .exercise-title {
+            color: var(--bb-amber);
+            font-size: 15px;
+            margin-bottom: 8px;
+        }
+
+        .exercise-instructions {
+            color: var(--bb-white);
+            font-size: 12px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .exercise-steps {
+            background: rgba(255, 140, 0, 0.1);
+            border: 1px solid var(--bb-amber-dim);
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .exercise-steps h4 {
+            color: var(--bb-amber);
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+
+        .exercise-steps ol {
+            margin-left: 18px;
+            color: var(--bb-white);
+            font-size: 11px;
+            line-height: 1.7;
+        }
+
+        .exercise-steps li {
+            margin-bottom: 4px;
+        }
+
+        .exercise-steps code {
+            background: var(--bb-black);
+            padding: 2px 5px;
+            border-radius: 3px;
+            color: var(--bb-amber);
+        }
+
+        .exercise-hint {
+            background: rgba(0, 163, 224, 0.1);
+            border: 1px solid var(--bb-blue);
+            border-radius: 4px;
+            padding: 10px 12px;
+        }
+
+        .exercise-hint h4 {
+            color: var(--bb-blue);
+            font-size: 10px;
+            margin-bottom: 4px;
+        }
+
+        .exercise-hint p {
+            color: var(--bb-grey);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .exercise-modal-footer {
+            padding: 12px 16px;
+            border-top: 1px solid var(--bb-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            background: var(--bb-panel);
+        }
+
+        .exercise-nav-btn {
+            background: var(--bb-panel);
+            border: 1px solid var(--bb-border);
+            color: var(--bb-white);
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .exercise-nav-btn:hover:not(:disabled) {
+            border-color: var(--bb-amber);
+            color: var(--bb-amber);
+        }
+
+        .exercise-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .exercise-nav-btn.primary {
+            background: var(--bb-blue);
+            border-color: var(--bb-blue);
+        }
+
+        .exercise-nav-btn.primary:hover {
+            background: #0093C0;
+            color: white;
+        }
+
+        .exercise-progress {
+            display: flex;
+            gap: 5px;
+        }
+
+        .exercise-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--bb-border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .exercise-dot:hover {
+            background: var(--bb-grey);
+        }
+
+        .exercise-dot.active {
+            background: var(--bb-blue);
+            box-shadow: 0 0 6px var(--bb-blue);
+        }
+
+        .exercise-dot.completed {
+            background: var(--bb-green);
+        }
+
+        /* Floating exercise button */
+        .exercise-float-btn {
+            position: fixed;
+            bottom: 75px;
+            right: 20px;
+            background: linear-gradient(135deg, var(--bb-blue), var(--bb-blue-dark));
+            border: none;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-weight: 600;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 20px rgba(0, 163, 224, 0.4);
+            z-index: 500;
+            transition: all 0.3s;
+        }
+
+        .exercise-float-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 163, 224, 0.5);
+        }
+
+        .exercise-float-btn .badge {
+            background: var(--bb-amber);
+            color: black;
+            padding: 2px 7px;
+            border-radius: 8px;
+            font-size: 10px;
+        }
+
+        /* Financial Analysis Sections */
+        .fa-section {
+            margin-bottom: 25px;
+        }
+
+        .fa-section h3 {
+            color: var(--bb-amber);
+            font-size: 12px;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--bb-border);
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--bb-amber);
+        }
+
+        .loading::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bb-black);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bb-border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--bb-grey);
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                display: none;
+            }
+            .yield-curve-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="panel-indicator"><span>1</span> BLOOMBERG</div>
+            <div class="command-input-wrapper" style="position: relative;">
+                <input type="text" id="command-input" placeholder="Enter command (e.g., AAPL EQUITY, NEWS, WEI, ECOW)..." autocomplete="off">
+                <div class="cmd-history" id="cmd-history"></div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="status-dot"></div>
+            <span>CONNECTED: US</span>
+            <span class="time" id="header-time">--:--:--</span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="security-header">
+                <div class="ticker-display" id="sidebar-ticker">SPX INDEX</div>
+                <div class="ticker-name" id="sidebar-name">S&P 500 Index</div>
+                <div class="price-display">
+                    <div class="price-main" id="sidebar-price">5,850.32</div>
+                    <div class="price-change positive" id="sidebar-change">+24.50 (+0.42%)</div>
+                </div>
+            </div>
+
+            <div class="function-menu">
+                <h3>RELATED FUNCTIONS</h3>
+                <ul class="function-list" id="function-list">
+                    <li onclick="executeFromMenu('DES')"><span class="fn-key">DES</span><span class="fn-desc">Description</span></li>
+                    <li onclick="executeFromMenu('FA')"><span class="fn-key">FA</span><span class="fn-desc">Financial Analysis</span></li>
+                    <li onclick="executeFromMenu('GP')"><span class="fn-key">GP</span><span class="fn-desc">Price Graph</span></li>
+                    <li onclick="executeFromMenu('ERN')"><span class="fn-key">ERN</span><span class="fn-desc">Earnings</span></li>
+                    <li onclick="executeFromMenu('NEWS')"><span class="fn-key">CN</span><span class="fn-desc">Company News</span></li>
+                </ul>
+            </div>
+
+            <div class="function-menu">
+                <h3>MARKET FUNCTIONS</h3>
+                <ul class="function-list">
+                    <li onclick="runCommand('WEI')"><span class="fn-key">WEI</span><span class="fn-desc">World Indices</span></li>
+                    <li onclick="runCommand('NEWS')"><span class="fn-key">NEWS</span><span class="fn-desc">Top Headlines</span></li>
+                    <li onclick="runCommand('ECOW')"><span class="fn-key">ECOW</span><span class="fn-desc">Economic Calendar</span></li>
+                    <li onclick="runCommand('GC')"><span class="fn-key">GC</span><span class="fn-desc">Yield Curves</span></li>
+                    <li onclick="runCommand('CRNCY')"><span class="fn-key">CRNCY</span><span class="fn-desc">Currency Rates</span></li>
+                </ul>
+            </div>
+
+            <div class="edu-panel" id="edu-panel">
+                <h4>&#x1F4A1; BMC TIP</h4>
+                <p id="edu-content">Type a ticker symbol followed by the asset class (e.g., "AAPL EQUITY") and press GO or Enter to load a security.</p>
+            </div>
+        </aside>
+
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Welcome View -->
+            <div class="view-panel active" id="view-welcome">
+                <div class="panel-header">
+                    <h2>BLOOMBERG TERMINAL SIMULATOR</h2>
+                    <span class="timestamp" id="welcome-timestamp"></span>
+                </div>
+                
+                <div class="practice-banner">
+                    <div>
+                        <h3>&#x1F4DA; Learning Mode Active</h3>
+                        <p>Practice Bloomberg Terminal commands in a safe environment with simulated market data.</p>
+                    </div>
+                    <button class="practice-btn" onclick="showPracticeExercise()">Start Exercise</button>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">S&P 500</div>
+                        <div class="stat-value" id="welcome-spx">5,850.32</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">DOW JONES</div>
+                        <div class="stat-value" id="welcome-djia">43,248.50</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">NASDAQ</div>
+                        <div class="stat-value" id="welcome-ndx">18,420.75</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">10Y TREASURY</div>
+                        <div class="stat-value" id="welcome-tsy">4.28%</div>
+                    </div>
+                </div>
+
+                <h3 style="color: var(--bb-amber); margin: 20px 0 15px; font-size: 13px;">QUICK START COMMANDS</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Command</th>
+                            <th>Description</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td class="highlight">TICKER EQUITY</td><td>Load a stock</td><td>AAPL EQUITY</td></tr>
+                        <tr><td class="highlight">NEWS</td><td>Top news headlines</td><td>NEWS</td></tr>
+                        <tr><td class="highlight">WEI</td><td>World equity indices</td><td>WEI</td></tr>
+                        <tr><td class="highlight">ECOW</td><td>Economic data calendar</td><td>ECOW</td></tr>
+                        <tr><td class="highlight">GC</td><td>Government yield curves</td><td>GC</td></tr>
+                        <tr><td class="highlight">CRNCY</td><td>Currency exchange rates</td><td>CRNCY</td></tr>
+                        <tr><td class="highlight">DES</td><td>Security description</td><td>(after loading security)</td></tr>
+                        <tr><td class="highlight">FA</td><td>Financial analysis</td><td>(after loading security)</td></tr>
+                        <tr><td class="highlight">GP</td><td>Price chart</td><td>(after loading security)</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- News View -->
+            <div class="view-panel" id="view-news">
+                <div class="panel-header">
+                    <h2>TOP NEWS</h2>
+                    <span class="timestamp" id="news-timestamp"></span>
+                </div>
+                <div id="news-content"></div>
+            </div>
+
+            <!-- World Equity Indices View -->
+            <div class="view-panel" id="view-wei">
+                <div class="panel-header">
+                    <h2>WEI - WORLD EQUITY INDICES</h2>
+                    <span class="timestamp" id="wei-timestamp"></span>
+                </div>
+                <div id="wei-content"></div>
+            </div>
+
+            <!-- Security Description View -->
+            <div class="view-panel" id="view-des">
+                <div class="panel-header">
+                    <h2 id="des-header">SECURITY DESCRIPTION</h2>
+                    <span class="timestamp" id="des-timestamp"></span>
+                </div>
+                <div id="des-content"></div>
+            </div>
+
+            <!-- Financial Analysis View -->
+            <div class="view-panel" id="view-fa">
+                <div class="panel-header">
+                    <h2 id="fa-header">FINANCIAL ANALYSIS</h2>
+                    <span class="timestamp" id="fa-timestamp"></span>
+                </div>
+                <div id="fa-content"></div>
+            </div>
+
+            <!-- Price Graph View -->
+            <div class="view-panel" id="view-gp">
+                <div class="panel-header">
+                    <h2 id="gp-header">PRICE GRAPH</h2>
+                    <span class="timestamp" id="gp-timestamp"></span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="price-chart"></canvas>
+                </div>
+                <div id="gp-stats"></div>
+            </div>
+
+            <!-- Earnings View -->
+            <div class="view-panel" id="view-ern">
+                <div class="panel-header">
+                    <h2 id="ern-header">EARNINGS ANALYSIS</h2>
+                    <span class="timestamp" id="ern-timestamp"></span>
+                </div>
+                <div id="ern-content"></div>
+            </div>
+
+            <!-- Economic Calendar View -->
+            <div class="view-panel" id="view-ecow">
+                <div class="panel-header">
+                    <h2>ECOW - ECONOMIC CALENDAR</h2>
+                    <span class="timestamp" id="ecow-timestamp"></span>
+                </div>
+                <div id="ecow-content"></div>
+            </div>
+
+            <!-- Government Curves View -->
+            <div class="view-panel" id="view-gc">
+                <div class="panel-header">
+                    <h2>GC - GOVERNMENT YIELD CURVES</h2>
+                    <span class="timestamp" id="gc-timestamp"></span>
+                </div>
+                <div class="yield-curve-container">
+                    <div class="chart-container">
+                        <canvas id="yield-chart"></canvas>
+                    </div>
+                    <div class="curve-data" id="gc-data"></div>
+                </div>
+            </div>
+
+            <!-- Currency Rates View -->
+            <div class="view-panel" id="view-crncy">
+                <div class="panel-header">
+                    <h2>CRNCY - CURRENCY RATES</h2>
+                    <span class="timestamp" id="crncy-timestamp"></span>
+                </div>
+                <div id="crncy-content"></div>
+            </div>
+
+            <!-- Practice Exercise View -->
+            <div class="view-panel" id="view-practice">
+                <div class="panel-header">
+                    <h2>&#x1F4DA; PRACTICE EXERCISE</h2>
+                </div>
+                <div id="practice-content"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Virtual Keyboard -->
+    <footer class="keyboard">
+        <button class="kb-key red" onclick="clearCommand()">
+            CANCEL
+            <span class="tooltip">Clear command (ESC)</span>
+        </button>
+        <button class="kb-key grey" onclick="goBack()">
+            MENU
+            <span class="tooltip">Return to menu</span>
+        </button>
+        <button class="kb-key yellow" onclick="appendToCommand(' GOVT')">
+            GOVT
+            <span class="tooltip">Government Securities</span>
+        </button>
+        <button class="kb-key yellow" onclick="appendToCommand(' CORP')">
+            CORP
+            <span class="tooltip">Corporate Bonds</span>
+        </button>
+        <button class="kb-key yellow" onclick="appendToCommand(' EQUITY')">
+            EQUITY
+            <span class="tooltip">Equities / Stocks</span>
+        </button>
+        <button class="kb-key yellow" onclick="appendToCommand(' INDEX')">
+            INDEX
+            <span class="tooltip">Market Indices</span>
+        </button>
+        <button class="kb-key yellow" onclick="appendToCommand(' CRNCY')">
+            CRNCY
+            <span class="tooltip">Currencies</span>
+        </button>
+        <button class="kb-key yellow" onclick="appendToCommand(' CMDTY')">
+            CMDTY
+            <span class="tooltip">Commodities</span>
+        </button>
+        <button class="kb-key green" onclick="executeCommand()">
+            &lt;GO&gt;
+            <span class="tooltip">Execute command (Enter)</span>
+        </button>
+    </footer>
+
+    <!-- Floating Exercise Button -->
+    <button class="exercise-float-btn" onclick="openExerciseModal()">
+        📚 Exercises <span class="badge" id="exercise-badge">1/10</span>
+    </button>
+
+    <!-- Exercise Modal -->
+    <div class="exercise-modal-overlay" id="exercise-modal-overlay" onclick="closeExerciseModalOnOverlay(event)">
+        <div class="exercise-modal">
+            <div class="exercise-modal-header">
+                <h3>📚 Practice Exercise <span class="exercise-counter" id="exercise-counter">1 of 10</span></h3>
+                <button class="exercise-modal-close" onclick="closeExerciseModal()">×</button>
+            </div>
+            <div class="exercise-modal-body" id="exercise-modal-body">
+                <!-- Exercise content will be injected here -->
+            </div>
+            <div class="exercise-modal-footer">
+                <button class="exercise-nav-btn" id="exercise-prev-btn" onclick="prevExercise()">← Previous</button>
+                <div class="exercise-progress" id="exercise-progress">
+                    <!-- Dots will be injected here -->
+                </div>
+                <button class="exercise-nav-btn primary" id="exercise-next-btn" onclick="nextExercise()">Next →</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // BLOOMBERG TERMINAL SIMULATOR - CORE ENGINE
+        // ============================================
+
+        // State Management
+        const state = {
+            currentSecurity: null,
+            commandHistory: [],
+            historyIndex: -1,
+            charts: {}
+        };
+
+        // Simulated Market Data Generator
+        const MarketData = {
+            // Base prices that fluctuate
+            basePrices: {
+                AAPL: 185.50, MSFT: 378.25, GOOGL: 141.80, AMZN: 178.90, META: 505.60,
+                NVDA: 875.30, TSLA: 248.50, JPM: 198.40, V: 275.80, JNJ: 155.20,
+                WMT: 165.30, PG: 158.90, UNH: 528.40, HD: 345.60, MA: 458.90,
+                SPX: 5850.32, DJIA: 43248.50, NDX: 18420.75, FTSE: 8125.40, DAX: 18450.20
+            },
+
+            // Company info database
+            companies: {
+                AAPL: { name: 'Apple Inc', sector: 'Technology', industry: 'Consumer Electronics', employees: 164000, founded: 1976, hq: 'Cupertino, CA' },
+                MSFT: { name: 'Microsoft Corp', sector: 'Technology', industry: 'Software', employees: 221000, founded: 1975, hq: 'Redmond, WA' },
+                GOOGL: { name: 'Alphabet Inc', sector: 'Technology', industry: 'Internet Services', employees: 182000, founded: 1998, hq: 'Mountain View, CA' },
+                AMZN: { name: 'Amazon.com Inc', sector: 'Consumer Discretionary', industry: 'E-Commerce', employees: 1540000, founded: 1994, hq: 'Seattle, WA' },
+                META: { name: 'Meta Platforms Inc', sector: 'Technology', industry: 'Social Media', employees: 67000, founded: 2004, hq: 'Menlo Park, CA' },
+                NVDA: { name: 'NVIDIA Corp', sector: 'Technology', industry: 'Semiconductors', employees: 29600, founded: 1993, hq: 'Santa Clara, CA' },
+                TSLA: { name: 'Tesla Inc', sector: 'Consumer Discretionary', industry: 'Auto Manufacturers', employees: 140000, founded: 2003, hq: 'Austin, TX' },
+                JPM: { name: 'JPMorgan Chase & Co', sector: 'Financials', industry: 'Banks', employees: 309000, founded: 1799, hq: 'New York, NY' },
+                V: { name: 'Visa Inc', sector: 'Financials', industry: 'Credit Services', employees: 29500, founded: 1958, hq: 'San Francisco, CA' },
+                JNJ: { name: 'Johnson & Johnson', sector: 'Healthcare', industry: 'Pharmaceuticals', employees: 131900, founded: 1886, hq: 'New Brunswick, NJ' }
+            },
+
+            // Generate realistic price with variance
+            getPrice(ticker, variance = 0.02) {
+                const base = this.basePrices[ticker] || 100;
+                const change = (Math.random() - 0.5) * 2 * variance * base;
+                return base + change;
+            },
+
+            // Generate price change
+            getChange(price, prevClose) {
+                const change = price - prevClose;
+                const pctChange = (change / prevClose) * 100;
+                return { change, pctChange };
+            },
+
+            // Generate historical prices for charts
+            generateHistoricalPrices(ticker, days = 30) {
+                const prices = [];
+                let price = this.basePrices[ticker] || 100;
+                const now = new Date();
+                
+                for (let i = days; i >= 0; i--) {
+                    const date = new Date(now);
+                    date.setDate(date.getDate() - i);
+                    price = price * (1 + (Math.random() - 0.48) * 0.03);
+                    prices.push({
+                        date: date.toISOString().split('T')[0],
+                        price: price,
+                        volume: Math.floor(Math.random() * 50000000) + 10000000
+                    });
+                }
+                return prices;
+            },
+
+            // Generate financial metrics
+            getFinancials(ticker) {
+                const base = this.basePrices[ticker] || 100;
+                const marketCap = base * (Math.random() * 2 + 1) * 1000000000;
+                return {
+                    marketCap: marketCap,
+                    pe: (Math.random() * 30 + 10).toFixed(2),
+                    eps: (base / (Math.random() * 20 + 15)).toFixed(2),
+                    dividend: (Math.random() * 3).toFixed(2),
+                    dividendYield: (Math.random() * 2.5).toFixed(2),
+                    beta: (Math.random() * 0.8 + 0.6).toFixed(2),
+                    week52High: (base * 1.25).toFixed(2),
+                    week52Low: (base * 0.75).toFixed(2),
+                    avgVolume: Math.floor(Math.random() * 50000000) + 10000000,
+                    revenue: marketCap * (Math.random() * 0.3 + 0.1),
+                    netIncome: marketCap * (Math.random() * 0.1 + 0.02),
+                    debtToEquity: (Math.random() * 1.5).toFixed(2),
+                    roe: (Math.random() * 30 + 5).toFixed(2),
+                    grossMargin: (Math.random() * 40 + 20).toFixed(2),
+                    operatingMargin: (Math.random() * 25 + 5).toFixed(2)
+                };
+            },
+
+            // Generate earnings data
+            getEarnings(ticker) {
+                const quarters = [];
+                const now = new Date();
+                for (let i = 0; i < 8; i++) {
+                    const date = new Date(now);
+                    date.setMonth(date.getMonth() - (i * 3));
+                    const estimate = (Math.random() * 3 + 1).toFixed(2);
+                    const actual = (parseFloat(estimate) + (Math.random() - 0.4) * 0.5).toFixed(2);
+                    quarters.push({
+                        quarter: `Q${4 - (i % 4)} ${date.getFullYear()}`,
+                        estimate: estimate,
+                        actual: actual,
+                        surprise: ((actual - estimate) / estimate * 100).toFixed(1)
+                    });
+                }
+                return quarters;
+            },
+
+            // Generate yield curve data
+            getYieldCurve() {
+                const maturities = ['1M', '3M', '6M', '1Y', '2Y', '3Y', '5Y', '7Y', '10Y', '20Y', '30Y'];
+                const baseYields = [5.25, 5.30, 5.15, 4.85, 4.45, 4.30, 4.20, 4.25, 4.28, 4.55, 4.45];
+                return maturities.map((m, i) => ({
+                    maturity: m,
+                    yield: (baseYields[i] + (Math.random() - 0.5) * 0.1).toFixed(2),
+                    change: ((Math.random() - 0.5) * 0.1).toFixed(2)
+                }));
+            },
+
+            // Generate currency rates
+            getCurrencyRates() {
+                return [
+                    { pair: 'EUR/USD', rate: (1.08 + Math.random() * 0.02).toFixed(4), change: ((Math.random() - 0.5) * 0.5).toFixed(2) },
+                    { pair: 'GBP/USD', rate: (1.27 + Math.random() * 0.02).toFixed(4), change: ((Math.random() - 0.5) * 0.5).toFixed(2) },
+                    { pair: 'USD/JPY', rate: (149 + Math.random() * 2).toFixed(2), change: ((Math.random() - 0.5) * 1).toFixed(2) },
+                    { pair: 'USD/CHF', rate: (0.88 + Math.random() * 0.02).toFixed(4), change: ((Math.random() - 0.5) * 0.5).toFixed(2) },
+                    { pair: 'AUD/USD', rate: (0.65 + Math.random() * 0.02).toFixed(4), change: ((Math.random() - 0.5) * 0.5).toFixed(2) },
+                    { pair: 'USD/CAD', rate: (1.36 + Math.random() * 0.02).toFixed(4), change: ((Math.random() - 0.5) * 0.5).toFixed(2) },
+                    { pair: 'EUR/GBP', rate: (0.85 + Math.random() * 0.02).toFixed(4), change: ((Math.random() - 0.5) * 0.3).toFixed(2) },
+                    { pair: 'EUR/JPY', rate: (161 + Math.random() * 2).toFixed(2), change: ((Math.random() - 0.5) * 1).toFixed(2) }
+                ];
+            },
+
+            // Generate economic calendar
+            getEconomicCalendar() {
+                const events = [
+                    { time: '08:30', event: 'Non-Farm Payrolls', country: 'US', importance: 'HIGH', actual: '256K', forecast: '165K', previous: '212K' },
+                    { time: '08:30', event: 'Unemployment Rate', country: 'US', importance: 'HIGH', actual: '4.1%', forecast: '4.2%', previous: '4.2%' },
+                    { time: '10:00', event: 'ISM Manufacturing PMI', country: 'US', importance: 'HIGH', actual: '49.3', forecast: '48.5', previous: '48.4' },
+                    { time: '10:00', event: 'Consumer Confidence', country: 'US', importance: 'MED', actual: '104.7', forecast: '106.0', previous: '109.7' },
+                    { time: '14:00', event: 'FOMC Rate Decision', country: 'US', importance: 'HIGH', actual: '4.50%', forecast: '4.50%', previous: '4.75%' },
+                    { time: '09:00', event: 'CPI YoY', country: 'EU', importance: 'HIGH', actual: '2.4%', forecast: '2.5%', previous: '2.6%' },
+                    { time: '04:30', event: 'GDP QoQ', country: 'UK', importance: 'MED', actual: '0.1%', forecast: '0.0%', previous: '-0.1%' },
+                    { time: '19:50', event: 'Trade Balance', country: 'JP', importance: 'MED', actual: '-¥234B', forecast: '-¥300B', previous: '-¥461B' }
+                ];
+                return events;
+            },
+
+            // Generate news headlines
+            getNews() {
+                const headlines = [
+                    { time: '10:42', headline: 'Fed Signals Potential Rate Pause as Inflation Data Cools Further', source: 'Bloomberg', category: 'Central Banks' },
+                    { time: '10:38', headline: 'Tech Stocks Rally on AI Chip Breakthrough, NVIDIA Hits New High', source: 'Bloomberg', category: 'Technology' },
+                    { time: '10:35', headline: 'Oil Prices Stabilize Near $78 Ahead of OPEC+ Meeting This Week', source: 'Reuters', category: 'Commodities' },
+                    { time: '10:32', headline: 'European Markets Close Higher on Earnings Optimism, DAX +0.8%', source: 'Bloomberg', category: 'Markets' },
+                    { time: '10:28', headline: 'Apple Announces $100 Billion Buyback Program, Largest in History', source: 'CNBC', category: 'Corporate' },
+                    { time: '10:25', headline: 'China Manufacturing PMI Rises to 50.4, First Expansion in 6 Months', source: 'Reuters', category: 'Economy' },
+                    { time: '10:20', headline: 'Treasury 10-Year Yield Falls Below 4.3% on Weak Jobs Report', source: 'Bloomberg', category: 'Fixed Income' },
+                    { time: '10:15', headline: 'Microsoft Cloud Revenue Beats Estimates, Azure Growth at 29%', source: 'Bloomberg', category: 'Earnings' },
+                    { time: '10:10', headline: 'Gold Rises to 3-Week High as Dollar Weakens on Fed Outlook', source: 'Reuters', category: 'Commodities' },
+                    { time: '10:05', headline: 'Bank of Japan Keeps Rates Steady, Yen Extends Losses', source: 'Bloomberg', category: 'Central Banks' }
+                ];
+                return headlines;
+            },
+
+            // Generate world indices
+            getWorldIndices() {
+                return [
+                    { name: 'S&P 500', ticker: 'SPX', value: this.getPrice('SPX', 0.005), change: (Math.random() - 0.4) * 30, region: 'Americas' },
+                    { name: 'Dow Jones', ticker: 'DJIA', value: this.getPrice('DJIA', 0.005), change: (Math.random() - 0.4) * 150, region: 'Americas' },
+                    { name: 'NASDAQ 100', ticker: 'NDX', value: this.getPrice('NDX', 0.008), change: (Math.random() - 0.4) * 80, region: 'Americas' },
+                    { name: 'Russell 2000', ticker: 'RTY', value: 2050 + Math.random() * 50, change: (Math.random() - 0.4) * 20, region: 'Americas' },
+                    { name: 'TSX Composite', ticker: 'SPTSX', value: 22500 + Math.random() * 200, change: (Math.random() - 0.4) * 100, region: 'Americas' },
+                    { name: 'FTSE 100', ticker: 'UKX', value: this.getPrice('FTSE', 0.005), change: (Math.random() - 0.4) * 30, region: 'Europe' },
+                    { name: 'DAX', ticker: 'DAX', value: this.getPrice('DAX', 0.005), change: (Math.random() - 0.4) * 80, region: 'Europe' },
+                    { name: 'CAC 40', ticker: 'CAC', value: 7850 + Math.random() * 50, change: (Math.random() - 0.4) * 30, region: 'Europe' },
+                    { name: 'Euro Stoxx 50', ticker: 'SX5E', value: 4950 + Math.random() * 30, change: (Math.random() - 0.4) * 25, region: 'Europe' },
+                    { name: 'Nikkei 225', ticker: 'NKY', value: 38500 + Math.random() * 500, change: (Math.random() - 0.4) * 300, region: 'Asia' },
+                    { name: 'Hang Seng', ticker: 'HSI', value: 17200 + Math.random() * 200, change: (Math.random() - 0.4) * 150, region: 'Asia' },
+                    { name: 'Shanghai Comp', ticker: 'SHCOMP', value: 3050 + Math.random() * 30, change: (Math.random() - 0.4) * 20, region: 'Asia' }
+                ];
+            }
+        };
+
+        // Educational Tips
+        const EduTips = {
+            tips: {
+                default: 'Type a ticker symbol followed by the asset class (e.g., "AAPL EQUITY") and press GO or Enter to load a security.',
+                security: 'Now that you\'ve loaded a security, try DES for description, FA for financials, GP for price chart, or ERN for earnings.',
+                news: 'NEWS shows top market headlines. In the real terminal, you can filter by company, sector, or topic.',
+                wei: 'WEI displays world equity indices. Notice how markets in different regions may move independently based on local factors.',
+                ecow: 'ECOW shows economic releases. The "Actual vs Estimate" comparison is crucial - markets react to surprises!',
+                gc: 'GC shows the yield curve. An inverted curve (short rates > long rates) often signals recession ahead.',
+                crncy: 'Currency rates are affected by interest rate differentials, trade balances, and economic strength.',
+                des: 'DES provides a company overview including sector, industry, and key statistics.',
+                fa: 'FA shows financial ratios like P/E, ROE, and margins. Use these to compare companies within a sector.',
+                gp: 'GP displays price history. In the real terminal, you can overlay technicals and compare to benchmarks.',
+                ern: 'ERN shows earnings history. The "surprise" column shows how actual EPS compared to analyst estimates.'
+            },
+            getTip(context) {
+                return this.tips[context] || this.tips.default;
+            }
+        };
+
+        // Practice Exercises - 10 Total
+        const Exercises = [
+            {
+                title: 'Find Apple\'s P/E Ratio',
+                instructions: 'Load Apple stock and find its Price-to-Earnings ratio. The P/E ratio is one of the most common valuation metrics used by investors.',
+                steps: ['Type <code>AAPL EQUITY</code> and press GO', 'Click on <code>FA</code> (Financial Analysis)', 'Find the P/E ratio in the Valuation section'],
+                hint: 'P/E = Price / Earnings Per Share. A higher P/E suggests investors expect higher growth.'
+            },
+            {
+                title: 'Check the Yield Curve',
+                instructions: 'View the current US Treasury yield curve and identify if it\'s normal, flat, or inverted. This is a critical recession indicator.',
+                steps: ['Type <code>GC</code> and press GO', 'Compare short-term (1M-2Y) to long-term (10Y-30Y) yields', 'Determine the curve shape based on the pattern'],
+                hint: 'If 2Y yield > 10Y yield, the curve is inverted - historically a recession predictor.'
+            },
+            {
+                title: 'Currency Analysis',
+                instructions: 'Find the EUR/USD exchange rate and understand what the rate means for international trade.',
+                steps: ['Type <code>CRNCY</code> and press GO', 'Find EUR/USD in the currency table', 'Note the rate and daily change'],
+                hint: 'Rate > 1 means 1 Euro buys more than 1 USD. Higher interest rates tend to strengthen a currency.'
+            },
+            {
+                title: 'Economic Calendar Review',
+                instructions: 'Find today\'s NFP (Non-Farm Payrolls) data and determine if it beat expectations. Markets react to surprises!',
+                steps: ['Type <code>ECOW</code> and press GO', 'Find Non-Farm Payrolls in the calendar', 'Compare Actual vs Forecast columns'],
+                hint: 'Actual > Forecast = Positive surprise = Markets usually rally. The opposite causes selloffs.'
+            },
+            {
+                title: 'Compare World Markets',
+                instructions: 'View global equity indices and identify which region is performing best today.',
+                steps: ['Type <code>WEI</code> and press GO', 'Review indices across Americas, Europe, and Asia', 'Compare percentage changes to find the leader'],
+                hint: 'Markets in different time zones react to different news. Asian markets close before US opens.'
+            },
+            {
+                title: 'Analyze Microsoft Financials',
+                instructions: 'Load Microsoft and analyze its profitability metrics to understand its business health.',
+                steps: ['Type <code>MSFT EQUITY</code> and press GO', 'Click on <code>FA</code> for Financial Analysis', 'Find ROE and Operating Margin in the Profitability section'],
+                hint: 'ROE (Return on Equity) above 15% is generally considered good. Compare margins to industry peers.'
+            },
+            {
+                title: 'Check Earnings Surprises',
+                instructions: 'Look at a company\'s earnings history to see its track record of beating or missing estimates.',
+                steps: ['Type <code>NVDA EQUITY</code> and press GO', 'Click on <code>ERN</code> (Earnings)', 'Review the Surprise % column across quarters'],
+                hint: 'Consistent positive surprises suggest conservative guidance. Negative surprises often cause stock drops.'
+            },
+            {
+                title: 'Read Market News',
+                instructions: 'Check the top news headlines and identify which stories might impact markets most.',
+                steps: ['Type <code>NEWS</code> and press GO', 'Scan headlines for Fed, earnings, or geopolitical news', 'Note which categories appear most frequently'],
+                hint: 'Central bank news (Fed, ECB) often has the biggest market impact. Earnings drive individual stocks.'
+            },
+            {
+                title: 'Price Chart Analysis',
+                instructions: 'View a stock\'s price chart and calculate its return over the displayed period.',
+                steps: ['Type <code>TSLA EQUITY</code> and press GO', 'Click on <code>GP</code> (Price Graph)', 'Find the 60-Day Return in the stats below the chart'],
+                hint: 'Compare the return to the broader market (S&P 500) to see if the stock outperformed.'
+            },
+            {
+                title: 'Bond Market Check',
+                instructions: 'Understand the relationship between short-term and long-term Treasury yields.',
+                steps: ['Type <code>GC</code> and press GO', 'Compare the 3-Month yield to the 10-Year yield', 'Calculate the spread (10Y minus 3M)'],
+                hint: 'A negative spread (3M > 10Y) is called inversion. The 3M-10Y spread is closely watched by economists.'
+            }
+        ];
+
+        // ============================================
+        // COMMAND PROCESSING
+        // ============================================
+
+        const commandInput = document.getElementById('command-input');
+
+        // Event Listeners
+        commandInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                executeCommand();
+            } else if (e.key === 'Escape') {
+                clearCommand();
+            } else if (e.key === 'ArrowUp') {
+                navigateHistory(-1);
+            } else if (e.key === 'ArrowDown') {
+                navigateHistory(1);
+            }
+        });
+
+        function executeCommand() {
+            const cmd = commandInput.value.trim().toUpperCase();
+            if (!cmd) return;
+
+            // Add to history
+            state.commandHistory.unshift(cmd);
+            state.historyIndex = -1;
+
+            // Parse and route command
+            routeCommand(cmd);
+
+            // Clear input
+            commandInput.value = '';
+        }
+
+        function routeCommand(cmd) {
+            // Hide all views first
+            document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+
+            // Parse command
+            const parts = cmd.split(/\s+/);
+            const primary = parts[0];
+            const secondary = parts[1] || '';
+
+            // Route based on command
+            if (primary === 'NEWS') {
+                showNews();
+            } else if (primary === 'WEI') {
+                showWorldIndices();
+            } else if (primary === 'ECOW') {
+                showEconomicCalendar();
+            } else if (primary === 'GC') {
+                showYieldCurve();
+            } else if (primary === 'CRNCY') {
+                showCurrencyRates();
+            } else if (primary === 'HELP') {
+                showView('welcome');
+            } else if (primary === 'DES' && state.currentSecurity) {
+                showDescription();
+            } else if (primary === 'FA' && state.currentSecurity) {
+                showFinancialAnalysis();
+            } else if (primary === 'GP' && state.currentSecurity) {
+                showPriceGraph();
+            } else if (primary === 'ERN' && state.currentSecurity) {
+                showEarnings();
+            } else if (secondary === 'EQUITY' || secondary === 'INDEX' || MarketData.companies[primary]) {
+                loadSecurity(primary, secondary || 'EQUITY');
+            } else if (MarketData.basePrices[primary]) {
+                loadSecurity(primary, 'INDEX');
+            } else {
+                // Unknown command - flash error
+                flashError();
+                showView('welcome');
+            }
+        }
+
+        function executeFromMenu(fn) {
+            if (state.currentSecurity) {
+                routeCommand(fn);
+            }
+        }
+
+        function runCommand(cmd) {
+            commandInput.value = cmd;
+            executeCommand();
+        }
+
+        function appendToCommand(text) {
+            commandInput.value += text;
+            commandInput.focus();
+        }
+
+        function clearCommand() {
+            commandInput.value = '';
+            commandInput.focus();
+        }
+
+        function goBack() {
+            showView('welcome');
+            updateEduTip('default');
+        }
+
+        function navigateHistory(direction) {
+            const newIndex = state.historyIndex + direction;
+            if (newIndex >= -1 && newIndex < state.commandHistory.length) {
+                state.historyIndex = newIndex;
+                commandInput.value = newIndex === -1 ? '' : state.commandHistory[newIndex];
+            }
+        }
+
+        function flashError() {
+            commandInput.style.backgroundColor = '#550000';
+            setTimeout(() => {
+                commandInput.style.backgroundColor = '';
+            }, 200);
+        }
+
+        // ============================================
+        // VIEW RENDERING
+        // ============================================
+
+        function showView(viewId) {
+            document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+            document.getElementById(`view-${viewId}`).classList.add('active');
+        }
+
+        function getTimestamp() {
+            return new Date().toLocaleString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        function formatNumber(num, decimals = 2) {
+            return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+        }
+
+        function formatLargeNumber(num) {
+            if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            return num.toLocaleString();
+        }
+
+        function updateSidebar(ticker, name, price, change, pctChange) {
+            document.getElementById('sidebar-ticker').textContent = ticker;
+            document.getElementById('sidebar-name').textContent = name;
+            document.getElementById('sidebar-price').textContent = formatNumber(price);
+            
+            const changeEl = document.getElementById('sidebar-change');
+            const sign = change >= 0 ? '+' : '';
+            changeEl.textContent = `${sign}${formatNumber(change)} (${sign}${formatNumber(pctChange)}%)`;
+            changeEl.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
+        }
+
+        function updateEduTip(context) {
+            document.getElementById('edu-content').textContent = EduTips.getTip(context);
+        }
+
+        // Load Security
+        function loadSecurity(ticker, type) {
+            const company = MarketData.companies[ticker];
+            const price = MarketData.getPrice(ticker);
+            const prevClose = price * (1 - (Math.random() - 0.5) * 0.02);
+            const { change, pctChange } = MarketData.getChange(price, prevClose);
+
+            state.currentSecurity = {
+                ticker,
+                type,
+                name: company ? company.name : `${ticker} ${type}`,
+                price,
+                prevClose,
+                change,
+                pctChange,
+                company
+            };
+
+            updateSidebar(
+                `${ticker} US ${type}`,
+                state.currentSecurity.name,
+                price,
+                change,
+                pctChange
+            );
+
+            updateEduTip('security');
+            showDescription();
+        }
+
+        // Show Description
+        function showDescription() {
+            if (!state.currentSecurity) return;
+            
+            const sec = state.currentSecurity;
+            const fin = MarketData.getFinancials(sec.ticker);
+            
+            document.getElementById('des-header').textContent = `${sec.name} - DESCRIPTION`;
+            document.getElementById('des-timestamp').textContent = getTimestamp();
+
+            let html = '';
+            
+            if (sec.company) {
+                html += `
+                    <div class="fa-section">
+                        <h3>COMPANY OVERVIEW</h3>
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <div class="stat-label">SECTOR</div>
+                                <div class="stat-value" style="font-size: 14px;">${sec.company.sector}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">INDUSTRY</div>
+                                <div class="stat-value" style="font-size: 14px;">${sec.company.industry}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">HEADQUARTERS</div>
+                                <div class="stat-value" style="font-size: 14px;">${sec.company.hq}</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">EMPLOYEES</div>
+                                <div class="stat-value" style="font-size: 14px;">${sec.company.employees.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="fa-section">
+                    <h3>KEY STATISTICS</h3>
+                    <table class="data-table">
+                        <tr><td>Last Price</td><td class="highlight">${formatNumber(sec.price)}</td><td>Market Cap</td><td>${formatLargeNumber(fin.marketCap)}</td></tr>
+                        <tr><td>Change</td><td class="${sec.change >= 0 ? 'positive' : 'negative'}">${sec.change >= 0 ? '+' : ''}${formatNumber(sec.change)} (${sec.pctChange >= 0 ? '+' : ''}${formatNumber(sec.pctChange)}%)</td><td>Avg Volume</td><td>${formatLargeNumber(fin.avgVolume)}</td></tr>
+                        <tr><td>52-Week High</td><td>${fin.week52High}</td><td>52-Week Low</td><td>${fin.week52Low}</td></tr>
+                        <tr><td>P/E Ratio</td><td>${fin.pe}</td><td>EPS</td><td>${fin.eps}</td></tr>
+                        <tr><td>Dividend</td><td>${fin.dividend}</td><td>Div Yield</td><td>${fin.dividendYield}%</td></tr>
+                        <tr><td>Beta</td><td>${fin.beta}</td><td></td><td></td></tr>
+                    </table>
+                </div>
+            `;
+
+            document.getElementById('des-content').innerHTML = html;
+            showView('des');
+            updateEduTip('des');
+        }
+
+        // Show Financial Analysis
+        function showFinancialAnalysis() {
+            if (!state.currentSecurity) return;
+
+            const sec = state.currentSecurity;
+            const fin = MarketData.getFinancials(sec.ticker);
+
+            document.getElementById('fa-header').textContent = `${sec.name} - FINANCIAL ANALYSIS`;
+            document.getElementById('fa-timestamp').textContent = getTimestamp();
+
+            const html = `
+                <div class="fa-section">
+                    <h3>VALUATION</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-label">P/E RATIO</div>
+                            <div class="stat-value">${fin.pe}x</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">MARKET CAP</div>
+                            <div class="stat-value">${formatLargeNumber(fin.marketCap)}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">EPS (TTM)</div>
+                            <div class="stat-value">$${fin.eps}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">DIV YIELD</div>
+                            <div class="stat-value">${fin.dividendYield}%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="fa-section">
+                    <h3>PROFITABILITY</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-label">REVENUE (TTM)</div>
+                            <div class="stat-value">${formatLargeNumber(fin.revenue)}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">NET INCOME</div>
+                            <div class="stat-value">${formatLargeNumber(fin.netIncome)}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">GROSS MARGIN</div>
+                            <div class="stat-value">${fin.grossMargin}%</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">OPERATING MARGIN</div>
+                            <div class="stat-value">${fin.operatingMargin}%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="fa-section">
+                    <h3>RETURNS & RISK</h3>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-label">ROE</div>
+                            <div class="stat-value">${fin.roe}%</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">DEBT/EQUITY</div>
+                            <div class="stat-value">${fin.debtToEquity}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">BETA</div>
+                            <div class="stat-value">${fin.beta}</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">52W RANGE</div>
+                            <div class="stat-value" style="font-size: 13px;">${fin.week52Low} - ${fin.week52High}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('fa-content').innerHTML = html;
+            showView('fa');
+            updateEduTip('fa');
+        }
+
+        // Show Price Graph
+        function showPriceGraph() {
+            if (!state.currentSecurity) return;
+
+            const sec = state.currentSecurity;
+            const historical = MarketData.generateHistoricalPrices(sec.ticker, 60);
+
+            document.getElementById('gp-header').textContent = `${sec.name} - PRICE GRAPH`;
+            document.getElementById('gp-timestamp').textContent = getTimestamp();
+
+            // Calculate stats
+            const prices = historical.map(h => h.price);
+            const high = Math.max(...prices);
+            const low = Math.min(...prices);
+            const avg = prices.reduce((a, b) => a + b) / prices.length;
+            const startPrice = prices[0];
+            const endPrice = prices[prices.length - 1];
+            const periodReturn = ((endPrice - startPrice) / startPrice * 100).toFixed(2);
+
+            document.getElementById('gp-stats').innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">PERIOD HIGH</div>
+                        <div class="stat-value">${formatNumber(high)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">PERIOD LOW</div>
+                        <div class="stat-value">${formatNumber(low)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">AVERAGE</div>
+                        <div class="stat-value">${formatNumber(avg)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">60-DAY RETURN</div>
+                        <div class="stat-value ${parseFloat(periodReturn) >= 0 ? 'positive' : 'negative'}">${periodReturn}%</div>
+                    </div>
+                </div>
+            `;
+
+            showView('gp');
+
+            // Render chart
+            setTimeout(() => {
+                renderPriceChart(historical, sec.ticker);
+            }, 100);
+
+            updateEduTip('gp');
+        }
+
+        function renderPriceChart(data, ticker) {
+            const ctx = document.getElementById('price-chart').getContext('2d');
+
+            if (state.charts.price) {
+                state.charts.price.destroy();
+            }
+
+            state.charts.price = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: ticker,
+                        data: data.map(d => d.price),
+                        borderColor: '#FF8C00',
+                        backgroundColor: 'rgba(255, 140, 0, 0.1)',
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#222' },
+                            ticks: { color: '#888', maxTicksLimit: 10 }
+                        },
+                        y: {
+                            grid: { color: '#222' },
+                            ticks: { color: '#888' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Show Earnings
+        function showEarnings() {
+            if (!state.currentSecurity) return;
+
+            const sec = state.currentSecurity;
+            const earnings = MarketData.getEarnings(sec.ticker);
+
+            document.getElementById('ern-header').textContent = `${sec.name} - EARNINGS`;
+            document.getElementById('ern-timestamp').textContent = getTimestamp();
+
+            let html = `
+                <div class="fa-section">
+                    <h3>EARNINGS HISTORY</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Quarter</th>
+                                <th>EPS Estimate</th>
+                                <th>EPS Actual</th>
+                                <th>Surprise %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            earnings.forEach(q => {
+                const surpriseClass = parseFloat(q.surprise) >= 0 ? 'positive' : 'negative';
+                html += `
+                    <tr>
+                        <td>${q.quarter}</td>
+                        <td>$${q.estimate}</td>
+                        <td class="highlight">$${q.actual}</td>
+                        <td class="${surpriseClass}">${q.surprise}%</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table></div>';
+
+            document.getElementById('ern-content').innerHTML = html;
+            showView('ern');
+            updateEduTip('ern');
+        }
+
+        // Show News
+        function showNews() {
+            const news = MarketData.getNews();
+            document.getElementById('news-timestamp').textContent = getTimestamp();
+
+            let html = '';
+            news.forEach(item => {
+                html += `
+                    <div class="news-item">
+                        <div class="news-time">${item.time} | ${item.category}</div>
+                        <div class="news-headline">${item.headline}</div>
+                        <div class="news-source">${item.source}</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('news-content').innerHTML = html;
+            showView('news');
+            updateEduTip('news');
+        }
+
+        // Show World Indices
+        function showWorldIndices() {
+            const indices = MarketData.getWorldIndices();
+            document.getElementById('wei-timestamp').textContent = getTimestamp();
+
+            let html = '<table class="data-table"><thead><tr><th>Index</th><th>Ticker</th><th>Value</th><th>Change</th><th>% Change</th></tr></thead><tbody>';
+
+            let currentRegion = '';
+            indices.forEach(idx => {
+                if (idx.region !== currentRegion) {
+                    currentRegion = idx.region;
+                    html += `<tr><td colspan="5" style="color: var(--bb-blue); font-weight: 600; padding-top: 15px;">${currentRegion.toUpperCase()}</td></tr>`;
+                }
+
+                const pctChange = (idx.change / idx.value * 100);
+                const changeClass = idx.change >= 0 ? 'positive' : 'negative';
+                const sign = idx.change >= 0 ? '+' : '';
+
+                html += `
+                    <tr onclick="runCommand('${idx.ticker} INDEX')" style="cursor: pointer;">
+                        <td>${idx.name}</td>
+                        <td class="highlight">${idx.ticker}</td>
+                        <td>${formatNumber(idx.value)}</td>
+                        <td class="${changeClass}">${sign}${formatNumber(idx.change)}</td>
+                        <td class="${changeClass}">${sign}${formatNumber(pctChange)}%</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+
+            document.getElementById('wei-content').innerHTML = html;
+            showView('wei');
+            updateEduTip('wei');
+        }
+
+        // Show Economic Calendar
+        function showEconomicCalendar() {
+            const events = MarketData.getEconomicCalendar();
+            document.getElementById('ecow-timestamp').textContent = getTimestamp();
+
+            let html = '<table class="data-table"><thead><tr><th>Time</th><th>Country</th><th>Event</th><th>Importance</th><th>Actual</th><th>Forecast</th><th>Previous</th></tr></thead><tbody>';
+
+            events.forEach(ev => {
+                const impClass = ev.importance === 'HIGH' ? 'negative' : (ev.importance === 'MED' ? 'highlight' : '');
+                const actualNum = parseFloat(ev.actual.replace(/[^0-9.-]/g, ''));
+                const forecastNum = parseFloat(ev.forecast.replace(/[^0-9.-]/g, ''));
+                const beatClass = actualNum > forecastNum ? 'positive' : (actualNum < forecastNum ? 'negative' : '');
+
+                html += `
+                    <tr>
+                        <td>${ev.time}</td>
+                        <td>${ev.country}</td>
+                        <td>${ev.event}</td>
+                        <td class="${impClass}">${ev.importance}</td>
+                        <td class="${beatClass}">${ev.actual}</td>
+                        <td>${ev.forecast}</td>
+                        <td>${ev.previous}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+
+            document.getElementById('ecow-content').innerHTML = html;
+            showView('ecow');
+            updateEduTip('ecow');
+        }
+
+        // Show Yield Curve
+        function showYieldCurve() {
+            const curve = MarketData.getYieldCurve();
+            document.getElementById('gc-timestamp').textContent = getTimestamp();
+
+            let html = '<h4 style="color: var(--bb-amber); margin-bottom: 10px;">US TREASURY YIELDS</h4>';
+            html += '<table class="data-table"><thead><tr><th>Maturity</th><th>Yield</th><th>Change</th></tr></thead><tbody>';
+
+            curve.forEach(point => {
+                const changeClass = parseFloat(point.change) >= 0 ? 'positive' : 'negative';
+                const sign = parseFloat(point.change) >= 0 ? '+' : '';
+                html += `
+                    <tr>
+                        <td>${point.maturity}</td>
+                        <td class="highlight">${point.yield}%</td>
+                        <td class="${changeClass}">${sign}${point.change}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+
+            // Check for inversion
+            const twoYear = parseFloat(curve.find(c => c.maturity === '2Y').yield);
+            const tenYear = parseFloat(curve.find(c => c.maturity === '10Y').yield);
+            if (twoYear > tenYear) {
+                html += '<div style="margin-top: 15px; padding: 10px; background: rgba(255,51,51,0.2); border: 1px solid var(--bb-red); color: var(--bb-red);">⚠️ YIELD CURVE INVERTED (2Y > 10Y) - Potential recession indicator</div>';
+            }
+
+            document.getElementById('gc-data').innerHTML = html;
+            showView('gc');
+
+            // Render yield curve chart
+            setTimeout(() => {
+                renderYieldChart(curve);
+            }, 100);
+
+            updateEduTip('gc');
+        }
+
+        function renderYieldChart(data) {
+            const ctx = document.getElementById('yield-chart').getContext('2d');
+
+            if (state.charts.yield) {
+                state.charts.yield.destroy();
+            }
+
+            state.charts.yield = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.maturity),
+                    datasets: [{
+                        label: 'Yield',
+                        data: data.map(d => parseFloat(d.yield)),
+                        borderColor: '#00A3E0',
+                        backgroundColor: 'rgba(0, 163, 224, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#00A3E0',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'US Treasury Yield Curve',
+                            color: '#888',
+                            font: { size: 12 }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#222' },
+                            ticks: { color: '#888' }
+                        },
+                        y: {
+                            grid: { color: '#222' },
+                            ticks: { color: '#888' },
+                            min: 3.5,
+                            max: 6
+                        }
+                    }
+                }
+            });
+        }
+
+        // Show Currency Rates
+        function showCurrencyRates() {
+            const rates = MarketData.getCurrencyRates();
+            document.getElementById('crncy-timestamp').textContent = getTimestamp();
+
+            let html = '<table class="data-table"><thead><tr><th>Pair</th><th>Rate</th><th>Change</th><th>% Change</th></tr></thead><tbody>';
+
+            rates.forEach(rate => {
+                const changeClass = parseFloat(rate.change) >= 0 ? 'positive' : 'negative';
+                const sign = parseFloat(rate.change) >= 0 ? '+' : '';
+                const pctChange = (parseFloat(rate.change) / parseFloat(rate.rate) * 100).toFixed(3);
+
+                html += `
+                    <tr>
+                        <td class="highlight">${rate.pair}</td>
+                        <td>${rate.rate}</td>
+                        <td class="${changeClass}">${sign}${rate.change}</td>
+                        <td class="${changeClass}">${sign}${pctChange}%</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+
+            document.getElementById('crncy-content').innerHTML = html;
+            showView('crncy');
+            updateEduTip('crncy');
+        }
+
+
+        // ============================================
+        // EXERCISE MODAL SYSTEM
+        // ============================================
+        
+        const exerciseState = {
+            currentIndex: 0,
+            completed: new Set()
+        };
+
+        function openExerciseModal() {
+            document.getElementById('exercise-modal-overlay').classList.add('active');
+            renderExercise();
+            updateExerciseProgress();
+        }
+
+        function closeExerciseModal() {
+            document.getElementById('exercise-modal-overlay').classList.remove('active');
+        }
+
+        function closeExerciseModalOnOverlay(event) {
+            if (event.target === document.getElementById('exercise-modal-overlay')) {
+                closeExerciseModal();
+            }
+        }
+
+        function renderExercise() {
+            const exercise = Exercises[exerciseState.currentIndex];
+            const body = document.getElementById('exercise-modal-body');
+            
+            body.innerHTML = `
+                <h2 class="exercise-title">🎯 ${exercise.title}</h2>
+                <p class="exercise-instructions">${exercise.instructions}</p>
+                <div class="exercise-steps">
+                    <h4>📋 STEPS TO COMPLETE:</h4>
+                    <ol>
+                        ${exercise.steps.map(step => '<li>' + step + '</li>').join('')}
+                    </ol>
+                </div>
+                <div class="exercise-hint">
+                    <h4>💡 HINT</h4>
+                    <p>${exercise.hint}</p>
+                </div>
+            `;
+
+            // Update counter
+            document.getElementById('exercise-counter').textContent = (exerciseState.currentIndex + 1) + ' of ' + Exercises.length;
+            document.getElementById('exercise-badge').textContent = (exerciseState.currentIndex + 1) + '/' + Exercises.length;
+
+            // Update nav buttons
+            document.getElementById('exercise-prev-btn').disabled = exerciseState.currentIndex === 0;
+            document.getElementById('exercise-next-btn').textContent = 
+                exerciseState.currentIndex === Exercises.length - 1 ? 'Finish ✓' : 'Next →';
+        }
+
+        function updateExerciseProgress() {
+            const container = document.getElementById('exercise-progress');
+            container.innerHTML = Exercises.map((_, i) => {
+                let classes = 'exercise-dot';
+                if (i === exerciseState.currentIndex) classes += ' active';
+                if (exerciseState.completed.has(i)) classes += ' completed';
+                return '<div class="' + classes + '" onclick="goToExercise(' + i + ')" title="Exercise ' + (i + 1) + '"></div>';
+            }).join('');
+        }
+
+        function nextExercise() {
+            exerciseState.completed.add(exerciseState.currentIndex);
+            if (exerciseState.currentIndex < Exercises.length - 1) {
+                exerciseState.currentIndex++;
+                renderExercise();
+                updateExerciseProgress();
+            } else {
+                // Completed all exercises
+                closeExerciseModal();
+                alert('🎉 Congratulations! You have completed all 10 exercises!');
+            }
+        }
+
+        function prevExercise() {
+            if (exerciseState.currentIndex > 0) {
+                exerciseState.currentIndex--;
+                renderExercise();
+                updateExerciseProgress();
+            }
+        }
+
+        function goToExercise(index) {
+            exerciseState.currentIndex = index;
+            renderExercise();
+            updateExerciseProgress();
+        }
+
+        // Legacy function - now opens modal
+        function showPracticeExercise() {
+            openExerciseModal();
+        }
+
+        // Keyboard shortcut to close modal with Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('exercise-modal-overlay').classList.contains('active')) {
+                closeExerciseModal();
+            }
+        });
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('header-time').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+        }
+
+        function init() {
+            // Update time every second
+            updateTime();
+            setInterval(updateTime, 1000);
+
+            // Set welcome timestamp
+            document.getElementById('welcome-timestamp').textContent = getTimestamp();
+
+            // Focus on input
+            commandInput.focus();
+
+            // Initialize welcome stats with live-ish data
+            document.getElementById('welcome-spx').textContent = formatNumber(MarketData.getPrice('SPX', 0.001));
+            document.getElementById('welcome-djia').textContent = formatNumber(MarketData.getPrice('DJIA', 0.001));
+            document.getElementById('welcome-ndx').textContent = formatNumber(MarketData.getPrice('NDX', 0.001));
+        }
+
+        // Start
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
