@@ -1,0 +1,1956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zero Trust & SASE Explorer</title>
+    <style>
+        /* Web-safe colors with ADA compliant contrast ratios */
+        :root {
+            --primary-dark: #003366;
+            --primary-medium: #336699;
+            --primary-light: #6699CC;
+            --accent-green: #006633;
+            --accent-orange: #CC6600;
+            --text-dark: #1a1a1a;
+            --text-light: #ffffff;
+            --bg-light: #f5f5f5;
+            --bg-white: #ffffff;
+            --border-color: #cccccc;
+            --success: #006633;
+            --error: #CC3300;
+            --focus-ring: #0066CC;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text-dark);
+            background-color: var(--bg-light);
+        }
+
+        /* Skip link for keyboard users */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--primary-dark);
+            color: var(--text-light);
+            padding: 8px 16px;
+            z-index: 1000;
+            text-decoration: none;
+        }
+
+        .skip-link:focus {
+            top: 0;
+        }
+
+        /* Focus styles for ADA compliance */
+        *:focus {
+            outline: 3px solid var(--focus-ring);
+            outline-offset: 2px;
+        }
+
+        button:focus, a:focus {
+            outline: 3px solid var(--focus-ring);
+            outline-offset: 2px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-medium));
+            color: var(--text-light);
+            padding: 24px 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 1.75rem;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            font-size: 1rem;
+            opacity: 0.95;
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Tab Navigation */
+        .tab-container {
+            background: var(--bg-white);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .tab-nav {
+            display: flex;
+            flex-wrap: wrap;
+            background: var(--primary-dark);
+            list-style: none;
+        }
+
+        .tab-nav li {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .tab-btn {
+            width: 100%;
+            padding: 14px 12px;
+            background: transparent;
+            border: none;
+            color: var(--text-light);
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-align: center;
+        }
+
+        .tab-btn:hover {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .tab-btn[aria-selected="true"] {
+            background: var(--primary-medium);
+            border-bottom: 3px solid var(--accent-orange);
+        }
+
+        .tab-panel {
+            padding: 24px;
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        h2 {
+            color: var(--primary-dark);
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            color: var(--primary-medium);
+            font-size: 1.2rem;
+            margin: 20px 0 12px 0;
+        }
+
+        p {
+            margin-bottom: 12px;
+        }
+
+        /* Tooltip System - Smart positioning */
+        .term {
+            color: var(--primary-dark);
+            border-bottom: 2px dotted var(--primary-medium);
+            cursor: help;
+            position: relative;
+            font-weight: 600;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: var(--primary-dark);
+            color: var(--text-light);
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            max-width: 320px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            line-height: 1.5;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip::before {
+            content: '';
+            position: absolute;
+            border: 8px solid transparent;
+        }
+
+        .tooltip.arrow-top::before {
+            bottom: 100%;
+            left: 20px;
+            border-bottom-color: var(--primary-dark);
+        }
+
+        .tooltip.arrow-bottom::before {
+            top: 100%;
+            left: 20px;
+            border-top-color: var(--primary-dark);
+        }
+
+        /* Pillar Cards */
+        .pillars-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .pillar-card {
+            background: var(--bg-white);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pillar-card:hover, .pillar-card:focus {
+            border-color: var(--primary-medium);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .pillar-card.selected {
+            border-color: var(--accent-green);
+            background: #e6f2e6;
+        }
+
+        .pillar-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .pillar-name {
+            font-weight: bold;
+            font-size: 0.85rem;
+            color: var(--primary-dark);
+        }
+
+        .pillar-details {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--bg-light);
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-green);
+            display: none;
+        }
+
+        .pillar-details.visible {
+            display: block;
+        }
+
+        /* SASE Components */
+        .sase-component {
+            background: var(--bg-white);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin: 12px 0;
+            overflow: hidden;
+        }
+
+        .sase-header {
+            background: var(--primary-light);
+            color: var(--text-dark);
+            padding: 12px 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sase-header:hover {
+            background: var(--primary-medium);
+            color: var(--text-light);
+        }
+
+        .expand-icon {
+            transition: transform 0.2s;
+        }
+
+        .sase-header[aria-expanded="true"] .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .sase-content {
+            padding: 16px;
+            display: none;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .sase-content.open {
+            display: block;
+        }
+
+        /* Comparison Table */
+        .comparison-container {
+            overflow-x: auto;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            background: var(--bg-white);
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        .comparison-table th {
+            background: var(--primary-dark);
+            color: var(--text-light);
+            font-weight: bold;
+        }
+
+        .comparison-table tr:nth-child(even) {
+            background: var(--bg-light);
+        }
+
+        .comparison-table tr:hover {
+            background: #e6f2ff;
+        }
+
+        /* Quiz Section */
+        .quiz-container {
+            background: var(--bg-white);
+            border: 2px solid var(--primary-light);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+        }
+
+        .quiz-question {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            color: var(--primary-dark);
+        }
+
+        .quiz-options {
+            list-style: none;
+        }
+
+        .quiz-option {
+            margin: 8px 0;
+        }
+
+        .quiz-option label {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-light);
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quiz-option label:hover {
+            border-color: var(--primary-medium);
+            background: #e6f2ff;
+        }
+
+        .quiz-option input {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+        }
+
+        .quiz-option.correct label {
+            background: #d4edda;
+            border-color: var(--success);
+        }
+
+        .quiz-option.incorrect label {
+            background: #f8d7da;
+            border-color: var(--error);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 8px 8px 8px 0;
+        }
+
+        .btn-primary {
+            background: var(--primary-dark);
+            color: var(--text-light);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-medium);
+        }
+
+        .btn-secondary {
+            background: var(--accent-green);
+            color: var(--text-light);
+        }
+
+        .btn-secondary:hover {
+            background: #004d26;
+        }
+
+        .feedback {
+            padding: 16px;
+            border-radius: 6px;
+            margin-top: 16px;
+            font-weight: bold;
+        }
+
+        .feedback.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Progress Indicator */
+        .progress-container {
+            margin: 20px 0;
+        }
+
+        .progress-bar {
+            height: 24px;
+            background: var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-green);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-light);
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        /* Architecture Diagram */
+        .diagram {
+            background: var(--bg-white);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+            text-align: center;
+        }
+
+        .diagram-layers {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .diagram-layer {
+            padding: 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .diagram-layer:hover {
+            transform: scale(1.02);
+        }
+
+        .layer-user { background: #6699CC; color: white; }
+        .layer-identity { background: #336699; color: white; }
+        .layer-network { background: #CC6600; color: white; }
+        .layer-app { background: #006633; color: white; }
+        .layer-data { background: #003366; color: white; }
+
+        .diagram-info {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--bg-light);
+            border-radius: 6px;
+            text-align: left;
+            min-height: 80px;
+        }
+
+        /* Score Display */
+        .score-display {
+            background: var(--primary-dark);
+            color: var(--text-light);
+            padding: 16px 24px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .score-number {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            .tab-nav {
+                flex-direction: column;
+            }
+
+            .tab-btn {
+                border-bottom: 1px solid rgba(255,255,255,0.2);
+            }
+
+            .pillars-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            header h1 {
+                font-size: 1.4rem;
+            }
+        }
+
+        /* Checklist Styles */
+        .checklist-category {
+            background: var(--bg-white);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin: 16px 0;
+            overflow: hidden;
+        }
+
+        .checklist-category-header {
+            background: var(--primary-light);
+            color: var(--text-dark);
+            padding: 12px 16px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .category-score {
+            background: var(--primary-dark);
+            color: var(--text-light);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+
+        .checklist-items {
+            padding: 16px;
+        }
+
+        .checklist-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--bg-light);
+        }
+
+        .checklist-item:last-child {
+            border-bottom: none;
+        }
+
+        .checklist-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 12px;
+            margin-top: 2px;
+            cursor: pointer;
+        }
+
+        .checklist-item label {
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .checklist-item.checked label {
+            color: var(--accent-green);
+        }
+
+        .assessment-summary {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-medium));
+            color: var(--text-light);
+            padding: 24px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .assessment-score {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .assessment-grade {
+            font-size: 1.2rem;
+            padding: 8px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        /* Resource Cards */
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin: 16px 0;
+        }
+
+        .resource-card {
+            background: var(--bg-white);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+
+        .resource-card:hover {
+            border-color: var(--primary-medium);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .resource-card h4 {
+            color: var(--primary-dark);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .resource-card p {
+            font-size: 0.9rem;
+            color: #555;
+            margin-bottom: 12px;
+        }
+
+        .resource-card .resource-type {
+            display: inline-block;
+            padding: 4px 10px;
+            background: var(--bg-light);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: var(--primary-medium);
+            margin-bottom: 8px;
+        }
+
+        .resource-link {
+            display: inline-block;
+            color: var(--primary-dark);
+            text-decoration: none;
+            font-weight: bold;
+            padding: 8px 16px;
+            background: var(--bg-light);
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .resource-link:hover {
+            background: var(--primary-dark);
+            color: var(--text-light);
+        }
+
+        .resource-section {
+            margin: 24px 0;
+        }
+
+        .resource-section h3 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary-light);
+        }
+
+        /* Scenario tag for quiz */
+        .scenario-tag {
+            display: inline-block;
+            background: var(--accent-orange);
+            color: var(--text-light);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        /* Print styles */
+        @media print {
+            .tab-nav, .btn {
+                display: none;
+            }
+            .tab-panel {
+                display: block !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <header>
+        <h1>🔐 Zero Trust & SASE Explorer</h1>
+        <p>Interactive Guide to Modern Security Architectures</p>
+    </header>
+
+    <main id="main-content">
+        <div class="tab-container">
+            <ul class="tab-nav" role="tablist" aria-label="Security Topics">
+                <li role="presentation">
+                    <button class="tab-btn" role="tab" id="tab-zt" aria-controls="panel-zt" aria-selected="true">
+                        Zero Trust
+                    </button>
+                </li>
+                <li role="presentation">
+                    <button class="tab-btn" role="tab" id="tab-sase" aria-controls="panel-sase" aria-selected="false">
+                        SASE
+                    </button>
+                </li>
+                <li role="presentation">
+                    <button class="tab-btn" role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false">
+                        Compare
+                    </button>
+                </li>
+                <li role="presentation">
+                    <button class="tab-btn" role="tab" id="tab-quiz" aria-controls="panel-quiz" aria-selected="false">
+                        Quiz
+                    </button>
+                </li>
+                <li role="presentation">
+                    <button class="tab-btn" role="tab" id="tab-assess" aria-controls="panel-assess" aria-selected="false">
+                        Assess
+                    </button>
+                </li>
+                <li role="presentation">
+                    <button class="tab-btn" role="tab" id="tab-resources" aria-controls="panel-resources" aria-selected="false">
+                        Resources
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Zero Trust Panel -->
+            <section class="tab-panel active" role="tabpanel" id="panel-zt" aria-labelledby="tab-zt">
+                <h2>Zero Trust Architecture</h2>
+                
+                <p>
+                    <span class="term" data-tooltip="A security framework that requires strict identity verification for every person and device trying to access resources, regardless of whether they are inside or outside the network perimeter.">Zero Trust</span> 
+                    is a security model based on the principle: <strong>"Never trust, always verify."</strong>
+                </p>
+                
+                <p>
+                    Unlike traditional 
+                    <span class="term" data-tooltip="A security approach that focuses on defending the boundary between an organization's internal network and the external internet, assuming everything inside is trusted.">perimeter-based security</span>, 
+                    Zero Trust assumes that threats can come from anywhere—inside or outside the network. Every access request must be verified before granting access.
+                </p>
+
+                <h3>Core Principles</h3>
+                <ul style="margin-left: 20px; margin-bottom: 16px;">
+                    <li><strong>Verify Explicitly:</strong> Always authenticate based on all available data points</li>
+                    <li><strong>Least Privilege Access:</strong> Limit user access to only what's needed</li>
+                    <li><strong>Assume Breach:</strong> Minimize blast radius and segment access</li>
+                </ul>
+
+                <h3>Click a Pillar to Learn More</h3>
+                <div class="pillars-grid" role="group" aria-label="Zero Trust Pillars">
+                    <div class="pillar-card" tabindex="0" role="button" data-pillar="identity" aria-pressed="false">
+                        <div class="pillar-icon">👤</div>
+                        <div class="pillar-name">Identity</div>
+                    </div>
+                    <div class="pillar-card" tabindex="0" role="button" data-pillar="devices" aria-pressed="false">
+                        <div class="pillar-icon">💻</div>
+                        <div class="pillar-name">Devices</div>
+                    </div>
+                    <div class="pillar-card" tabindex="0" role="button" data-pillar="network" aria-pressed="false">
+                        <div class="pillar-icon">🌐</div>
+                        <div class="pillar-name">Network</div>
+                    </div>
+                    <div class="pillar-card" tabindex="0" role="button" data-pillar="applications" aria-pressed="false">
+                        <div class="pillar-icon">📱</div>
+                        <div class="pillar-name">Applications</div>
+                    </div>
+                    <div class="pillar-card" tabindex="0" role="button" data-pillar="data" aria-pressed="false">
+                        <div class="pillar-icon">💾</div>
+                        <div class="pillar-name">Data</div>
+                    </div>
+                    <div class="pillar-card" tabindex="0" role="button" data-pillar="visibility" aria-pressed="false">
+                        <div class="pillar-icon">📊</div>
+                        <div class="pillar-name">Visibility</div>
+                    </div>
+                </div>
+
+                <div id="pillar-details" class="pillar-details" aria-live="polite">
+                    <p>Click on a pillar above to see details.</p>
+                </div>
+
+                <h3>Interactive Architecture View</h3>
+                <div class="diagram">
+                    <p style="margin-bottom: 12px; font-style: italic;">Click each layer to learn more:</p>
+                    <div class="diagram-layers">
+                        <div class="diagram-layer layer-user" tabindex="0" role="button" data-layer="user">
+                            👤 User/Device
+                        </div>
+                        <div class="diagram-layer layer-identity" tabindex="0" role="button" data-layer="identity">
+                            🔑 Identity Verification
+                        </div>
+                        <div class="diagram-layer layer-network" tabindex="0" role="button" data-layer="network">
+                            🛡️ Network Segmentation
+                        </div>
+                        <div class="diagram-layer layer-app" tabindex="0" role="button" data-layer="app">
+                            📱 Application Access
+                        </div>
+                        <div class="diagram-layer layer-data" tabindex="0" role="button" data-layer="data">
+                            💾 Protected Data
+                        </div>
+                    </div>
+                    <div id="layer-info" class="diagram-info" aria-live="polite">
+                        <strong>How it works:</strong> Every request flows through multiple verification layers. No implicit trust is granted at any stage.
+                    </div>
+                </div>
+            </section>
+
+            <!-- SASE Panel -->
+            <section class="tab-panel" role="tabpanel" id="panel-sase" aria-labelledby="tab-sase" hidden>
+                <h2>SASE: Secure Access Service Edge</h2>
+                
+                <p>
+                    <span class="term" data-tooltip="A cloud-native architecture that combines network security functions with WAN capabilities to support the dynamic secure access needs of organizations.">SASE</span> 
+                    (pronounced "sassy") is a cloud-delivered framework that converges networking and security into a unified platform.
+                </p>
+                
+                <p>
+                    Coined by Gartner in 2019, SASE addresses the challenges of securing 
+                    <span class="term" data-tooltip="Employees who work outside the traditional office environment, accessing corporate resources from various locations using different devices and networks.">distributed workforces</span> 
+                    and 
+                    <span class="term" data-tooltip="Applications and services hosted on the internet rather than on-premises servers, accessed via web browsers or APIs.">cloud-based applications</span>.
+                </p>
+
+                <h3>SASE Components (Click to Expand)</h3>
+                
+                <div class="sase-component">
+                    <button class="sase-header" aria-expanded="false" aria-controls="sdwan-content">
+                        <span>🔗 SD-WAN (Software-Defined WAN)</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div id="sdwan-content" class="sase-content">
+                        <p><strong>What it does:</strong> Creates an overlay network that optimizes traffic routing across multiple connection types (MPLS, broadband, LTE).</p>
+                        <p><strong>Key benefits:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            <li>Improved application performance</li>
+                            <li>Centralized management</li>
+                            <li>Cost reduction vs. traditional WANs</li>
+                            <li>Dynamic path selection</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="sase-component">
+                    <button class="sase-header" aria-expanded="false" aria-controls="ztna-content">
+                        <span>🔐 ZTNA (Zero Trust Network Access)</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div id="ztna-content" class="sase-content">
+                        <p><strong>What it does:</strong> Provides identity-based access to applications, replacing traditional VPNs with granular, per-session verification.</p>
+                        <p><strong>Key benefits:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            <li>No network-level access—only app-level</li>
+                            <li>Continuous trust evaluation</li>
+                            <li>Reduced attack surface</li>
+                            <li>Better user experience than VPN</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="sase-component">
+                    <button class="sase-header" aria-expanded="false" aria-controls="casb-content">
+                        <span>☁️ CASB (Cloud Access Security Broker)</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div id="casb-content" class="sase-content">
+                        <p><strong>What it does:</strong> Acts as a security checkpoint between users and cloud services, enforcing policies and providing visibility.</p>
+                        <p><strong>Key benefits:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            <li>Shadow IT discovery</li>
+                            <li>Data loss prevention (DLP)</li>
+                            <li>Threat protection</li>
+                            <li>Compliance monitoring</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="sase-component">
+                    <button class="sase-header" aria-expanded="false" aria-controls="swg-content">
+                        <span>🌐 SWG (Secure Web Gateway)</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div id="swg-content" class="sase-content">
+                        <p><strong>What it does:</strong> Filters internet traffic to protect users from web-based threats and enforce acceptable use policies.</p>
+                        <p><strong>Key benefits:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            <li>Malware protection</li>
+                            <li>URL filtering</li>
+                            <li>SSL/TLS inspection</li>
+                            <li>Content filtering</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="sase-component">
+                    <button class="sase-header" aria-expanded="false" aria-controls="fwaas-content">
+                        <span>🔥 FWaaS (Firewall as a Service)</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div id="fwaas-content" class="sase-content">
+                        <p><strong>What it does:</strong> Delivers next-generation firewall capabilities from the cloud, eliminating the need for on-premises hardware.</p>
+                        <p><strong>Key benefits:</strong></p>
+                        <ul style="margin-left: 20px;">
+                            <li>Scalable protection</li>
+                            <li>Intrusion detection/prevention</li>
+                            <li>Application awareness</li>
+                            <li>Unified policy management</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3>Market Growth</h3>
+                <div class="progress-container">
+                    <p style="margin-bottom: 8px;"><strong>SASE Market Projection (2024-2030)</strong></p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 35%;" role="progressbar" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100">
+                            ~$15B → $45B+
+                        </div>
+                    </div>
+                    <p style="margin-top: 8px; font-size: 0.9rem; color: #666;">CAGR: ~24% (Compound Annual Growth Rate)</p>
+                </div>
+            </section>
+
+            <!-- Compare Panel -->
+            <section class="tab-panel" role="tabpanel" id="panel-compare" aria-labelledby="tab-compare" hidden>
+                <h2>Zero Trust vs. SASE: Comparison</h2>
+                
+                <p>While Zero Trust and SASE are related, they serve different purposes. Understanding their relationship helps in building a comprehensive security strategy.</p>
+
+                <div class="comparison-container">
+                    <table class="comparison-table" aria-label="Comparison between Zero Trust and SASE">
+                        <thead>
+                            <tr>
+                                <th scope="col">Aspect</th>
+                                <th scope="col">Zero Trust</th>
+                                <th scope="col">SASE</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Definition</strong></td>
+                                <td>Security philosophy/framework</td>
+                                <td>Cloud-delivered architecture</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Core Focus</strong></td>
+                                <td>Never trust, always verify</td>
+                                <td>Converge networking + security</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Scope</strong></td>
+                                <td>Access control principles</td>
+                                <td>Network + security services</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Delivery</strong></td>
+                                <td>On-prem, cloud, or hybrid</td>
+                                <td>Cloud-native (edge-delivered)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Components</strong></td>
+                                <td>IAM, MFA, microsegmentation</td>
+                                <td>SD-WAN, ZTNA, CASB, SWG, FWaaS</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Primary Use</strong></td>
+                                <td>Identity-centric security</td>
+                                <td>Secure remote/distributed access</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>How They Work Together</h3>
+                <div class="diagram">
+                    <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; align-items: center;">
+                        <div style="background: #336699; color: white; padding: 20px; border-radius: 50%; width: 150px; height: 150px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold;">
+                            Zero Trust<br>(Philosophy)
+                        </div>
+                        <div style="font-size: 2rem;">+</div>
+                        <div style="background: #006633; color: white; padding: 20px; border-radius: 50%; width: 150px; height: 150px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold;">
+                            SASE<br>(Architecture)
+                        </div>
+                        <div style="font-size: 2rem;">=</div>
+                        <div style="background: #CC6600; color: white; padding: 20px; border-radius: 8px; min-width: 180px; text-align: center; font-weight: bold;">
+                            Modern Security<br>Framework
+                        </div>
+                    </div>
+                    <p style="margin-top: 20px;"><strong>Key Insight:</strong> SASE implements Zero Trust principles through its ZTNA component, making them complementary rather than competing approaches.</p>
+                </div>
+
+                <h3>When to Use Each</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 16px;">
+                    <div style="background: #e6f2ff; padding: 16px; border-radius: 8px; border-left: 4px solid #336699;">
+                        <h4 style="color: #336699; margin-bottom: 8px;">Choose Zero Trust When:</h4>
+                        <ul style="margin-left: 16px;">
+                            <li>Defining security strategy</li>
+                            <li>Implementing access controls</li>
+                            <li>Protecting on-prem resources</li>
+                            <li>Building security culture</li>
+                        </ul>
+                    </div>
+                    <div style="background: #e6f2e6; padding: 16px; border-radius: 8px; border-left: 4px solid #006633;">
+                        <h4 style="color: #006633; margin-bottom: 8px;">Choose SASE When:</h4>
+                        <ul style="margin-left: 16px;">
+                            <li>Supporting remote workforce</li>
+                            <li>Migrating to cloud services</li>
+                            <li>Consolidating security tools</li>
+                            <li>Optimizing WAN performance</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quiz Panel -->
+            <section class="tab-panel" role="tabpanel" id="panel-quiz" aria-labelledby="tab-quiz" hidden>
+                <h2>Knowledge Check</h2>
+                <p>Test your understanding of Zero Trust and SASE concepts!</p>
+
+                <div class="score-display">
+                    <div>Your Score</div>
+                    <div class="score-number" id="score-display">0 / 12</div>
+                </div>
+
+                <div id="quiz-container">
+                    <!-- Questions loaded dynamically -->
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" id="check-answers" aria-label="Check your answers">
+                        Check Answers
+                    </button>
+                    <button class="btn btn-secondary" id="reset-quiz" aria-label="Reset quiz">
+                        Reset Quiz
+                    </button>
+                </div>
+
+                <div id="quiz-feedback" class="feedback" style="display: none;" aria-live="polite"></div>
+            </section>
+
+            <!-- Assessment Panel -->
+            <section class="tab-panel" role="tabpanel" id="panel-assess" aria-labelledby="tab-assess" hidden>
+                <h2>Zero Trust Readiness Assessment</h2>
+                <p>Evaluate your organization's current security posture against Zero Trust principles. Check each item your organization has implemented.</p>
+
+                <div class="assessment-summary">
+                    <div>Overall Readiness Score</div>
+                    <div class="assessment-score" id="assessment-score">0%</div>
+                    <div class="assessment-grade" id="assessment-grade">Not Started</div>
+                </div>
+
+                <div class="checklist-category">
+                    <div class="checklist-category-header">
+                        <span>👤 Identity & Access Management</span>
+                        <span class="category-score" id="score-identity">0/5</span>
+                    </div>
+                    <div class="checklist-items">
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-mfa" data-category="identity">
+                            <label for="check-mfa"><strong>MFA Implemented:</strong> Multi-factor authentication required for all users accessing critical systems</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-sso" data-category="identity">
+                            <label for="check-sso"><strong>SSO Deployed:</strong> Single Sign-On solution centralizes identity management</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-rbac" data-category="identity">
+                            <label for="check-rbac"><strong>Role-Based Access:</strong> Access permissions assigned based on job roles (RBAC)</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-pam" data-category="identity">
+                            <label for="check-pam"><strong>Privileged Access Management:</strong> PAM solution controls and monitors admin accounts</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-lifecycle" data-category="identity">
+                            <label for="check-lifecycle"><strong>Identity Lifecycle:</strong> Automated provisioning/deprovisioning of user accounts</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="checklist-category">
+                    <div class="checklist-category-header">
+                        <span>💻 Device Security</span>
+                        <span class="category-score" id="score-devices">0/5</span>
+                    </div>
+                    <div class="checklist-items">
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-mdm" data-category="devices">
+                            <label for="check-mdm"><strong>MDM/UEM Solution:</strong> Mobile Device or Unified Endpoint Management deployed</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-edr" data-category="devices">
+                            <label for="check-edr"><strong>EDR Deployed:</strong> Endpoint Detection and Response on all managed devices</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-compliance" data-category="devices">
+                            <label for="check-compliance"><strong>Device Compliance:</strong> Access denied for non-compliant devices (patches, AV)</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-inventory" data-category="devices">
+                            <label for="check-inventory"><strong>Asset Inventory:</strong> Complete inventory of all devices accessing resources</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-byod" data-category="devices">
+                            <label for="check-byod"><strong>BYOD Policy:</strong> Clear policies and controls for personal devices</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="checklist-category">
+                    <div class="checklist-category-header">
+                        <span>🌐 Network Security</span>
+                        <span class="category-score" id="score-network">0/5</span>
+                    </div>
+                    <div class="checklist-items">
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-segment" data-category="network">
+                            <label for="check-segment"><strong>Microsegmentation:</strong> Network divided into isolated security zones</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-encrypt" data-category="network">
+                            <label for="check-encrypt"><strong>Encrypted Traffic:</strong> All network traffic encrypted (TLS 1.2+)</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-dns" data-category="network">
+                            <label for="check-dns"><strong>DNS Security:</strong> Protective DNS filtering implemented</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-ztna" data-category="network">
+                            <label for="check-ztna"><strong>ZTNA/SDP:</strong> Zero Trust Network Access replacing or supplementing VPN</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-nac" data-category="network">
+                            <label for="check-nac"><strong>Network Access Control:</strong> NAC verifies devices before network access</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="checklist-category">
+                    <div class="checklist-category-header">
+                        <span>📊 Visibility & Analytics</span>
+                        <span class="category-score" id="score-visibility">0/5</span>
+                    </div>
+                    <div class="checklist-items">
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-siem" data-category="visibility">
+                            <label for="check-siem"><strong>SIEM Deployed:</strong> Security Information and Event Management centralizes logs</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-ueba" data-category="visibility">
+                            <label for="check-ueba"><strong>User Analytics:</strong> UEBA detects anomalous user behavior</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-continuous" data-category="visibility">
+                            <label for="check-continuous"><strong>Continuous Monitoring:</strong> Real-time monitoring of all access attempts</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-soar" data-category="visibility">
+                            <label for="check-soar"><strong>Automated Response:</strong> SOAR or automated playbooks for incident response</label>
+                        </div>
+                        <div class="checklist-item">
+                            <input type="checkbox" id="check-audit" data-category="visibility">
+                            <label for="check-audit"><strong>Audit Trail:</strong> Complete audit logs of all access and changes</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" id="export-assessment" aria-label="Export assessment results">
+                        📄 Export Results
+                    </button>
+                    <button class="btn btn-secondary" id="reset-assessment" aria-label="Reset assessment">
+                        🔄 Reset Assessment
+                    </button>
+                </div>
+            </section>
+
+            <!-- Resources Panel -->
+            <section class="tab-panel" role="tabpanel" id="panel-resources" aria-labelledby="tab-resources" hidden>
+                <h2>Hands-On Labs & Resources</h2>
+                <p>Deepen your understanding with these practical resources, labs, and official documentation.</p>
+
+                <div class="resource-section">
+                    <h3>🔬 Hands-On Labs</h3>
+                    <div class="resource-grid">
+                        <div class="resource-card">
+                            <span class="resource-type">FREE LAB</span>
+                            <h4>🔐 Microsoft Zero Trust Lab</h4>
+                            <p>Interactive lab environment to practice implementing Zero Trust with Azure AD, Conditional Access, and Microsoft Defender.</p>
+                            <a href="https://learn.microsoft.com/en-us/security/zero-trust/" target="_blank" rel="noopener noreferrer" class="resource-link">Access Lab →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">FREE LAB</span>
+                            <h4>☁️ Google BeyondCorp Workshop</h4>
+                            <p>Learn Google's Zero Trust implementation through hands-on exercises with BeyondCorp Enterprise and Identity-Aware Proxy.</p>
+                            <a href="https://cloud.google.com/beyondcorp-enterprise" target="_blank" rel="noopener noreferrer" class="resource-link">Explore →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">FREE LAB</span>
+                            <h4>🌐 Cisco SASE Sandbox</h4>
+                            <p>Test drive Cisco Umbrella, SD-WAN, and Secure Access in a sandbox environment with guided scenarios.</p>
+                            <a href="https://developer.cisco.com/site/sandbox/" target="_blank" rel="noopener noreferrer" class="resource-link">Try Sandbox →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">FREE LAB</span>
+                            <h4>🛡️ Palo Alto Networks Lab</h4>
+                            <p>Prisma Access and SASE hands-on training with real-world configuration scenarios and best practices.</p>
+                            <a href="https://www.paloaltonetworks.com/resources/education" target="_blank" rel="noopener noreferrer" class="resource-link">Start Learning →</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resource-section">
+                    <h3>📚 Official Documentation & Frameworks</h3>
+                    <div class="resource-grid">
+                        <div class="resource-card">
+                            <span class="resource-type">NIST STANDARD</span>
+                            <h4>📖 NIST SP 800-207</h4>
+                            <p>The foundational Zero Trust Architecture document from NIST. Essential reading for understanding ZTA principles and deployment models.</p>
+                            <a href="https://csrc.nist.gov/publications/detail/sp/800-207/final" target="_blank" rel="noopener noreferrer" class="resource-link">Read Document →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">PRACTICE GUIDE</span>
+                            <h4>🏛️ NIST SP 1800-35</h4>
+                            <p>Implementing a Zero Trust Architecture - practical guidance with reference implementations and use cases.</p>
+                            <a href="https://www.nccoe.nist.gov/projects/implementing-zero-trust-architecture" target="_blank" rel="noopener noreferrer" class="resource-link">View Guide →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">FEDERAL MANDATE</span>
+                            <h4>🇺🇸 OMB M-22-09</h4>
+                            <p>Federal Zero Trust Strategy memorandum outlining requirements for U.S. government agencies through FY2024.</p>
+                            <a href="https://zerotrust.cyber.gov/" target="_blank" rel="noopener noreferrer" class="resource-link">Learn More →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">CISA GUIDANCE</span>
+                            <h4>🔒 CISA Zero Trust Maturity</h4>
+                            <p>Zero Trust Maturity Model helping organizations assess and plan their ZTA implementation journey.</p>
+                            <a href="https://www.cisa.gov/zero-trust-maturity-model" target="_blank" rel="noopener noreferrer" class="resource-link">View Model →</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resource-section">
+                    <h3>🎓 Certification Prep</h3>
+                    <div class="resource-grid">
+                        <div class="resource-card">
+                            <span class="resource-type">CERTIFICATION</span>
+                            <h4>📜 CompTIA Security+</h4>
+                            <p>Covers Zero Trust concepts in domains like Architecture and Design. Foundation for security careers.</p>
+                            <a href="https://www.comptia.org/certifications/security" target="_blank" rel="noopener noreferrer" class="resource-link">Exam Info →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">CERTIFICATION</span>
+                            <h4>📜 CEH - Zero Trust Module</h4>
+                            <p>Certified Ethical Hacker covers Zero Trust in network defense and security architecture modules.</p>
+                            <a href="https://www.eccouncil.org/train-certify/certified-ethical-hacker-ceh/" target="_blank" rel="noopener noreferrer" class="resource-link">Learn More →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">CERTIFICATION</span>
+                            <h4>📜 CCNP Security</h4>
+                            <p>Cisco certification with SASE, Zero Trust, and Secure Access architecture components.</p>
+                            <a href="https://www.cisco.com/c/en/us/training-events/training-certifications/certifications/professional/ccnp-security.html" target="_blank" rel="noopener noreferrer" class="resource-link">View Path →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">VENDOR CERT</span>
+                            <h4>📜 Zscaler Certifications</h4>
+                            <p>Vendor-specific SASE and Zero Trust certifications from a leading cloud security provider.</p>
+                            <a href="https://www.zscaler.com/resources/education-certification" target="_blank" rel="noopener noreferrer" class="resource-link">Explore →</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="resource-section">
+                    <h3>🔧 Tools & Simulators</h3>
+                    <div class="resource-grid">
+                        <div class="resource-card">
+                            <span class="resource-type">TOOL</span>
+                            <h4>🧪 Wireshark</h4>
+                            <p>Analyze network traffic to understand what Zero Trust protects against. Great for seeing unencrypted vs encrypted traffic.</p>
+                            <a href="https://www.wireshark.org/" target="_blank" rel="noopener noreferrer" class="resource-link">Download →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">TOOL</span>
+                            <h4>🖥️ GNS3</h4>
+                            <p>Network simulation platform to practice microsegmentation and network security configurations.</p>
+                            <a href="https://www.gns3.com/" target="_blank" rel="noopener noreferrer" class="resource-link">Get Started →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">PLATFORM</span>
+                            <h4>☁️ TryHackMe</h4>
+                            <p>Hands-on cybersecurity training with rooms covering network security, IAM, and security architecture.</p>
+                            <a href="https://tryhackme.com/" target="_blank" rel="noopener noreferrer" class="resource-link">Start Free →</a>
+                        </div>
+                        <div class="resource-card">
+                            <span class="resource-type">PLATFORM</span>
+                            <h4>🎯 Hack The Box</h4>
+                            <p>Advanced penetration testing labs - understand what attackers do to appreciate why Zero Trust matters.</p>
+                            <a href="https://www.hackthebox.com/" target="_blank" rel="noopener noreferrer" class="resource-link">Join Free →</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Tooltip element -->
+    <div class="tooltip" id="tooltip" role="tooltip" aria-hidden="true"></div>
+
+    <script>
+        // ==========================================
+        // Tab Navigation
+        // ==========================================
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabPanels = document.querySelectorAll('.tab-panel');
+
+        function switchTab(targetTab) {
+            tabButtons.forEach(btn => {
+                btn.setAttribute('aria-selected', 'false');
+            });
+            tabPanels.forEach(panel => {
+                panel.classList.remove('active');
+                panel.setAttribute('hidden', '');
+            });
+
+            targetTab.setAttribute('aria-selected', 'true');
+            const panelId = targetTab.getAttribute('aria-controls');
+            const targetPanel = document.getElementById(panelId);
+            targetPanel.classList.add('active');
+            targetPanel.removeAttribute('hidden');
+        }
+
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn));
+            btn.addEventListener('keydown', (e) => {
+                const tabs = Array.from(tabButtons);
+                const index = tabs.indexOf(btn);
+                
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const nextIndex = (index + 1) % tabs.length;
+                    tabs[nextIndex].focus();
+                    switchTab(tabs[nextIndex]);
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prevIndex = (index - 1 + tabs.length) % tabs.length;
+                    tabs[prevIndex].focus();
+                    switchTab(tabs[prevIndex]);
+                }
+            });
+        });
+
+        // ==========================================
+        // Smart Tooltip System (no screen bleed)
+        // ==========================================
+        const tooltip = document.getElementById('tooltip');
+        const terms = document.querySelectorAll('.term');
+
+        function positionTooltip(term) {
+            const rect = term.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const padding = 10;
+
+            let left = rect.left;
+            let top = rect.bottom + padding;
+
+            // Check right edge
+            if (left + tooltipRect.width > window.innerWidth - padding) {
+                left = window.innerWidth - tooltipRect.width - padding;
+            }
+
+            // Check left edge
+            if (left < padding) {
+                left = padding;
+            }
+
+            // Check bottom edge - if tooltip would go off bottom, show above
+            tooltip.classList.remove('arrow-top', 'arrow-bottom');
+            if (top + tooltipRect.height > window.innerHeight - padding) {
+                top = rect.top - tooltipRect.height - padding;
+                tooltip.classList.add('arrow-bottom');
+            } else {
+                tooltip.classList.add('arrow-top');
+            }
+
+            // Check top edge
+            if (top < padding) {
+                top = padding;
+            }
+
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
+        terms.forEach(term => {
+            term.addEventListener('mouseenter', () => {
+                tooltip.textContent = term.dataset.tooltip;
+                tooltip.classList.add('visible');
+                tooltip.setAttribute('aria-hidden', 'false');
+                // Position after making visible so we can get dimensions
+                requestAnimationFrame(() => positionTooltip(term));
+            });
+
+            term.addEventListener('mouseleave', () => {
+                tooltip.classList.remove('visible');
+                tooltip.setAttribute('aria-hidden', 'true');
+            });
+
+            term.addEventListener('focus', () => {
+                tooltip.textContent = term.dataset.tooltip;
+                tooltip.classList.add('visible');
+                tooltip.setAttribute('aria-hidden', 'false');
+                requestAnimationFrame(() => positionTooltip(term));
+            });
+
+            term.addEventListener('blur', () => {
+                tooltip.classList.remove('visible');
+                tooltip.setAttribute('aria-hidden', 'true');
+            });
+
+            // Make terms keyboard accessible
+            term.setAttribute('tabindex', '0');
+            term.setAttribute('role', 'button');
+            term.setAttribute('aria-describedby', 'tooltip');
+        });
+
+        // ==========================================
+        // Zero Trust Pillars Interaction
+        // ==========================================
+        const pillarData = {
+            identity: {
+                title: 'Identity',
+                content: `<strong>Identity</strong> is the foundation of Zero Trust. Every access request must verify who the user is using:
+                <ul style="margin: 8px 0 0 20px;">
+                    <li><strong>MFA (Multi-Factor Authentication):</strong> Requiring multiple proofs of identity</li>
+                    <li><strong>SSO (Single Sign-On):</strong> Centralized identity management</li>
+                    <li><strong>Behavioral Analytics:</strong> Detecting unusual access patterns</li>
+                    <li><strong>Conditional Access:</strong> Policies based on risk signals</li>
+                </ul>`
+            },
+            devices: {
+                title: 'Devices',
+                content: `<strong>Device security</strong> ensures that only trusted, compliant devices can access resources:
+                <ul style="margin: 8px 0 0 20px;">
+                    <li><strong>Device health checks:</strong> Verifying OS patches, antivirus status</li>
+                    <li><strong>MDM/MAM:</strong> Mobile Device/Application Management</li>
+                    <li><strong>Endpoint Detection:</strong> Monitoring for threats on devices</li>
+                    <li><strong>Certificate-based trust:</strong> Device identity verification</li>
+                </ul>`
+            },
+            network: {
+                title: 'Network',
+                content: `<strong>Network security</strong> in Zero Trust focuses on microsegmentation and encrypted communications:
+                <ul style="margin: 8px 0 0 20px;">
+                    <li><strong>Microsegmentation:</strong> Dividing networks into small secure zones</li>
+                    <li><strong>Encrypted traffic:</strong> All communications encrypted (TLS)</li>
+                    <li><strong>Software-defined perimeter:</strong> Dynamic network boundaries</li>
+                    <li><strong>Network monitoring:</strong> Real-time threat detection</li>
+                </ul>`
+            },
+            applications: {
+                title: 'Applications',
+                content: `<strong>Application security</strong> ensures proper access controls at the app level:
+                <ul style="margin: 8px 0 0 20px;">
+                    <li><strong>App-level permissions:</strong> Granular access controls</li>
+                    <li><strong>API security:</strong> Protecting application interfaces</li>
+                    <li><strong>Shadow IT discovery:</strong> Finding unauthorized apps</li>
+                    <li><strong>Container security:</strong> Securing cloud-native apps</li>
+                </ul>`
+            },
+            data: {
+                title: 'Data',
+                content: `<strong>Data protection</strong> is the ultimate goal—keeping sensitive information secure:
+                <ul style="margin: 8px 0 0 20px;">
+                    <li><strong>Data classification:</strong> Labeling sensitivity levels</li>
+                    <li><strong>Encryption at rest/in transit:</strong> Protecting stored and moving data</li>
+                    <li><strong>DLP (Data Loss Prevention):</strong> Preventing unauthorized transfers</li>
+                    <li><strong>Rights management:</strong> Controlling what users can do with data</li>
+                </ul>`
+            },
+            visibility: {
+                title: 'Visibility & Analytics',
+                content: `<strong>Visibility</strong> provides the intelligence needed for Zero Trust to work:
+                <ul style="margin: 8px 0 0 20px;">
+                    <li><strong>SIEM integration:</strong> Centralized security event management</li>
+                    <li><strong>User behavior analytics:</strong> Detecting anomalies</li>
+                    <li><strong>Continuous monitoring:</strong> Real-time threat assessment</li>
+                    <li><strong>Automated response:</strong> AI-driven threat mitigation</li>
+                </ul>`
+            }
+        };
+
+        const pillarCards = document.querySelectorAll('.pillar-card');
+        const pillarDetails = document.getElementById('pillar-details');
+
+        pillarCards.forEach(card => {
+            const handlePillarClick = () => {
+                pillarCards.forEach(c => {
+                    c.classList.remove('selected');
+                    c.setAttribute('aria-pressed', 'false');
+                });
+                card.classList.add('selected');
+                card.setAttribute('aria-pressed', 'true');
+                
+                const pillar = card.dataset.pillar;
+                const data = pillarData[pillar];
+                pillarDetails.innerHTML = data.content;
+                pillarDetails.classList.add('visible');
+            };
+
+            card.addEventListener('click', handlePillarClick);
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handlePillarClick();
+                }
+            });
+        });
+
+        // ==========================================
+        // Architecture Layer Interaction
+        // ==========================================
+        const layerData = {
+            user: '<strong>User/Device Layer:</strong> This is where access requests originate. Zero Trust verifies the user\'s identity AND the device\'s security posture before proceeding.',
+            identity: '<strong>Identity Verification Layer:</strong> Multi-factor authentication, conditional access policies, and behavioral analytics work together to confirm the user is who they claim to be.',
+            network: '<strong>Network Segmentation Layer:</strong> Microsegmentation isolates resources. Even authenticated users only reach the specific resources they need—no lateral movement allowed.',
+            app: '<strong>Application Access Layer:</strong> Applications enforce their own access controls. Least privilege principles ensure users only access the features they need.',
+            data: '<strong>Data Protection Layer:</strong> The crown jewels! Data is encrypted, classified, and protected with DLP policies. Only verified, authorized users can access it.'
+        };
+
+        const layers = document.querySelectorAll('.diagram-layer');
+        const layerInfo = document.getElementById('layer-info');
+
+        layers.forEach(layer => {
+            const handleLayerClick = () => {
+                layers.forEach(l => l.style.opacity = '0.6');
+                layer.style.opacity = '1';
+                layerInfo.innerHTML = layerData[layer.dataset.layer];
+            };
+
+            layer.addEventListener('click', handleLayerClick);
+            layer.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleLayerClick();
+                }
+            });
+        });
+
+        // ==========================================
+        // SASE Accordion
+        // ==========================================
+        const saseHeaders = document.querySelectorAll('.sase-header');
+
+        saseHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                const isExpanded = header.getAttribute('aria-expanded') === 'true';
+                const content = document.getElementById(header.getAttribute('aria-controls'));
+                
+                header.setAttribute('aria-expanded', !isExpanded);
+                content.classList.toggle('open');
+            });
+        });
+
+        // ==========================================
+        // Quiz System
+        // ==========================================
+        const quizQuestions = [
+            {
+                question: 'What is the core principle of Zero Trust?',
+                options: [
+                    'Trust internal network traffic',
+                    'Never trust, always verify',
+                    'Use VPNs for all connections',
+                    'Perimeter security first'
+                ],
+                correct: 1,
+                scenario: false
+            },
+            {
+                question: 'What does SASE stand for?',
+                options: [
+                    'Secure Access Security Edge',
+                    'Software Access Service Enterprise',
+                    'Secure Access Service Edge',
+                    'Security Architecture System Edge'
+                ],
+                correct: 2,
+                scenario: false
+            },
+            {
+                question: 'Which component of SASE replaces traditional VPNs?',
+                options: [
+                    'SD-WAN',
+                    'CASB',
+                    'ZTNA',
+                    'SWG'
+                ],
+                correct: 2,
+                scenario: false
+            },
+            {
+                question: 'What is microsegmentation in Zero Trust?',
+                options: [
+                    'Using small network cables',
+                    'Dividing networks into small, secure zones',
+                    'Creating mini firewalls',
+                    'Segmenting user accounts'
+                ],
+                correct: 1,
+                scenario: false
+            },
+            {
+                question: 'Which SASE component monitors cloud application usage?',
+                options: [
+                    'FWaaS',
+                    'SD-WAN',
+                    'CASB',
+                    'SWG'
+                ],
+                correct: 2,
+                scenario: false
+            },
+            {
+                question: 'SCENARIO: A finance employee logs in from an unfamiliar location at 3 AM and attempts to access payroll data. In a Zero Trust environment, what should happen?',
+                options: [
+                    'Allow access since they have valid credentials',
+                    'Block permanently and notify security',
+                    'Require additional verification (step-up authentication) before granting access',
+                    'Allow read-only access automatically'
+                ],
+                correct: 2,
+                scenario: true
+            },
+            {
+                question: 'SCENARIO: Your company has 500 remote employees using personal devices. Which SASE component would you prioritize FIRST to secure their web browsing?',
+                options: [
+                    'SD-WAN for faster connections',
+                    'Secure Web Gateway (SWG) for threat filtering',
+                    'FWaaS for port blocking',
+                    'CASB for cloud apps'
+                ],
+                correct: 1,
+                scenario: true
+            },
+            {
+                question: 'SCENARIO: An attacker compromises a user account inside your network. Under Zero Trust, which principle limits the damage they can cause?',
+                options: [
+                    'Perimeter defense',
+                    'Network segmentation only',
+                    'Least privilege access and microsegmentation',
+                    'Strong passwords'
+                ],
+                correct: 2,
+                scenario: true
+            },
+            {
+                question: 'SCENARIO: Employees complain that VPN is slow when working remotely. Your CISO wants to improve security AND performance. What solution addresses both?',
+                options: [
+                    'Buy more VPN licenses',
+                    'Implement ZTNA to replace VPN with direct, verified access',
+                    'Increase bandwidth at headquarters',
+                    'Disable security scanning for speed'
+                ],
+                correct: 1,
+                scenario: true
+            },
+            {
+                question: 'SCENARIO: Your organization discovers employees are using unauthorized cloud storage (Shadow IT). Which SASE component helps discover and control this?',
+                options: [
+                    'SD-WAN',
+                    'FWaaS',
+                    'CASB (Cloud Access Security Broker)',
+                    'DNS filtering'
+                ],
+                correct: 2,
+                scenario: true
+            },
+            {
+                question: 'In Zero Trust, what does "assume breach" mean for security architecture?',
+                options: [
+                    'Expect all systems are already compromised and give up',
+                    'Design defenses assuming attackers may already be inside the network',
+                    'Assume all employees are malicious',
+                    'Only protect the most critical systems'
+                ],
+                correct: 1,
+                scenario: false
+            },
+            {
+                question: 'SCENARIO: A hospital needs to secure IoT medical devices that cannot run security agents. Which Zero Trust approach is most appropriate?',
+                options: [
+                    'Ignore them since they cannot be secured',
+                    'Network-based segmentation and monitoring of device behavior',
+                    'Replace all devices with newer models',
+                    'Disable network access for all medical devices'
+                ],
+                correct: 1,
+                scenario: true
+            }
+        ];
+
+        const quizContainer = document.getElementById('quiz-container');
+        const checkAnswersBtn = document.getElementById('check-answers');
+        const resetQuizBtn = document.getElementById('reset-quiz');
+        const quizFeedback = document.getElementById('quiz-feedback');
+        const scoreDisplay = document.getElementById('score-display');
+
+        function renderQuiz() {
+            quizContainer.innerHTML = quizQuestions.map((q, qIndex) => `
+                <div class="quiz-container" data-question="${qIndex}">
+                    ${q.scenario ? '<span class="scenario-tag">📋 SCENARIO</span>' : ''}
+                    <div class="quiz-question">${qIndex + 1}. ${q.question}</div>
+                    <ul class="quiz-options">
+                        ${q.options.map((opt, oIndex) => `
+                            <li class="quiz-option">
+                                <label>
+                                    <input type="radio" name="q${qIndex}" value="${oIndex}" aria-label="${opt}">
+                                    ${opt}
+                                </label>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `).join('');
+            scoreDisplay.textContent = `0 / ${quizQuestions.length}`;
+        }
+
+        function checkAnswers() {
+            let score = 0;
+            
+            quizQuestions.forEach((q, qIndex) => {
+                const options = document.querySelectorAll(`[data-question="${qIndex}"] .quiz-option`);
+                const selected = document.querySelector(`input[name="q${qIndex}"]:checked`);
+                
+                options.forEach((opt, oIndex) => {
+                    opt.classList.remove('correct', 'incorrect');
+                    if (oIndex === q.correct) {
+                        opt.classList.add('correct');
+                    }
+                });
+
+                if (selected) {
+                    const selectedIndex = parseInt(selected.value);
+                    if (selectedIndex === q.correct) {
+                        score++;
+                    } else {
+                        options[selectedIndex].classList.add('incorrect');
+                    }
+                }
+            });
+
+            scoreDisplay.textContent = `${score} / ${quizQuestions.length}`;
+            
+            quizFeedback.style.display = 'block';
+            if (score === quizQuestions.length) {
+                quizFeedback.className = 'feedback success';
+                quizFeedback.textContent = '🎉 Perfect score! You have mastered Zero Trust and SASE concepts!';
+            } else if (score >= quizQuestions.length * 0.6) {
+                quizFeedback.className = 'feedback success';
+                quizFeedback.textContent = `👍 Good job! You got ${score} out of ${quizQuestions.length} correct. Review the highlighted answers above.`;
+            } else {
+                quizFeedback.className = 'feedback error';
+                quizFeedback.textContent = `📚 Keep learning! You got ${score} out of ${quizQuestions.length}. Review the material and try again.`;
+            }
+        }
+
+        function resetQuiz() {
+            renderQuiz();
+            scoreDisplay.textContent = `0 / ${quizQuestions.length}`;
+            quizFeedback.style.display = 'none';
+        }
+
+        checkAnswersBtn.addEventListener('click', checkAnswers);
+        resetQuizBtn.addEventListener('click', resetQuiz);
+
+        // Initialize quiz
+        renderQuiz();
+
+        // ==========================================
+        // Assessment System
+        // ==========================================
+        const checkboxes = document.querySelectorAll('.checklist-item input[type="checkbox"]');
+        const assessmentScoreEl = document.getElementById('assessment-score');
+        const assessmentGradeEl = document.getElementById('assessment-grade');
+        const exportBtn = document.getElementById('export-assessment');
+        const resetAssessmentBtn = document.getElementById('reset-assessment');
+
+        function updateAssessment() {
+            const categories = {
+                identity: { checked: 0, total: 5 },
+                devices: { checked: 0, total: 5 },
+                network: { checked: 0, total: 5 },
+                visibility: { checked: 0, total: 5 }
+            };
+
+            let totalChecked = 0;
+            const totalItems = 20;
+
+            checkboxes.forEach(checkbox => {
+                const category = checkbox.dataset.category;
+                if (checkbox.checked) {
+                    categories[category].checked++;
+                    totalChecked++;
+                    checkbox.parentElement.classList.add('checked');
+                } else {
+                    checkbox.parentElement.classList.remove('checked');
+                }
+            });
+
+            // Update category scores
+            Object.keys(categories).forEach(cat => {
+                const scoreEl = document.getElementById(`score-${cat}`);
+                if (scoreEl) {
+                    scoreEl.textContent = `${categories[cat].checked}/${categories[cat].total}`;
+                }
+            });
+
+            // Update overall score
+            const percentage = Math.round((totalChecked / totalItems) * 100);
+            assessmentScoreEl.textContent = `${percentage}%`;
+
+            // Determine grade
+            let grade = '';
+            if (percentage === 0) {
+                grade = 'Not Started';
+            } else if (percentage < 25) {
+                grade = '🔴 Beginning - Significant gaps exist';
+            } else if (percentage < 50) {
+                grade = '🟠 Developing - Foundation in place';
+            } else if (percentage < 75) {
+                grade = '🟡 Advancing - Good progress';
+            } else if (percentage < 100) {
+                grade = '🟢 Mature - Near complete';
+            } else {
+                grade = '✅ Optimized - Full Zero Trust!';
+            }
+            assessmentGradeEl.textContent = grade;
+        }
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateAssessment);
+        });
+
+        function exportAssessment() {
+            const categories = ['Identity & Access Management', 'Device Security', 'Network Security', 'Visibility & Analytics'];
+            const categoryKeys = ['identity', 'devices', 'network', 'visibility'];
+            
+            let report = '=== ZERO TRUST READINESS ASSESSMENT REPORT ===\n';
+            report += `Date: ${new Date().toLocaleDateString()}\n`;
+            report += `Overall Score: ${assessmentScoreEl.textContent}\n`;
+            report += `Maturity Level: ${assessmentGradeEl.textContent}\n\n`;
+
+            categoryKeys.forEach((key, index) => {
+                const scoreEl = document.getElementById(`score-${key}`);
+                report += `--- ${categories[index]} (${scoreEl.textContent}) ---\n`;
+                
+                const categoryCheckboxes = document.querySelectorAll(`input[data-category="${key}"]`);
+                categoryCheckboxes.forEach(cb => {
+                    const label = cb.parentElement.querySelector('label').textContent.trim();
+                    const status = cb.checked ? '✓' : '✗';
+                    report += `  [${status}] ${label.substring(0, 60)}...\n`;
+                });
+                report += '\n';
+            });
+
+            report += '=== RECOMMENDATIONS ===\n';
+            
+            const uncheckedItems = [];
+            checkboxes.forEach(cb => {
+                if (!cb.checked) {
+                    const label = cb.parentElement.querySelector('label strong').textContent;
+                    uncheckedItems.push(label);
+                }
+            });
+
+            if (uncheckedItems.length > 0) {
+                report += 'Priority items to address:\n';
+                uncheckedItems.slice(0, 5).forEach((item, i) => {
+                    report += `  ${i + 1}. ${item}\n`;
+                });
+            } else {
+                report += 'Congratulations! All assessment items are complete.\n';
+            }
+
+            // Create download
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `zero-trust-assessment-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function resetAssessment() {
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                checkbox.parentElement.classList.remove('checked');
+            });
+            updateAssessment();
+        }
+
+        exportBtn.addEventListener('click', exportAssessment);
+        resetAssessmentBtn.addEventListener('click', resetAssessment);
+
+        // Initialize assessment
+        updateAssessment();
+
+        // ==========================================
+        // Handle window resize for tooltip repositioning
+        // ==========================================
+        window.addEventListener('resize', () => {
+            tooltip.classList.remove('visible');
+        });
+    </script>
+</body>
+</html>
