@@ -1017,6 +1017,38 @@
             color: var(--bb-grey-dim);
         }
 
+        .deliverable-input.correct {
+            border-color: var(--bb-green);
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        .deliverable-input.incorrect {
+            border-color: var(--bb-red);
+            background: rgba(255, 51, 51, 0.1);
+        }
+
+        .answer-feedback {
+            margin-top: 8px;
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .answer-feedback.correct {
+            display: block;
+            color: var(--bb-green);
+            background: rgba(0, 255, 0, 0.1);
+            border-left: 3px solid var(--bb-green);
+        }
+
+        .answer-feedback.incorrect {
+            display: block;
+            color: var(--bb-red);
+            background: rgba(255, 51, 51, 0.1);
+            border-left: 3px solid var(--bb-red);
+        }
+
         /* Securities Modal */
         .securities-modal-content {
             background: var(--bb-dark);
@@ -1339,6 +1371,37 @@
         .report-answer-status.unanswered {
             background: var(--bb-red);
             color: #fff;
+        }
+
+        .report-answer-status.correct {
+            background: var(--bb-green);
+            color: #000;
+        }
+
+        .report-answer-status.incorrect {
+            background: var(--bb-red);
+            color: #fff;
+        }
+
+        .report-answer-response.correct {
+            border-left-color: var(--bb-green);
+        }
+
+        .report-answer-response.incorrect {
+            border-left-color: var(--bb-red);
+        }
+
+        .report-correct-answer {
+            color: var(--bb-amber);
+            font-size: 11px;
+            margin-top: 6px;
+            padding: 6px 12px;
+            background: rgba(255, 136, 0, 0.1);
+            border-left: 3px solid var(--bb-amber);
+        }
+
+        .summary-stat-value.low-score {
+            color: var(--bb-red) !important;
         }
 
         .report-answer-question {
@@ -2645,7 +2708,7 @@
         };
 
         // ============================================
-        // EXERCISES DATA - With Deliverables
+        // EXERCISES DATA - With Deliverables and Answers
         // ============================================
         const Exercises = [
             {
@@ -2660,7 +2723,12 @@
                 deliverable: {
                     question: 'What is Apple\'s P/E Ratio?',
                     answerType: 'number',
-                    placeholder: 'Enter the P/E ratio you found'
+                    placeholder: 'Enter the P/E ratio you found',
+                    correctAnswer: '28.5',
+                    validateFn: (input) => {
+                        const num = parseFloat(input.replace(/[x%]/gi, '').trim());
+                        return !isNaN(num) && Math.abs(num - 28.5) < 0.5;
+                    }
                 }
             },
             {
@@ -2675,7 +2743,18 @@
                 deliverable: {
                     question: 'What is the 2Y-10Y spread, and is the curve Normal, Flat, or Inverted?',
                     answerType: 'text',
-                    placeholder: 'Enter spread and curve shape (e.g., +0.50%, Normal)'
+                    placeholder: 'Enter spread and curve shape (e.g., +0.50%, Normal)',
+                    correctAnswer: '-0.34%, Inverted',
+                    validateFn: (input) => {
+                        const lower = input.toLowerCase();
+                        // Must mention inverted AND have a negative spread value
+                        const hasInverted = lower.includes('invert');
+                        const hasNegative = input.includes('-') || lower.includes('negative');
+                        // Check for approximate spread value (-0.34)
+                        const spreadMatch = input.match(/-?\d+\.?\d*/);
+                        const spreadCorrect = spreadMatch && Math.abs(Math.abs(parseFloat(spreadMatch[0])) - 0.34) < 0.1;
+                        return hasInverted && (hasNegative || spreadCorrect);
+                    }
                 }
             },
             {
@@ -2690,7 +2769,16 @@
                 deliverable: {
                     question: 'What is the current EUR/USD rate and its daily % change?',
                     answerType: 'text',
-                    placeholder: 'Enter rate and % change'
+                    placeholder: 'Enter rate and % change',
+                    correctAnswer: '1.0842, +0.138%',
+                    validateFn: (input) => {
+                        // Check for rate around 1.0842
+                        const rateMatch = input.match(/1\.08\d*/);
+                        const hasCorrectRate = rateMatch && Math.abs(parseFloat(rateMatch[0]) - 1.0842) < 0.01;
+                        // Check for positive change
+                        const hasPositiveChange = input.includes('+') || (input.includes('0.1') && !input.includes('-0.1'));
+                        return hasCorrectRate && hasPositiveChange;
+                    }
                 }
             },
             {
@@ -2705,7 +2793,13 @@
                 deliverable: {
                     question: 'What is the current GDP Growth rate and Unemployment rate?',
                     answerType: 'text',
-                    placeholder: 'Enter both rates (GDP: _%, Unemployment: _%)'
+                    placeholder: 'Enter both rates (GDP: _%, Unemployment: _%)',
+                    correctAnswer: 'GDP: 2.8%, Unemployment: 3.7%',
+                    validateFn: (input) => {
+                        const hasGDP = input.includes('2.8');
+                        const hasUnemployment = input.includes('3.7');
+                        return hasGDP && hasUnemployment;
+                    }
                 }
             },
             {
@@ -2720,7 +2814,14 @@
                 deliverable: {
                     question: 'Which country has the highest GDP growth? Which has the highest policy rate?',
                     answerType: 'text',
-                    placeholder: 'Highest GDP: [Country], Highest Rate: [Country]'
+                    placeholder: 'Highest GDP: [Country], Highest Rate: [Country]',
+                    correctAnswer: 'Highest GDP: China, Highest Rate: United States',
+                    validateFn: (input) => {
+                        const lower = input.toLowerCase();
+                        const hasChina = lower.includes('china');
+                        const hasUS = lower.includes('us') || lower.includes('united states') || lower.includes('america');
+                        return hasChina && hasUS;
+                    }
                 }
             },
             {
@@ -2735,7 +2836,13 @@
                 deliverable: {
                     question: 'What are Microsoft\'s Operating Margin and Net Margin?',
                     answerType: 'text',
-                    placeholder: 'Operating: _%, Net: _%'
+                    placeholder: 'Operating: _%, Net: _%',
+                    correctAnswer: 'Operating: 29.8%, Net: 25.3%',
+                    validateFn: (input) => {
+                        const hasOperating = input.includes('29.8') || input.includes('29,8');
+                        const hasNet = input.includes('25.3') || input.includes('25,3');
+                        return hasOperating && hasNet;
+                    }
                 }
             },
             {
@@ -2750,7 +2857,12 @@
                 deliverable: {
                     question: 'What was NVIDIA\'s earnings surprise % for the most recent quarter?',
                     answerType: 'text',
-                    placeholder: 'Enter the surprise % (include + or - sign)'
+                    placeholder: 'Enter the surprise % (include + or - sign)',
+                    correctAnswer: '+3.8%',
+                    validateFn: (input) => {
+                        const numMatch = input.match(/\+?\s*3\.8/);
+                        return numMatch !== null;
+                    }
                 }
             },
             {
@@ -2765,7 +2877,16 @@
                 deliverable: {
                     question: 'What is the top headline, and would it likely be bullish or bearish for stocks?',
                     answerType: 'text',
-                    placeholder: 'Describe headline and your assessment'
+                    placeholder: 'Describe headline and your assessment',
+                    correctAnswer: 'Fed Officials Signal Patience on Rate Cuts - Bearish',
+                    validateFn: (input) => {
+                        const lower = input.toLowerCase();
+                        // Accept if they mention Fed and provide any bull/bear assessment
+                        const hasFed = lower.includes('fed') || lower.includes('rate');
+                        const hasAssessment = lower.includes('bull') || lower.includes('bear') || 
+                                              lower.includes('positive') || lower.includes('negative');
+                        return hasFed && hasAssessment;
+                    }
                 }
             },
             {
@@ -2781,7 +2902,18 @@
                 deliverable: {
                     question: 'What is Tesla\'s approximate current price and is the 1Y trend Up, Down, or Sideways?',
                     answerType: 'text',
-                    placeholder: 'Price: $____, Trend: ____'
+                    placeholder: 'Price: $____, Trend: ____',
+                    correctAnswer: 'Approximately $240-250, Trend varies',
+                    validateFn: (input) => {
+                        const lower = input.toLowerCase();
+                        // Check for a reasonable Tesla price (between 200-300)
+                        const priceMatch = input.match(/\$?\s*(\d{2,3})/);
+                        const hasReasonablePrice = priceMatch && parseInt(priceMatch[1]) >= 180 && parseInt(priceMatch[1]) <= 320;
+                        // Check for trend assessment
+                        const hasTrend = lower.includes('up') || lower.includes('down') || lower.includes('sideways') || 
+                                        lower.includes('flat') || lower.includes('increas') || lower.includes('decreas');
+                        return hasReasonablePrice && hasTrend;
+                    }
                 }
             },
             {
@@ -2796,7 +2928,14 @@
                 deliverable: {
                     question: 'What are the 3M, 2Y, and 10Y yields?',
                     answerType: 'text',
-                    placeholder: '3M: _%, 2Y: _%, 10Y: _%'
+                    placeholder: '3M: _%, 2Y: _%, 10Y: _%',
+                    correctAnswer: '3M: 5.38%, 2Y: 4.62%, 10Y: 4.28%',
+                    validateFn: (input) => {
+                        const has3M = input.includes('5.38') || input.includes('5,38');
+                        const has2Y = input.includes('4.62') || input.includes('4,62');
+                        const has10Y = input.includes('4.28') || input.includes('4,28');
+                        return has3M && has2Y && has10Y;
+                    }
                 }
             }
         ];
@@ -3614,6 +3753,7 @@
             currentIndex: 0, 
             completed: new Set(), 
             answers: {},
+            correctAnswers: {},
             studentInfo: {
                 name: '',
                 className: '',
@@ -3657,11 +3797,15 @@
                 return;
             }
 
-            // Count answered questions
+            // Count answered and correct questions
             let answeredCount = 0;
+            let correctCount = 0;
             for (let i = 0; i < Exercises.length; i++) {
                 if (exerciseState.answers[i] && exerciseState.answers[i].trim()) {
                     answeredCount++;
+                    if (exerciseState.correctAnswers[i] === true) {
+                        correctCount++;
+                    }
                 }
             }
 
@@ -3671,24 +3815,39 @@
                 const exercise = Exercises[i];
                 const answer = exerciseState.answers[i] || '';
                 const isAnswered = answer.trim() !== '';
+                const isCorrect = exerciseState.correctAnswers[i];
+                
+                let statusClass, statusText;
+                if (!isAnswered) {
+                    statusClass = 'unanswered';
+                    statusText = 'UNANSWERED';
+                } else if (isCorrect) {
+                    statusClass = 'correct';
+                    statusText = 'CORRECT ✓';
+                } else {
+                    statusClass = 'incorrect';
+                    statusText = 'INCORRECT ✗';
+                }
                 
                 answersHtml += `
                     <div class="report-answer-item">
                         <div class="report-answer-header">
                             <span class="report-answer-num">${i + 1}</span>
                             <span class="report-answer-title">${exercise.title}</span>
-                            <span class="report-answer-status ${isAnswered ? 'answered' : 'unanswered'}">
-                                ${isAnswered ? 'ANSWERED' : 'UNANSWERED'}
+                            <span class="report-answer-status ${statusClass}">
+                                ${statusText}
                             </span>
                         </div>
                         <div class="report-answer-question">${exercise.deliverable.question}</div>
-                        <div class="report-answer-response ${isAnswered ? '' : 'empty'}">
+                        <div class="report-answer-response ${isAnswered ? (isCorrect ? 'correct' : 'incorrect') : 'empty'}">
                             ${isAnswered ? answer : 'No answer provided'}
                         </div>
+                        ${isAnswered && !isCorrect ? `<div class="report-correct-answer">Correct answer: ${exercise.deliverable.correctAnswer}</div>` : ''}
                     </div>
                 `;
             }
 
+            const scorePercent = Math.round((correctCount / Exercises.length) * 100);
             const reportHtml = `
                 <div class="report-content" id="report-printable">
                     <div class="report-header">
@@ -3713,16 +3872,16 @@
 
                     <div class="report-summary">
                         <div class="summary-stat">
-                            <div class="summary-stat-value">${answeredCount}</div>
-                            <div class="summary-stat-label">Questions Answered</div>
+                            <div class="summary-stat-value ${scorePercent >= 70 ? '' : 'low-score'}">${correctCount}/${Exercises.length}</div>
+                            <div class="summary-stat-label">Score</div>
                         </div>
                         <div class="summary-stat">
-                            <div class="summary-stat-value">${Exercises.length}</div>
-                            <div class="summary-stat-label">Total Questions</div>
+                            <div class="summary-stat-value ${scorePercent >= 70 ? '' : 'low-score'}">${scorePercent}%</div>
+                            <div class="summary-stat-label">Percentage</div>
                         </div>
                         <div class="summary-stat">
-                            <div class="summary-stat-value">${Math.round((answeredCount / Exercises.length) * 100)}%</div>
-                            <div class="summary-stat-label">Completion Rate</div>
+                            <div class="summary-stat-value">${answeredCount}/${Exercises.length}</div>
+                            <div class="summary-stat-label">Attempted</div>
                         </div>
                     </div>
 
@@ -3760,6 +3919,18 @@
         }
 
         function downloadReport() {
+            // Count answered and correct questions
+            let answeredCount = 0;
+            let correctCount = 0;
+            for (let i = 0; i < Exercises.length; i++) {
+                if (exerciseState.answers[i] && exerciseState.answers[i].trim()) {
+                    answeredCount++;
+                    if (exerciseState.correctAnswers[i] === true) {
+                        correctCount++;
+                    }
+                }
+            }
+
             // Create a text version of the report for download
             let reportText = `BLOOMBERG TERMINAL SIMULATOR
 Practice Exercise Score Report
@@ -3771,16 +3942,11 @@ Student Information:
 - Date: ${formatReportDate(exerciseState.studentInfo.date)}
 
 `;
-            let answeredCount = 0;
-            for (let i = 0; i < Exercises.length; i++) {
-                if (exerciseState.answers[i] && exerciseState.answers[i].trim()) {
-                    answeredCount++;
-                }
-            }
 
             reportText += `Summary:
-- Questions Answered: ${answeredCount} / ${Exercises.length}
-- Completion Rate: ${Math.round((answeredCount / Exercises.length) * 100)}%
+- Score: ${correctCount} / ${Exercises.length} correct
+- Percentage: ${Math.round((correctCount / Exercises.length) * 100)}%
+- Questions Attempted: ${answeredCount} / ${Exercises.length}
 
 ================================
 EXERCISE RESPONSES
@@ -3791,16 +3957,34 @@ EXERCISE RESPONSES
             for (let i = 0; i < Exercises.length; i++) {
                 const exercise = Exercises[i];
                 const answer = exerciseState.answers[i] || 'No answer provided';
+                const isAnswered = answer.trim() !== '' && answer !== 'No answer provided';
+                const isCorrect = exerciseState.correctAnswers[i];
+                
+                let status;
+                if (!isAnswered) {
+                    status = 'UNANSWERED';
+                } else if (isCorrect) {
+                    status = 'CORRECT ✓';
+                } else {
+                    status = 'INCORRECT ✗';
+                }
                 
                 reportText += `Exercise ${i + 1}: ${exercise.title}
+Status: ${status}
 Question: ${exercise.deliverable.question}
-Answer: ${answer}
+Your Answer: ${answer}`;
+                
+                if (isAnswered && !isCorrect) {
+                    reportText += `
+Correct Answer: ${exercise.deliverable.correctAnswer}`;
+                }
+                
+                reportText += `
 
 `;
             }
 
-            reportText += `
-================================
+            reportText += `================================
 Report generated: ${new Date().toLocaleString()}
 `;
 
@@ -3820,6 +4004,21 @@ Report generated: ${new Date().toLocaleString()}
             const exercise = Exercises[exerciseState.currentIndex];
             const stepsHtml = exercise.steps.map(step => '<li>' + step + '</li>').join('');
             
+            // Check if there's an existing answer and its correctness
+            const existingAnswer = exerciseState.answers[exerciseState.currentIndex] || '';
+            const isCorrect = exerciseState.correctAnswers[exerciseState.currentIndex];
+            const hasAnswer = existingAnswer.trim() !== '';
+            
+            let inputClass = 'deliverable-input';
+            let feedbackHtml = '<div class="answer-feedback" id="answer-feedback-' + exerciseState.currentIndex + '"></div>';
+            
+            if (hasAnswer && isCorrect !== undefined) {
+                inputClass += isCorrect ? ' correct' : ' incorrect';
+                feedbackHtml = `<div class="answer-feedback ${isCorrect ? 'correct' : 'incorrect'}" id="answer-feedback-${exerciseState.currentIndex}">
+                    ${isCorrect ? '✓ Correct!' : '✗ Incorrect. Expected: ' + exercise.deliverable.correctAnswer}
+                </div>`;
+            }
+            
             document.getElementById('exercise-body').innerHTML = `
                 <h3 class="exercise-title">🎯 ${exercise.title}</h3>
                 <p class="exercise-instructions">${exercise.instructions}</p>
@@ -3837,11 +4036,12 @@ Report generated: ${new Date().toLocaleString()}
                     <h4>📝 YOUR ANSWER</h4>
                     <label class="deliverable-question">${exercise.deliverable.question}</label>
                     <input type="text" 
-                           class="deliverable-input" 
+                           class="${inputClass}" 
                            id="deliverable-input-${exerciseState.currentIndex}"
                            placeholder="${exercise.deliverable.placeholder}"
-                           value="${exerciseState.answers[exerciseState.currentIndex] || ''}"
+                           value="${existingAnswer}"
                            onchange="saveAnswer(${exerciseState.currentIndex}, this.value)">
+                    ${feedbackHtml}
                 </div>
             `;
 
@@ -3855,6 +4055,29 @@ Report generated: ${new Date().toLocaleString()}
 
         function saveAnswer(index, value) {
             exerciseState.answers[index] = value;
+            
+            // Validate the answer
+            const exercise = Exercises[index];
+            if (value.trim() && exercise.deliverable.validateFn) {
+                const isCorrect = exercise.deliverable.validateFn(value);
+                exerciseState.correctAnswers[index] = isCorrect;
+                
+                // Show feedback
+                const inputEl = document.getElementById(`deliverable-input-${index}`);
+                const feedbackEl = document.getElementById(`answer-feedback-${index}`);
+                
+                if (inputEl) {
+                    inputEl.classList.remove('correct', 'incorrect');
+                    inputEl.classList.add(isCorrect ? 'correct' : 'incorrect');
+                }
+                
+                if (feedbackEl) {
+                    feedbackEl.className = `answer-feedback ${isCorrect ? 'correct' : 'incorrect'}`;
+                    feedbackEl.innerHTML = isCorrect 
+                        ? '✓ Correct!' 
+                        : `✗ Incorrect. Expected: ${exercise.deliverable.correctAnswer}`;
+                }
+            }
         }
 
         function updateExerciseProgress() {
