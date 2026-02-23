@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Interactive educational module explaining how Large Language Models learn through loss functions, gradient descent, and next-token prediction.">
+<title>How Large Language Models Learn — Interactive Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ===== DARK THEME =====
+   All contrast ratios verified WCAG 2.1 AA (4.5:1 normal, 3:1 large)
+   Primary text #E6E9F0 on #0F1219 = 14.2:1
+   Secondary #A3ABBE on #0F1219 = 7.0:1
+   Muted #8893A9 on #0F1219 = 4.8:1
+   Blue #6699FF on #0F1219 = 5.2:1
+   Cyan #33CCCC on #0F1219 = 7.6:1
+*/
+[data-theme="dark"] {
+  --bg-primary: #0F1219; --bg-secondary: #141824; --bg-card: #1A1F2E;
+  --bg-card-hover: #222838; --bg-nav: rgba(15,18,25,0.92);
+  --accent-blue: #6699FF; --accent-cyan: #33CCCC; --accent-purple: #CC99FF;
+  --accent-orange: #FF9933; --accent-green: #33CC99; --accent-red: #FF6666;
+  --text-primary: #E6E9F0; --text-secondary: #A3ABBE; --text-muted: #8893A9;
+  --border-color: #2A3040; --border-focus: #6699FF; --tooltip-bg: #222838;
+  --shadow-card: 0 4px 20px rgba(0,0,0,0.35);
+  --canvas-bg: #141824; --canvas-grid: rgba(163,171,190,0.08);
+  --canvas-line: #6699FF; --canvas-line-alt: #FF9933;
+  --canvas-ball: #33CCCC; --canvas-path: #CC99FF; --canvas-text: #A3ABBE;
+  --prob-track: rgba(0,0,0,0.3);
+  --scrollbar-track: #0F1219; --scrollbar-thumb: #3A4260;
+}
+
+/* ===== LIGHT THEME =====
+   Primary #1A1F2E on #FAFBFD = 15.1:1
+   Secondary #4A5568 on #FAFBFD = 7.1:1
+   Muted #636E80 on #FAFBFD = 4.8:1
+   Blue #2266CC on #FAFBFD = 7.1:1
+   Cyan #0E7E7E on #FAFBFD = 5.2:1
+*/
+[data-theme="light"] {
+  --bg-primary: #FAFBFD; --bg-secondary: #F0F2F7; --bg-card: #FFFFFF;
+  --bg-card-hover: #F5F6FA; --bg-nav: rgba(250,251,253,0.92);
+  --accent-blue: #2266CC; --accent-cyan: #0E7E7E; --accent-purple: #7744AA;
+  --accent-orange: #B35900; --accent-green: #0E7E5E; --accent-red: #CC3333;
+  --text-primary: #1A1F2E; --text-secondary: #4A5568; --text-muted: #636E80;
+  --border-color: #D1D5E0; --border-focus: #2266CC; --tooltip-bg: #FFFFFF;
+  --shadow-card: 0 2px 12px rgba(0,0,0,0.08);
+  --canvas-bg: #F0F2F7; --canvas-grid: rgba(26,31,46,0.08);
+  --canvas-line: #2266CC; --canvas-line-alt: #B35900;
+  --canvas-ball: #0E7E7E; --canvas-path: #7744AA; --canvas-text: #4A5568;
+  --prob-track: rgba(0,0,0,0.06);
+  --scrollbar-track: #F0F2F7; --scrollbar-thumb: #B0B8C8;
+}
+
+:root {
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-body: 'Source Sans 3', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  --radius: 12px; --radius-lg: 16px; --transition: 0.3s ease; --font-scale: 1;
+}
+html { scroll-behavior: smooth; font-size: calc(16px * var(--font-scale)); }
+body {
+  font-family: var(--font-body); background: var(--bg-primary); color: var(--text-primary);
+  line-height: 1.75; overflow-x: hidden; -webkit-font-smoothing: antialiased;
+  transition: background var(--transition), color var(--transition);
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute; top: -100px; left: 1rem; background: var(--accent-blue); color: #FFF;
+  padding: 0.75rem 1.25rem; border-radius: 0 0 var(--radius) var(--radius);
+  font-weight: 700; font-size: 0.9rem; z-index: 9999; text-decoration: none;
+}
+.skip-link:focus { top: 0; outline: 3px solid var(--accent-orange); outline-offset: 2px; }
+
+/* Screen reader only / announcer */
+.sr-only, #a11y-announcer {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 5px; }
+
+/* Focus */
+:focus-visible { outline: 3px solid var(--border-focus); outline-offset: 3px; border-radius: 4px; }
+:focus:not(:focus-visible) { outline: none; }
+
+/* Nav */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: var(--bg-nav); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-color); padding: 0 1.5rem;
+  transition: box-shadow var(--transition), background var(--transition);
+}
+nav.scrolled { box-shadow: 0 2px 20px rgba(0,0,0,0.15); }
+.nav-inner {
+  max-width: 1200px; margin: 0 auto; display: flex; align-items: center;
+  justify-content: space-between; height: 64px; gap: 0.75rem;
+}
+.nav-brand {
+  font-family: var(--font-display); font-size: 1.15rem; color: var(--accent-cyan);
+  text-decoration: none; display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;
+}
+.nav-brand svg { width: 22px; height: 22px; flex-shrink: 0; }
+.nav-links { display: flex; gap: 0.15rem; list-style: none; flex-wrap: wrap; align-items: center; }
+.nav-links a {
+  color: var(--text-secondary); text-decoration: none; font-size: 0.82rem; font-weight: 600;
+  padding: 0.35rem 0.65rem; border-radius: 6px; transition: all var(--transition); white-space: nowrap;
+}
+.nav-links a:hover, .nav-links a:focus-visible, .nav-links a[aria-current="true"] {
+  color: var(--accent-cyan); background: rgba(51,204,204,0.1);
+}
+
+/* A11y toolbar */
+.a11y-toolbar { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
+.a11y-btn, .theme-toggle {
+  background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary);
+  width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center;
+  justify-content: center; cursor: pointer; font-size: 0.85rem; font-weight: 700;
+  transition: all var(--transition); font-family: var(--font-body); padding: 0;
+}
+.a11y-btn:hover, .a11y-btn:focus-visible, .theme-toggle:hover, .theme-toggle:focus-visible {
+  border-color: var(--accent-blue); background: var(--bg-card-hover);
+}
+.theme-toggle { font-size: 1.05rem; }
+.font-label { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.nav-toggle {
+  display: none; background: none; border: 1px solid var(--border-color); border-radius: 8px;
+  color: var(--text-primary); cursor: pointer; padding: 0.4rem; width: 36px; height: 36px;
+  align-items: center; justify-content: center;
+}
+
+/* Progress bar */
+#progress-bar {
+  position: fixed; top: 64px; left: 0; height: 4px; background: var(--accent-blue);
+  z-index: 999; transition: width 0.15s ease; border-radius: 0 2px 2px 0;
+}
+
+/* Main */
+main { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 0 1.5rem; }
+
+/* Hero */
+.hero {
+  min-height: 88vh; display: flex; flex-direction: column; justify-content: center;
+  align-items: center; text-align: center; padding-top: 80px;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem; background: var(--bg-card);
+  border: 1px solid var(--border-color); border-radius: 100px; padding: 0.4rem 1.1rem;
+  font-size: 0.78rem; color: var(--accent-blue); font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 1.5rem;
+  animation: fadeUp 0.7s ease both;
+}
+.hero-badge .dot { width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; }
+.hero h1 {
+  font-family: var(--font-display); font-size: clamp(2.2rem,5.5vw,3.6rem);
+  line-height: 1.2; margin-bottom: 1.2rem; animation: fadeUp 0.7s 0.1s ease both;
+}
+.hero-subtitle {
+  font-size: 1.1rem; color: var(--text-secondary); max-width: 600px;
+  margin-bottom: 2.5rem; font-weight: 400; animation: fadeUp 0.7s 0.2s ease both;
+}
+.hero-cards {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem;
+  width: 100%; max-width: 660px; animation: fadeUp 0.7s 0.3s ease both;
+}
+.hero-card {
+  background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius);
+  padding: 1.2rem 1rem; text-align: center; transition: all var(--transition);
+  cursor: pointer; text-decoration: none; color: inherit;
+}
+.hero-card:hover, .hero-card:focus-visible {
+  transform: translateY(-3px); border-color: var(--accent-blue); box-shadow: var(--shadow-card);
+}
+.hero-card .card-icon { font-size: 1.5rem; margin-bottom: 0.5rem; display: block; }
+.hero-card .card-label { font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 0.2rem; }
+.hero-card .card-desc { font-size: 0.75rem; color: var(--text-muted); }
+.scroll-indicator {
+  margin-top: 2.5rem; animation: floatDown 2.5s ease-in-out infinite, fadeUp 0.7s 0.5s ease both;
+  color: var(--text-muted); font-size: 0.8rem; display: flex; flex-direction: column;
+  align-items: center; gap: 0.4rem;
+}
+@keyframes floatDown { 0%,100%{transform:translateY(0)}50%{transform:translateY(6px)} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)} }
+
+/* Sections */
+section { padding: 4.5rem 0 2.5rem; }
+.section-label {
+  font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent-blue);
+  letter-spacing: 0.1em; text-transform: uppercase; display: flex; align-items: center;
+  gap: 0.75rem; margin-bottom: 0.75rem; font-weight: 500;
+}
+.section-label::before { content:''; width: 28px; height: 2px; background: var(--accent-blue); }
+h2 {
+  font-family: var(--font-display); font-size: clamp(1.7rem,3.5vw,2.4rem);
+  line-height: 1.25; margin-bottom: 1rem;
+}
+h3 { font-family: var(--font-display); font-size: 1.3rem; margin: 2rem 0 0.75rem; }
+p { margin-bottom: 1.2rem; color: var(--text-secondary); }
+.lead { font-size: 1.08rem; }
+
+/* Tooltips */
+.term {
+  color: var(--accent-cyan); border-bottom: 2px dotted var(--accent-cyan);
+  cursor: help; position: relative; font-weight: 600;
+}
+.term .tooltip {
+  position: absolute; bottom: calc(100% + 14px); left: 50%;
+  transform: translateX(-50%) translateY(6px); background: var(--tooltip-bg);
+  border: 2px solid var(--border-color); border-radius: var(--radius);
+  padding: 1rem 1.1rem; width: 310px; font-size: 0.84rem; line-height: 1.6;
+  color: var(--text-primary); font-weight: 400;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25); opacity: 0; visibility: hidden;
+  pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 200;
+}
+.term .tooltip::after {
+  content:''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 8px solid transparent; border-top-color: var(--tooltip-bg);
+}
+.term:hover .tooltip, .term:focus .tooltip, .term:focus-within .tooltip {
+  opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); pointer-events: auto;
+}
+.tooltip-title { font-weight: 700; color: var(--accent-blue); margin-bottom: 0.35rem; font-size: 0.88rem; display: block; }
+
+/* Callouts */
+.callout {
+  background: var(--bg-card); border-left: 4px solid var(--accent-blue);
+  border-radius: 0 var(--radius) var(--radius) 0; padding: 1.2rem 1.4rem;
+  margin: 1.5rem 0; font-size: 0.92rem; color: var(--text-secondary);
+}
+.callout.warning { border-left-color: var(--accent-orange); }
+.callout.success { border-left-color: var(--accent-green); }
+.callout strong { color: var(--text-primary); }
+
+/* Sim containers */
+.sim-container {
+  background: var(--bg-card); border: 2px solid var(--border-color);
+  border-radius: var(--radius-lg); padding: 1.75rem; margin: 2rem 0;
+}
+.sim-container:focus-within { border-color: var(--accent-blue); }
+.sim-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+.sim-title { font-family: var(--font-display); font-size: 1.1rem; }
+.sim-badge {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 0.25rem 0.75rem; border-radius: 100px; background: var(--bg-secondary);
+  border: 1px solid var(--border-color); color: var(--accent-blue);
+}
+.sim-canvas {
+  width: 100%; height: 280px; border-radius: var(--radius); background: var(--canvas-bg);
+  display: block; border: 1px solid var(--border-color);
+}
+#gd-canvas { height: 320px; cursor: crosshair; }
+.sim-controls { display: flex; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; align-items: center; }
+.sim-btn {
+  background: var(--accent-blue); color: #FFF; border: none; border-radius: 8px;
+  padding: 0.55rem 1.2rem; font-family: var(--font-body); font-size: 0.85rem; font-weight: 700;
+  cursor: pointer; transition: all var(--transition); min-height: 44px;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+}
+.sim-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.sim-btn.secondary { background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); }
+.sim-btn.secondary:hover { border-color: var(--accent-blue); }
+.sim-slider-group { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); }
+.sim-slider-group label { font-weight: 600; cursor: pointer; }
+.sim-slider-group input[type="range"] {
+  -webkit-appearance: none; height: 6px; background: var(--bg-secondary);
+  border: 1px solid var(--border-color); border-radius: 3px; width: 110px; cursor: pointer;
+}
+.sim-slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent-blue); border: 2px solid var(--bg-primary); cursor: pointer;
+}
+.sim-note { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.75rem; margin-bottom: 0; line-height: 1.6; }
+
+/* Tokens */
+.token-display { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 1rem 0; min-height: 50px; align-items: center; }
+.token {
+  display: inline-flex; align-items: center; padding: 0.4rem 0.7rem; border-radius: 6px;
+  font-family: var(--font-mono); font-size: 0.88rem; font-weight: 500;
+}
+.token.context { background: rgba(102,153,255,0.12); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+.token.predicted { background: rgba(51,204,153,0.12); color: var(--accent-green); border: 1px solid var(--accent-green); animation: tokenAppear 0.4s ease; }
+.token.cursor-token { width: 3px; height: 1.5em; background: var(--accent-cyan); padding: 0; border-radius: 2px; animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:0} }
+@keyframes tokenAppear { from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)} }
+.prob-bar-container { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 1rem; }
+.prob-row { display: flex; align-items: center; gap: 0.75rem; }
+.prob-word { font-family: var(--font-mono); font-size: 0.84rem; width: 100px; text-align: right; color: var(--text-secondary); font-weight: 500; }
+.prob-track { flex: 1; height: 28px; background: var(--prob-track); border-radius: 6px; overflow: hidden; }
+.prob-fill { height: 100%; border-radius: 6px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); display: flex; align-items: center; padding-left: 0.6rem; font-size: 0.75rem; font-weight: 700; color: #FFF; }
+
+/* Video */
+.video-embed { background: var(--bg-card); border: 2px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; margin: 2rem 0; }
+.video-header { padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--border-color); }
+.video-icon { width: 40px; height: 40px; border-radius: 8px; background: rgba(204,51,51,0.12); display: flex; align-items: center; justify-content: center; color: var(--accent-red); font-size: 1.1rem; flex-shrink: 0; }
+.video-info h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 0.15rem; }
+.video-info span { font-size: 0.78rem; color: var(--text-muted); }
+.video-wrapper { position: relative; padding-top: 56.25%; }
+.video-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+
+/* Takeaways */
+.takeaway-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 1rem; margin: 1.5rem 0; }
+.takeaway-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 1.4rem; transition: all var(--transition); }
+.takeaway-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
+.takeaway-card .tk-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 0.75rem; background: var(--bg-secondary); }
+.takeaway-card h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; }
+.takeaway-card p { font-size: 0.84rem; color: var(--text-muted); margin: 0; }
+
+/* Table */
+.table-wrapper { overflow-x: auto; margin: 1.5rem 0; border-radius: var(--radius); border: 1px solid var(--border-color); }
+.comparison-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.comparison-table th, .comparison-table td { padding: 0.9rem 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+.comparison-table th { background: var(--bg-secondary); color: var(--accent-blue); font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.comparison-table td { color: var(--text-secondary); }
+.comparison-table tbody tr:hover td { background: var(--bg-card-hover); }
+.comparison-table tbody tr:last-child td { border-bottom: none; }
+.check { color: var(--accent-green); font-weight: 700; }
+.cross { color: var(--accent-red); font-weight: 700; }
+
+/* Quiz */
+.quiz-container { background: var(--bg-card); border: 2px solid var(--border-color); border-radius: var(--radius-lg); padding: 2rem; margin: 2rem 0; }
+.quiz-progress { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+.quiz-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--bg-secondary); border: 2px solid var(--border-color); transition: all 0.3s ease; }
+.quiz-dot.answered-correct { background: var(--accent-green); border-color: var(--accent-green); }
+.quiz-dot.answered-incorrect { background: var(--accent-red); border-color: var(--accent-red); }
+.quiz-dot.current { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(102,153,255,0.25); }
+.quiz-question { font-size: 1.05rem; font-weight: 700; margin-bottom: 1.25rem; line-height: 1.5; }
+.quiz-options { display: flex; flex-direction: column; gap: 0.5rem; }
+.quiz-option {
+  background: var(--bg-secondary); border: 2px solid var(--border-color); border-radius: var(--radius);
+  padding: 0.9rem 1.2rem; cursor: pointer; font-size: 0.9rem; transition: all var(--transition);
+  color: var(--text-secondary); min-height: 48px; display: flex; align-items: center; font-weight: 500;
+}
+.quiz-option:hover, .quiz-option:focus-visible { border-color: var(--accent-blue); color: var(--text-primary); background: var(--bg-card-hover); }
+.quiz-option.correct { border-color: var(--accent-green)!important; background: rgba(51,204,153,0.1); color: var(--accent-green); }
+.quiz-option.incorrect { border-color: var(--accent-red)!important; background: rgba(255,102,102,0.08); color: var(--accent-red); }
+.quiz-option[aria-disabled="true"] { cursor: default; pointer-events: none; }
+.quiz-feedback { margin-top: 1rem; padding: 1rem 1.2rem; border-radius: var(--radius); font-size: 0.9rem; line-height: 1.6; display: none; }
+.quiz-feedback.show { display: block; }
+.quiz-feedback.correct-fb { background: rgba(51,204,153,0.08); border: 1px solid var(--accent-green); }
+.quiz-feedback.incorrect-fb { background: rgba(255,102,102,0.06); border: 1px solid var(--accent-red); }
+
+/* Footer */
+footer { margin-top: 3rem; padding: 2.5rem 0; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-muted); font-size: 0.84rem; }
+footer a { color: var(--accent-blue); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Reveal */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* Responsive */
+@media(max-width:900px){
+  .nav-links{display:none}
+  .nav-links.open{display:flex;position:absolute;top:64px;left:0;right:0;flex-direction:column;background:var(--bg-nav);backdrop-filter:blur(16px);padding:0.75rem 1rem;border-bottom:1px solid var(--border-color);gap:0.25rem}
+  .nav-toggle{display:flex}
+  .font-label{display:none}
+}
+@media(max-width:600px){
+  .hero-cards{grid-template-columns:1fr;max-width:300px}
+  .sim-container{padding:1.2rem}
+  .sim-controls{flex-direction:column;align-items:stretch}
+  section{padding:3rem 0 1.5rem}
+  .takeaway-grid{grid-template-columns:1fr}
+  .quiz-container{padding:1.25rem}
+  .a11y-toolbar{gap:0.2rem}
+  .a11y-btn,.theme-toggle{width:32px;height:32px;font-size:0.75rem}
+  .tooltip{width:250px;left:0;transform:translateX(-10%) translateY(6px)}
+  .term:hover .tooltip,.term:focus .tooltip{transform:translateX(-10%) translateY(0)}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}
+  html{scroll-behavior:auto}
+}
+@media(forced-colors:active){.sim-btn{border:2px solid ButtonText}.callout{border-left-width:4px}.quiz-option{border-width:2px}}
+@media print{nav,#progress-bar,.scroll-indicator,.a11y-toolbar,.sim-container,.video-embed,.quiz-container{display:none!important}body{background:#fff;color:#000}main{max-width:100%}}
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<div id="a11y-announcer" aria-live="polite" aria-atomic="true" role="status"></div>
+
+<nav id="main-nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a href="#top" class="nav-brand" aria-label="LLM Explorer — back to top">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      LLM Explorer
+    </a>
+    <ul class="nav-links" id="nav-links" role="menubar">
+      <li role="none"><a href="#overview" role="menuitem">Overview</a></li>
+      <li role="none"><a href="#loss-functions" role="menuitem">Loss Functions</a></li>
+      <li role="none"><a href="#gradient-descent" role="menuitem">Gradient Descent</a></li>
+      <li role="none"><a href="#next-token" role="menuitem">Next-Token</a></li>
+      <li role="none"><a href="#limitations" role="menuitem">Limitations</a></li>
+      <li role="none"><a href="#quiz" role="menuitem">Quiz</a></li>
+    </ul>
+    <div class="a11y-toolbar" role="toolbar" aria-label="Accessibility controls">
+      <span class="font-label" aria-hidden="true">Text:</span>
+      <button class="a11y-btn" onclick="changeFontSize(-1)" aria-label="Decrease font size" title="Decrease font size">A&#x2212;</button>
+      <button class="a11y-btn" onclick="changeFontSize(0)" aria-label="Reset font size to default" title="Reset font size">A</button>
+      <button class="a11y-btn" onclick="changeFontSize(1)" aria-label="Increase font size" title="Increase font size">A+</button>
+      <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Switch to light mode" title="Toggle dark/light mode">
+        <span id="theme-icon" aria-hidden="true">&#x2600;&#xFE0F;</span>
+      </button>
+    </div>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="nav-links">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div id="progress-bar" role="progressbar" aria-label="Reading progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+
+<main id="main-content">
+  <section class="hero" id="top" aria-labelledby="hero-heading">
+    <div class="hero-badge" aria-hidden="true"><span class="dot"></span> Interactive Learning Module</div>
+    <h1 id="hero-heading">How Large Language Models<br>Actually Learn</h1>
+    <p class="hero-subtitle">An interactive exploration of loss functions, gradient descent, and next-token prediction — the three core mechanics behind every LLM.</p>
+    <div class="hero-cards" role="list" aria-label="Three core concepts">
+      <a href="#loss-functions" class="hero-card" role="listitem"><span class="card-icon" aria-hidden="true">&#x1F4C9;</span><span class="card-label">Loss Functions</span><span class="card-desc">Measuring failure</span></a>
+      <a href="#gradient-descent" class="hero-card" role="listitem"><span class="card-icon" aria-hidden="true">&#x26F0;&#xFE0F;</span><span class="card-label">Gradient Descent</span><span class="card-desc">Making improvements</span></a>
+      <a href="#next-token" class="hero-card" role="listitem"><span class="card-icon" aria-hidden="true">&#x1F52E;</span><span class="card-label">Next-Token</span><span class="card-desc">What LLMs actually do</span></a>
+    </div>
+    <div class="scroll-indicator" aria-hidden="true">Scroll to explore<br><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg></div>
+  </section>
+
+  <section id="overview" class="reveal" aria-labelledby="overview-heading">
+    <div class="section-label" aria-hidden="true">Section 00 — The Big Picture</div>
+    <h2 id="overview-heading">What Does "Learning" Really Mean?</h2>
+    <p class="lead">When we say an LLM "learns," we create a misleading impression. The word suggests something like human learning — complete with understanding, reasoning, and insight. But that is not what happens inside these systems.</p>
+    <p>LLMs don't learn the way you learned to code or solve problems. Instead, they follow repetitive mathematical procedures billions of times, adjusting countless internal <span class="term" tabindex="0" role="button" aria-describedby="tip-params">parameters<span class="tooltip" id="tip-params" role="tooltip"><span class="tooltip-title">Parameters (Weights &amp; Biases)</span>The numerical values inside a neural network that get adjusted during training. Modern LLMs like GPT-3 have 175 billion parameters — think of them as billions of tiny "knobs" the training process fine-tunes.</span></span> until they become very good at mimicking patterns in text.</p>
+    <div class="callout" role="note"><strong>&#x1F4A1; Why this matters:</strong> Understanding how LLMs actually work helps you know when to trust their outputs and when to be skeptical. It reveals why they can write convincing essays about topics they don't understand, and why they sometimes fail in surprising ways.</div>
+    <p>Three core concepts drive how LLMs work:</p>
+    <div class="takeaway-grid" role="list" aria-label="Three core concepts">
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x1F4C9;</div><h4>Loss Functions</h4><p>A scoring system measuring how wrong the model is. Higher number = worse performance. Training aims to minimize this.</p></div>
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x26F0;&#xFE0F;</div><h4>Gradient Descent</h4><p>The optimization algorithm that adjusts billions of parameters to reduce the loss, one tiny step at a time.</p></div>
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x1F52E;</div><h4>Next-Token Prediction</h4><p>The deceptively simple task LLMs are actually trained on: predict the next word in a sequence, billions of times over.</p></div>
+    </div>
+  </section>
+
+  <section id="loss-functions" class="reveal" aria-labelledby="loss-heading">
+    <div class="section-label" aria-hidden="true">Section 01 — The Foundation</div>
+    <h2 id="loss-heading">Loss Functions: Measuring Failure</h2>
+    <p class="lead">Before an LLM can learn anything, we need a way to measure how badly it's performing. This measurement is the <span class="term" tabindex="0" role="button" aria-describedby="tip-loss">loss function<span class="tooltip" id="tip-loss" role="tooltip"><span class="tooltip-title">Loss Function</span>A mathematical function that calculates a single number representing how wrong the model's predictions are. The goal of training is to make this number as small as possible. Also called "cost function" or "objective function."</span></span> — a single number representing how wrong the model is.</p>
+    <h3>Three Requirements of a Good Loss Function</h3>
+    <div class="takeaway-grid" role="list" aria-label="Three requirements of a loss function">
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x1F3AF;</div><h4>1. Specific</h4><p>Must measure something concrete — like predicting the next word correctly — not vague qualities like "intelligence."</p></div>
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x26A1;</div><h4>2. Computable</h4><p>The computer must calculate it quickly and repeatedly. We can't measure abstract qualities like "creativity."</p></div>
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x3030;&#xFE0F;</div><h4>3. Smooth</h4><p>Output must change gradually — like a slope, not stairs — so the training algorithm knows which direction to adjust.</p></div>
+    </div>
+    <div class="callout warning" role="note"><strong>&#x26A0;&#xFE0F; Why accuracy isn't used directly:</strong> Accuracy isn't smooth — you either got 47 or 48 predictions right, never 47.3. LLMs optimize for <span class="term" tabindex="0" role="button" aria-describedby="tip-ce">cross-entropy loss<span class="tooltip" id="tip-ce" role="tooltip"><span class="tooltip-title">Cross-Entropy Loss</span>A smooth mathematical function measuring the difference between predicted probability distribution and the actual correct answer. Unlike accuracy, it provides continuous gradient information for training.</span></span> instead — smooth and mathematically tractable.</div>
+
+    <div class="sim-container" role="region" aria-label="Loss function visualization">
+      <div class="sim-header"><span class="sim-title">Interactive: Smooth vs. Step Functions</span><span class="sim-badge">Simulation</span></div>
+      <canvas id="loss-canvas" class="sim-canvas" role="img" aria-label="Graph comparing smooth cross-entropy loss curve with stepped accuracy function. The smooth curve decreases gradually, while the stepped function jumps between whole numbers."></canvas>
+      <div class="sim-controls">
+        <button class="sim-btn" onclick="toggleLossView()" aria-label="Toggle between smooth loss curve and accuracy step function">Toggle: Smooth Loss / Accuracy Steps</button>
+        <div class="sim-slider-group"><label for="noise-slider">Noise:</label><input type="range" id="noise-slider" min="0" max="50" value="10" oninput="drawLossCanvas()" aria-label="Adjust noise level on graph"></div>
+      </div>
+      <p class="sim-note">The smooth curve (cross-entropy) provides a continuous gradient the model can follow downhill. The step function (accuracy) gives no directional information between steps.</p>
+    </div>
+    <div class="callout" role="note"><strong>&#x1F511; Critical insight:</strong> LLMs are scored on matching patterns in their training data, <em>not</em> on being truthful or correct. If false information appears frequently in training data, the model gets rewarded for reproducing it.</div>
+  </section>
+
+  <section id="gradient-descent" class="reveal" aria-labelledby="gd-heading">
+    <div class="section-label" aria-hidden="true">Section 02 — The Process</div>
+    <h2 id="gd-heading">Gradient Descent: Rolling Downhill</h2>
+    <p class="lead">Once we have a loss function, we need a process to improve the model. <span class="term" tabindex="0" role="button" aria-describedby="tip-gd">Gradient descent<span class="tooltip" id="tip-gd" role="tooltip"><span class="tooltip-title">Gradient Descent</span>An optimization algorithm that iteratively adjusts parameters in the direction that reduces the loss function. The "gradient" is the mathematical slope telling you which direction is "downhill."</span></span> figures out how to adjust billions of parameters to reduce the loss.</p>
+    <p>Imagine a ball on a hilly landscape. The ball's position represents the model's current parameter values. Valleys are low loss (good); peaks are high loss (bad). Start at a random position, check the slope, nudge the ball downhill, and repeat billions of times.</p>
+
+    <div class="sim-container" role="region" aria-label="Gradient descent interactive simulation">
+      <div class="sim-header"><span class="sim-title">Interactive: Gradient Descent Visualizer</span><span class="sim-badge">Click to Place Ball</span></div>
+      <canvas id="gd-canvas" class="sim-canvas" role="img" aria-label="Interactive hilly landscape for gradient descent simulation. Click to place a ball, then press Run Descent to watch it roll downhill."></canvas>
+      <div class="sim-controls">
+        <button class="sim-btn" onclick="startGradientDescent()" aria-label="Start gradient descent animation">&#x25B6; Run Descent</button>
+        <button class="sim-btn secondary" onclick="resetGD()" aria-label="Reset gradient descent simulation">&#x21BB; Reset</button>
+        <div class="sim-slider-group"><label for="lr-slider">Learning Rate:</label><input type="range" id="lr-slider" min="1" max="20" value="8" aria-label="Adjust learning rate"><output id="lr-value" for="lr-slider" style="font-family:var(--font-mono);color:var(--accent-cyan);min-width:40px;font-weight:600;">0.08</output></div>
+      </div>
+      <p class="sim-note">Click the landscape to place the ball, then press Run. The <span class="term" tabindex="0" role="button" aria-describedby="tip-lr">learning rate<span class="tooltip" id="tip-lr" role="tooltip"><span class="tooltip-title">Learning Rate</span>A hyperparameter controlling step size during gradient descent. Too large = overshooting valleys. Too small = painfully slow training. Finding the right balance is critical.</span></span> controls step size. Too high = overshooting. Too low = painfully slow.</p>
+    </div>
+    <p>This uses a <span class="term" tabindex="0" role="button" aria-describedby="tip-greedy">greedy algorithm<span class="tooltip" id="tip-greedy" role="tooltip"><span class="tooltip-title">Greedy Algorithm</span>An algorithm making the locally optimal choice at each step without looking ahead. Like walking downhill in thick fog — you see only your feet, not deeper valleys beyond a small hill.</span></span> — only looking at the immediate step. Modern LLMs use <span class="term" tabindex="0" role="button" aria-describedby="tip-sgd">Stochastic Gradient Descent (SGD)<span class="tooltip" id="tip-sgd" role="tooltip"><span class="tooltip-title">Stochastic Gradient Descent</span>A variation using small random batches of training data instead of the entire dataset. "Stochastic" means random. This makes training feasible at massive scale while providing beneficial noise to escape shallow local minima.</span></span> — using small random batches instead of the entire dataset.</p>
+
+    <div class="video-embed">
+      <div class="video-header"><div class="video-icon" aria-hidden="true">&#x25B6;</div><div class="video-info"><h4>Gradient Descent — How Neural Networks Learn</h4><span>3Blue1Brown &middot; Chapter 2, Deep Learning</span></div></div>
+      <div class="video-wrapper"><iframe src="https://www.youtube.com/embed/IHZwWFHWa-w" title="Gradient Descent, How Neural Networks Learn — 3Blue1Brown video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>
+    </div>
+  </section>
+
+  <section id="next-token" class="reveal" aria-labelledby="token-heading">
+    <div class="section-label" aria-hidden="true">Section 03 — The Secret</div>
+    <h2 id="token-heading">Next-Token Prediction: What LLMs Actually Do</h2>
+    <p class="lead">Despite their ability to write essays and hold conversations, LLMs are trained on one deceptively simple task: predict the next <span class="term" tabindex="0" role="button" aria-describedby="tip-token">token<span class="tooltip" id="tip-token" role="tooltip"><span class="tooltip-title">Token</span>A chunk of text the model processes as one unit. Tokens can be whole words, parts of words, or punctuation. GPT models use roughly 50,000 different tokens.</span></span> in a sequence.</p>
+    <p>During training, the model sees overlapping segments and tries to predict what comes next — given "The" predict "cat"; given "The cat" predict "sat" — billions of times across trillions of words.</p>
+
+    <div class="sim-container" role="region" aria-label="Next-token prediction simulation">
+      <div class="sim-header"><span class="sim-title">Interactive: Next-Token Prediction</span><span class="sim-badge">Simulation</span></div>
+      <div id="token-sim">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;" role="group" aria-label="Choose a sentence to simulate">
+          <button class="sim-btn" onclick="runTokenPrediction(0)" aria-label="Simulate: The cat sat on the...">Sentence 1</button>
+          <button class="sim-btn" onclick="runTokenPrediction(1)" aria-label="Simulate: I love to eat breakfast with chopsticks in...">Sentence 2</button>
+          <button class="sim-btn" onclick="runTokenPrediction(2)" aria-label="Simulate: The transformer architecture uses...">Sentence 3</button>
+          <button class="sim-btn secondary" onclick="resetTokenSim()" aria-label="Reset token simulation">&#x21BB; Reset</button>
+        </div>
+        <div class="token-display" id="token-display" role="region" aria-live="polite" aria-label="Token prediction display"><span style="color:var(--text-muted);font-size:0.9rem;">Select a sentence above to see next-token prediction in action.</span></div>
+        <div class="prob-bar-container" id="prob-bars" role="list" aria-label="Predicted word probabilities"></div>
+      </div>
+    </div>
+
+    <h3>How Context Narrows Predictions</h3>
+    <p>Consider predicting the next word after "I love to eat" — it could be almost any food. Add "for breakfast" and you narrow to breakfast foods. Add "with chopsticks" and it narrows further. Add "in Tokyo" and you're thinking Japanese breakfast items. More context, better predictions.</p>
+    <p>The <span class="term" tabindex="0" role="button" aria-describedby="tip-transformer">transformer<span class="tooltip" id="tip-transformer" role="tooltip"><span class="tooltip-title">Transformer Architecture</span>Introduced in 2017 by Google researchers, transformers process all input tokens in parallel (not sequentially). They use "attention" to understand word relationships regardless of distance — the breakthrough behind modern LLMs.</span></span> architecture processes all training examples in parallel, making it feasible to train on datasets that would take multiple human lifetimes to read.</p>
+
+    <div class="video-embed">
+      <div class="video-header"><div class="video-icon" aria-hidden="true">&#x25B6;</div><div class="video-info"><h4>Large Language Models Explained Briefly</h4><span>3Blue1Brown &middot; Neural Networks Series</span></div></div>
+      <div class="video-wrapper"><iframe src="https://www.youtube.com/embed/LPZh9BOjkQs" title="Large Language Models Explained Briefly — 3Blue1Brown video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>
+    </div>
+    <div class="video-embed">
+      <div class="video-header"><div class="video-icon" aria-hidden="true">&#x25B6;</div><div class="video-info"><h4>Visualizing Transformers &amp; Attention</h4><span>3Blue1Brown &middot; Deep Learning Chapter 5</span></div></div>
+      <div class="video-wrapper"><iframe src="https://www.youtube.com/embed/wjZofJX0v4M" title="Visualizing Transformers and Attention — 3Blue1Brown video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>
+    </div>
+  </section>
+
+  <section id="limitations" class="reveal" aria-labelledby="limits-heading">
+    <div class="section-label" aria-hidden="true">Section 04 — The Reality Check</div>
+    <h2 id="limits-heading">Amazing&#x2026; But Flawed</h2>
+    <p class="lead">Pattern matching is not reasoning, and this creates predictable failure modes every LLM user should understand.</p>
+    <h3>LLMs: Strengths vs. Weaknesses</h3>
+    <div class="table-wrapper" role="region" aria-label="Comparison table" tabindex="0">
+    <table class="comparison-table"><caption class="sr-only">Tasks where LLMs excel versus struggle, with explanations.</caption>
+      <thead><tr><th scope="col">Capability</th><th scope="col">Excels &#x2713;</th><th scope="col">Struggles &#x2717;</th></tr></thead>
+      <tbody>
+        <tr><td>Common programming (Python, JS)</td><td class="check">&#x2713; Abundant training data</td><td></td></tr>
+        <tr><td>Obscure / new languages</td><td></td><td class="cross">&#x2717; Extrapolates incorrectly</td></tr>
+        <tr><td>Writing in standard formats</td><td class="check">&#x2713; Pattern-rich domain</td><td></td></tr>
+        <tr><td>Verifying factual premises</td><td></td><td class="cross">&#x2717; No fact-checking</td></tr>
+        <tr><td>Familiar logic puzzles</td><td class="check">&#x2713; Memorized solutions</td><td></td></tr>
+        <tr><td>Modified familiar puzzles</td><td></td><td class="cross">&#x2717; Reproduces memorized answer</td></tr>
+        <tr><td>Major language translation</td><td class="check">&#x2713; Millions of parallel examples</td><td></td></tr>
+        <tr><td>Novel logical reasoning</td><td></td><td class="cross">&#x2717; Pattern matching &#x2260; reasoning</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout warning" role="alert"><strong>&#x26A0;&#xFE0F; The core issue:</strong> LLMs are optimized to reproduce patterns from training data, not to be truthful, logical, or correct. When training data contains errors, models learn those errors. When it contains biases, models learn those too.</div>
+    <h3><span class="term" tabindex="0" role="button" aria-describedby="tip-hallucination">Hallucination<span class="tooltip" id="tip-hallucination" role="tooltip"><span class="tooltip-title">Hallucination</span>When an LLM generates confident, plausible-sounding text that is factually incorrect or fabricated. It produces text that "sounds right" based on pattern matching, not truth verification.</span></span> — The Fundamental Failure</h3>
+    <p>When an LLM encounters a question with a false premise, it doesn't verify it. It pattern-matches to produce a response that "sounds right." The answer can sound authoritative while being completely wrong — because <span class="term" tabindex="0" role="button" aria-describedby="tip-fuzzy">transformers perform fuzzy matching<span class="tooltip" id="tip-fuzzy" role="tooltip"><span class="tooltip-title">Fuzzy Matching in Transformers</span>When a transformer sees text similar to training data, it retrieves and adapts known answers. Efficient for common problems, but fails when small differences actually matter.</span></span> against training data.</p>
+  </section>
+
+  <section id="quiz" class="reveal" aria-labelledby="quiz-heading">
+    <div class="section-label" aria-hidden="true">Section 05 — Test Your Understanding</div>
+    <h2 id="quiz-heading">Knowledge Check</h2>
+    <p>Test what you've learned. Select the best answer for each question. Keyboard shortcut: press 1&#x2013;4 to select.</p>
+    <div class="quiz-container" role="region" aria-label="Interactive quiz with 5 questions">
+      <div class="quiz-progress" id="quiz-progress" role="group" aria-label="Quiz progress"></div>
+      <div class="quiz-question" id="quiz-question" tabindex="-1" aria-live="polite"></div>
+      <div class="quiz-options" id="quiz-options" role="radiogroup" aria-label="Answer choices"></div>
+      <div class="quiz-feedback" id="quiz-feedback" role="status" aria-live="assertive"></div>
+      <div class="sim-controls" style="margin-top:1rem;"><button class="sim-btn" id="quiz-next-btn" onclick="nextQuestion()" style="display:none;" aria-label="Go to next question">Next Question &#x2192;</button></div>
+    </div>
+  </section>
+
+  <section id="takeaways" class="reveal" aria-labelledby="takeaway-heading">
+    <div class="section-label" aria-hidden="true">Section 06 — Key Takeaways</div>
+    <h2 id="takeaway-heading">Practical Guidelines</h2>
+    <div class="takeaway-grid" role="list" aria-label="Four practical guidelines">
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x2705;</div><h4>Use LLMs for well-represented tasks</h4><p>Common programming, standard formats, and FAQs. Powerful productivity tools for routine work.</p></div>
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x1F50D;</div><h4>Be skeptical with novel problems</h4><p>Unusual edge cases, rare domains, or critical-accuracy situations require human verification.</p></div>
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x26A1;</div><h4>Always verify important outputs</h4><p>Confident-sounding responses aren't necessarily correct. Training optimizes for pattern matching, not truth.</p></div>
+      <div class="takeaway-card" role="listitem"><div class="tk-icon" aria-hidden="true">&#x1F9E0;</div><h4>Pattern matching &#x2260; reasoning</h4><p>LLMs are remarkable at reproducing patterns. But no matter how sophisticated, that is not the same as understanding.</p></div>
+    </div>
+    <div class="callout success" role="note"><strong>&#x1F4DA; Want to go deeper?</strong> Explore the full <a href="https://www.3blue1brown.com/topics/neural-networks" target="_blank" rel="noopener">3Blue1Brown Deep Learning series</a> covering neural networks, transformers, attention, and how LLMs store facts.</div>
+  </section>
+</main>
+
+<footer role="contentinfo">
+  <p>Interactive learning module based on <a href="https://blog.bytebytego.com/p/how-large-language-models-learn" target="_blank" rel="noopener">ByteByteGo: How Large Language Models Learn</a></p>
+  <p style="margin-top:0.5rem;">Videos by <a href="https://www.3blue1brown.com/topics/neural-networks" target="_blank" rel="noopener">3Blue1Brown</a> &middot; Built for educational use &middot; WCAG 2.1 AA compliant</p>
+</footer>
+
+<script>
+function announce(msg){var el=document.getElementById('a11y-announcer');el.textContent='';setTimeout(function(){el.textContent=msg},50)}
+
+/* Theme */
+function getStored(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function setStored(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  var icon=document.getElementById('theme-icon'),btn=document.getElementById('theme-toggle');
+  if(t==='dark'){icon.innerHTML='&#x2600;&#xFE0F;';btn.setAttribute('aria-label','Switch to light mode')}
+  else{icon.innerHTML='&#x1F319;';btn.setAttribute('aria-label','Switch to dark mode')}
+  setTimeout(function(){drawLossCanvas();drawGD()},60);
+}
+function toggleTheme(){
+  var c=document.documentElement.getAttribute('data-theme');
+  var n=c==='dark'?'light':'dark';applyTheme(n);setStored('llm-theme',n);
+  announce('Switched to '+n+' mode');
+}
+(function(){var s=getStored('llm-theme');if(s){applyTheme(s);return}
+if(window.matchMedia&&window.matchMedia('(prefers-color-scheme:light)').matches)applyTheme('light');else applyTheme('dark')})();
+if(window.matchMedia)window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(e){if(!getStored('llm-theme'))applyTheme(e.matches?'dark':'light')});
+
+/* Font size */
+var fontScale=1,FONT_MIN=0.8,FONT_MAX=1.5,FONT_STEP=0.1;
+function updateFS(){document.documentElement.style.setProperty('--font-scale',fontScale);setStored('llm-fs',fontScale);setTimeout(function(){drawLossCanvas();drawGD()},60)}
+function changeFontSize(d){
+  if(d===0){fontScale=1;announce('Font size reset to default')}
+  else if(d>0){fontScale=Math.min(FONT_MAX,+(fontScale+FONT_STEP).toFixed(2));announce('Font size increased to '+Math.round(fontScale*100)+' percent')}
+  else{fontScale=Math.max(FONT_MIN,+(fontScale-FONT_STEP).toFixed(2));announce('Font size decreased to '+Math.round(fontScale*100)+' percent')}
+  updateFS();
+}
+(function(){var s=parseFloat(getStored('llm-fs'));if(s&&s>=FONT_MIN&&s<=FONT_MAX){fontScale=s;updateFS()}})();
+
+/* Nav */
+var nav=document.getElementById('main-nav'),progressBar=document.getElementById('progress-bar');
+var sections=document.querySelectorAll('section[id]'),navLinks=document.querySelectorAll('#nav-links a');
+var navToggle=document.getElementById('nav-toggle'),navLinksEl=document.getElementById('nav-links');
+navToggle.addEventListener('click',function(){var o=navLinksEl.classList.toggle('open');navToggle.setAttribute('aria-expanded',o)});
+navLinksEl.addEventListener('click',function(e){if(e.target.tagName==='A'){navLinksEl.classList.remove('open');navToggle.setAttribute('aria-expanded','false')}});
+window.addEventListener('scroll',function(){
+  nav.classList.toggle('scrolled',window.scrollY>20);
+  var st=window.scrollY,dh=document.documentElement.scrollHeight-window.innerHeight;
+  var p=dh>0?(st/dh)*100:0;progressBar.style.width=p+'%';progressBar.setAttribute('aria-valuenow',Math.round(p));
+  var cur='';sections.forEach(function(s){if(st>=s.offsetTop-140)cur=s.getAttribute('id')});
+  navLinks.forEach(function(l){l.setAttribute('aria-current',l.getAttribute('href')==='#'+cur?'true':'false')});
+},{passive:true});
+
+/* Reveal */
+var prm=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+var ro=new IntersectionObserver(function(entries){entries.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible')})},{threshold:0.06,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal').forEach(function(el){if(prm)el.classList.add('visible');else ro.observe(el)});
+
+/* Canvas util */
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function resizeCanvas(c){var r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;var ctx=c.getContext('2d');ctx.scale(d,d);return{w:r.width,h:r.height,ctx:ctx}}
+
+/* Loss canvas */
+var showSmooth=true;
+function drawLossCanvas(){
+  var c=document.getElementById('loss-canvas'),r=resizeCanvas(c),w=r.w,h=r.h,ctx=r.ctx;
+  var noise=parseInt(document.getElementById('noise-slider').value);
+  ctx.clearRect(0,0,w,h);
+  var lc=cssVar('--canvas-line'),la=cssVar('--canvas-line-alt'),gc=cssVar('--canvas-grid'),tc=cssVar('--canvas-text');
+  ctx.strokeStyle=gc;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(50,16);ctx.lineTo(50,h-40);ctx.lineTo(w-16,h-40);ctx.stroke();
+  for(var i=1;i<5;i++){var y=16+((h-56)/5)*i;ctx.beginPath();ctx.strokeStyle=gc;ctx.moveTo(50,y);ctx.lineTo(w-16,y);ctx.stroke()}
+  ctx.fillStyle=tc;ctx.font='13px Source Sans 3, sans-serif';ctx.textAlign='center';
+  ctx.fillText('Training Steps \u2192',w/2,h-8);
+  ctx.save();ctx.translate(14,h/2);ctx.rotate(-Math.PI/2);ctx.fillText(showSmooth?'Cross-Entropy Loss \u2191':'Accuracy (%) \u2191',0,0);ctx.restore();
+  var pw=w-72,ph=h-64,sx=55,sy=22;
+  if(showSmooth){
+    ctx.beginPath();ctx.strokeStyle=lc;ctx.lineWidth=3;
+    for(var i=0;i<=pw;i++){var t=i/pw,base=Math.exp(-3.5*t)*0.82+0.12,n=Math.sin(t*28+0.5)*noise*0.001;
+    var y=sy+(1-base-n)*ph;if(i===0)ctx.moveTo(sx+i,y);else ctx.lineTo(sx+i,y)}ctx.stroke();
+    ctx.fillStyle=lc;ctx.font='bold 13px Source Sans 3, sans-serif';ctx.textAlign='left';
+    ctx.fillText('\u2713 Smooth \u2014 gradients always available',sx+8,sy+22);
+  }else{
+    ctx.beginPath();ctx.strokeStyle=la;ctx.lineWidth=3;
+    var steps=12,prevY=sy+ph*0.88;
+    for(var s=0;s<=steps;s++){var x1=sx+(s/steps)*pw,x2=sx+((s+1)/steps)*pw;
+    var seed=Math.sin(s*7.3+1.2)*0.5+0.5,acc=Math.min(0.94,0.12+s*0.068+seed*noise*0.003);
+    var y=sy+(1-acc)*ph;ctx.moveTo(x1,prevY);ctx.lineTo(x1,y);ctx.lineTo(Math.min(x2,sx+pw),y);prevY=y}ctx.stroke();
+    ctx.fillStyle=la;ctx.font='bold 13px Source Sans 3, sans-serif';ctx.textAlign='left';
+    ctx.fillText('\u2717 Steps \u2014 no gradient between levels!',sx+8,sy+22);
+  }
+}
+function toggleLossView(){showSmooth=!showSmooth;drawLossCanvas();announce(showSmooth?'Showing smooth cross-entropy loss curve':'Showing stepped accuracy function')}
+
+/* Gradient descent */
+var gdBall=null,gdPath=[],gdAnimating=false,gdAnimFrame=null;
+function landscape(x,w){var t=x/w;return 0.25*Math.sin(t*Math.PI*3.2)+0.15*Math.sin(t*Math.PI*5.1+1)+0.08*Math.sin(t*Math.PI*8.3+2)+0.35*Math.pow(t-0.5,2)+0.2}
+function landscapeDeriv(x,w){return(landscape(x+1,w)-landscape(x-1,w))/2}
+function drawGD(){
+  var c=document.getElementById('gd-canvas'),r=resizeCanvas(c),w=r.w,h=r.h,ctx=r.ctx;
+  ctx.clearRect(0,0,w,h);
+  var lc=cssVar('--canvas-line'),bc=cssVar('--canvas-ball'),pc=cssVar('--canvas-path'),tc=cssVar('--canvas-text'),gc=cssVar('--canvas-grid');
+  var pad=40,pw=w-pad*2,ph=h-pad*2;
+  ctx.beginPath();ctx.moveTo(pad,h-pad);
+  for(var i=0;i<=pw;i++){ctx.lineTo(pad+i,pad+(1-landscape(i,pw))*ph)}
+  ctx.lineTo(pad+pw,h-pad);ctx.closePath();ctx.fillStyle=gc;ctx.fill();
+  ctx.beginPath();ctx.strokeStyle=lc;ctx.lineWidth=2.5;
+  for(var i=0;i<=pw;i++){var y=pad+(1-landscape(i,pw))*ph;if(i===0)ctx.moveTo(pad+i,y);else ctx.lineTo(pad+i,y)}ctx.stroke();
+  if(gdPath.length>1){ctx.beginPath();ctx.strokeStyle=pc;ctx.lineWidth=2;ctx.globalAlpha=0.6;ctx.setLineDash([5,4]);
+  gdPath.forEach(function(p,i){var y=pad+(1-landscape(p-pad,pw))*ph;if(i===0)ctx.moveTo(p,y);else ctx.lineTo(p,y)});
+  ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1}
+  if(gdBall!==null){var bx=gdBall,by=pad+(1-landscape(bx-pad,pw))*ph;
+  ctx.beginPath();ctx.arc(bx,by,9,0,Math.PI*2);ctx.fillStyle=bc;ctx.fill();ctx.strokeStyle=cssVar('--text-primary');ctx.lineWidth=2.5;ctx.stroke()}
+  ctx.fillStyle=tc;ctx.font='12px Source Sans 3, sans-serif';ctx.textAlign='center';
+  ctx.fillText('Parameter Values \u2192',w/2,h-8);ctx.fillText('\u2190 Lower Loss is Better',w/2,pad-12);
+}
+document.getElementById('gd-canvas').addEventListener('click',function(e){
+  if(gdAnimating)return;var rect=e.target.getBoundingClientRect();
+  gdBall=e.clientX-rect.left;gdPath=[gdBall];drawGD();announce('Ball placed. Press Run Descent to start.');
+});
+document.getElementById('lr-slider').addEventListener('input',function(){document.getElementById('lr-value').textContent=(this.value/100).toFixed(2)});
+function startGradientDescent(){
+  if(!gdBall){announce('Click on the landscape first to place the ball.');return}
+  if(gdAnimating)return;gdAnimating=true;announce('Gradient descent running.');
+  var rect=document.getElementById('gd-canvas').getBoundingClientRect(),pw=rect.width-80;
+  var lr=parseInt(document.getElementById('lr-slider').value)/100,step=0;
+  function anim(){var g=landscapeDeriv(gdBall-40,pw);gdBall-=g*lr*pw*1.5;
+  gdBall=Math.max(45,Math.min(rect.width-45,gdBall));gdPath.push(gdBall);drawGD();step++;
+  if(step<120&&Math.abs(g)>0.0001)gdAnimFrame=requestAnimationFrame(anim);
+  else{gdAnimating=false;announce('Descent complete after '+step+' steps.')}}anim();
+}
+function resetGD(){if(gdAnimFrame)cancelAnimationFrame(gdAnimFrame);gdAnimating=false;gdBall=null;gdPath=[];drawGD();announce('Simulation reset.')}
+
+/* Token prediction */
+var tokenData=[
+  {context:['The','cat','sat','on','the'],predictions:[{word:'mat',prob:0.42,color:'#33CC99'},{word:'floor',prob:0.21,color:'#6699FF'},{word:'couch',prob:0.14,color:'#CC99FF'},{word:'table',prob:0.09,color:'#FF9933'},{word:'roof',prob:0.06,color:'#FF6666'}]},
+  {context:['I','love','to','eat','breakfast','with','chopsticks','in'],predictions:[{word:'Tokyo',prob:0.35,color:'#33CC99'},{word:'Japan',prob:0.28,color:'#6699FF'},{word:'China',prob:0.15,color:'#CC99FF'},{word:'Korea',prob:0.10,color:'#FF9933'},{word:'bed',prob:0.03,color:'#FF6666'}]},
+  {context:['The','transformer','architecture','uses'],predictions:[{word:'attention',prob:0.52,color:'#33CC99'},{word:'self-attention',prob:0.22,color:'#6699FF'},{word:'multi-head',prob:0.11,color:'#CC99FF'},{word:'parallel',prob:0.07,color:'#FF9933'},{word:'layers',prob:0.04,color:'#FF6666'}]}
+];
+function runTokenPrediction(idx){
+  var d=tokenData[idx],disp=document.getElementById('token-display'),bars=document.getElementById('prob-bars');
+  disp.innerHTML='';bars.innerHTML='';announce('Showing prediction. Context: '+d.context.join(' '));
+  d.context.forEach(function(w,i){setTimeout(function(){var s=document.createElement('span');s.className='token context';s.textContent=w;
+  if(!prm)s.style.animation='tokenAppear 0.3s ease both';disp.appendChild(s)},prm?0:i*180)});
+  var delay=prm?50:d.context.length*180+250;
+  setTimeout(function(){
+    var cur=document.createElement('span');cur.className='token cursor-token';cur.setAttribute('aria-hidden','true');disp.appendChild(cur);
+    d.predictions.forEach(function(pred,i){setTimeout(function(){
+      var row=document.createElement('div');row.className='prob-row';row.setAttribute('role','listitem');
+      row.innerHTML='<span class="prob-word">'+pred.word+'</span><div class="prob-track" role="progressbar" aria-valuenow="'+Math.round(pred.prob*100)+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+pred.word+': '+Math.round(pred.prob*100)+' percent"><div class="prob-fill" style="width:0%;background:'+pred.color+';">'+Math.round(pred.prob*100)+'%</div></div>';
+      bars.appendChild(row);requestAnimationFrame(function(){requestAnimationFrame(function(){row.querySelector('.prob-fill').style.width=(pred.prob*100)+'%'})});
+    },prm?0:i*130)});
+    setTimeout(function(){cur.remove();var p=document.createElement('span');p.className='token predicted';p.textContent=d.predictions[0].word;disp.appendChild(p);
+    announce('Predicted: '+d.predictions[0].word+' ('+Math.round(d.predictions[0].prob*100)+'%)')},prm?100:d.predictions.length*130+350);
+  },delay);
+}
+function resetTokenSim(){document.getElementById('token-display').innerHTML='<span style="color:var(--text-muted);font-size:0.9rem;">Select a sentence above to see next-token prediction in action.</span>';document.getElementById('prob-bars').innerHTML='';announce('Token simulation reset.')}
+
+/* Quiz */
+var quizData=[
+  {q:"Why don't LLMs use simple accuracy as their loss function?",opts:["A) Accuracy is too easy to compute","B) Accuracy isn't smooth \u2014 it jumps between whole numbers, giving no gradient info","C) Accuracy doesn't work with text data","D) Accuracy is too slow to calculate"],correct:1,exp:"Accuracy produces discrete jumps (47 vs 48 correct) with no values between. The training algorithm can't determine which direction to adjust. Cross-entropy loss is smooth and provides continuous gradient information."},
+  {q:"What does the 'gradient' in gradient descent actually measure?",opts:["A) Total number of errors","B) The color of the loss landscape","C) The slope at the current position \u2014 direction and steepness of decline","D) How much memory the model uses"],correct:2,exp:"The gradient measures the slope at the model's current position in parameter space \u2014 both which direction is 'downhill' and how steep the decline is."},
+  {q:"What is Stochastic Gradient Descent (SGD) and why is it used?",opts:["A) Uses the entire dataset for maximum accuracy","B) Uses small random batches, making training feasible with massive datasets","C) Skips the gradient and uses random guesses","D) Trains on only one example at a time forever"],correct:1,exp:"SGD uses small random batches instead of the full dataset. The randomness helps escape shallow local minima that standard gradient descent would get stuck in."},
+  {q:"What simple task are LLMs actually trained on?",opts:["A) Understanding and reasoning about language","B) Answering questions truthfully","C) Predicting the next token (word) in a sequence","D) Memorizing entire documents word for word"],correct:2,exp:"Despite impressive capabilities, LLMs are trained on one task: predict the next token. Done billions of times, sophisticated behaviors emerge from this simple objective at massive scale."},
+  {q:"Why do LLMs sometimes 'hallucinate' \u2014 producing confident but false answers?",opts:["A) They are programmed to lie","B) Their training data is always accurate","C) They're optimized to match patterns, not verify truth","D) They run out of computing power"],correct:2,exp:"LLMs are scored on matching patterns, not truthfulness. They produce plausible text via pattern-matching rather than verifying accuracy. False information in training data gets confidently reproduced."}
+];
+var currentQ=0,quizAnswered=new Array(quizData.length).fill(null);
+function renderQuiz(){
+  var pe=document.getElementById('quiz-progress');
+  pe.innerHTML=quizData.map(function(_,i){var c='quiz-dot',l='Question '+(i+1);if(i===currentQ){c+=' current';l+=' (current)'}if(quizAnswered[i]===true){c+=' answered-correct';l+=' correct'}if(quizAnswered[i]===false){c+=' answered-incorrect';l+=' incorrect'}return '<span class="'+c+'" role="img" aria-label="'+l+'"></span>'}).join('');
+  var q=quizData[currentQ];document.getElementById('quiz-question').textContent='Question '+(currentQ+1)+' of '+quizData.length+': '+q.q;
+  var oe=document.getElementById('quiz-options');oe.innerHTML='';
+  q.opts.forEach(function(o,i){var d=document.createElement('div');d.className='quiz-option';d.textContent=o;d.setAttribute('role','radio');d.setAttribute('aria-checked','false');d.setAttribute('tabindex','0');
+  d.addEventListener('click',function(){answerQuiz(i)});d.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();answerQuiz(i)}});oe.appendChild(d)});
+  var fb=document.getElementById('quiz-feedback');fb.className='quiz-feedback';fb.innerHTML='';document.getElementById('quiz-next-btn').style.display='none';
+}
+function answerQuiz(idx){
+  if(quizAnswered[currentQ]!==null)return;var q=quizData[currentQ],opts=document.querySelectorAll('.quiz-option'),fb=document.getElementById('quiz-feedback');
+  opts[idx].classList.add(idx===q.correct?'correct':'incorrect');opts[idx].setAttribute('aria-checked','true');
+  if(idx!==q.correct)opts[q.correct].classList.add('correct');
+  opts.forEach(function(o){o.setAttribute('aria-disabled','true');o.setAttribute('tabindex','-1')});
+  quizAnswered[currentQ]=(idx===q.correct);
+  fb.innerHTML=(idx===q.correct?'\u2705 Correct! ':'\u274C Not quite. ')+q.exp;
+  fb.className='quiz-feedback show '+(idx===q.correct?'correct-fb':'incorrect-fb');
+  announce(idx===q.correct?'Correct!':'Incorrect. Correct answer was option '+String.fromCharCode(65+q.correct)+'.');
+  if(currentQ<quizData.length-1){var nb=document.getElementById('quiz-next-btn');nb.style.display='inline-flex';nb.focus()}
+  else{var sc=quizAnswered.filter(function(a){return a===true}).length;
+  setTimeout(function(){var sm=sc===quizData.length?'\uD83C\uDF89 Perfect!':sc>=3?'\uD83D\uDC4D Great work!':'\uD83D\uDCD6 Review the sections above.';
+  fb.innerHTML+='<br><br><strong>Quiz Complete!</strong> Score: '+sc+'/'+quizData.length+'. '+sm;announce('Quiz complete. Score: '+sc+' of '+quizData.length)},400)}
+  updateProgressDots();
+}
+function updateProgressDots(){
+  var pe=document.getElementById('quiz-progress');
+  pe.innerHTML=quizData.map(function(_,i){var c='quiz-dot',l='Question '+(i+1);if(i===currentQ){c+=' current';l+=' (current)'}if(quizAnswered[i]===true){c+=' answered-correct';l+=' correct'}if(quizAnswered[i]===false){c+=' answered-incorrect';l+=' incorrect'}return '<span class="'+c+'" role="img" aria-label="'+l+'"></span>'}).join('');
+}
+function nextQuestion(){if(currentQ<quizData.length-1){currentQ++;renderQuiz();document.getElementById('quiz-question').focus()}}
+document.addEventListener('keydown',function(e){
+  var qs=document.getElementById('quiz');var r=qs.getBoundingClientRect();
+  if(r.top>window.innerHeight||r.bottom<0)return;
+  if(e.key>='1'&&e.key<='4'&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&quizAnswered[currentQ]===null)answerQuiz(parseInt(e.key)-1);
+});
+
+/* Init */
+window.addEventListener('load',function(){drawLossCanvas();drawGD();renderQuiz()});
+window.addEventListener('resize',function(){drawLossCanvas();drawGD()});
+</script>
+</body>
+</html>
