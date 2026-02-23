@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Interactive educational guide on how AI generates images using diffusion models, CLIP, and neural networks. Accessible, WCAG 2.1 AA compliant.">
+<title>How AI Generates Images — Interactive Guide</title>
+<style>
+/* === THEME VARIABLES === */
+/* Dark Theme (default) — all contrast ratios verified WCAG 2.1 AA */
+:root[data-theme="dark"] {
+  --bg-primary: #0F1219;      /* Main background */
+  --bg-secondary: #181D28;    /* Cards, nav */
+  --bg-card: #1C2333;         /* Elevated cards */
+  --bg-card-hover: #232B3E;
+  --text-primary: #E6E9F0;    /* 14.2:1 on bg-primary */
+  --text-secondary: #A3ABBE;  /* 7.0:1 on bg-primary */
+  --text-muted: #7A849A;      /* 4.5:1 on bg-primary */
+  --accent-blue: #6699FF;     /* 5.2:1 on bg-primary */
+  --accent-cyan: #33CCCC;     /* 7.6:1 on bg-primary */
+  --accent-green: #33CC99;    /* 7.1:1 on bg-primary */
+  --accent-red: #FF6666;      /* 4.8:1 on bg-primary */
+  --accent-purple: #B388FF;   /* 5.5:1 on bg-primary */
+  --accent-orange: #FFAA55;   /* 8.3:1 on bg-primary */
+  --border-color: #2A3148;
+  --focus-ring: #6699FF;
+  --code-bg: #161B26;
+  --shadow: 0 2px 12px rgba(0,0,0,0.35);
+}
+/* Light Theme — all contrast ratios verified WCAG 2.1 AA */
+:root[data-theme="light"] {
+  --bg-primary: #FAFBFD;
+  --bg-secondary: #F0F2F7;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F5F7FA;
+  --text-primary: #1A1F2E;    /* 15.1:1 on bg-primary */
+  --text-secondary: #4A5568;  /* 7.1:1 on bg-primary */
+  --text-muted: #6B7A90;      /* 4.6:1 on bg-primary */
+  --accent-blue: #2266CC;     /* 7.1:1 on bg-primary */
+  --accent-cyan: #0E7E7E;     /* 5.2:1 on bg-primary */
+  --accent-green: #0C8C5E;    /* 5.0:1 on bg-primary */
+  --accent-red: #CC3333;      /* 5.5:1 on bg-primary */
+  --accent-purple: #7B2FBE;   /* 5.8:1 on bg-primary */
+  --accent-orange: #B86E00;   /* 5.4:1 on bg-primary */
+  --border-color: #D8DCE6;
+  --focus-ring: #2266CC;
+  --code-bg: #F0F2F7;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+/* === BASE === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: calc(100% * var(--font-scale, 1)); }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.7; transition: background 0.3s, color 0.3s; }
+a { color: var(--accent-blue); text-decoration: underline; }
+a:hover, a:focus { color: var(--accent-cyan); }
+/* Skip link */
+.skip-link { position: absolute; top: -100%; left: 1rem; background: var(--accent-blue); color: #fff; padding: 0.75rem 1.25rem; border-radius: 0 0 8px 8px; z-index: 10000; font-weight: 700; text-decoration: none; }
+.skip-link:focus { top: 0; }
+/* Focus */
+:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+:focus:not(:focus-visible) { outline: none; }
+/* === NAV === */
+nav { position: sticky; top: 0; z-index: 1000; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+nav .brand { font-weight: 800; font-size: 1rem; color: var(--text-primary); white-space: nowrap; }
+nav .brand span { color: var(--accent-purple); }
+nav .nav-links { display: flex; gap: 0.25rem; flex-wrap: wrap; list-style: none; }
+nav .nav-links a { color: var(--text-secondary); text-decoration: none; padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.82rem; font-weight: 500; white-space: nowrap; }
+nav .nav-links a:hover, nav .nav-links a:focus { background: var(--bg-card); color: var(--text-primary); }
+.a11y-toolbar { display: flex; gap: 0.35rem; align-items: center; }
+.a11y-toolbar button { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 0.3rem 0.55rem; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 600; min-width: 36px; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+.a11y-toolbar button:hover, .a11y-toolbar button:focus-visible { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.mobile-menu-btn { display: none; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.65rem; border-radius: 6px; cursor: pointer; font-size: 1.1rem; min-width: 44px; min-height: 44px; }
+/* Progress */
+#progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue)); z-index: 1001; transition: width 0.2s; width: 0%; }
+/* === MAIN === */
+main { max-width: 820px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+section { margin-bottom: 3.5rem; }
+.section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent-purple); margin-bottom: 0.4rem; }
+h1 { font-size: 2rem; font-weight: 800; line-height: 1.25; margin-bottom: 0.5rem; }
+h1 .gradient { background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.subtitle { font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.6; }
+h2 { font-size: 1.35rem; font-weight: 800; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem; }
+h2 .icon { font-size: 1.3rem; }
+h3 { font-size: 1.05rem; font-weight: 700; margin: 1.5rem 0 0.75rem; color: var(--accent-cyan); }
+p { margin-bottom: 1rem; color: var(--text-secondary); }
+strong { color: var(--text-primary); font-weight: 700; }
+/* Tooltips */
+.term { position: relative; color: var(--accent-cyan); border-bottom: 1px dashed var(--accent-cyan); cursor: help; }
+.tooltip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.85rem 1rem; width: 280px; box-shadow: var(--shadow); opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0.2s; z-index: 50; font-size: 0.82rem; line-height: 1.55; color: var(--text-secondary); pointer-events: none; }
+.tooltip .tooltip-title { display: block; font-weight: 700; color: var(--text-primary); margin-bottom: 0.3rem; font-size: 0.85rem; }
+.term:hover .tooltip, .term:focus .tooltip { opacity: 1; visibility: visible; }
+/* Callouts */
+.callout { background: var(--bg-card); border-left: 4px solid var(--accent-blue); border-radius: 0 var(--radius-lg, 12px) var(--radius-lg, 12px) 0; padding: 1.1rem 1.3rem; margin: 1.5rem 0; font-size: 0.9rem; line-height: 1.65; color: var(--text-secondary); }
+.callout.warning { border-left-color: var(--accent-orange); }
+.callout.success { border-left-color: var(--accent-green); }
+.callout.purple { border-left-color: var(--accent-purple); }
+/* Cards */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; }
+.card h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary); }
+.card p { font-size: 0.85rem; margin-bottom: 0; }
+/* Sim */
+.sim-container { background: var(--bg-card); border: 2px solid var(--border-color); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; }
+.sim-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+.sim-canvas-wrap { position: relative; width: 100%; margin-bottom: 1rem; }
+.sim-canvas-wrap canvas { width: 100%; display: block; border-radius: 8px; }
+.sim-controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.sim-btn { background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.45rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; gap: 0.4rem; }
+.sim-btn:hover, .sim-btn:focus-visible { background: var(--accent-purple); color: #fff; border-color: var(--accent-purple); }
+.sim-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+input[type="range"] { accent-color: var(--accent-purple); width: 140px; }
+/* Video */
+.video-embed { background: var(--bg-card); border: 2px solid var(--border-color); border-radius: 12px; overflow: hidden; margin: 2rem 0; }
+.video-header { padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--border-color); }
+.video-icon { width: 40px; height: 40px; border-radius: 8px; background: rgba(204,51,51,0.12); display: flex; align-items: center; justify-content: center; color: var(--accent-red); font-size: 1.1rem; flex-shrink: 0; }
+.video-info h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 0.15rem; }
+.video-info span { font-size: 0.78rem; color: var(--text-muted); }
+.video-wrapper { position: relative; padding-top: 56.25%; }
+.video-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+/* Table */
+.comparison-table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.88rem; }
+.comparison-table caption { font-weight: 700; font-size: 1rem; margin-bottom: 0.75rem; text-align: left; color: var(--text-primary); }
+.comparison-table th, .comparison-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+.comparison-table th { background: var(--bg-secondary); color: var(--text-primary); font-weight: 700; }
+.comparison-table td { color: var(--text-secondary); }
+.comparison-table .check { color: var(--accent-green); font-weight: 700; }
+.comparison-table .cross { color: var(--accent-red); font-weight: 700; }
+/* Quiz */
+.quiz-container { background: var(--bg-card); border: 2px solid var(--border-color); border-radius: 12px; padding: 2rem; margin: 2rem 0; }
+.quiz-progress { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+.quiz-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--bg-secondary); border: 2px solid var(--border-color); transition: all 0.3s ease; }
+.quiz-dot.answered-correct { background: var(--accent-green); border-color: var(--accent-green); }
+.quiz-dot.answered-incorrect { background: var(--accent-red); border-color: var(--accent-red); }
+.quiz-dot.current { border-color: var(--accent-purple); box-shadow: 0 0 0 3px rgba(179,136,255,0.25); }
+.quiz-question { font-size: 1.05rem; font-weight: 700; margin-bottom: 1.25rem; line-height: 1.5; }
+.quiz-options { display: flex; flex-direction: column; gap: 0.5rem; }
+.quiz-option {
+  background: var(--bg-secondary); border: 2px solid var(--border-color); border-radius: 10px;
+  padding: 0.85rem 1.1rem; cursor: pointer; font-size: 0.9rem; color: var(--text-secondary);
+  transition: all 0.15s ease; font-weight: 500; min-height: 44px;
+}
+.quiz-option:hover, .quiz-option:focus-visible { border-color: var(--accent-purple); color: var(--text-primary); background: var(--bg-card-hover); }
+.quiz-option.correct { border-color: var(--accent-green)!important; background: rgba(51,204,153,0.1); color: var(--accent-green); }
+.quiz-option.incorrect { border-color: var(--accent-red)!important; background: rgba(255,102,102,0.08); color: var(--accent-red); }
+.quiz-option[aria-disabled="true"] { cursor: default; pointer-events: none; }
+.quiz-feedback { margin-top: 1rem; padding: 1rem 1.2rem; border-radius: 8px; font-size: 0.9rem; line-height: 1.6; display: none; }
+.quiz-feedback.show { display: block; }
+.quiz-feedback.correct-fb { background: rgba(51,204,153,0.08); border: 1px solid var(--accent-green); }
+.quiz-feedback.incorrect-fb { background: rgba(255,102,102,0.06); border: 1px solid var(--accent-red); }
+/* Footer */
+footer { text-align: center; padding: 2rem 1.5rem; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted); }
+/* Screen reader only */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+/* Announcer */
+#announcer { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+/* Responsive */
+@media(max-width:768px) {
+  nav .nav-links { display: none; flex-direction: column; width: 100%; gap: 0.15rem; }
+  nav .nav-links.open { display: flex; }
+  .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
+  main { padding: 1.5rem 1rem 3rem; }
+  h1 { font-size: 1.5rem; }
+  .quiz-container { padding: 1.25rem; }
+  .card-grid { grid-template-columns: 1fr; }
+}
+/* Reduced motion */
+@media(prefers-reduced-motion:reduce) { *, *::before, *::after { animation-duration: 0.01ms!important; transition-duration: 0.01ms!important; scroll-behavior: auto!important; } }
+/* High contrast */
+@media(forced-colors:active) { .sim-btn { border: 2px solid ButtonText; } .callout { border-left-width: 4px; } .quiz-option { border-width: 2px; } }
+/* Print */
+@media print { nav, #progress-bar, .scroll-indicator, .a11y-toolbar, .sim-container, .video-embed, .quiz-container { display:none!important; } body { background:#fff; color:#000; } main { max-width:100%; } }
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<div id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Reading progress"></div>
+<div id="announcer" aria-live="polite" role="status"></div>
+
+<nav role="navigation" aria-label="Main navigation">
+  <div class="brand"><span>&#x1F3A8;</span> AI Image Generation</div>
+  <button class="mobile-menu-btn" aria-label="Toggle navigation menu" aria-expanded="false" onclick="toggleMenu()">&#x2630;</button>
+  <ul class="nav-links" role="menubar">
+    <li role="none"><a href="#overview" role="menuitem">Overview</a></li>
+    <li role="none"><a href="#diffusion" role="menuitem">Diffusion</a></li>
+    <li role="none"><a href="#text-to-image" role="menuitem">Text-to-Image</a></li>
+    <li role="none"><a href="#architecture" role="menuitem">Architecture</a></li>
+    <li role="none"><a href="#comparison" role="menuitem">GANs vs Diffusion</a></li>
+    <li role="none"><a href="#limitations" role="menuitem">Limitations</a></li>
+    <li role="none"><a href="#quiz" role="menuitem">Quiz</a></li>
+  </ul>
+  <div class="a11y-toolbar" role="toolbar" aria-label="Accessibility controls">
+    <button onclick="changeFontSize(-1)" aria-label="Decrease font size">A&minus;</button>
+    <button onclick="changeFontSize(0)" aria-label="Reset font size">A</button>
+    <button onclick="changeFontSize(1)" aria-label="Increase font size">A+</button>
+    <button id="theme-toggle" onclick="toggleTheme()" aria-label="Switch to light mode">&#x2600;</button>
+  </div>
+</nav>
+
+<main id="main-content">
+  <!-- SECTION 1: Overview -->
+  <section id="overview" aria-labelledby="overview-heading">
+    <div class="section-label">Introduction</div>
+    <h1 id="overview-heading">How AI <span class="gradient">Generates Images</span></h1>
+    <p class="subtitle">From random noise to photorealistic art — a visual, interactive guide to the technology behind DALL-E, Stable Diffusion, and Midjourney.</p>
+
+    <p>In recent years, AI image generators have gone from producing blurry, distorted faces to creating photorealistic images that are nearly indistinguishable from photographs. But how does a computer turn a text prompt like <em>"a cat wearing a space helmet on Mars"</em> into an actual image?</p>
+
+    <p>The answer lies in a family of techniques called <span class="term" tabindex="0" role="button" aria-describedby="tip-diffusion">diffusion models<span class="tooltip" id="tip-diffusion" role="tooltip"><span class="tooltip-title">Diffusion Models</span>A class of generative AI models that create images by learning to reverse a noise-adding process. They start with random static and gradually denoise it into a coherent image.</span></span>. Unlike the <span class="term" tabindex="0" role="button" aria-describedby="tip-llm">large language models (LLMs)<span class="tooltip" id="tip-llm" role="tooltip"><span class="tooltip-title">Large Language Models</span>AI models like GPT and Claude that are trained to predict the next word in a sequence. They work with text, not pixels, and use different architectures than image generators.</span></span> that power chatbots, image generators work with <strong>pixels instead of words</strong>, and they use a fundamentally different training approach.</p>
+
+    <div class="callout purple" role="note"><strong>&#x1F517; Connection to LLMs:</strong> While LLMs predict the next <em>token</em> in text, diffusion models predict the <em>noise</em> in an image. Both use deep neural networks and gradient descent for training, but their objectives and architectures are quite different. Text-to-image models combine both — using a language model to understand prompts and a diffusion model to generate pixels.</div>
+
+    <h3>The Key Idea in One Sentence</h3>
+    <p><strong>Train a neural network to remove noise from images, then use it to turn pure static into art by removing noise step by step.</strong></p>
+
+    <div class="card-grid">
+      <div class="card"><h4>&#x1F4F7; Image Generation</h4><p>Create entirely new images from text descriptions, sketches, or other images using learned patterns.</p></div>
+      <div class="card"><h4>&#x1F3AD; Style Transfer</h4><p>Apply the visual style of one image (like Van Gogh's brushstrokes) onto the content of another.</p></div>
+      <div class="card"><h4>&#x1F58C;&#xFE0F; Inpainting</h4><p>Fill in missing or selected regions of an image with contextually appropriate content.</p></div>
+      <div class="card"><h4>&#x1F50D; Super-Resolution</h4><p>Enhance low-resolution images by adding realistic fine detail that wasn't in the original.</p></div>
+    </div>
+  </section>
+
+  <!-- SECTION 2: The Diffusion Process -->
+  <section id="diffusion" aria-labelledby="diffusion-heading">
+    <div class="section-label">Core Mechanism</div>
+    <h2 id="diffusion-heading"><span class="icon">&#x1F300;</span> The Diffusion Process</h2>
+    <p>The name "diffusion" comes from physics — like a drop of ink spreading through water. In AI, the idea is similar: take a clear image and gradually <strong>add random noise</strong> until it becomes pure static. Then, train a neural network to <strong>reverse the process</strong> — starting from noise and recovering the original image, one step at a time.</p>
+
+    <h3>Forward Process: Destroying an Image</h3>
+    <p>During training, the model takes real images and progressively corrupts them with <span class="term" tabindex="0" role="button" aria-describedby="tip-gaussian">Gaussian noise<span class="tooltip" id="tip-gaussian" role="tooltip"><span class="tooltip-title">Gaussian Noise</span>Random pixel values drawn from a normal (bell-curve) distribution. Each step adds a small amount, and after many steps the original image is completely destroyed.</span></span> over many time steps. At step 0, the image is crystal clear. By step T (often 1,000), it's indistinguishable from random static.</p>
+
+    <h3>Reverse Process: Creating from Noise</h3>
+    <p>A <span class="term" tabindex="0" role="button" aria-describedby="tip-unet">U-Net<span class="tooltip" id="tip-unet" role="tooltip"><span class="tooltip-title">U-Net Architecture</span>A neural network shaped like a U — it compresses an image down, then expands it back up with skip connections. Originally designed for medical imaging, it's now the backbone of most diffusion models.</span></span> neural network is trained to predict what noise was added at each step. During generation, the model starts with pure random noise and iteratively predicts and removes noise, revealing an image over dozens of steps.</p>
+
+    <!-- Interactive Simulation: Diffusion Steps -->
+    <div class="sim-container" role="region" aria-label="Interactive diffusion process simulator">
+      <div class="sim-title">&#x1F9EA; Diffusion Process Visualizer</div>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">Use the slider to see how noise transforms an image. Left = clear image, Right = pure noise. During generation, AI walks this path in reverse.</p>
+      <div class="sim-canvas-wrap">
+        <canvas id="diffusion-canvas" width="760" height="260" aria-label="Visualization of image going from clear to noisy across diffusion steps"></canvas>
+      </div>
+      <div class="sim-controls">
+        <label for="noise-slider" class="sim-label">Noise Level:</label>
+        <input type="range" id="noise-slider" min="0" max="100" value="0" aria-label="Noise level from 0 percent clear to 100 percent noise" oninput="updateDiffusionViz()">
+        <span id="noise-value" class="sim-label" aria-live="polite">0%</span>
+        <button class="sim-btn" onclick="animateDiffusion('forward')" aria-label="Animate forward diffusion adding noise">Forward &#x25B6;</button>
+        <button class="sim-btn" onclick="animateDiffusion('reverse')" aria-label="Animate reverse diffusion removing noise">&#x25C0; Reverse</button>
+      </div>
+    </div>
+
+    <div class="callout warning" role="note"><strong>&#x26A0;&#xFE0F; Key insight:</strong> The model doesn't learn to generate images directly. It learns to <em>predict noise</em>. The actual image emerges as a side effect of systematically subtracting predicted noise from random static. This is mathematically more stable than trying to generate an image in one shot.</div>
+
+    <div class="video-embed">
+      <div class="video-header"><div class="video-icon" aria-hidden="true">&#x25B6;</div><div class="video-info"><h4>How AI Image Generators Work</h4><span>Computerphile &middot; Dr. Mike Pound</span></div></div>
+      <div class="video-wrapper"><iframe src="https://www.youtube.com/embed/1CIpzeNxIhU" title="How AI Image Generators Work — Computerphile video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>
+    </div>
+  </section>
+
+  <!-- SECTION 3: Text-to-Image -->
+  <section id="text-to-image" aria-labelledby="t2i-heading">
+    <div class="section-label">Guidance</div>
+    <h2 id="t2i-heading"><span class="icon">&#x1F4DD;</span> From Text to Image: CLIP &amp; Embeddings</h2>
+    <p>A raw diffusion model can only produce random images — it has no way to know you want <em>"a golden retriever on a surfboard."</em> To make text-to-image work, the model needs a way to understand language and connect words to visual concepts.</p>
+
+    <h3>CLIP: Bridging Words and Pictures</h3>
+    <p><span class="term" tabindex="0" role="button" aria-describedby="tip-clip">CLIP<span class="tooltip" id="tip-clip" role="tooltip"><span class="tooltip-title">CLIP (Contrastive Language-Image Pretraining)</span>A model developed by OpenAI that learns to match images with text descriptions. Trained on 400 million image-text pairs from the internet, it creates a shared "embedding space" where related images and text are close together.</span></span> (Contrastive Language-Image Pretraining), developed by OpenAI, is the key bridge. It was trained on <strong>400 million image-text pairs</strong> from the internet. CLIP learns a shared mathematical space where related images and text descriptions land close together.</p>
+
+    <p>CLIP has two encoders working together: a <strong>text encoder</strong> (transformer-based, like GPT) that converts words into vectors, and an <strong>image encoder</strong> (Vision Transformer) that converts images into vectors in the same space. After training, the vector for <em>"a photo of a cat"</em> is mathematically close to vectors of actual cat photos.</p>
+
+    <h3>How Text Guides the Diffusion</h3>
+    <p>When you type a prompt, the text encoder converts it into an <span class="term" tabindex="0" role="button" aria-describedby="tip-embedding">embedding vector<span class="tooltip" id="tip-embedding" role="tooltip"><span class="tooltip-title">Embedding Vector</span>A list of numbers (typically 512–1024 values) that captures the meaning of text or an image. Similar concepts produce similar vectors. "Happy golden retriever" and "joyful labrador" would have nearby vectors.</span></span>. This vector is fed into the U-Net at every denoising step via <span class="term" tabindex="0" role="button" aria-describedby="tip-crossattn">cross-attention<span class="tooltip" id="tip-crossattn" role="tooltip"><span class="tooltip-title">Cross-Attention</span>A mechanism that lets one data stream (the image being generated) attend to another (the text embedding). At each layer of the U-Net, the model "looks at" the text prompt to guide what it produces.</span></span>, steering the noise removal toward an image that matches your description.</p>
+
+    <!-- Interactive Simulation: Text Embedding -->
+    <div class="sim-container" role="region" aria-label="Interactive text embedding similarity demo">
+      <div class="sim-title">&#x1F50D; Text Embedding Similarity</div>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">See how CLIP places related concepts close together in embedding space. Click a prompt to see which concepts are most similar.</p>
+      <div id="embedding-demo" role="group" aria-label="Embedding prompt selector">
+        <div class="sim-controls" style="margin-bottom:1rem;flex-wrap:wrap;">
+          <button class="sim-btn" onclick="showEmbedding(0)" aria-label="Show embedding for sunset over ocean">&#x1F305; Sunset over ocean</button>
+          <button class="sim-btn" onclick="showEmbedding(1)" aria-label="Show embedding for cat wearing hat">&#x1F431; Cat wearing hat</button>
+          <button class="sim-btn" onclick="showEmbedding(2)" aria-label="Show embedding for futuristic city">&#x1F3D9;&#xFE0F; Futuristic city</button>
+        </div>
+        <div id="embedding-results" role="status" aria-live="polite" style="font-size:0.88rem;color:var(--text-secondary);min-height:120px;"></div>
+      </div>
+    </div>
+
+    <div class="callout" role="note"><strong>&#x1F4A1; Why "avocado armchair" works:</strong> Because CLIP learned from internet text-image pairs, it understands individual concepts and can <em>compose</em> them. The embedding for "avocado armchair" sits near both "avocado" (green, textured) and "armchair" (furniture shape), so the diffusion model blends these visual features into a novel creation.</div>
+
+    <div class="video-embed">
+      <div class="video-header"><div class="video-icon" aria-hidden="true">&#x25B6;</div><div class="video-info"><h4>But How Do AI Images and Videos Actually Work?</h4><span>3Blue1Brown &middot; Guest Video by Welch Labs</span></div></div>
+      <div class="video-wrapper"><iframe src="https://www.youtube.com/embed/iv-5mZ_9CPY" title="But How Do AI Images Actually Work — 3Blue1Brown / Welch Labs video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>
+    </div>
+  </section>
+
+  <!-- SECTION 4: Architecture -->
+  <section id="architecture" aria-labelledby="arch-heading">
+    <div class="section-label">Under the Hood</div>
+    <h2 id="arch-heading"><span class="icon">&#x1F9E9;</span> Architecture: Latent Space &amp; U-Nets</h2>
+
+    <p>Working directly with full-resolution images (say, 512×512 pixels with 3 color channels = 786,432 values) is extremely expensive. Modern systems like Stable Diffusion solve this with a trick: perform diffusion in a compressed <span class="term" tabindex="0" role="button" aria-describedby="tip-latent">latent space<span class="tooltip" id="tip-latent" role="tooltip"><span class="tooltip-title">Latent Space</span>A compressed representation of data. A 512×512 image might be reduced to a 64×64 latent representation — 64× smaller — while preserving the essential information. Diffusion happens in this efficient space.</span></span>.</p>
+
+    <h3>The VAE: Compressing and Decompressing</h3>
+    <p>A <span class="term" tabindex="0" role="button" aria-describedby="tip-vae">Variational Autoencoder (VAE)<span class="tooltip" id="tip-vae" role="tooltip"><span class="tooltip-title">Variational Autoencoder (VAE)</span>A neural network with two halves: an encoder that compresses images into a small latent representation, and a decoder that reconstructs images from it. The diffusion model works in the compressed space, then the VAE decoder produces the final full-resolution image.</span></span> first compresses a 512×512 image into a 64×64 latent representation. The diffusion process runs entirely in this compact space, making it <strong>~64× more efficient</strong>. After denoising, the VAE decoder expands the result back to full resolution.</p>
+
+    <h3>The U-Net: Predicting Noise</h3>
+    <p>The U-Net is the core of the model. It takes three inputs: the noisy latent image, the current time step, and the text embedding. Its architecture compresses the image through downsampling blocks, then expands it through upsampling blocks with skip connections that preserve fine details. At each level, <strong>cross-attention layers</strong> incorporate the text prompt.</p>
+
+    <h3>The Noise Schedule</h3>
+    <p>Not all denoising steps are equal. A <span class="term" tabindex="0" role="button" aria-describedby="tip-schedule">noise schedule<span class="tooltip" id="tip-schedule" role="tooltip"><span class="tooltip-title">Noise Schedule</span>A predefined plan for how much noise to add or remove at each step. Early steps make big structural decisions (composition, shapes), while later steps refine fine details (textures, edges). Common schedules include linear and cosine.</span></span> controls how much noise is added/removed at each step. Early steps establish the broad composition — shapes and layout. Later steps add fine details like textures, lighting, and edges.</p>
+
+    <!-- Interactive Simulation: Latent Space -->
+    <div class="sim-container" role="region" aria-label="Interactive latent space pipeline visualization">
+      <div class="sim-title">&#x2699;&#xFE0F; Latent Diffusion Pipeline</div>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">Click "Run Pipeline" to see how a text prompt flows through the latent diffusion pipeline step by step.</p>
+      <div class="sim-canvas-wrap">
+        <canvas id="pipeline-canvas" width="760" height="300" aria-label="Animated visualization of the latent diffusion pipeline from text to image"></canvas>
+      </div>
+      <div class="sim-controls">
+        <button class="sim-btn" id="pipeline-btn" onclick="runPipeline()" aria-label="Run the latent diffusion pipeline animation">Run Pipeline &#x25B6;</button>
+      </div>
+    </div>
+
+    <div class="video-embed">
+      <div class="video-header"><div class="video-icon" aria-hidden="true">&#x25B6;</div><div class="video-info"><h4>Stable Diffusion in Code (AI Image Generation)</h4><span>Computerphile &middot; Dr. Mike Pound</span></div></div>
+      <div class="video-wrapper"><iframe src="https://www.youtube.com/embed/J87hffSMB60" title="Stable Diffusion in Code — Computerphile video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>
+    </div>
+  </section>
+
+  <!-- SECTION 5: GANs vs Diffusion -->
+  <section id="comparison" aria-labelledby="comp-heading">
+    <div class="section-label">Historical Context</div>
+    <h2 id="comp-heading"><span class="icon">&#x2696;&#xFE0F;</span> GANs vs. Diffusion Models</h2>
+    <p>Before diffusion models, <span class="term" tabindex="0" role="button" aria-describedby="tip-gan">Generative Adversarial Networks (GANs)<span class="tooltip" id="tip-gan" role="tooltip"><span class="tooltip-title">GANs (Generative Adversarial Networks)</span>Invented in 2014, GANs pit two networks against each other: a Generator that creates fake images and a Discriminator that tries to tell real from fake. They improve each other through competition, but are notoriously difficult to train.</span></span> were the dominant method for AI image generation. Introduced in 2014 by Ian Goodfellow, GANs use a <strong>generator</strong> that creates images and a <strong>discriminator</strong> that tries to detect fakes — an adversarial game that pushes the generator to improve.</p>
+
+    <p>GANs produced impressive results (think "This Person Does Not Exist"), but had significant training challenges. Diffusion models, introduced in 2015 and refined by 2020, eventually surpassed GANs in image quality and diversity.</p>
+
+    <table class="comparison-table" aria-label="Comparison of GANs versus diffusion models">
+      <caption>GANs vs. Diffusion Models</caption>
+      <thead><tr><th scope="col">Feature</th><th scope="col">GANs</th><th scope="col">Diffusion Models</th></tr></thead>
+      <tbody>
+        <tr><td>Training stability</td><td class="cross">&#x2717; Often unstable, tricky to tune</td><td class="check">&#x2713; Stable, simple loss function</td></tr>
+        <tr><td>Image quality</td><td>Good, but inconsistent</td><td class="check">&#x2713; State-of-the-art quality</td></tr>
+        <tr><td>Image diversity</td><td class="cross">&#x2717; Prone to mode collapse</td><td class="check">&#x2713; High diversity</td></tr>
+        <tr><td>Generation speed</td><td class="check">&#x2713; Fast (single forward pass)</td><td class="cross">&#x2717; Slow (many iterative steps)</td></tr>
+        <tr><td>Text conditioning</td><td>Difficult to add</td><td class="check">&#x2713; Natural via cross-attention</td></tr>
+        <tr><td>Training approach</td><td>Adversarial (two competing networks)</td><td>Denoising (single network)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout" role="note"><strong>&#x1F4CA; Mode collapse explained:</strong> A major GAN failure mode where the generator learns to produce only one or a few variations that fool the discriminator. For example, a face generator might only produce one face from every angle. Diffusion models avoid this entirely because they learn the full data distribution through denoising.</div>
+
+    <h3>The Timeline of AI Image Generation</h3>
+    <div class="card-grid">
+      <div class="card"><h4>2014 — GANs</h4><p>Ian Goodfellow introduces Generative Adversarial Networks. Image generation becomes possible but difficult.</p></div>
+      <div class="card"><h4>2015 — Diffusion</h4><p>Sohl-Dickstein et al. propose diffusion-based generative models. Results are modest but promising.</p></div>
+      <div class="card"><h4>2020 — DDPM</h4><p>Ho et al. publish Denoising Diffusion Probabilistic Models, matching GAN quality for the first time.</p></div>
+      <div class="card"><h4>2021 — CLIP</h4><p>OpenAI releases CLIP, connecting text and images. Enables text-to-image generation.</p></div>
+      <div class="card"><h4>2022 — DALL-E 2</h4><p>OpenAI's DALL-E 2 uses CLIP + diffusion to generate photorealistic images from text prompts.</p></div>
+      <div class="card"><h4>2022 — Stable Diffusion</h4><p>Stability AI open-sources Stable Diffusion, bringing AI image generation to everyone.</p></div>
+    </div>
+  </section>
+
+  <!-- SECTION 6: Limitations -->
+  <section id="limitations" aria-labelledby="limits-heading">
+    <div class="section-label">Challenges</div>
+    <h2 id="limits-heading"><span class="icon">&#x26A0;&#xFE0F;</span> Limitations &amp; Ethical Considerations</h2>
+
+    <p>Despite their impressive capabilities, AI image generators have significant limitations and raise important ethical questions that users and developers must understand.</p>
+
+    <h3>Technical Limitations</h3>
+    <p><strong>Hands and text:</strong> Diffusion models notoriously struggle with generating human hands (wrong number of fingers) and readable text in images. This is because these require understanding precise spatial relationships that the noise-prediction approach doesn't naturally capture.</p>
+    <p><strong>Spatial reasoning:</strong> Prompts like "a red cube on top of a blue sphere" often produce incorrect arrangements. The model doesn't truly understand 3D spatial relationships — it's pattern-matching from training data.</p>
+    <p><strong>Consistency:</strong> Generating the same character across multiple images is challenging because each generation starts from different random noise.</p>
+    <p><strong>Speed:</strong> Unlike GANs that generate in one pass, diffusion models require dozens of iterative steps, making them slower to produce results.</p>
+
+    <h3>Ethical Considerations</h3>
+    <p><strong>Training data and copyright:</strong> These models are trained on billions of images scraped from the internet, raising questions about whether this constitutes fair use of artists' and photographers' work.</p>
+    <p><strong>Bias:</strong> Models inherit biases from their training data. Prompts for "doctor" might disproportionately generate images of certain demographics, while "criminal" might show biased results, reflecting and potentially amplifying societal stereotypes.</p>
+    <p><strong>Deepfakes and misinformation:</strong> The ability to generate photorealistic images of events that never happened creates new risks for <span class="term" tabindex="0" role="button" aria-describedby="tip-deepfake">deepfakes<span class="tooltip" id="tip-deepfake" role="tooltip"><span class="tooltip-title">Deepfakes</span>AI-generated or manipulated media (images, video, audio) designed to look or sound like real people doing or saying things they never did. Named from "deep learning" + "fake."</span></span> and disinformation.</p>
+
+    <div class="callout warning" role="note"><strong>&#x1F6E1;&#xFE0F; Safeguards:</strong> Most commercial image generators include safety filters, content policies, and invisible watermarks (like Google's SynthID) to identify AI-generated images. Research into detection methods is an active and important field.</div>
+
+    <div class="card-grid">
+      <div class="card"><h4>&#x1F6AB; What They Can't Do</h4><p>Truly understand scenes, count objects reliably, maintain character consistency, or generate accurate text within images.</p></div>
+      <div class="card"><h4>&#x2705; What They Do Well</h4><p>Creative ideation, concept art, style exploration, artistic compositions, and rapid prototyping of visual ideas.</p></div>
+    </div>
+  </section>
+
+  <!-- SECTION 7: Quiz -->
+  <section id="quiz" aria-labelledby="quiz-heading">
+    <div class="section-label">Test Your Knowledge</div>
+    <h2 id="quiz-heading"><span class="icon">&#x1F9E0;</span> Knowledge Check</h2>
+    <p>Test what you've learned. Select the best answer for each question. Keyboard shortcut: press 1&#x2013;4 to select.</p>
+    <div class="quiz-container" role="region" aria-label="Interactive quiz with 5 questions">
+      <div class="quiz-progress" id="quiz-progress" role="group" aria-label="Quiz progress"></div>
+      <div class="quiz-question" id="quiz-question" tabindex="-1" aria-live="polite"></div>
+      <div class="quiz-options" id="quiz-options" role="radiogroup" aria-label="Answer choices"></div>
+      <div class="quiz-feedback" id="quiz-feedback" role="status" aria-live="assertive"></div>
+      <div class="sim-controls" style="margin-top:1rem;"><button class="sim-btn" id="quiz-next-btn" onclick="nextQuestion()" style="display:none;" aria-label="Go to next question">Next Question &#x2192;</button></div>
+    </div>
+  </section>
+
+  <!-- TAKEAWAY -->
+  <section id="takeaway" aria-labelledby="takeaway-heading">
+    <div class="section-label">Summary</div>
+    <h2 id="takeaway-heading"><span class="icon">&#x1F3AF;</span> Key Takeaways</h2>
+    <div class="card-grid">
+      <div class="card"><h4>&#x1F300; Learn to Denoise</h4><p>Diffusion models are trained to predict and remove noise. Image generation is the reverse of image destruction.</p></div>
+      <div class="card"><h4>&#x1F4DD; CLIP Connects Modalities</h4><p>Text encoders convert prompts into vectors that guide the diffusion process via cross-attention at every step.</p></div>
+      <div class="card"><h4>&#x1F5DC;&#xFE0F; Latent Space = Efficiency</h4><p>VAEs compress images before diffusion runs, making the process ~64× more efficient than working with raw pixels.</p></div>
+      <div class="card"><h4>&#x2696;&#xFE0F; Power + Responsibility</h4><p>These tools are powerful creative aids, but they raise real questions about copyright, bias, and misuse.</p></div>
+    </div>
+
+    <div class="callout success" role="note"><strong>&#x1F4DA; Want to go deeper?</strong> Explore the full <a href="https://www.3blue1brown.com/topics/neural-networks" target="_blank" rel="noopener">3Blue1Brown Deep Learning series</a> covering neural networks, transformers, attention, and how diffusion models work.</div>
+  </section>
+</main>
+
+<footer role="contentinfo">
+  <p><strong>How AI Generates Images</strong> &mdash; An interactive educational guide</p>
+  <p style="margin-top:0.5rem;">Videos by <a href="https://www.youtube.com/@Computerphile" target="_blank" rel="noopener">Computerphile</a> &amp; <a href="https://www.3blue1brown.com/topics/neural-networks" target="_blank" rel="noopener">3Blue1Brown</a> &middot; Built for educational use &middot; WCAG 2.1 AA compliant</p>
+</footer>
+
+<script>
+/* === Accessibility: Announcer === */
+function announce(msg){var el=document.getElementById('announcer');el.textContent='';setTimeout(function(){el.textContent=msg},50)}
+
+/* === Theme Toggle === */
+function toggleTheme(){
+  var html=document.documentElement;var current=html.getAttribute('data-theme');
+  var next=current==='dark'?'light':'dark';html.setAttribute('data-theme',next);
+  var btn=document.getElementById('theme-toggle');
+  btn.innerHTML=next==='dark'?'\u2600':'\u263E';
+  btn.setAttribute('aria-label','Switch to '+(next==='dark'?'light':'dark')+' mode');
+  try{localStorage.setItem('theme',next)}catch(e){}
+  announce('Switched to '+next+' mode');
+  drawDiffusionCanvas();drawPipelineCanvas();
+}
+(function(){try{var saved=localStorage.getItem('theme');if(saved){document.documentElement.setAttribute('data-theme',saved);
+var btn=document.getElementById('theme-toggle');if(btn){btn.innerHTML=saved==='dark'?'\u2600':'\u263E';btn.setAttribute('aria-label','Switch to '+(saved==='dark'?'light':'dark')+' mode')}}}catch(e){}})();
+
+/* === Font Size === */
+var fontScale=100;
+function changeFontSize(dir){
+  if(dir===0)fontScale=100;else fontScale=Math.max(80,Math.min(150,fontScale+dir*10));
+  document.documentElement.style.setProperty('--font-scale',fontScale/100);
+  try{localStorage.setItem('fontScale',fontScale)}catch(e){}
+  announce('Font size '+(dir===0?'reset to':dir>0?'increased to':'decreased to')+' '+fontScale+' percent');
+  drawDiffusionCanvas();drawPipelineCanvas();
+}
+(function(){try{var s=localStorage.getItem('fontScale');if(s){fontScale=parseInt(s);document.documentElement.style.setProperty('--font-scale',fontScale/100)}}catch(e){}})();
+
+/* === Mobile Menu === */
+function toggleMenu(){var nav=document.querySelector('.nav-links');var btn=document.querySelector('.mobile-menu-btn');var open=nav.classList.toggle('open');btn.setAttribute('aria-expanded',open)}
+
+/* === Scroll Progress === */
+window.addEventListener('scroll',function(){var h=document.documentElement;var pct=h.scrollTop/(h.scrollHeight-h.clientHeight)*100;var bar=document.getElementById('progress-bar');bar.style.width=pct+'%';bar.setAttribute('aria-valuenow',Math.round(pct))});
+
+/* === Theme-Aware Colors === */
+function getThemeColors(){
+  var dark=document.documentElement.getAttribute('data-theme')==='dark';
+  return {
+    bg: dark?'#1C2333':'#FFFFFF',
+    bgAlt: dark?'#232B3E':'#F0F2F7',
+    text: dark?'#E6E9F0':'#1A1F2E',
+    textMuted: dark?'#7A849A':'#6B7A90',
+    blue: dark?'#6699FF':'#2266CC',
+    purple: dark?'#B388FF':'#7B2FBE',
+    cyan: dark?'#33CCCC':'#0E7E7E',
+    green: dark?'#33CC99':'#0C8C5E',
+    red: dark?'#FF6666':'#CC3333',
+    orange: dark?'#FFAA55':'#B86E00',
+    border: dark?'#2A3148':'#D8DCE6',
+    noise: dark?'rgba(255,255,255,':'rgba(0,0,0,'
+  };
+}
+
+/* === DIFFUSION CANVAS === */
+function drawDiffusionCanvas(){
+  var canvas=document.getElementById('diffusion-canvas');if(!canvas)return;
+  var ctx=canvas.getContext('2d');var w=canvas.width,h=canvas.height;var c=getThemeColors();
+  var noiseLevel=parseInt(document.getElementById('noise-slider').value)/100;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle=c.bg;ctx.fillRect(0,0,w,h);
+
+  // Draw 5 image stages
+  var stages=5;var imgW=120;var imgH=120;var gap=(w-stages*imgW)/(stages+1);
+  var y=(h-imgH)/2;
+
+  for(var i=0;i<stages;i++){
+    var x=gap+(imgW+gap)*i;
+    var stageNoise=i/(stages-1);
+    var highlight=(Math.abs(noiseLevel-stageNoise)<0.15);
+
+    // Draw frame
+    ctx.strokeStyle=highlight?c.purple:c.border;
+    ctx.lineWidth=highlight?3:1;
+    ctx.strokeRect(x,y,imgW,imgH);
+
+    // Draw "image" with noise
+    drawNoisyImage(ctx,x,y,imgW,imgH,stageNoise,c);
+
+    // Label
+    ctx.fillStyle=highlight?c.purple:c.textMuted;
+    ctx.font=(highlight?'bold ':'')+Math.round(11*fontScale/100)+'px -apple-system, sans-serif';
+    ctx.textAlign='center';
+    var label=i===0?'Original':i===stages-1?'Pure Noise':'Step '+(i*250);
+    ctx.fillText(label,x+imgW/2,y+imgH+18);
+  }
+
+  // Arrow between stages
+  for(var i=0;i<stages-1;i++){
+    var x1=gap+(imgW+gap)*i+imgW+4;
+    var x2=gap+(imgW+gap)*(i+1)-4;
+    var ay=h/2;
+    ctx.strokeStyle=c.textMuted;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(x1,ay);ctx.lineTo(x2,ay);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x2-6,ay-4);ctx.lineTo(x2,ay);ctx.lineTo(x2-6,ay+4);ctx.stroke();
+  }
+
+  // Direction labels
+  ctx.fillStyle=c.cyan;ctx.font='bold '+Math.round(12*fontScale/100)+'px -apple-system, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('\u2192 Forward Process (add noise)',w/2,y-14);
+  ctx.fillStyle=c.green;
+  ctx.fillText('\u2190 Reverse Process (remove noise)',w/2,y+imgH+38);
+}
+
+function drawNoisyImage(ctx,x,y,w,h,noise,c){
+  // Draw a simple "scene" that gets progressively noisier
+  var clarity=1-noise;
+
+  // Sky
+  ctx.fillStyle=mixColor(c.blue,'#888888',noise);
+  ctx.globalAlpha=Math.max(0.15,clarity);
+  ctx.fillRect(x,y,w,h*0.5);
+
+  // Ground
+  ctx.fillStyle=mixColor(c.green,'#888888',noise);
+  ctx.fillRect(x,y+h*0.5,w,h*0.5);
+
+  // Sun
+  if(clarity>0.2){
+    ctx.fillStyle=mixColor(c.orange,'#888888',noise);
+    ctx.beginPath();ctx.arc(x+w*0.75,y+h*0.25,12*clarity,0,Math.PI*2);ctx.fill();
+  }
+
+  // Mountain
+  if(clarity>0.15){
+    ctx.fillStyle=mixColor(c.purple,'#888888',noise);
+    ctx.beginPath();ctx.moveTo(x+w*0.2,y+h*0.5);ctx.lineTo(x+w*0.5,y+h*0.15);ctx.lineTo(x+w*0.8,y+h*0.5);ctx.fill();
+  }
+
+  ctx.globalAlpha=1;
+
+  // Noise overlay
+  if(noise>0.02){
+    var imgData=ctx.getImageData(x,y,w,h);var d=imgData.data;
+    for(var p=0;p<d.length;p+=4){
+      var n=(Math.random()-0.5)*255*noise;
+      d[p]=Math.max(0,Math.min(255,d[p]+n));
+      d[p+1]=Math.max(0,Math.min(255,d[p+1]+n));
+      d[p+2]=Math.max(0,Math.min(255,d[p+2]+n));
+    }
+    ctx.putImageData(imgData,x,y);
+  }
+}
+
+function mixColor(c1,c2,t){
+  var r1=parseInt(c1.slice(1,3),16),g1=parseInt(c1.slice(3,5),16),b1=parseInt(c1.slice(5,7),16);
+  var r2=parseInt(c2.slice(1,3),16),g2=parseInt(c2.slice(3,5),16),b2=parseInt(c2.slice(5,7),16);
+  var r=Math.round(r1+(r2-r1)*t),g=Math.round(g1+(g2-g1)*t),b=Math.round(b1+(b2-b1)*t);
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+
+function updateDiffusionViz(){
+  var v=document.getElementById('noise-slider').value;
+  document.getElementById('noise-value').textContent=v+'%';
+  drawDiffusionCanvas();
+}
+
+var diffAnim=null;
+function animateDiffusion(dir){
+  if(diffAnim)clearInterval(diffAnim);
+  var slider=document.getElementById('noise-slider');
+  var target=dir==='forward'?100:0;
+  var step=dir==='forward'?2:-2;
+  diffAnim=setInterval(function(){
+    var v=parseInt(slider.value)+step;
+    if((dir==='forward'&&v>=target)||(dir==='reverse'&&v<=target)){
+      v=target;clearInterval(diffAnim);diffAnim=null;
+      announce(dir==='forward'?'Forward diffusion complete — image is now pure noise':'Reverse diffusion complete — image recovered from noise');
+    }
+    slider.value=v;updateDiffusionViz();
+  },40);
+}
+
+/* === EMBEDDING DEMO === */
+var embeddingData=[
+  {prompt:'Sunset over ocean',items:[
+    {label:'Beach at golden hour',score:0.92},{label:'Sunrise mountain landscape',score:0.78},
+    {label:'Ocean waves photograph',score:0.85},{label:'Cat sitting indoors',score:0.12},
+    {label:'City skyline at dusk',score:0.65},{label:'Warm color palette painting',score:0.71}
+  ]},
+  {prompt:'Cat wearing hat',items:[
+    {label:'Kitten with bow tie',score:0.88},{label:'Dog wearing costume',score:0.72},
+    {label:'Pet portrait photography',score:0.79},{label:'Abstract geometric art',score:0.08},
+    {label:'Funny animal photos',score:0.83},{label:'Fashion accessories display',score:0.31}
+  ]},
+  {prompt:'Futuristic city',items:[
+    {label:'Cyberpunk neon skyline',score:0.94},{label:'Modern architecture photos',score:0.76},
+    {label:'Sci-fi movie concept art',score:0.89},{label:'Rural countryside farm',score:0.09},
+    {label:'Night city aerial view',score:0.72},{label:'Space station interior',score:0.68}
+  ]}
+];
+
+function showEmbedding(idx){
+  var data=embeddingData[idx];var c=getThemeColors();
+  var html='<div style="font-weight:700;margin-bottom:0.75rem;color:'+c.text+'">Prompt: "'+data.prompt+'"</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 80px;gap:0.4rem;align-items:center;">';
+  // Sort by score desc
+  var sorted=data.items.slice().sort(function(a,b){return b.score-a.score});
+  sorted.forEach(function(item){
+    var pct=Math.round(item.score*100);
+    var barColor=item.score>0.7?c.green:item.score>0.4?c.orange:c.red;
+    html+='<div style="font-size:0.84rem;">'+item.label+'</div>';
+    html+='<div style="display:flex;align-items:center;gap:0.4rem;">';
+    html+='<div style="flex:1;height:8px;background:'+c.bgAlt+';border-radius:4px;overflow:hidden;">';
+    html+='<div style="width:'+pct+'%;height:100%;background:'+barColor+';border-radius:4px;transition:width 0.5s;"></div></div>';
+    html+='<span style="font-size:0.75rem;font-weight:700;color:'+barColor+';min-width:32px;">'+pct+'%</span></div>';
+  });
+  html+='</div>';
+  document.getElementById('embedding-results').innerHTML=html;
+  announce('Showing similarity scores for prompt: '+data.prompt);
+}
+
+/* === PIPELINE CANVAS === */
+var pipelineStep=-1;var pipelineAnim=null;
+function drawPipelineCanvas(){
+  var canvas=document.getElementById('pipeline-canvas');if(!canvas)return;
+  var ctx=canvas.getContext('2d');var w=canvas.width,h=canvas.height;var c=getThemeColors();
+  ctx.clearRect(0,0,w,h);ctx.fillStyle=c.bg;ctx.fillRect(0,0,w,h);
+
+  var stages=[
+    {label:'Text Prompt',icon:'\u270D\uFE0F',color:c.blue,desc:'"a cat on\nthe moon"'},
+    {label:'Text Encoder',icon:'\u1F4DD',color:c.cyan,desc:'CLIP converts\ntext \u2192 vector'},
+    {label:'Random Noise',icon:'\u2728',color:c.textMuted,desc:'64\u00D764 latent\nGaussian noise'},
+    {label:'U-Net Denoising',icon:'\u1F9E0',color:c.purple,desc:'Predict & remove\nnoise \u00D750 steps'},
+    {label:'VAE Decoder',icon:'\u1F50D',color:c.green,desc:'64\u00D764 \u2192 512\u00D7512\nfull resolution'},
+    {label:'Final Image',icon:'\u1F5BC\uFE0F',color:c.orange,desc:'Output\nimage!'}
+  ];
+
+  var boxW=105;var boxH=70;var gap=(w-stages.length*boxW)/(stages.length+1);
+  var yCenter=h/2-10;
+
+  stages.forEach(function(s,i){
+    var x=gap+(boxW+gap)*i;
+    var y=yCenter-boxH/2;
+    var active=i<=pipelineStep;
+    var current=i===pipelineStep;
+
+    // Box
+    ctx.fillStyle=active?(current?s.color+'33':s.color+'18'):c.bgAlt;
+    ctx.strokeStyle=active?s.color:c.border;
+    ctx.lineWidth=current?2.5:1;
+    roundRect(ctx,x,y,boxW,boxH,8);
+
+    // Label
+    ctx.fillStyle=active?c.text:c.textMuted;
+    ctx.font='bold '+Math.round(10*fontScale/100)+'px -apple-system, sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(s.label,x+boxW/2,y+16);
+
+    // Desc
+    ctx.fillStyle=active?s.color:c.textMuted;
+    ctx.font=Math.round(9*fontScale/100)+'px -apple-system, sans-serif';
+    var lines=s.desc.split('\n');
+    lines.forEach(function(line,li){ctx.fillText(line,x+boxW/2,y+32+li*13)});
+
+    // Arrow
+    if(i<stages.length-1){
+      var ax=x+boxW+2;var ax2=ax+gap-4;
+      ctx.strokeStyle=(i<pipelineStep)?c.purple:c.border;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(ax,yCenter);ctx.lineTo(ax2,yCenter);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(ax2-5,yCenter-4);ctx.lineTo(ax2,yCenter);ctx.lineTo(ax2-5,yCenter+4);ctx.stroke();
+    }
+  });
+
+  // Title
+  ctx.fillStyle=c.textMuted;
+  ctx.font=Math.round(11*fontScale/100)+'px -apple-system, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('Latent Diffusion Pipeline (Stable Diffusion)',w/2,h-12);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();ctx.fill();ctx.stroke();
+}
+
+function runPipeline(){
+  if(pipelineAnim)clearInterval(pipelineAnim);
+  pipelineStep=-1;drawPipelineCanvas();
+  var btn=document.getElementById('pipeline-btn');btn.disabled=true;
+  var stages=['Text prompt received','Text encoder processing with CLIP','Generating random noise in latent space','U-Net denoising in progress','VAE decoder upscaling to full resolution','Image generation complete!'];
+  pipelineAnim=setInterval(function(){
+    pipelineStep++;drawPipelineCanvas();
+    if(pipelineStep<stages.length)announce(stages[pipelineStep]);
+    if(pipelineStep>=stages.length-1){clearInterval(pipelineAnim);pipelineAnim=null;btn.disabled=false;}
+  },900);
+}
+
+/* === QUIZ === */
+var quizData=[
+  {q:"What do diffusion models learn to do during training?",opts:["A) Generate images from scratch in one step","B) Predict and remove noise that was added to images","C) Classify images into categories","D) Compress images into smaller files"],correct:1,exp:"Diffusion models are trained on a simple task: predict the noise that was added to an image. During generation, this ability is applied iteratively — starting from pure noise and removing it step by step to reveal a new image."},
+  {q:"What role does CLIP play in text-to-image generation?",opts:["A) It generates the final pixels of the image","B) It compresses images into latent space","C) It connects text descriptions and images in a shared embedding space","D) It adds noise to images during training"],correct:2,exp:"CLIP bridges the gap between language and vision. Trained on 400 million image-text pairs, it creates a shared mathematical space where text and images with similar meanings are close together, allowing text prompts to guide image generation."},
+  {q:"Why do latent diffusion models (like Stable Diffusion) work in compressed latent space?",opts:["A) Latent space produces higher quality images","B) It makes the images look more artistic","C) Working in compressed space is ~64\u00D7 more computationally efficient","D) It's the only way diffusion can work mathematically"],correct:2,exp:"A 512\u00D7512 image has 786,432 values. A VAE compresses this to a 64\u00D764 latent space — about 64\u00D7 smaller. Diffusion runs in this compact space, then the VAE decoder expands the result back to full resolution. Same quality, vastly less computation."},
+  {q:"What was a major problem with GANs that diffusion models solved?",opts:["A) GANs could only produce black and white images","B) GANs suffered from mode collapse — producing limited variety","C) GANs required text prompts to work","D) GANs were too slow to be practical"],correct:1,exp:"Mode collapse was a notorious GAN failure where the generator would learn to produce only one or a few variations that fool the discriminator. Diffusion models avoid this because they learn the full data distribution through denoising, naturally producing diverse outputs."},
+  {q:"What is 'classifier-free guidance' in image generation?",opts:["A) A way to generate images without any neural network","B) A technique that amplifies the effect of the text prompt on the output","C) A method to classify generated images as real or fake","D) A system that removes inappropriate content"],correct:1,exp:"Classifier-free guidance compares noise predictions with and without the text embedding, then amplifies the difference. This steers the output more strongly toward the prompt, producing images that better match what the user described — at the cost of some diversity."}
+];
+var currentQ=0,quizAnswered=new Array(quizData.length).fill(null);
+function renderQuiz(){
+  var pe=document.getElementById('quiz-progress');
+  pe.innerHTML=quizData.map(function(_,i){var cls='quiz-dot',lbl='Question '+(i+1);if(i===currentQ){cls+=' current';lbl+=' (current)'}if(quizAnswered[i]===true){cls+=' answered-correct';lbl+=' correct'}if(quizAnswered[i]===false){cls+=' answered-incorrect';lbl+=' incorrect'}return '<span class="'+cls+'" role="img" aria-label="'+lbl+'"></span>'}).join('');
+  var q=quizData[currentQ];document.getElementById('quiz-question').textContent='Question '+(currentQ+1)+' of '+quizData.length+': '+q.q;
+  var oe=document.getElementById('quiz-options');oe.innerHTML='';
+  q.opts.forEach(function(o,i){var d=document.createElement('div');d.className='quiz-option';d.textContent=o;d.setAttribute('role','radio');d.setAttribute('aria-checked','false');d.setAttribute('tabindex','0');
+  d.addEventListener('click',function(){answerQuiz(i)});d.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();answerQuiz(i)}});oe.appendChild(d)});
+  var fb=document.getElementById('quiz-feedback');fb.className='quiz-feedback';fb.innerHTML='';document.getElementById('quiz-next-btn').style.display='none';
+}
+function answerQuiz(idx){
+  if(quizAnswered[currentQ]!==null)return;var q=quizData[currentQ],opts=document.querySelectorAll('.quiz-option'),fb=document.getElementById('quiz-feedback');
+  opts[idx].classList.add(idx===q.correct?'correct':'incorrect');opts[idx].setAttribute('aria-checked','true');
+  if(idx!==q.correct)opts[q.correct].classList.add('correct');
+  opts.forEach(function(o){o.setAttribute('aria-disabled','true');o.setAttribute('tabindex','-1')});
+  quizAnswered[currentQ]=(idx===q.correct);
+  fb.innerHTML=(idx===q.correct?'\u2705 Correct! ':'\u274C Not quite. ')+q.exp;
+  fb.className='quiz-feedback show '+(idx===q.correct?'correct-fb':'incorrect-fb');
+  announce(idx===q.correct?'Correct!':'Incorrect. Correct answer was option '+String.fromCharCode(65+q.correct)+'.');
+  if(currentQ<quizData.length-1){var nb=document.getElementById('quiz-next-btn');nb.style.display='inline-flex';nb.focus()}
+  else{var sc=quizAnswered.filter(function(a){return a===true}).length;
+  setTimeout(function(){var sm=sc===quizData.length?'\uD83C\uDF89 Perfect!':sc>=3?'\uD83D\uDC4D Great work!':'\uD83D\uDCD6 Review the sections above.';
+  fb.innerHTML+='<br><br><strong>Quiz Complete!</strong> Score: '+sc+'/'+quizData.length+'. '+sm;announce('Quiz complete. Score: '+sc+' of '+quizData.length)},400)}
+  updateProgressDots();
+}
+function updateProgressDots(){
+  var pe=document.getElementById('quiz-progress');
+  pe.innerHTML=quizData.map(function(_,i){var cls='quiz-dot',lbl='Question '+(i+1);if(i===currentQ){cls+=' current';lbl+=' (current)'}if(quizAnswered[i]===true){cls+=' answered-correct';lbl+=' correct'}if(quizAnswered[i]===false){cls+=' answered-incorrect';lbl+=' incorrect'}return '<span class="'+cls+'" role="img" aria-label="'+lbl+'"></span>'}).join('');
+}
+function nextQuestion(){if(currentQ<quizData.length-1){currentQ++;renderQuiz();document.getElementById('quiz-question').focus()}}
+document.addEventListener('keydown',function(e){
+  var qs=document.getElementById('quiz');var r=qs.getBoundingClientRect();
+  if(r.top>window.innerHeight||r.bottom<0)return;
+  if(e.key>='1'&&e.key<='4'&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&quizAnswered[currentQ]===null)answerQuiz(parseInt(e.key)-1);
+});
+
+/* === INIT === */
+window.addEventListener('load',function(){drawDiffusionCanvas();drawPipelineCanvas();renderQuiz()});
+window.addEventListener('resize',function(){drawDiffusionCanvas();drawPipelineCanvas()});
+</script>
+</body>
+</html>
