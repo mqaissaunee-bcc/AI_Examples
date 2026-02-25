@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML Previewer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --border: #2a2a32;
+    --accent: #e8ff47;
+    --accent-dim: rgba(232,255,71,0.12);
+    --text: #e8e8f0;
+    --muted: #666680;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+  }
+
+  header .tag {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid rgba(232,255,71,0.3);
+    padding: 2px 8px;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    align-items: center;
+  }
+
+  button {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  button:hover { border-color: var(--accent); color: var(--accent); }
+
+  button.primary {
+    background: var(--accent);
+    color: #0d0d0f;
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+
+  button.primary:hover { background: #d4ea2e; border-color: #d4ea2e; color: #0d0d0f; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .pane + .pane {
+    border-left: 1px solid var(--border);
+  }
+
+  .pane-header {
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .pane-header .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.6;
+  }
+
+  textarea {
+    flex: 1;
+    background: var(--bg);
+    color: var(--text);
+    border: none;
+    outline: none;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    line-height: 1.7;
+    padding: 20px;
+    resize: none;
+    tab-size: 2;
+  }
+
+  textarea::placeholder { color: var(--muted); }
+
+  iframe {
+    flex: 1;
+    border: none;
+    background: #fff;
+  }
+
+  .status-bar {
+    padding: 6px 24px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-shrink: 0;
+  }
+
+  .status-bar .indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .status-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+
+  .status-dot.ready { background: var(--accent); }
+
+  #char-count { margin-left: auto; }
+
+  /* Save modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 28px 32px;
+    min-width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .modal h2 {
+    font-family: var(--sans);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .modal label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .modal input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .modal input[type="text"]:focus { border-color: var(--accent); }
+
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+  #file-input { display: none; }
+
+  @media (max-width: 700px) {
+    .workspace { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    .pane + .pane { border-left: none; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>HTML Previewer</h1>
+  <span class="tag">LIVE</span>
+  <div class="toolbar">
+    <button onclick="openFile()">Open</button>
+    <button onclick="saveFile()">Save</button>
+    <button onclick="clearEditor()">Clear</button>
+    <button onclick="copyCode()">Copy</button>
+    <button class="primary" onclick="renderPreview()">▶ Run</button>
+  </div>
+</header>
+
+<!-- Hidden file input for Open -->
+<input type="file" id="file-input" accept=".html,.htm,.txt" onchange="handleFileOpen(event)">
+
+<!-- Save modal -->
+<div class="modal-overlay" id="save-modal" onclick="closeSaveModal(event)">
+  <div class="modal">
+    <h2>Save File</h2>
+    <div>
+      <label for="save-name">Filename</label>
+      <input type="text" id="save-name" placeholder="my-page.html" onkeydown="saveName_keydown(event)">
+    </div>
+    <div class="modal-actions">
+      <button onclick="closeSaveModal()">Cancel</button>
+      <button class="primary" onclick="confirmSave()">Download</button>
+    </div>
+  </div>
+</div>
+
+<div class="workspace">
+  <div class="pane">
+    <div class="pane-header"><span class="dot"></span>HTML / CSS / JS</div>
+    <textarea id="editor" spellcheck="false" placeholder="Paste your HTML here...&#10;&#10;Supports inline CSS and JavaScript.&#10;Press Ctrl+Enter or click Run to preview."
+      oninput="updateCount()" onkeydown="handleKey(event)"></textarea>
+  </div>
+  <div class="pane">
+    <div class="pane-header"><span class="dot"></span>Preview</div>
+    <iframe id="preview" sandbox="allow-scripts allow-same-origin allow-forms" title="HTML Preview"></iframe>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="indicator">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text">Ready</span>
+  </div>
+  <span id="char-count">0 chars</span>
+</div>
+
+<script>
+  const editor = document.getElementById('editor');
+  const preview = document.getElementById('preview');
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const charCount = document.getElementById('char-count');
+
+  function renderPreview() {
+    const code = editor.value.trim();
+    if (!code) {
+      setStatus('No content to render', false);
+      return;
+    }
+    try {
+      const doc = preview.contentDocument || preview.contentWindow.document;
+      doc.open();
+      doc.write(code);
+      doc.close();
+      setStatus('Rendered', true);
+    } catch (e) {
+      setStatus('Error: ' + e.message, false);
+    }
+  }
+
+  function clearEditor() {
+    editor.value = '';
+    const doc = preview.contentDocument || preview.contentWindow.document;
+    doc.open(); doc.write(''); doc.close();
+    updateCount();
+    setStatus('Cleared', false);
+  }
+
+  function copyCode() {
+    navigator.clipboard.writeText(editor.value).then(() => setStatus('Copied!', true));
+  }
+
+  // --- Open ---
+  function openFile() {
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-input').click();
+  }
+
+  function handleFileOpen(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      editor.value = ev.target.result;
+      updateCount();
+      setStatus('Opened: ' + file.name, true);
+      renderPreview();
+    };
+    reader.readAsText(file);
+  }
+
+  // --- Save ---
+  function saveFile() {
+    const nameInput = document.getElementById('save-name');
+    nameInput.value = currentFilename || 'index.html';
+    document.getElementById('save-modal').classList.add('open');
+    setTimeout(() => { nameInput.focus(); nameInput.select(); }, 50);
+  }
+
+  function closeSaveModal(e) {
+    if (e && e.target !== document.getElementById('save-modal')) return;
+    document.getElementById('save-modal').classList.remove('open');
+  }
+
+  function saveName_keydown(e) {
+    if (e.key === 'Enter') confirmSave();
+    if (e.key === 'Escape') document.getElementById('save-modal').classList.remove('open');
+  }
+
+  function confirmSave() {
+    let name = document.getElementById('save-name').value.trim() || 'index.html';
+    if (!name.match(/\.(html?|txt)$/i)) name += '.html';
+    currentFilename = name;
+    const blob = new Blob([editor.value], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+    document.getElementById('save-modal').classList.remove('open');
+    setStatus('Saved: ' + name, true);
+  }
+
+  let currentFilename = 'index.html';
+
+  function handleKey(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      renderPreview();
+    }
+    // Tab support
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = editor.selectionStart, end = editor.selectionEnd;
+      editor.value = editor.value.substring(0, s) + '  ' + editor.value.substring(end);
+      editor.selectionStart = editor.selectionEnd = s + 2;
+    }
+  }
+
+  function updateCount() {
+    const n = editor.value.length;
+    charCount.textContent = n.toLocaleString() + ' char' + (n !== 1 ? 's' : '');
+  }
+
+  function setStatus(msg, good) {
+    statusText.textContent = msg;
+    statusDot.className = 'status-dot' + (good ? ' ready' : '');
+    if (good) setTimeout(() => { statusText.textContent = 'Ready'; statusDot.className = 'status-dot ready'; }, 2000);
+  }
+
+  // Init
+  updateCount();
+</script>
+</body>
+</html>
