@@ -158,8 +158,14 @@ button.icon-btn { padding: 5px 9px; font-size: 0.85rem; line-height: 1; }
 }
 
 /* Initial 50/50 split */
-#pane-editor  { flex: 0 0 50%; width: 50%; }
+#pane-editor  { flex: 0 0 50%; width: 50%; transition: width 0.25s ease, min-width 0.25s ease; overflow: hidden; }
 #pane-preview { flex: 1 1 auto; }
+
+/* Editor hidden state */
+#pane-editor.hidden { flex: 0 0 0 !important; width: 0 !important; min-width: 0 !important; }
+#divider.editor-hidden { display: none; }
+
+button.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 
 .pane {
   display: flex;
@@ -427,6 +433,7 @@ iframe { flex: 1; border: none; background: #fff; }
     <button onclick="clearEditor()">Clear</button>
     <button onclick="copyCode()">Copy</button>
     <div class="toolbar-sep"></div>
+    <button id="toggle-btn" class="icon-btn" onclick="toggleEditor()" title="Show/hide editor">&#10092;&#10093;</button>
     <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
     <div class="toolbar-sep"></div>
     <button class="primary" onclick="renderPreview()">&#9654; Run</button>
@@ -890,6 +897,41 @@ function cssColorToHex(color) {
   const m = color.match(/\d+/g);
   if (!m) return '#000000';
   return '#' + m.slice(0,3).map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+}
+
+// ── Editor toggle ──────────────────────────────────────────────────────────
+let editorVisible = true;
+let savedEditorWidth = null;
+
+function toggleEditor() {
+  const editorPane = document.getElementById('pane-editor');
+  const divider    = document.getElementById('divider');
+  const btn        = document.getElementById('toggle-btn');
+
+  if (editorVisible) {
+    // Save current width before hiding
+    savedEditorWidth = editorPane.getBoundingClientRect().width;
+    editorPane.classList.add('hidden');
+    divider.classList.add('editor-hidden');
+    btn.classList.add('active');
+    btn.title = 'Show editor';
+    editorVisible = false;
+  } else {
+    editorPane.classList.remove('hidden');
+    divider.classList.remove('editor-hidden');
+    btn.classList.remove('active');
+    btn.title = 'Hide editor';
+    // Restore saved width or fall back to 50%
+    if (savedEditorWidth) {
+      editorPane.style.flex  = 'none';
+      editorPane.style.width = savedEditorWidth + 'px';
+    } else {
+      editorPane.style.flex  = '0 0 50%';
+      editorPane.style.width = '50%';
+    }
+    editorVisible = true;
+    cm.focus();
+  }
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
