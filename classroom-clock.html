@@ -550,6 +550,156 @@
             margin-top: 0;
         }
 
+        /* Quick Add Input */
+        .quick-add-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .quick-add-input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid var(--accent-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .quick-add-input:focus {
+            outline: none;
+            border-color: var(--safe-color);
+            box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.1);
+        }
+
+        .quick-add-btn {
+            padding: 10px 20px;
+            background: var(--safe-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .quick-add-btn:hover {
+            background-color: #229954;
+            transform: scale(1.05);
+        }
+
+        .bulk-add-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: var(--accent-color);
+            cursor: pointer;
+            font-size: 0.95rem;
+            text-decoration: underline;
+        }
+
+        .bulk-add-link:hover {
+            opacity: 0.8;
+        }
+
+        /* Bulk Add Modal */
+        .bulk-add-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2002;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .bulk-add-modal.active {
+            display: flex;
+        }
+
+        .bulk-add-content {
+            background: var(--panel-bg);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .bulk-add-content h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--accent-color);
+        }
+
+        .bulk-add-textarea {
+            width: 100%;
+            min-height: 300px;
+            padding: 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            background: var(--bg-color);
+            color: var(--text-color);
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+
+        .bulk-add-textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .bulk-add-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .bulk-add-submit {
+            flex: 1;
+            padding: 12px 20px;
+            background: var(--safe-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .bulk-add-submit:hover {
+            background-color: #229954;
+        }
+
+        .bulk-add-cancel {
+            flex: 1;
+            padding: 12px 20px;
+            background: var(--bg-color);
+            color: var(--text-color);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .bulk-add-cancel:hover {
+            border-color: var(--accent-color);
+        }
+
+        .bulk-add-hint {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 10px;
+        }
+
         /* World Clock Section */
         .world-clocks-section {
             margin-top: 40px;
@@ -1256,6 +1406,22 @@
         <button class="timer-alert-btn" onclick="dismissAlert()">OK</button>
     </div>
 
+    <!-- Bulk Add Tasks Modal -->
+    <div class="bulk-add-modal" id="bulkAddModal">
+        <div class="bulk-add-content">
+            <h3>📝 Bulk Add Tasks</h3>
+            <p class="bulk-add-hint">Enter one task per line. Empty lines will be ignored.</p>
+            <textarea 
+                id="bulkAddTextarea" 
+                class="bulk-add-textarea" 
+                placeholder="Grade homework&#10;Email students about lab&#10;Update Canvas module&#10;Prepare demo for next class&#10;Order lab equipment"></textarea>
+            <div class="bulk-add-buttons">
+                <button class="bulk-add-submit" onclick="submitBulkAdd()">Add All Tasks</button>
+                <button class="bulk-add-cancel" onclick="closeBulkAddModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Panel -->
     <div class="settings-panel" id="settingsPanel">
         <h2>
@@ -1368,6 +1534,19 @@
 
             <div id="todoSettings" class="hidden">
                 <label style="margin-top: 15px; display: block;">To-Do List</label>
+                
+                <!-- Quick Add -->
+                <div class="quick-add-container">
+                    <input type="text" 
+                           id="quickAddInput" 
+                           class="quick-add-input" 
+                           placeholder="Quick add: Type a task and press Enter..."
+                           onkeypress="handleQuickAddKeypress(event)">
+                    <button class="quick-add-btn" onclick="quickAddTask()">+</button>
+                </div>
+                
+                <a class="bulk-add-link" onclick="openBulkAddModal()">📝 Bulk Add Tasks (one per line)</a>
+                
                 <div class="schedule-editor" id="todoEditor">
                     <!-- To-do items will be added here dynamically -->
                 </div>
@@ -2075,6 +2254,87 @@
             renderTodoEditor();
             updateScheduleDisplay();
         }
+
+        // Quick Add Task
+        function quickAddTask() {
+            const input = document.getElementById('quickAddInput');
+            const task = input.value.trim();
+            
+            if (!task) {
+                return; // Don't add empty tasks
+            }
+            
+            if (!settings.todo) {
+                settings.todo = [];
+            }
+            
+            settings.todo.push({ task: task, notes: '', completed: false });
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            renderTodoEditor();
+            updateScheduleDisplay();
+            
+            // Clear input and focus for next entry
+            input.value = '';
+            input.focus();
+        }
+
+        // Handle Enter key in quick add input
+        function handleQuickAddKeypress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                quickAddTask();
+            }
+        }
+
+        // Open bulk add modal
+        function openBulkAddModal() {
+            document.getElementById('bulkAddModal').classList.add('active');
+            document.getElementById('bulkAddTextarea').focus();
+        }
+
+        // Close bulk add modal
+        function closeBulkAddModal() {
+            document.getElementById('bulkAddModal').classList.remove('active');
+            document.getElementById('bulkAddTextarea').value = '';
+        }
+
+        // Submit bulk add tasks
+        function submitBulkAdd() {
+            const textarea = document.getElementById('bulkAddTextarea');
+            const lines = textarea.value.split('\n').filter(line => line.trim());
+            
+            if (lines.length === 0) {
+                alert('Please enter at least one task.');
+                return;
+            }
+            
+            if (!settings.todo) {
+                settings.todo = [];
+            }
+            
+            // Add each non-empty line as a task
+            lines.forEach(line => {
+                const trimmedLine = line.trim();
+                if (trimmedLine) {
+                    settings.todo.push({ task: trimmedLine, notes: '', completed: false });
+                }
+            });
+            
+            localStorage.setItem('clockSettings', JSON.stringify(settings));
+            renderTodoEditor();
+            updateScheduleDisplay();
+            
+            closeBulkAddModal();
+            alert(`✓ Added ${lines.length} tasks successfully!`);
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('bulkAddModal');
+            if (e.target === modal) {
+                closeBulkAddModal();
+            }
+        });
 
         function removeTodoItem(index) {
             settings.todo.splice(index, 1);
