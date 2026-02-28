@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>When Is It Art? — An Interactive Timeline of Controversial Art</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap');
+
+  /* ── CSS Variables ── */
+  :root {
+    --bg: #F5F3EE;
+    --bg-warm: #EFECE5;
+    --surface: #FFFFFF;
+    --surface-hover: #FAFAF8;
+    --ink: #2B2B2B;
+    --ink-light: #5A5A5A;
+    --ink-muted: #8A8A8A;
+    --accent: #336699;
+    --accent-dark: #264D80;
+    --accent-light: #D6E4F0;
+    --accent-glow: rgba(51, 102, 153, 0.12);
+    --border: #D5D0C8;
+    --border-light: #E8E4DC;
+    --timeline-line: #B0AAA0;
+    --marker-size: 18px;
+    --panel-radius: 10px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --font-display: 'DM Serif Display', Georgia, 'Times New Roman', serif;
+    --font-body: 'Source Sans 3', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+    /* Era colors */
+    --era-classical: #7A6B5D;
+    --era-modern: #336699;
+    --era-contemporary: #6B5B8D;
+    --era-digital: #2D7D6B;
+  }
+
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.65;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* ── Focus Styles (Accessibility) ── */
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* ── Skip Link ── */
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 1rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    border-radius: 0 0 8px 8px;
+    z-index: 1000;
+    text-decoration: none;
+    transition: top 0.2s;
+  }
+  .skip-link:focus { top: 0; }
+
+  /* ── Page Header ── */
+  .page-header {
+    background: linear-gradient(175deg, #2B3A4E 0%, #1A2636 100%);
+    color: #fff;
+    padding: 3rem 2rem 2.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .page-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+  .page-header h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 400;
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.01em;
+    position: relative;
+  }
+  .page-header h1 em {
+    font-style: italic;
+    color: #9CC;
+  }
+  .page-header .subtitle {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.7);
+    max-width: 680px;
+    margin: 0.75rem auto 0;
+    font-weight: 300;
+    line-height: 1.6;
+  }
+  .badge {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.3rem 1rem;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 100px;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.65);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* ── Container ── */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  /* ── Intro Section ── */
+  .intro-section {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: var(--panel-radius);
+    padding: 2rem 2.25rem;
+    margin: 2rem auto;
+    max-width: 960px;
+    box-shadow: var(--shadow-sm);
+  }
+  .intro-section h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--ink);
+  }
+  .intro-section p {
+    color: var(--ink-light);
+    font-size: 1rem;
+    line-height: 1.7;
+    margin-bottom: 0.75rem;
+  }
+  .intro-section p:last-child { margin-bottom: 0; }
+
+  /* ── Video Section ── */
+  .video-section {
+    max-width: 960px;
+    margin: 0 auto 2rem;
+    padding: 0 1.5rem;
+  }
+  .video-wrapper {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: var(--panel-radius);
+    padding: 1.75rem 2.25rem;
+    box-shadow: var(--shadow-sm);
+  }
+  .video-wrapper h2 {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    margin-bottom: 0.5rem;
+  }
+  .video-wrapper p {
+    color: var(--ink-light);
+    font-size: 0.95rem;
+    margin-bottom: 1.25rem;
+  }
+  .video-embed {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .video-embed iframe {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border: 0;
+  }
+
+  /* ── Filter Bar ── */
+  .filter-bar {
+    max-width: 960px;
+    margin: 0 auto 1.5rem;
+    padding: 0 1.5rem;
+  }
+  .filter-bar fieldset {
+    border: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .filter-bar legend {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--ink-light);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    width: 100%;
+  }
+  .filter-btn {
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 0.5rem 1.15rem;
+    border: 2px solid var(--border);
+    border-radius: 100px;
+    background: var(--surface);
+    color: var(--ink-light);
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+  }
+  .filter-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+  }
+  .filter-btn[aria-pressed="true"] {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .filter-btn[aria-pressed="true"]:hover {
+    background: var(--accent-dark);
+    border-color: var(--accent-dark);
+  }
+
+  /* ── Timeline ── */
+  .timeline-section {
+    max-width: 960px;
+    margin: 0 auto 3rem;
+    padding: 0 1.5rem;
+  }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  .timeline {
+    position: relative;
+    padding: 1rem 0 2rem 3rem;
+  }
+  /* Vertical line */
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--timeline-line);
+    border-radius: 3px;
+  }
+
+  /* ── Timeline Event Card ── */
+  .timeline-event {
+    position: relative;
+    margin-bottom: 1.25rem;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.4s ease, transform 0.4s ease, max-height 0.5s ease;
+  }
+  .timeline-event.entering {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  .timeline-event[hidden] { display: none; }
+
+  /* Marker dot */
+  .timeline-event::before {
+    content: '';
+    position: absolute;
+    left: -3rem;
+    top: 1.5rem;
+    width: var(--marker-size);
+    height: var(--marker-size);
+    border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--timeline-line);
+    transition: var(--transition);
+    z-index: 2;
+  }
+  .timeline-event[data-era="classical"]::before { border-color: var(--era-classical); }
+  .timeline-event[data-era="modern"]::before { border-color: var(--era-modern); }
+  .timeline-event[data-era="contemporary"]::before { border-color: var(--era-contemporary); }
+  .timeline-event[data-era="digital"]::before { border-color: var(--era-digital); }
+
+  .timeline-event[aria-expanded="true"]::before,
+  .timeline-event:hover::before {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-glow);
+  }
+
+  .event-card {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: var(--panel-radius);
+    padding: 1.25rem 1.75rem;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+  }
+  .event-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-md);
+    transform: translateX(4px);
+  }
+  .timeline-event[aria-expanded="true"] .event-card {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-md);
+    background: var(--surface-hover);
+  }
+
+  .event-year {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    margin-bottom: 0.15rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .era-tag {
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.6rem;
+    border-radius: 100px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  [data-era="classical"] .era-tag { background: rgba(122,107,93,0.12); color: var(--era-classical); }
+  [data-era="modern"] .era-tag { background: rgba(51,102,153,0.12); color: var(--era-modern); }
+  [data-era="contemporary"] .era-tag { background: rgba(107,91,141,0.12); color: var(--era-contemporary); }
+  [data-era="digital"] .era-tag { background: rgba(45,125,107,0.12); color: var(--era-digital); }
+
+  .event-title {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    margin: 0.2rem 0 0.35rem;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .event-summary {
+    color: var(--ink-light);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+  .expand-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.6rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--accent);
+    transition: var(--transition);
+  }
+  .expand-hint .arrow {
+    display: inline-block;
+    transition: transform 0.3s ease;
+    font-size: 1rem;
+  }
+  .timeline-event[aria-expanded="true"] .expand-hint .arrow {
+    transform: rotate(90deg);
+  }
+
+  /* ── Detail Panel ── */
+  .detail-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    opacity: 0;
+  }
+  .detail-panel.open {
+    opacity: 1;
+  }
+  .detail-inner {
+    padding: 1.5rem 1.75rem;
+    background: linear-gradient(to bottom, var(--accent-glow), transparent);
+    border-top: 2px solid var(--accent-light);
+    border-radius: 0 0 var(--panel-radius) var(--panel-radius);
+  }
+  .detail-inner h4 {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    margin-bottom: 0.6rem;
+    color: var(--ink);
+  }
+  .detail-text {
+    color: var(--ink-light);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    margin-bottom: 1.25rem;
+  }
+  .reflection-box {
+    background: var(--surface);
+    border: 1px solid var(--accent-light);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+  }
+  .reflection-box .label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    margin-bottom: 0.3rem;
+  }
+  .reflection-box p {
+    color: var(--ink);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    font-style: italic;
+  }
+
+  /* ── Footer ── */
+  .page-footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border-light);
+    margin-top: 1rem;
+  }
+  .page-footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .page-footer a:hover { text-decoration: underline; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .page-header { padding: 2rem 1.25rem 1.75rem; }
+    .page-header h1 { font-size: 1.75rem; }
+    .intro-section, .video-wrapper { padding: 1.5rem; }
+    .timeline { padding-left: 2.25rem; }
+    .timeline-event::before { left: -2.25rem; width: 14px; height: 14px; }
+    .event-card { padding: 1rem 1.25rem; }
+    .event-title { font-size: 1.15rem; }
+    .detail-inner { padding: 1.25rem; }
+    .filter-bar fieldset { gap: 0.35rem; }
+    .filter-btn { font-size: 0.8rem; padding: 0.4rem 0.9rem; }
+  }
+
+  /* ── Print ── */
+  @media print {
+    .filter-bar, .video-section, .skip-link, .expand-hint { display: none; }
+    .detail-panel { max-height: none !important; opacity: 1 !important; }
+    .event-card { box-shadow: none; border: 1px solid #ccc; }
+    .page-header { background: #333; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<a href="#timeline" class="skip-link">Skip to timeline</a>
+
+<!-- ════════ HEADER ════════ -->
+<header class="page-header" role="banner">
+  <h1>When Is It <em>Art</em>?</h1>
+  <p class="subtitle">
+    From Impressionism to AI-generated images, explore the moments that made people ask:
+    "But is it really art?" A timeline of controversy, creativity, and changing definitions.
+  </p>
+  <span class="badge">Interactive Timeline</span>
+</header>
+
+<!-- ════════ INTRO ════════ -->
+<section class="intro-section container" aria-labelledby="intro-heading">
+  <h2 id="intro-heading">How to Use This Timeline</h2>
+  <p>
+    Throughout history, new art movements have shocked audiences and sparked heated debates. Works we celebrate in museums today were once ridiculed, rejected, or dismissed as "not real art." This timeline highlights key moments when artistic boundaries were pushed — and sometimes broken.
+  </p>
+  <p>
+    <strong>Click or tap any event</strong> to read a deeper explanation and a reflection question you can discuss with classmates or think about on your own. Use the <strong>filter buttons</strong> below to focus on a specific era. All events are arranged chronologically from top to bottom.
+  </p>
+</section>
+
+<!-- ════════ VIDEO ════════ -->
+<section class="video-section" aria-labelledby="video-heading">
+  <div class="video-wrapper">
+    <h2 id="video-heading">Watch: The AI Art Debate</h2>
+    <p>This short video explores the recent controversy around AI-generated art and what it means for creativity. Watch before or after exploring the timeline.</p>
+    <div class="video-embed">
+      <iframe
+        src="https://www.youtube.com/embed/9LPV-hb1CKU?start=65"
+        title="Video: The AI Art Debate — explores the controversy around AI-generated art"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen
+        loading="lazy"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ FILTERS ════════ -->
+<nav class="filter-bar" aria-label="Filter timeline events by era">
+  <fieldset>
+    <legend>Filter by Era</legend>
+    <button class="filter-btn" aria-pressed="true" data-filter="all">All Eras</button>
+    <button class="filter-btn" aria-pressed="false" data-filter="classical">Pre-Modern</button>
+    <button class="filter-btn" aria-pressed="false" data-filter="modern">Early Modern</button>
+    <button class="filter-btn" aria-pressed="false" data-filter="contemporary">Contemporary</button>
+    <button class="filter-btn" aria-pressed="false" data-filter="digital">Digital &amp; AI</button>
+  </fieldset>
+</nav>
+
+<!-- ════════ TIMELINE ════════ -->
+<main class="timeline-section" id="timeline">
+  <h2 class="sr-only">Timeline of Controversial Art Movements and Works</h2>
+  <div class="timeline" role="list" aria-label="Timeline events">
+
+    <!-- Event data is injected by JavaScript below -->
+
+  </div>
+</main>
+
+<!-- ════════ FOOTER ════════ -->
+<footer class="page-footer" role="contentinfo">
+  <p>Created for educational use. Content covers art history topics through an interdisciplinary lens.</p>
+  <p style="margin-top:0.35rem;">Accessibility: This page follows <a href="https://www.w3.org/WAI/standards-guidelines/wcag/" target="_blank" rel="noopener">WCAG 2.1 AA</a> guidelines. If you experience any issues, please contact your instructor.</p>
+</footer>
+
+<script>
+/* ──────────────────────────────────────────────────────────
+   EVENT DATA
+   ────────────────────────────────────────────────────────── */
+const events = [
+  {
+    id: "impressionism",
+    year: "1874",
+    era: "classical",
+    title: "Impressionism Scandalizes Paris",
+    summary: "Claude Monet, Pierre-Auguste Renoir, and others exhibited paintings with visible brushstrokes and everyday subjects at the Salon des Refusés. Critics called the work unfinished and sloppy — the name \"Impressionism\" started as an insult.",
+    detail: "In 1874, a group of painters organized their own exhibition after being repeatedly rejected by the official Paris Salon, the most prestigious art show in Europe. Monet's painting <em>Impression, Sunrise</em> was mocked by critic Louis Leroy, who used the word \"impression\" sarcastically to suggest the work was just a rough sketch. The Impressionists broke rules by painting outdoors (\"en plein air\" — meaning \"in open air\"), using quick, visible brushstrokes, and focusing on light and color instead of precise, realistic detail. Today, Impressionist paintings are among the most beloved and expensive artworks in the world — a dramatic reversal from their initial reception.",
+    question: "Think of a time something you created was criticized. Did the feedback change how you felt about your work, or did you stick with your vision? How might that experience connect to what the Impressionists went through?"
+  },
+  {
+    id: "fountain",
+    year: "1917",
+    era: "modern",
+    title: "Marcel Duchamp's \"Fountain\"",
+    summary: "Duchamp submitted a factory-made urinal signed \"R. Mutt\" to an art exhibition. The piece was rejected, but it became one of the most influential artworks of the 20th century, launching the concept of \"readymades\" — ordinary objects presented as art.",
+    detail: "Marcel Duchamp purchased a standard porcelain urinal from a plumbing supply store, turned it on its side, signed it \"R. Mutt 1917,\" and submitted it to the Society of Independent Artists exhibition in New York. The committee refused to display it, arguing a mass-produced toilet fixture could not be art. Duchamp's point was revolutionary: he argued that art is defined by the artist's choice and context, not by craftsmanship or traditional beauty. A <em>readymade</em> is an everyday manufactured object that an artist selects and designates as art. <em>Fountain</em> challenged centuries of assumptions about what art must look like and who gets to decide what counts as art — questions that remain central to debates about AI art today.",
+    question: "If choosing an object and calling it art makes it art, what does that say about the role of the artist? Is the idea behind a work more important than the skill used to make it?"
+  },
+  {
+    id: "abstract-expressionism",
+    year: "1940s–1950s",
+    era: "modern",
+    title: "Abstract Expressionism: \"My Kid Could Do That\"",
+    summary: "Jackson Pollock's drip paintings and Mark Rothko's color fields were dismissed by many as random messes or \"just paint on a canvas.\" Critics and the public asked: where is the skill? Where is the subject?",
+    detail: "Abstract Expressionism emerged in New York after World War II as the first major American art movement. Jackson Pollock famously placed canvases on the floor and dripped, poured, and flung paint onto them — a technique called \"action painting.\" Mark Rothko created enormous canvases of glowing, stacked rectangles meant to produce an emotional or even spiritual response. The common public reaction was (and often still is): \"A child could make that.\" But the artists argued that their work expressed deep inner emotions, rejected commercial illustration, and demanded a new way of seeing. Pollock's process was physically demanding, deeply intentional, and influenced by jazz improvisation and Native American sand painting. These works now sell for hundreds of millions of dollars.",
+    question: "When someone says \"my kid could paint that,\" what assumptions are they making about what art requires? Does difficulty or technical skill determine value in art — or in other fields you care about?"
+  },
+  {
+    id: "warhol",
+    year: "1962",
+    era: "contemporary",
+    title: "Andy Warhol's Soup Cans and Pop Art",
+    summary: "Warhol exhibited 32 paintings of Campbell's Soup cans. Critics asked whether copying a commercial product label counted as art or was just advertising. Pop Art blurred the line between \"high art\" and mass culture.",
+    detail: "When Andy Warhol displayed his <em>Campbell's Soup Cans</em> at the Ferus Gallery in Los Angeles in 1962, many people were confused or offended. The paintings were near-identical reproductions of soup can labels — hardly the unique, personal expression people expected from an artist. Warhol, who came from a commercial illustration background, intentionally challenged the boundary between fine art and consumer culture. <em>Pop Art</em> is an art movement that draws on imagery from advertising, comic books, and mass-produced goods. Warhol later used silkscreen printing to mass-produce portraits of celebrities like Marilyn Monroe, further asking: if art can be mechanically reproduced, what makes it special? This question directly parallels today's debates about AI-generated images.",
+    question: "Warhol mass-produced his art using industrial techniques. How is that similar to — or different from — using AI to generate hundreds of images from a text prompt?"
+  },
+  {
+    id: "performance",
+    year: "1960s–1970s",
+    era: "contemporary",
+    title: "Performance Art and Conceptual Art",
+    summary: "Artists like Yoko Ono and Marina Abramović used their own bodies, audience participation, and ideas as the artwork. With nothing to hang on a wall or sell, many questioned if these \"happenings\" qualified as art at all.",
+    detail: "Performance art and conceptual art pushed boundaries by declaring that the <em>idea</em> or <em>experience</em> is the artwork, not a physical object. Yoko Ono's 1964 piece <em>Cut Piece</em> invited audience members to cut away her clothing with scissors — an uncomfortable exploration of vulnerability and power. <em>Conceptual art</em> is art in which the concept or idea takes priority over the finished visual product. Marina Abramović's multi-decade career in endurance performance, including sitting silently across from strangers for hundreds of hours in <em>The Artist Is Present</em> (2010), challenged viewers to consider attention, presence, and human connection as artistic media. These practices faced intense skepticism: if there's no painting, no sculpture, and no permanent object, many people argued it simply wasn't art.",
+    question: "Is an experience or an idea enough to be considered art? Think of examples outside visual art — like music, cooking, or coding — where the process might matter as much as the product."
+  },
+  {
+    id: "banksy",
+    year: "2018",
+    era: "contemporary",
+    title: "Banksy's Self-Shredding Painting",
+    summary: "Banksy's \"Girl with Balloon\" self-destructed through a hidden shredder moments after selling at auction for £1 million. The stunt questioned the absurdity of the art market and made the shredded piece even more valuable.",
+    detail: "At a Sotheby's auction in London in October 2018, the anonymous street artist Banksy's framed painting <em>Girl with Balloon</em> passed through a hidden shredder built into the frame the moment the auctioneer's hammer fell. The audience gasped as the canvas emerged from the bottom of the frame in strips. Banksy later revealed he had installed the shredder years earlier \"in case it was ever put up for auction.\" The partially shredded work was renamed <em>Love is in the Bin</em> and later resold for approximately £18.5 million — roughly 18 times the original price. The event was a commentary on how the art market turns creative expression into financial speculation, but ironically the act of destruction itself became the most valuable part. Banksy's work straddles street art, vandalism, political activism, and fine art — categories that traditional definitions struggle to contain.",
+    question: "Destroying the painting made it more valuable. What does that reveal about how we assign value to art? Is the art market's reaction part of the artwork, or does it undermine Banksy's message?"
+  },
+  {
+    id: "banana",
+    year: "2019",
+    era: "contemporary",
+    title: "The $120,000 Banana",
+    summary: "Italian artist Maurizio Cattelan duct-taped a banana to a gallery wall and titled it \"Comedian.\" It sold for $120,000 before another artist ate it. The incident went viral and reignited the question: what counts as art?",
+    detail: "At Art Basel Miami Beach in December 2019, artist Maurizio Cattelan displayed a single banana attached to a white wall with a strip of gray duct tape. Titled <em>Comedian</em>, the piece came in an edition of three, each priced at $120,000 to $150,000 — and they sold. When performance artist David Datuna walked up and ate the banana in front of cameras, the gallery simply replaced it with a new one, stating that the <em>concept</em> was the artwork, not the physical banana. The piece sparked a global conversation about conceptual art, value, and whether the art world had lost touch with everyday people. Cattelan, known for provocative works (including a solid gold toilet titled <em>America</em>), argued the banana was a sincere commentary on how we assign value. For many students and non-specialists, this is a perfect entry point for asking fundamental questions about art.",
+    question: "If the banana isn't the art — the concept is — then what exactly did the buyers purchase? How does this compare to buying a digital file like an NFT or an AI-generated image?"
+  },
+  {
+    id: "ai-art-prize",
+    year: "2022",
+    era: "digital",
+    title: "AI Art Wins a State Fair Prize",
+    summary: "Jason Allen submitted \"Théâtre D'opéra Spatial,\" an image generated using Midjourney (an AI tool), to the Colorado State Fair fine arts competition — and won first place. Artists were furious; the public was divided.",
+    detail: "In August 2022, Jason Allen entered an AI-generated image titled <em>Théâtre D'opéra Spatial</em> in the Colorado State Fair's annual fine art competition under the \"digital arts/digitally-manipulated photography\" category. He used Midjourney, a text-to-image AI model that generates images from written prompts (short text descriptions of what you want the image to look like). Allen spent weeks refining his prompts and editing the results in Photoshop before submitting. When he won first place, the backlash was immediate. Artists posted on social media that \"AI is the death of art\" and accused Allen of cheating. Allen countered that art has always involved tools — from brushes to cameras to Photoshop — and that his creative vision guided the result. The controversy crystallized a modern version of the same question that has followed art for over a century: does using a new tool disqualify the output from being art?",
+    question: "Allen spent weeks refining his AI-generated image before submitting it. At what point does using a tool cross the line from 'creating art' to 'having a machine create it for you'? Is there a clear line?"
+  },
+  {
+    id: "ai-copyright",
+    year: "2023–Present",
+    era: "digital",
+    title: "AI Art and Copyright Battles",
+    summary: "Courts and governments worldwide began wrestling with whether AI-generated images can be copyrighted, who owns them, and whether AI models trained on artists' work constitute theft. The legal and ethical landscape is still being shaped.",
+    detail: "Starting in 2023, a wave of lawsuits and policy debates erupted over AI-generated art. The U.S. Copyright Office ruled that images generated purely by AI cannot be copyrighted because copyright requires human authorship. However, works that combine AI output with significant human editing may qualify. Meanwhile, artists filed class-action lawsuits against companies like Stability AI, Midjourney, and DeviantArt, arguing that AI models were trained on billions of copyrighted images without permission or compensation. <em>Copyright</em> is the legal right that protects original creative works from being copied without the creator's permission. These legal battles are ongoing and may reshape how AI tools are built and used. The debate echoes historical tensions — photographers once fought for their work to be recognized as art protected by copyright, just as AI-generated works seek recognition today.",
+    question: "If an AI is trained on millions of human artworks, who deserves credit — or payment — for the images it produces? How would you design a fair system that respects both human artists and people who use AI tools creatively?"
+  },
+  {
+    id: "future",
+    year: "2025 & Beyond",
+    era: "digital",
+    title: "The Ongoing Question: What Will Art Become?",
+    summary: "AI tools are becoming more powerful and accessible every month. As the boundary between human and machine creativity blurs, the centuries-old question — \"What is art?\" — has never been more relevant or more personal.",
+    detail: "Today, tools like Midjourney, DALL·E, Stable Diffusion, and Adobe Firefly allow anyone to generate detailed images from text prompts in seconds. Some artists are embracing AI as a collaborator, combining generated elements with traditional techniques. Others see it as an existential threat to livelihoods built on years of skill development. Art schools are debating whether to teach AI tools, ban them, or both. Museums are starting to exhibit AI works alongside human-made pieces. The question is no longer just \"Is it art?\" but also \"Who is the artist?\" and \"What does creativity mean when a machine can simulate it?\" Every point on this timeline shows that art's definition has always expanded when challenged. Whether AI-generated work will be embraced as the next evolution — like photography and digital art before it — or rejected as something fundamentally different, is a story still being written by people like you.",
+    question: "Imagine you're curating a gallery 20 years from now. Would you include AI-generated works alongside human-made art? What criteria would you use to decide what gets displayed — and what gets left out?"
+  }
+];
+
+/* ──────────────────────────────────────────────────────────
+   RENDER TIMELINE
+   ────────────────────────────────────────────────────────── */
+const timeline = document.querySelector('.timeline');
+
+function renderEvents() {
+  timeline.innerHTML = '';
+  events.forEach((ev, i) => {
+    const article = document.createElement('article');
+    article.className = 'timeline-event';
+    article.setAttribute('role', 'listitem');
+    article.setAttribute('data-era', ev.era);
+    article.setAttribute('data-id', ev.id);
+    article.setAttribute('aria-expanded', 'false');
+    article.setAttribute('tabindex', '0');
+    article.style.animationDelay = `${i * 60}ms`;
+
+    const eraLabels = { classical: 'Pre-Modern', modern: 'Early Modern', contemporary: 'Contemporary', digital: 'Digital & AI' };
+
+    article.innerHTML = `
+      <div class="event-card" role="button" aria-label="Expand details for: ${ev.title}">
+        <div class="event-year">
+          ${ev.year}
+          <span class="era-tag">${eraLabels[ev.era]}</span>
+        </div>
+        <h3 class="event-title">${ev.title}</h3>
+        <p class="event-summary">${ev.summary}</p>
+        <span class="expand-hint" aria-hidden="true"><span class="arrow">▸</span> Read more &amp; reflect</span>
+      </div>
+      <div class="detail-panel" id="detail-${ev.id}" role="region" aria-label="Details for ${ev.title}">
+        <div class="detail-inner">
+          <h4>In Depth</h4>
+          <p class="detail-text">${ev.detail}</p>
+          <div class="reflection-box">
+            <div class="label">💬 Reflection Question</div>
+            <p>${ev.question}</p>
+          </div>
+        </div>
+      </div>
+    `;
+    timeline.appendChild(article);
+  });
+}
+
+renderEvents();
+
+/* ──────────────────────────────────────────────────────────
+   EXPAND / COLLAPSE
+   ────────────────────────────────────────────────────────── */
+timeline.addEventListener('click', (e) => {
+  const article = e.target.closest('.timeline-event');
+  if (!article) return;
+  toggleEvent(article);
+});
+
+timeline.addEventListener('keydown', (e) => {
+  const article = e.target.closest('.timeline-event');
+  if (!article) return;
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    toggleEvent(article);
+  }
+});
+
+function toggleEvent(article) {
+  const isOpen = article.getAttribute('aria-expanded') === 'true';
+  const panel = article.querySelector('.detail-panel');
+  const inner = panel.querySelector('.detail-inner');
+
+  if (isOpen) {
+    panel.style.maxHeight = '0';
+    panel.classList.remove('open');
+    article.setAttribute('aria-expanded', 'false');
+  } else {
+    // Close any other open panel
+    document.querySelectorAll('.timeline-event[aria-expanded="true"]').forEach(other => {
+      if (other !== article) {
+        other.setAttribute('aria-expanded', 'false');
+        const otherPanel = other.querySelector('.detail-panel');
+        otherPanel.style.maxHeight = '0';
+        otherPanel.classList.remove('open');
+      }
+    });
+    panel.style.maxHeight = inner.scrollHeight + 40 + 'px';
+    panel.classList.add('open');
+    article.setAttribute('aria-expanded', 'true');
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   FILTERS
+   ────────────────────────────────────────────────────────── */
+const filterButtons = document.querySelectorAll('.filter-btn');
+
+filterButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const filter = btn.getAttribute('data-filter');
+
+    // Update pressed states
+    filterButtons.forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+
+    // Close all open panels first
+    document.querySelectorAll('.timeline-event[aria-expanded="true"]').forEach(article => {
+      article.setAttribute('aria-expanded', 'false');
+      const panel = article.querySelector('.detail-panel');
+      panel.style.maxHeight = '0';
+      panel.classList.remove('open');
+    });
+
+    // Filter events
+    const allEvents = document.querySelectorAll('.timeline-event');
+    allEvents.forEach((article, i) => {
+      const era = article.getAttribute('data-era');
+      const shouldShow = filter === 'all' || era === filter;
+
+      if (shouldShow) {
+        article.removeAttribute('hidden');
+        article.classList.add('entering');
+        requestAnimationFrame(() => {
+          setTimeout(() => article.classList.remove('entering'), 50 + i * 40);
+        });
+      } else {
+        article.setAttribute('hidden', '');
+        article.classList.remove('entering');
+      }
+    });
+
+    // Announce filter change to screen readers
+    const liveRegion = document.getElementById('filter-live');
+    const visibleCount = document.querySelectorAll('.timeline-event:not([hidden])').length;
+    const eraLabel = btn.textContent.trim();
+    liveRegion.textContent = `Showing ${visibleCount} event${visibleCount !== 1 ? 's' : ''} for ${eraLabel}.`;
+  });
+});
+
+/* ── Live region for filter announcements ── */
+const liveRegion = document.createElement('div');
+liveRegion.id = 'filter-live';
+liveRegion.setAttribute('role', 'status');
+liveRegion.setAttribute('aria-live', 'polite');
+liveRegion.className = 'sr-only';
+document.body.appendChild(liveRegion);
+
+/* ──────────────────────────────────────────────────────────
+   ENTRANCE ANIMATION (Intersection Observer)
+   ────────────────────────────────────────────────────────── */
+if ('IntersectionObserver' in window) {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.timeline-event').forEach((el, i) => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transitionDelay = `${i * 60}ms`;
+    observer.observe(el);
+  });
+}
+</script>
+
+</body>
+</html>
