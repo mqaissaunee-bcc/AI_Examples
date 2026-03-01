@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presentation Recording Timer</title>
+<style>
+  /* ========== CSS VARIABLES & THEME ========== */
+  :root {
+    --bg-primary: #F5F5F0;
+    --bg-secondary: #EAEAE4;
+    --bg-card: #FFFFFF;
+    --text-primary: #1A1A1A;
+    --text-secondary: #4A4A4A;
+    --text-muted: #6B6B6B;
+    --border: #C8C8C0;
+    --border-focus: #2D5F2D;
+
+    --green-bg: #D4EDDA;
+    --green-text: #155724;
+    --green-accent: #28A745;
+    --yellow-bg: #FFF3CD;
+    --yellow-text: #856404;
+    --yellow-accent: #D4A012;
+    --red-bg: #F8D7DA;
+    --red-text: #721C24;
+    --red-accent: #DC3545;
+
+    --font-display: 'DM Mono', 'Courier New', monospace;
+    --font-body: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+    --radius: 10px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,400;0,500;0,700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  *:focus-visible {
+    outline: 3px solid var(--border-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .skip-link {
+    position: absolute; top: -100%; left: 50%; transform: translateX(-50%);
+    background: var(--text-primary); color: #FFF; padding: 8px 20px;
+    border-radius: 0 0 var(--radius) var(--radius); z-index: 1000;
+    font-weight: 500; text-decoration: none;
+  }
+  .skip-link:focus { top: 0; }
+
+  /* ========== LAYOUT ========== */
+  .app-container { max-width: 680px; margin: 0 auto; padding: 32px 24px; }
+
+  header { text-align: center; margin-bottom: 36px; }
+  header h1 {
+    font-family: var(--font-display); font-size: 1.5rem; font-weight: 500;
+    letter-spacing: -0.02em; margin-bottom: 6px;
+  }
+  header p { font-size: 0.95rem; color: var(--text-secondary); }
+
+  /* ========== CARD ========== */
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px; margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .card-label {
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 16px;
+  }
+
+  /* ========== TIMER DISPLAY ========== */
+  .timer-display-section { text-align: center; padding: 20px 0; }
+
+  .timer-status-badge {
+    display: inline-block; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.12em; padding: 4px 14px;
+    border-radius: 20px; margin-bottom: 16px; transition: all 0.4s ease;
+  }
+  .status-ready { background: var(--bg-secondary); color: var(--text-muted); }
+  .status-green { background: var(--green-bg); color: var(--green-text); }
+  .status-yellow { background: var(--yellow-bg); color: var(--yellow-text); }
+  .status-red { background: var(--red-bg); color: var(--red-text); }
+  .status-paused { background: #E2E2E2; color: var(--text-secondary); }
+  .status-ended { background: var(--red-bg); color: var(--red-text); }
+
+  .timer-time {
+    font-family: var(--font-display); font-size: 4.5rem; font-weight: 500;
+    line-height: 1; letter-spacing: -0.03em; margin-bottom: 6px;
+    transition: color 0.4s ease; min-height: 4.5rem;
+  }
+  .timer-time.color-green { color: var(--green-text); }
+  .timer-time.color-yellow { color: var(--yellow-text); }
+  .timer-time.color-red { color: var(--red-text); }
+
+  .timer-elapsed-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px; }
+
+  @keyframes pulse-warning { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .timer-time.pulsing { animation: pulse-warning 1s ease-in-out infinite; }
+
+  /* ========== PROGRESS BAR ========== */
+  .progress-container { width: 100%; margin: 0 auto 8px; }
+  .progress-track {
+    width: 100%; height: 10px; background: var(--bg-secondary);
+    border-radius: 5px; overflow: hidden; border: 1px solid var(--border);
+  }
+  .progress-fill {
+    height: 100%; width: 0%; border-radius: 5px;
+    transition: width 0.5s linear, background-color 0.4s ease;
+    background-color: var(--green-accent);
+  }
+  .progress-fill.fill-green { background-color: var(--green-accent); }
+  .progress-fill.fill-yellow { background-color: var(--yellow-accent); }
+  .progress-fill.fill-red { background-color: var(--red-accent); }
+  .progress-labels {
+    display: flex; justify-content: space-between; font-size: 0.75rem;
+    color: var(--text-muted); font-family: var(--font-display); margin-top: 6px;
+  }
+
+  /* ========== DURATION SELECTOR ========== */
+  .duration-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 10px; margin-bottom: 16px;
+  }
+  .duration-btn {
+    font-family: var(--font-display); font-size: 0.9rem; font-weight: 500;
+    padding: 10px 6px; border: 2px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .duration-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+  .duration-btn.active { border-color: var(--green-text); background: var(--green-bg); color: var(--green-text); }
+
+  .custom-duration-row { display: flex; align-items: center; gap: 10px; }
+  .custom-duration-row label { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); white-space: nowrap; }
+  .custom-input {
+    font-family: var(--font-display); font-size: 0.9rem; width: 80px;
+    padding: 8px 10px; border: 2px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-card); color: var(--text-primary); text-align: center;
+  }
+  .custom-input:focus { border-color: var(--border-focus); }
+
+  /* ========== CONTROLS ========== */
+  .controls-row { display: flex; gap: 12px; }
+
+  .btn {
+    flex: 1; font-family: var(--font-body); font-size: 0.95rem; font-weight: 700;
+    padding: 14px 20px; border: 2px solid transparent; border-radius: var(--radius);
+    cursor: pointer; transition: all 0.2s ease; letter-spacing: 0.02em;
+  }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .btn-start { background: var(--green-text); color: #FFFFFF; border-color: var(--green-text); }
+  .btn-start:hover:not(:disabled) { background: #1A4A1A; }
+  .btn-pause { background: var(--yellow-text); color: #FFFFFF; border-color: var(--yellow-text); }
+  .btn-pause:hover:not(:disabled) { background: #6B5003; }
+  .btn-reset { background: var(--bg-card); color: var(--text-secondary); border-color: var(--border); }
+  .btn-reset:hover:not(:disabled) { border-color: var(--red-accent); color: var(--red-text); }
+
+  /* ========== POPUP MODE SELECTOR ========== */
+  .mode-selector {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
+  }
+
+  .mode-card {
+    border: 2px solid var(--border); border-radius: var(--radius); padding: 16px 12px;
+    background: var(--bg-card); cursor: pointer; transition: all 0.2s ease;
+    text-align: center; position: relative;
+  }
+  .mode-card:hover { border-color: var(--text-secondary); }
+  .mode-card.active { border-color: var(--green-text); background: var(--green-bg); }
+  .mode-card.active .mode-card-title { color: var(--green-text); }
+
+  .mode-card-icon { font-size: 1.6rem; margin-bottom: 8px; display: block; line-height: 1; }
+  .mode-card-title {
+    font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 4px;
+  }
+  .mode-card-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; }
+
+  /* Visual preview inside mode cards */
+  .mode-preview { margin: 10px auto 0; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+
+  .preview-compact {
+    width: 80px; height: 48px; background: var(--green-bg); margin: 0 auto;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .preview-compact .pc-time { font-family: var(--font-display); font-size: 0.6rem; color: var(--green-text); font-weight: 500; }
+  .preview-compact .pc-bar { width: 60%; height: 2px; background: rgba(0,0,0,0.1); border-radius: 1px; margin-top: 3px; }
+  .preview-compact .pc-bar-fill { width: 35%; height: 100%; background: var(--green-accent); border-radius: 1px; }
+
+  .preview-minimal { width: 100%; height: 12px; background: var(--bg-secondary); display: flex; align-items: center; position: relative; }
+  .preview-minimal .pm-fill { width: 35%; height: 100%; background: var(--green-accent); border-radius: 0 2px 2px 0; }
+  .preview-minimal .pm-time {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    font-family: var(--font-display); font-size: 0.45rem; color: var(--text-muted);
+  }
+
+  .preview-full {
+    width: 80px; height: 48px; background: var(--green-bg); margin: 0 auto;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .preview-full .pf-badge {
+    font-size: 0.3rem; font-weight: 700; text-transform: uppercase;
+    background: var(--green-text); color: #fff; padding: 1px 4px; border-radius: 4px;
+    margin-bottom: 2px; letter-spacing: 0.04em;
+  }
+  .preview-full .pf-time { font-family: var(--font-display); font-size: 0.9rem; color: var(--green-text); font-weight: 500; }
+  .preview-full .pf-sub { font-size: 0.3rem; color: var(--text-muted); margin-top: 1px; }
+
+  .launch-btn {
+    width: 100%; font-family: var(--font-body); font-size: 0.95rem; font-weight: 700;
+    padding: 14px 20px; border: 2px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
+    transition: all 0.2s ease; letter-spacing: 0.02em;
+  }
+  .launch-btn:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+
+  /* ========== INSTRUCTIONS ========== */
+  .instructions {
+    margin-top: 12px; padding: 16px 20px; background: var(--bg-secondary);
+    border-radius: var(--radius); border-left: 4px solid var(--green-accent);
+  }
+  .instructions h3 {
+    font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 8px;
+  }
+  .instructions p { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; }
+  .instructions p:last-child { margin-bottom: 0; }
+  .instructions kbd {
+    font-family: var(--font-display); font-size: 0.8rem;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 6px;
+  }
+
+  /* ========== SEGMENT LOG ========== */
+  .segment-log { max-height: 200px; overflow-y: auto; }
+  .segment-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--bg-secondary); font-size: 0.85rem;
+  }
+  .segment-item:last-child { border-bottom: none; }
+  .segment-num { font-family: var(--font-display); font-weight: 500; color: var(--text-muted); min-width: 80px; }
+  .segment-duration { font-family: var(--font-display); font-weight: 500; color: var(--text-primary); }
+  .segment-status {
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 2px 10px; border-radius: 12px;
+  }
+  .seg-under { background: var(--green-bg); color: var(--green-text); }
+  .seg-over { background: var(--red-bg); color: var(--red-text); }
+  .no-segments { text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 16px 0; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  /* ========== RESPONSIVE ========== */
+  @media (max-width: 500px) {
+    .timer-time { font-size: 3rem; min-height: 3rem; }
+    .duration-grid { grid-template-columns: repeat(2, 1fr); }
+    .controls-row { flex-wrap: wrap; }
+    .btn { flex: 1 1 45%; }
+    .mode-selector { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<a href="#main-controls" class="skip-link">Skip to timer controls</a>
+<div id="sr-announcements" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<div class="app-container" role="main">
+  <header>
+    <h1>⏱ Recording Timer</h1>
+    <p>Stay on pace. Keep recordings concise and focused.</p>
+  </header>
+
+  <!-- TIMER DISPLAY -->
+  <div class="card">
+    <div class="timer-display-section" aria-label="Timer display">
+      <div id="statusBadge" class="timer-status-badge status-ready">Ready</div>
+      <div id="timerDisplay" class="timer-time" aria-live="off">20:00</div>
+      <div id="elapsedLabel" class="timer-elapsed-label">remaining of 20:00</div>
+      <div class="progress-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Recording time progress" id="progressBar">
+        <div class="progress-track">
+          <div id="progressFill" class="progress-fill fill-green"></div>
+        </div>
+        <div class="progress-labels">
+          <span>0:00</span>
+          <span id="progressMid"></span>
+          <span id="progressEnd">20:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DURATION + TIMER CONTROLS -->
+  <div class="card" id="main-controls">
+    <div class="card-label">Duration</div>
+    <div class="duration-grid" role="radiogroup" aria-label="Select timer duration">
+      <button class="duration-btn" role="radio" aria-checked="false" data-minutes="5" onclick="selectDuration(5, this)">5 min</button>
+      <button class="duration-btn" role="radio" aria-checked="false" data-minutes="10" onclick="selectDuration(10, this)">10 min</button>
+      <button class="duration-btn" role="radio" aria-checked="false" data-minutes="15" onclick="selectDuration(15, this)">15 min</button>
+      <button class="duration-btn active" role="radio" aria-checked="true" data-minutes="20" onclick="selectDuration(20, this)">20 min</button>
+    </div>
+    <div class="custom-duration-row">
+      <label for="customMinutes">Custom:</label>
+      <input type="number" id="customMinutes" class="custom-input" min="1" max="120" placeholder="min" aria-label="Custom duration in minutes" onchange="selectCustomDuration()">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Controls</div>
+    <div class="controls-row">
+      <button class="btn btn-start" id="btnStart" onclick="startTimer()" aria-label="Start timer">&#9654; Start</button>
+      <button class="btn btn-pause" id="btnPause" onclick="pauseTimer()" disabled aria-label="Pause timer">&#9208; Pause</button>
+      <button class="btn btn-reset" id="btnReset" onclick="resetTimer()" aria-label="Reset timer">&#8634; Reset</button>
+    </div>
+  </div>
+
+  <!-- FLOAT MODE SELECTOR -->
+  <div class="card">
+    <div class="card-label">Float Mode &mdash; Choose Your Timer Window</div>
+
+    <div class="mode-selector" role="radiogroup" aria-label="Select floating timer display mode">
+      <!-- COMPACT BOX -->
+      <div class="mode-card active" role="radio" aria-checked="true" tabindex="0" data-mode="compact" onclick="selectMode('compact', this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMode('compact',this)}">
+        <span class="mode-card-icon" aria-hidden="true">&#9723;&#65039;</span>
+        <div class="mode-card-title">Compact Box</div>
+        <div class="mode-card-desc">Time + bar + badge in a small draggable box</div>
+        <div class="mode-preview">
+          <div class="preview-compact">
+            <div class="pc-time">17:32</div>
+            <div class="pc-bar"><div class="pc-bar-fill"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MINIMAL BAR -->
+      <div class="mode-card" role="radio" aria-checked="false" tabindex="0" data-mode="minimal" onclick="selectMode('minimal', this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMode('minimal',this)}">
+        <span class="mode-card-icon" aria-hidden="true">&#9644;</span>
+        <div class="mode-card-title">Minimal Bar</div>
+        <div class="mode-card-desc">Ultra-thin strip. Color only. Near invisible.</div>
+        <div class="mode-preview">
+          <div class="preview-minimal">
+            <div class="pm-fill"></div>
+            <span class="pm-time">17:32</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- FULL SCREEN -->
+      <div class="mode-card" role="radio" aria-checked="false" tabindex="0" data-mode="full" onclick="selectMode('full', this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMode('full',this)}">
+        <span class="mode-card-icon" aria-hidden="true">&#11036;</span>
+        <div class="mode-card-title">Full Screen</div>
+        <div class="mode-card-desc">Large clock. Huge digits. Hard to miss.</div>
+        <div class="mode-preview">
+          <div class="preview-full">
+            <div class="pf-badge">On Pace</div>
+            <div class="pf-time">17:32</div>
+            <div class="pf-sub">remaining of 20:00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="launch-btn" id="btnPopup" onclick="launchPopup()" aria-label="Open floating timer window">&#8599; Launch Floating Timer</button>
+
+    <div class="instructions" role="note">
+      <h3>How to use</h3>
+      <p><strong>Compact Box</strong> &mdash; small window you drag to a corner. Time + progress bar + status badge.</p>
+      <p><strong>Minimal Bar</strong> &mdash; ultra-thin 420&times;44 strip. Just a color-shifting bar with tiny time readout. Designed to be nearly invisible while presenting.</p>
+      <p><strong>Full Screen</strong> &mdash; fills the popup with huge digits, a progress ring, and status. Great for a second monitor or across-the-room visibility.</p>
+      <p>Use <kbd>Space</kbd> to start/pause, <kbd>R</kbd> to reset from this page.</p>
+      <p>Color shifts: <strong style="color:var(--green-text)">Green</strong> &rarr; <strong style="color:var(--yellow-text)">Yellow</strong> at 75% &rarr; <strong style="color:var(--red-text)">Red + Pulse</strong> in final minute.</p>
+    </div>
+  </div>
+
+  <!-- SEGMENT LOG -->
+  <div class="card">
+    <div class="card-label">Segment Log</div>
+    <div id="segmentLog" class="segment-log" aria-label="Recording segment history">
+      <p class="no-segments">No segments recorded yet. Complete a timer to log it.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== STATE ==========
+let totalSeconds = 20 * 60;
+let remainingSeconds = totalSeconds;
+let timerInterval = null;
+let isRunning = false;
+let isPaused = false;
+let popupWindow = null;
+let segments = [];
+let lastAnnouncedPhase = '';
+let currentMode = 'compact';
+
+// ========== DOM REFS ==========
+const timerDisplay = document.getElementById('timerDisplay');
+const statusBadge = document.getElementById('statusBadge');
+const elapsedLabel = document.getElementById('elapsedLabel');
+const progressFill = document.getElementById('progressFill');
+const progressBar = document.getElementById('progressBar');
+const progressMid = document.getElementById('progressMid');
+const progressEnd = document.getElementById('progressEnd');
+const btnStart = document.getElementById('btnStart');
+const btnPause = document.getElementById('btnPause');
+const btnReset = document.getElementById('btnReset');
+const srAnnouncements = document.getElementById('sr-announcements');
+
+// ========== HELPERS ==========
+function fmt(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function announce(msg) {
+  srAnnouncements.textContent = '';
+  requestAnimationFrame(function() { srAnnouncements.textContent = msg; });
+}
+
+function getPhase(remaining, total) {
+  const pct = ((total - remaining) / total) * 100;
+  if (remaining <= 60) return 'red';
+  if (pct >= 75) return 'yellow';
+  return 'green';
+}
+
+// ========== MODE SELECTION ==========
+function selectMode(mode, el) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-card').forEach(function(c) {
+    c.classList.remove('active');
+    c.setAttribute('aria-checked', 'false');
+  });
+  el.classList.add('active');
+  el.setAttribute('aria-checked', 'true');
+  announce('Timer mode set to ' + mode);
+  if (popupWindow && !popupWindow.closed) { popupWindow.close(); popupWindow = null; }
+}
+
+// ========== DURATION SELECTION ==========
+function selectDuration(mins, btnEl) {
+  if (isRunning) return;
+  document.querySelectorAll('.duration-btn').forEach(function(b) {
+    b.classList.remove('active');
+    b.setAttribute('aria-checked', 'false');
+  });
+  if (btnEl) { btnEl.classList.add('active'); btnEl.setAttribute('aria-checked', 'true'); }
+  document.getElementById('customMinutes').value = '';
+  setDuration(mins);
+}
+
+function selectCustomDuration() {
+  if (isRunning) return;
+  var val = parseInt(document.getElementById('customMinutes').value);
+  if (val && val > 0 && val <= 120) {
+    document.querySelectorAll('.duration-btn').forEach(function(b) {
+      b.classList.remove('active');
+      b.setAttribute('aria-checked', 'false');
+    });
+    setDuration(val);
+  }
+}
+
+function setDuration(mins) {
+  totalSeconds = mins * 60;
+  remainingSeconds = totalSeconds;
+  updateDisplay();
+  announce('Timer set to ' + mins + ' minutes');
+}
+
+// ========== DISPLAY UPDATE ==========
+function updateDisplay() {
+  var phase = (isRunning || isPaused) ? getPhase(remainingSeconds, totalSeconds) : 'none';
+  var elapsed = totalSeconds - remainingSeconds;
+  var pct = totalSeconds > 0 ? (elapsed / totalSeconds) * 100 : 0;
+  var isFinalMinute = remainingSeconds <= 60 && remainingSeconds > 0 && isRunning;
+
+  timerDisplay.textContent = fmt(remainingSeconds);
+  timerDisplay.className = 'timer-time';
+  if (phase === 'green') timerDisplay.classList.add('color-green');
+  else if (phase === 'yellow') timerDisplay.classList.add('color-yellow');
+  else if (phase === 'red') timerDisplay.classList.add('color-red');
+  if (isFinalMinute) timerDisplay.classList.add('pulsing');
+
+  statusBadge.className = 'timer-status-badge';
+  if (!isRunning && !isPaused && remainingSeconds === totalSeconds) {
+    statusBadge.classList.add('status-ready'); statusBadge.textContent = 'Ready';
+  } else if (isPaused) {
+    statusBadge.classList.add('status-paused'); statusBadge.textContent = 'Paused';
+  } else if (remainingSeconds <= 0) {
+    statusBadge.classList.add('status-ended'); statusBadge.textContent = "Time's Up!";
+  } else {
+    statusBadge.classList.add('status-' + phase);
+    if (phase === 'green') statusBadge.textContent = 'On Pace';
+    else if (phase === 'yellow') statusBadge.textContent = 'Wrapping Up';
+    else statusBadge.textContent = 'Final Minute';
+  }
+
+  elapsedLabel.textContent = 'remaining of ' + fmt(totalSeconds);
+  progressFill.style.width = pct + '%';
+  progressFill.className = 'progress-fill fill-' + (phase === 'none' ? 'green' : phase);
+  progressBar.setAttribute('aria-valuenow', Math.round(pct));
+  progressMid.textContent = fmt(Math.floor(totalSeconds / 2));
+  progressEnd.textContent = fmt(totalSeconds);
+
+  if (isRunning && phase !== lastAnnouncedPhase) {
+    lastAnnouncedPhase = phase;
+    if (phase === 'yellow') announce('75% elapsed. Begin wrapping up.');
+    else if (phase === 'red') announce('Final minute. Finish your segment.');
+  }
+
+  syncPopup();
+}
+
+// ========== TIMER CONTROLS ==========
+function startTimer() {
+  if (isRunning) return;
+  if (remainingSeconds <= 0) { resetTimer(); return; }
+  isRunning = true;
+  isPaused = false;
+  btnStart.disabled = true;
+  btnPause.disabled = false;
+  btnPause.innerHTML = '&#9208; Pause';
+  announce('Timer started. ' + fmt(remainingSeconds) + ' remaining.');
+
+  timerInterval = setInterval(function() {
+    remainingSeconds--;
+    if (remainingSeconds <= 0) {
+      remainingSeconds = 0;
+      clearInterval(timerInterval);
+      timerInterval = null;
+      isRunning = false;
+      btnStart.disabled = false;
+      btnStart.innerHTML = '&#9654; Start';
+      btnPause.disabled = true;
+      logSegment();
+      announce("Time is up! Segment logged.");
+    }
+    updateDisplay();
+  }, 1000);
+
+  updateDisplay();
+}
+
+function pauseTimer() {
+  if (!isRunning && !isPaused) return;
+  if (isRunning) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    isRunning = false;
+    isPaused = true;
+    btnStart.disabled = false;
+    btnPause.innerHTML = '&#9654; Resume';
+    announce('Timer paused at ' + fmt(remainingSeconds));
+  } else if (isPaused) {
+    startTimer();
+  }
+  updateDisplay();
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  isRunning = false;
+  isPaused = false;
+  remainingSeconds = totalSeconds;
+  lastAnnouncedPhase = '';
+  btnStart.disabled = false;
+  btnStart.innerHTML = '&#9654; Start';
+  btnPause.disabled = true;
+  btnPause.innerHTML = '&#9208; Pause';
+  updateDisplay();
+  announce('Timer reset to ' + fmt(totalSeconds));
+}
+
+// ========== SEGMENT LOG ==========
+function logSegment() {
+  var elapsed = totalSeconds - remainingSeconds;
+  segments.push({ num: segments.length + 1, duration: elapsed, target: totalSeconds, over: elapsed > totalSeconds });
+  renderSegments();
+}
+
+function renderSegments() {
+  var container = document.getElementById('segmentLog');
+  if (segments.length === 0) {
+    container.innerHTML = '<p class="no-segments">No segments recorded yet. Complete a timer to log it.</p>';
+    return;
+  }
+  container.innerHTML = segments.map(function(s) {
+    return '<div class="segment-item">' +
+      '<span class="segment-num">Seg #' + s.num + '</span>' +
+      '<span class="segment-duration">' + fmt(s.duration) + ' / ' + fmt(s.target) + '</span>' +
+      '<span class="segment-status ' + (s.over ? 'seg-over' : 'seg-under') + '">' + (s.over ? 'Over' : 'On Time') + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+// ============================================================
+//  POPUP BUILDERS
+// ============================================================
+
+function buildCompactHTML() {
+  return '<!DOCTYPE html>\n' +
+'<html lang="en"><head><meta charset="UTF-8"><title>Timer</title>\n' +
+'<style>\n' +
+'@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;700&display=swap");\n' +
+'*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n' +
+'body{font-family:"DM Sans",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;padding:16px;background:#F5F5F0;color:#1A1A1A;user-select:none;overflow:hidden;transition:background 0.4s ease}\n' +
+'body.bg-green{background:#D4EDDA}body.bg-yellow{background:#FFF3CD}body.bg-red{background:#F8D7DA}\n' +
+'.badge{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;padding:3px 12px;border-radius:16px;margin-bottom:8px;transition:all 0.4s ease}\n' +
+'.badge-ready{background:#E2E2E2;color:#6B6B6B}.badge-green{background:#155724;color:#FFF}.badge-yellow{background:#856404;color:#FFF}.badge-red{background:#721C24;color:#FFF}.badge-paused{background:#6B6B6B;color:#FFF}.badge-ended{background:#721C24;color:#FFF}\n' +
+'.time{font-family:"DM Mono",monospace;font-size:3.5rem;font-weight:500;line-height:1;letter-spacing:-0.03em;transition:color 0.4s ease;margin-bottom:6px}\n' +
+'.time.c-green{color:#155724}.time.c-yellow{color:#856404}.time.c-red{color:#721C24}\n' +
+'@keyframes pulse-warning{0%,100%{opacity:1}50%{opacity:0.4}}\n' +
+'.time.pulsing{animation:pulse-warning 1s ease-in-out infinite}\n' +
+'.bar-track{width:90%;height:6px;background:rgba(0,0,0,0.1);border-radius:3px;overflow:hidden;margin-top:4px}\n' +
+'.bar-fill{height:100%;width:0%;border-radius:3px;transition:width 0.5s linear,background 0.4s ease;background:#28A745}\n' +
+'.bar-fill.f-green{background:#28A745}.bar-fill.f-yellow{background:#D4A012}.bar-fill.f-red{background:#DC3545}\n' +
+'.sub{font-size:0.75rem;color:#6B6B6B;margin-top:2px}\n' +
+'</style></head>\n' +
+'<body>\n' +
+'<div id="pBadge" class="badge badge-ready">Ready</div>\n' +
+'<div id="pTime" class="time">--:--</div>\n' +
+'<div class="bar-track"><div id="pBar" class="bar-fill f-green"></div></div>\n' +
+'<div id="pSub" class="sub">remaining</div>\n' +
+'</body></html>';
+}
+
+function buildMinimalHTML() {
+  return '<!DOCTYPE html>\n' +
+'<html lang="en"><head><meta charset="UTF-8"><title>Timer</title>\n' +
+'<style>\n' +
+'@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap");\n' +
+'*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n' +
+'html,body{height:100%;overflow:hidden}\n' +
+'body{display:flex;align-items:stretch;background:#EAEAE4;user-select:none;padding:0;margin:0}\n' +
+'.strip{width:100%;height:100%;display:flex;align-items:center;position:relative;background:#EAEAE4;overflow:hidden;transition:background 0.3s ease}\n' +
+'.fill{position:absolute;left:0;top:0;height:100%;width:0%;transition:width 0.5s linear,background 0.4s ease;background:#28A745}\n' +
+'.fill.f-green{background:#28A745}.fill.f-yellow{background:#D4A012}.fill.f-red{background:#DC3545}\n' +
+'@keyframes bar-pulse{0%,100%{opacity:1}50%{opacity:0.5}}\n' +
+'.fill.pulsing{animation:bar-pulse 1s ease-in-out infinite}\n' +
+'.time-readout{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-family:"DM Mono",monospace;font-size:0.85rem;font-weight:500;color:#1A1A1A;z-index:2;white-space:nowrap;text-shadow:0 0 4px rgba(255,255,255,0.9);transition:color 0.4s ease}\n' +
+'.time-readout.c-green{color:#155724}.time-readout.c-yellow{color:#856404}.time-readout.c-red{color:#721C24}\n' +
+'.dot{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;z-index:2;transition:background 0.4s ease;background:#6B6B6B}\n' +
+'.dot.d-green{background:#155724}.dot.d-yellow{background:#856404}.dot.d-red{background:#721C24}\n' +
+'.dot.d-paused{background:#6B6B6B}.dot.d-ended{background:#721C24}\n' +
+'@keyframes dot-pulse{0%,100%{opacity:1;transform:translateY(-50%) scale(1)}50%{opacity:0.4;transform:translateY(-50%) scale(0.7)}}\n' +
+'.dot.pulsing{animation:dot-pulse 1s ease-in-out infinite}\n' +
+'</style></head>\n' +
+'<body>\n' +
+'<div class="strip" id="pStrip">\n' +
+'  <div class="fill f-green" id="pFill"></div>\n' +
+'  <div class="dot" id="pDot"></div>\n' +
+'  <div class="time-readout" id="pTime">--:--</div>\n' +
+'</div>\n' +
+'</body></html>';
+}
+
+function buildFullHTML() {
+  return '<!DOCTYPE html>\n' +
+'<html lang="en"><head><meta charset="UTF-8"><title>Timer</title>\n' +
+'<style>\n' +
+'@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;700&display=swap");\n' +
+'*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n' +
+'html,body{height:100%;overflow:hidden}\n' +
+'body{font-family:"DM Sans",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;padding:32px;background:#F5F5F0;color:#1A1A1A;user-select:none;transition:background 0.4s ease}\n' +
+'body.bg-green{background:#D4EDDA}body.bg-yellow{background:#FFF3CD}body.bg-red{background:#F8D7DA}\n' +
+'.badge{font-size:0.9rem;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;padding:6px 22px;border-radius:24px;margin-bottom:20px;transition:all 0.4s ease}\n' +
+'.badge-ready{background:#E2E2E2;color:#6B6B6B}.badge-green{background:#155724;color:#FFF}.badge-yellow{background:#856404;color:#FFF}.badge-red{background:#721C24;color:#FFF}.badge-paused{background:#6B6B6B;color:#FFF}.badge-ended{background:#721C24;color:#FFF}\n' +
+'.time{font-family:"DM Mono",monospace;font-weight:500;line-height:1;letter-spacing:-0.04em;transition:color 0.4s ease;margin-bottom:12px;font-size:clamp(4rem,18vw,14rem)}\n' +
+'.time.c-green{color:#155724}.time.c-yellow{color:#856404}.time.c-red{color:#721C24}\n' +
+'@keyframes pulse-warning{0%,100%{opacity:1}50%{opacity:0.35}}\n' +
+'.time.pulsing{animation:pulse-warning 1s ease-in-out infinite}\n' +
+'.sub{font-size:1.1rem;color:#6B6B6B;margin-bottom:24px;letter-spacing:0.02em;font-family:"DM Mono",monospace}\n' +
+'.ring-container{position:relative;width:min(200px,30vw);height:min(200px,30vw);margin-bottom:16px}\n' +
+'.ring-svg{width:100%;height:100%;transform:rotate(-90deg)}\n' +
+'.ring-bg{fill:none;stroke:rgba(0,0,0,0.08);stroke-width:8}\n' +
+'.ring-fill{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 0.5s linear,stroke 0.4s ease;stroke:#28A745}\n' +
+'.ring-fill.r-green{stroke:#28A745}.ring-fill.r-yellow{stroke:#D4A012}.ring-fill.r-red{stroke:#DC3545}\n' +
+'@keyframes ring-pulse{0%,100%{opacity:1}50%{opacity:0.4}}\n' +
+'.ring-fill.pulsing{animation:ring-pulse 1s ease-in-out infinite}\n' +
+'.ring-pct{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:"DM Mono",monospace;font-size:clamp(1rem,4vw,2rem);font-weight:500;color:#4A4A4A}\n' +
+'.bottom-bar{position:fixed;bottom:0;left:0;width:100%;height:8px;background:rgba(0,0,0,0.06)}\n' +
+'.bottom-bar-fill{height:100%;width:0%;transition:width 0.5s linear,background 0.4s ease;background:#28A745}\n' +
+'.bottom-bar-fill.bf-green{background:#28A745}.bottom-bar-fill.bf-yellow{background:#D4A012}.bottom-bar-fill.bf-red{background:#DC3545}\n' +
+'</style></head>\n' +
+'<body>\n' +
+'<div id="pBadge" class="badge badge-ready">Ready</div>\n' +
+'<div id="pTime" class="time">--:--</div>\n' +
+'<div id="pSub" class="sub">remaining of --:--</div>\n' +
+'<div class="ring-container">\n' +
+'  <svg class="ring-svg" viewBox="0 0 120 120">\n' +
+'    <circle class="ring-bg" cx="60" cy="60" r="52"/>\n' +
+'    <circle class="ring-fill r-green" id="pRing" cx="60" cy="60" r="52" stroke-dasharray="326.73" stroke-dashoffset="326.73"/>\n' +
+'  </svg>\n' +
+'  <div class="ring-pct" id="pPct">0%</div>\n' +
+'</div>\n' +
+'<div class="bottom-bar"><div class="bottom-bar-fill bf-green" id="pBottomBar"></div></div>\n' +
+'</body></html>';
+}
+
+// ============================================================
+//  POPUP LAUNCH + SYNC
+// ============================================================
+
+function launchPopup() {
+  if (popupWindow && !popupWindow.closed) { popupWindow.focus(); return; }
+
+  var html, features;
+  if (currentMode === 'compact') {
+    html = buildCompactHTML();
+    features = 'width=340,height=200,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no';
+  } else if (currentMode === 'minimal') {
+    html = buildMinimalHTML();
+    features = 'width=420,height=44,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no';
+  } else {
+    html = buildFullHTML();
+    features = 'width=800,height=600,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no';
+  }
+
+  popupWindow = window.open('', 'TimerPopup_' + currentMode, features);
+  if (!popupWindow) {
+    announce('Popup blocked. Please allow popups for this site.');
+    alert('Popup was blocked. Please allow popups for this site and try again.');
+    return;
+  }
+
+  popupWindow.document.open();
+  popupWindow.document.write(html);
+  popupWindow.document.close();
+  setTimeout(function() { syncPopup(); }, 120);
+}
+
+function syncPopup() {
+  if (!popupWindow || popupWindow.closed) return;
+  try {
+    var doc = popupWindow.document;
+    var phase = (isRunning || isPaused) ? getPhase(remainingSeconds, totalSeconds) : 'none';
+    var elapsed = totalSeconds - remainingSeconds;
+    var pct = totalSeconds > 0 ? (elapsed / totalSeconds) * 100 : 0;
+    var isFinalMin = remainingSeconds <= 60 && remainingSeconds > 0 && isRunning;
+    var phaseClass = (phase === 'none') ? 'green' : phase;
+
+    // Detect mode by unique elements
+    var hasStrip = doc.getElementById('pStrip');
+    var hasRing = doc.getElementById('pRing');
+
+    if (hasStrip) {
+      // ======= MINIMAL BAR =======
+      var pFill = doc.getElementById('pFill');
+      var pDot = doc.getElementById('pDot');
+      var pTime = doc.getElementById('pTime');
+
+      pFill.style.width = pct + '%';
+      pFill.className = 'fill f-' + phaseClass;
+      if (isFinalMin) pFill.classList.add('pulsing');
+
+      pTime.textContent = fmt(remainingSeconds);
+      pTime.className = 'time-readout';
+      if (phase === 'green') pTime.classList.add('c-green');
+      else if (phase === 'yellow') pTime.classList.add('c-yellow');
+      else if (phase === 'red') pTime.classList.add('c-red');
+
+      pDot.className = 'dot';
+      if (!isRunning && !isPaused && remainingSeconds === totalSeconds) pDot.classList.add('d-paused');
+      else if (isPaused) pDot.classList.add('d-paused');
+      else if (remainingSeconds <= 0) { pDot.classList.add('d-ended'); pDot.classList.add('pulsing'); }
+      else { pDot.classList.add('d-' + phase); if (isFinalMin) pDot.classList.add('pulsing'); }
+
+    } else if (hasRing) {
+      // ======= FULL SCREEN =======
+      var pTime = doc.getElementById('pTime');
+      var pBadge = doc.getElementById('pBadge');
+      var pSub = doc.getElementById('pSub');
+      var pRing = doc.getElementById('pRing');
+      var pPct = doc.getElementById('pPct');
+      var pBottomBar = doc.getElementById('pBottomBar');
+      var body = doc.body;
+
+      pTime.textContent = fmt(remainingSeconds);
+      pTime.className = 'time';
+      if (phase === 'green') pTime.classList.add('c-green');
+      else if (phase === 'yellow') pTime.classList.add('c-yellow');
+      else if (phase === 'red') pTime.classList.add('c-red');
+      if (isFinalMin) pTime.classList.add('pulsing');
+
+      body.className = '';
+      if (phase === 'green') body.classList.add('bg-green');
+      else if (phase === 'yellow') body.classList.add('bg-yellow');
+      else if (phase === 'red') body.classList.add('bg-red');
+
+      applyBadge(pBadge, phase);
+
+      pSub.textContent = fmt(remainingSeconds) + ' remaining of ' + fmt(totalSeconds);
+
+      var circumference = 326.73;
+      var offset = circumference - (pct / 100) * circumference;
+      pRing.style.strokeDashoffset = offset;
+      pRing.className = 'ring-fill r-' + phaseClass;
+      if (isFinalMin) pRing.classList.add('pulsing');
+
+      pPct.textContent = Math.round(pct) + '%';
+
+      pBottomBar.style.width = pct + '%';
+      pBottomBar.className = 'bottom-bar-fill bf-' + phaseClass;
+
+    } else {
+      // ======= COMPACT BOX =======
+      var pTime = doc.getElementById('pTime');
+      var pBadge = doc.getElementById('pBadge');
+      var pBar = doc.getElementById('pBar');
+      var pSub = doc.getElementById('pSub');
+      var body = doc.body;
+      if (!pTime) return;
+
+      pTime.textContent = fmt(remainingSeconds);
+      pTime.className = 'time';
+      if (phase === 'green') pTime.classList.add('c-green');
+      else if (phase === 'yellow') pTime.classList.add('c-yellow');
+      else if (phase === 'red') pTime.classList.add('c-red');
+      if (isFinalMin) pTime.classList.add('pulsing');
+
+      body.className = '';
+      if (phase === 'green') body.classList.add('bg-green');
+      else if (phase === 'yellow') body.classList.add('bg-yellow');
+      else if (phase === 'red') body.classList.add('bg-red');
+
+      applyBadge(pBadge, phase);
+
+      pBar.style.width = pct + '%';
+      pBar.className = 'bar-fill f-' + phaseClass;
+      pSub.textContent = fmt(remainingSeconds) + ' remaining of ' + fmt(totalSeconds);
+    }
+
+  } catch(e) { /* popup closed or cross-origin */ }
+}
+
+function applyBadge(el, phase) {
+  el.className = 'badge';
+  if (!isRunning && !isPaused && remainingSeconds === totalSeconds) {
+    el.classList.add('badge-ready'); el.textContent = 'Ready';
+  } else if (isPaused) {
+    el.classList.add('badge-paused'); el.textContent = 'Paused';
+  } else if (remainingSeconds <= 0) {
+    el.classList.add('badge-ended'); el.textContent = "Time's Up!";
+  } else {
+    el.classList.add('badge-' + phase);
+    if (phase === 'green') el.textContent = 'On Pace';
+    else if (phase === 'yellow') el.textContent = 'Wrapping Up';
+    else el.textContent = 'Final Minute';
+  }
+}
+
+// ========== KEYBOARD SHORTCUTS ==========
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (isRunning) pauseTimer();
+    else startTimer();
+  } else if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    resetTimer();
+  }
+});
+
+// ========== INIT ==========
+updateDisplay();
+</script>
+</body>
+</html>
