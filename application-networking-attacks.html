@@ -741,11 +741,13 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
 /* Wrapper — inline, triggers tooltip on hover/focus */
 .tt {
   position: relative;
-  display: inline;
+  display: inline-block;
   border-bottom: 1px dotted var(--teal);
   color: inherit;
   cursor: help;
   white-space: normal;
+  vertical-align: baseline;
+  line-height: inherit;
 }
 .tt:focus { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 2px; }
 
@@ -756,8 +758,8 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
   opacity: 0;
   pointer-events: none;
 
-  /* Positioning — will be overridden by JS for edge-aware placement */
-  position: fixed; /* fixed so it always stays in viewport */
+  /* Positioning — overridden by JS */
+  position: fixed;
   z-index: 9000;
 
   /* Sizing */
@@ -814,6 +816,12 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
   transform: translateX(-50%);
   border-bottom-color: var(--navy-dark);
   border-top: none;
+}
+
+/* Measure state: visible but transparent so offsetHeight is real */
+.tt-bubble.tt-measuring {
+  visibility: visible;
+  opacity: 0;
 }
 
 /* Show state */
@@ -2720,25 +2728,29 @@ function resetQuiz() {
 document.addEventListener('DOMContentLoaded', buildQuiz);
 
 /* ===================================================================
-   SMART TOOLTIP ENGINE — viewport-aware, ADA-compliant
+   SMART TOOLTIP ENGINE + FLASHCARD KEYS — viewport-aware, ADA-compliant
 =================================================================== */
 (function() {
-  const MARGIN = 12;   // gap between trigger and bubble
-  const EDGE   = 10;   // minimum distance from viewport edge
-
+  const MARGIN = 12;
+  const EDGE   = 10;
   let activeEl = null;
 
   function positionBubble(trigger) {
     const bubble = trigger.querySelector('.tt-bubble');
     if (!bubble) return;
 
+    // Temporarily make visible off-screen to measure real height
+    bubble.classList.add('tt-measuring');
+    bubble.style.top  = '-9999px';
+    bubble.style.left = '-9999px';
+    const bw = bubble.offsetWidth  || 280;
+    const bh = bubble.offsetHeight || 80;
+    bubble.classList.remove('tt-measuring');
+
     const tr = trigger.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const bw = bubble.offsetWidth  || 280;
-    const bh = bubble.offsetHeight || 100;
 
-    // ── Vertical: prefer above, fall back to below ──────────────────
     let top, arrowClass;
     const spaceAbove = tr.top;
     const spaceBelow = vh - tr.bottom;
@@ -2757,12 +2769,10 @@ document.addEventListener('DOMContentLoaded', buildQuiz);
       arrowClass = 'tt-below';
     }
 
-    // ── Horizontal: center on trigger, clamp to viewport ───────────
     let left = tr.left + tr.width / 2 - bw / 2;
     left = Math.max(EDGE, Math.min(left, vw - bw - EDGE));
 
-    // Arrow horizontal position relative to bubble
-    const arrowLeft = (tr.left + tr.width / 2) - left;
+    const arrowLeft    = (tr.left + tr.width / 2) - left;
     const arrowClamped = Math.max(12, Math.min(arrowLeft, bw - 12));
 
     bubble.classList.remove('tt-above', 'tt-below');
@@ -2776,8 +2786,7 @@ document.addEventListener('DOMContentLoaded', buildQuiz);
     if (activeEl && activeEl !== el) hideTip(activeEl);
     activeEl = el;
     el.classList.add('tt-active');
-    // Position after browser paints so offsetHeight is accurate
-    requestAnimationFrame(() => positionBubble(el));
+    positionBubble(el);
   }
 
   function hideTip(el) {
@@ -2788,64 +2797,48 @@ document.addEventListener('DOMContentLoaded', buildQuiz);
 
   function initTooltips() {
     document.querySelectorAll('.tt').forEach(el => {
-      // Mouse
       el.addEventListener('mouseenter', () => showTip(el));
       el.addEventListener('mouseleave', () => hideTip(el));
-
-      // Keyboard / focus
-      el.addEventListener('focus', () => showTip(el));
-      el.addEventListener('blur',  () => hideTip(el));
-
-      // Touch: tap once to show, tap again or tap elsewhere to hide
+      el.addEventListener('focus',      () => showTip(el));
+      el.addEventListener('blur',       () => hideTip(el));
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         el.classList.contains('tt-active') ? hideTip(el) : showTip(el);
       });
     });
-
-    // Close any open tip on outside click/touch
     document.addEventListener('click', () => { if (activeEl) hideTip(activeEl); });
-
-    // Reposition on scroll / resize while tip is open
     ['scroll', 'resize'].forEach(evt =>
       window.addEventListener(evt, () => { if (activeEl) positionBubble(activeEl); }, { passive: true })
     );
-
-    // Escape key closes tip
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && activeEl) { hideTip(activeEl); activeEl.focus(); }
     });
   }
 
-  // ── Tab info icon initializer (shares showTip/hideTip from this scope) ──────
   function initTabInfoIcons() {
     document.querySelectorAll('.sub-tab-btn[data-tipterm]').forEach(btn => {
       const term = btn.dataset.tipterm;
       const def  = btn.dataset.tipdef;
       if (!term || !def) return;
 
-      // Wrap the button in a flex container
       const wrap = document.createElement('span');
       wrap.className = 'sub-tab-wrap';
       btn.parentNode.insertBefore(wrap, btn);
       wrap.appendChild(btn);
 
-      // Create the ⓘ info button as a sibling (NOT inside btn)
       const infoBtn = document.createElement('button');
       infoBtn.type = 'button';
       infoBtn.className = 'tab-tip-btn tt';
-      infoBtn.setAttribute('aria-label', `Definition for ${term}: ${def}`);
+      infoBtn.setAttribute('aria-label', 'Definition for ' + term + ': ' + def);
       infoBtn.setAttribute('tabindex', '0');
-      infoBtn.innerHTML = `ⓘ<span class="tab-tip-hint">definition</span>`;
+      infoBtn.innerHTML = 'ⓘ<span class="tab-tip-hint">definition</span>';
 
-      // Build the tooltip bubble on the infoBtn
       const bubble = document.createElement('span');
       bubble.className = 'tt-bubble';
       bubble.setAttribute('role', 'tooltip');
-      bubble.innerHTML = `<strong>${term}</strong>${def}`;
+      bubble.innerHTML = '<strong>' + term + '</strong>' + def;
       infoBtn.appendChild(bubble);
 
-      // Events — showTip/hideTip are in the same IIFE scope
       infoBtn.addEventListener('click', e => {
         e.stopPropagation();
         infoBtn.classList.contains('tt-active') ? hideTip(infoBtn) : showTip(infoBtn);
@@ -2859,10 +2852,26 @@ document.addEventListener('DOMContentLoaded', buildQuiz);
     });
   }
 
-  // Run both inits after DOM is ready
+  function initFlashcardKeys() {
+    document.addEventListener('keydown', (e) => {
+      const fcSection = document.getElementById('section-7');
+      if (!fcSection || !fcSection.classList.contains('active')) return;
+      if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); nextCard(); }
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); prevCard(); }
+      if ((e.key === ' ' || e.key === 'Enter') &&
+          (document.activeElement.tagName === 'BODY' ||
+           document.activeElement.id === 'flashcard')) {
+        e.preventDefault();
+        flipCard();
+      }
+    });
+  }
+
   function initAll() {
     initTooltips();
     initTabInfoIcons();
+    initFlashcardKeys();
   }
 
   if (document.readyState === 'loading') {
