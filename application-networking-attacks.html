@@ -304,7 +304,9 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ===== TABS (sub-tabs) ===== */
-.sub-tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid var(--light-gray); flex-wrap: wrap; }
+.sub-tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid var(--light-gray); flex-wrap: wrap; position: relative; }
+/* wrap span acts as a flex child alongside unwrapped buttons */
+.sub-tab-wrap { display: inline-flex; align-items: stretch; }
 .sub-tab-btn {
   background: var(--section-bg); border: none; padding: 10px 20px;
   font-family: var(--font-body); font-size: .85rem; font-weight: 600;
@@ -667,6 +669,164 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
   .flow-steps { flex-direction: column; align-items: center; }
   .flow-arrow { transform: rotate(90deg); margin: 4px 0; }
 }
+
+/* ===== TAB INFO ICONS (sibling ⓘ buttons next to tab labels) ===== */
+.sub-tabs {
+  position: relative; /* anchor for absolutely-placed info icons */
+}
+/* Each sub-tab-btn that has a tip gets a relative wrapper */
+.sub-tab-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+/* The ⓘ button — sits to the right of the tab button */
+.tab-tip-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: auto;
+  min-height: 38px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 0 4px 0 0;
+  cursor: pointer;
+  color: var(--teal);
+  font-size: .8rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: color var(--transition);
+  vertical-align: top;
+  /* Separate from tab click area */
+  z-index: 2;
+}
+.tab-tip-btn:hover,
+.tab-tip-btn:focus-visible {
+  color: var(--gold);
+}
+.tab-tip-btn:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+/* Tooltip bubble attached to the ⓘ button */
+.tab-tip-btn .tt-bubble {
+  width: 260px;
+  max-width: min(260px, 88vw);
+}
+
+/* Hint text that appears below active-tab ⓘ icons */
+.tab-tip-hint {
+  position: absolute;
+  bottom: -1.6em;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: .65rem;
+  color: var(--teal);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .2s;
+  font-style: italic;
+}
+.tab-tip-btn:hover .tab-tip-hint,
+.tab-tip-btn:focus-visible .tab-tip-hint {
+  opacity: 1;
+}
+
+/* ===== TOOLTIPS ===== */
+/* Wrapper — inline, triggers tooltip on hover/focus */
+.tt {
+  position: relative;
+  display: inline;
+  border-bottom: 1px dotted var(--teal);
+  color: inherit;
+  cursor: help;
+  white-space: normal;
+}
+.tt:focus { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 2px; }
+
+/* The tooltip bubble */
+.tt-bubble {
+  /* Hidden by default */
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+
+  /* Positioning — will be overridden by JS for edge-aware placement */
+  position: fixed; /* fixed so it always stays in viewport */
+  z-index: 9000;
+
+  /* Sizing */
+  width: 280px;
+  max-width: min(280px, 90vw);
+
+  /* Visual */
+  background: var(--navy-dark);
+  color: #f0f4f8;
+  font-family: var(--font-body);
+  font-size: .80rem;
+  font-weight: 400;
+  line-height: 1.55;
+  border-radius: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--teal);
+  box-shadow: 0 6px 24px rgba(0,0,0,.35);
+
+  /* Transition */
+  transition: opacity .18s ease, visibility .18s ease;
+}
+
+/* Term label inside bubble */
+.tt-bubble strong {
+  display: block;
+  color: var(--gold-light);
+  font-size: .82rem;
+  margin-bottom: 4px;
+  font-weight: 700;
+  font-family: var(--font-body);
+}
+
+/* Arrow — small triangle; JS adds a class for direction */
+.tt-bubble::before {
+  content: '';
+  position: absolute;
+  width: 0; height: 0;
+  border: 6px solid transparent;
+}
+
+/* Arrow pointing DOWN (tooltip is above trigger) */
+.tt-bubble.tt-above::before {
+  top: 100%;
+  left: var(--arrow-left, 50%);
+  transform: translateX(-50%);
+  border-top-color: var(--navy-dark);
+  border-bottom: none;
+}
+
+/* Arrow pointing UP (tooltip is below trigger) */
+.tt-bubble.tt-below::before {
+  bottom: 100%;
+  left: var(--arrow-left, 50%);
+  transform: translateX(-50%);
+  border-bottom-color: var(--navy-dark);
+  border-top: none;
+}
+
+/* Show state */
+.tt.tt-active .tt-bubble {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: none;
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .tt-bubble { transition: none; }
+}
 </style>
 </head>
 <body>
@@ -707,7 +867,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
       <span class="nav-num">3</span>Poisoning Attacks
     </button>
     <button class="nav-btn" data-section="3">
-      <span class="nav-num">4</span>Denial of Service
+      <span class="nav-num">4</span><span class="tt" role="term" tabindex="0" aria-label="Denial of Service: DoS — an attack that makes a system, service, or network unavailable by overwhelming it with traffic, consuming its resources, or exploiting a crash-inducing vulnerability.">Denial of Service<span class="tt-bubble" role="tooltip"><strong>Denial of Service</strong>DoS — an attack that makes a system, service, or network unavailable by overwhelming it with traffic, consuming its resources, or exploiting a crash-inducing vulnerability.</span></span>
     </button>
     <button class="nav-btn" data-section="4">
       <span class="nav-num">5</span>Web App Attacks
@@ -743,26 +903,26 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
   </div>
   <div class="section-body">
     <h3>Welcome</h3>
-    <p>Understanding how attackers compromise applications and networks is foundational to defending them. This lesson examines the full spectrum of application-level and network-level attack techniques—from man-in-the-middle interception and ARP/DNS poisoning to SQL injection, cross-site scripting, denial-of-service floods, and buffer overflow exploits. You will also explore modern attack vectors including API abuse, supply chain attacks, and on-path attacks that appear in the current Security+ exam.</p>
+    <p>Understanding how attackers compromise applications and networks is foundational to defending them. This lesson examines the full spectrum of application-level and network-level attack techniques—from <span class="tt" role="term" tabindex="0" aria-label="man-in-the-middle: An attack where the adversary secretly intercepts and possibly alters communications between two parties who believe they are talking directly. Updated SY0-701 term: on-path attack.">man-in-the-middle<span class="tt-bubble" role="tooltip"><strong>man-in-the-middle</strong>An attack where the adversary secretly intercepts and possibly alters communications between two parties who believe they are talking directly. Updated SY0-701 term: on-path attack.</span></span> interception and ARP/<span class="tt" role="term" tabindex="0" aria-label="DNS poisoning: Inserting fraudulent DNS records into a resolver&#39;s cache, causing users to be directed to attacker-controlled IP addresses when resolving domain names.">DNS poisoning<span class="tt-bubble" role="tooltip"><strong>DNS poisoning</strong>Inserting fraudulent DNS records into a resolver's cache, causing users to be directed to attacker-controlled IP addresses when resolving domain names.</span></span> to <span class="tt" role="term" tabindex="0" aria-label="SQL injection: SQLi — inserting malicious SQL code into input fields to manipulate the backend database: bypassing authentication, extracting data, or deleting records.">SQL injection<span class="tt-bubble" role="tooltip"><strong>SQL injection</strong>SQLi — inserting malicious SQL code into input fields to manipulate the backend database: bypassing authentication, extracting data, or deleting records.</span></span>, <span class="tt" role="term" tabindex="0" aria-label="cross-site scripting: XSS — injecting malicious scripts into web pages viewed by other users, enabling session hijacking, credential theft, or malicious redirects.">cross-site scripting<span class="tt-bubble" role="tooltip"><strong>cross-site scripting</strong>XSS — injecting malicious scripts into web pages viewed by other users, enabling session hijacking, credential theft, or malicious redirects.</span></span>, denial-of-service floods, and <span class="tt" role="term" tabindex="0" aria-label="buffer overflow: Occurs when a program writes more data into a buffer than it can hold, overwriting adjacent memory. Attackers exploit this to inject and execute arbitrary code.">buffer overflow<span class="tt-bubble" role="tooltip"><strong>buffer overflow</strong>Occurs when a program writes more data into a buffer than it can hold, overwriting adjacent memory. Attackers exploit this to inject and execute arbitrary code.</span></span> exploits. You will also explore modern attack vectors including API abuse, supply chain attacks, and on-path attacks that appear in the current Security+ exam.</p>
     <p>This lesson aligns with <strong>CompTIA Security+ SY0-701</strong>, specifically Domain 2 (Threats, Vulnerabilities &amp; Mitigations) objectives covering attack techniques, indicators of compromise, and application security weaknesses.</p>
 
     <h3>Learning Objectives</h3>
     <div class="card-grid">
       <div class="info-card danger-card">
         <h4>&#128272; Objective 1: Interception &amp; Poisoning</h4>
-        <p>Identify man-in-the-middle, on-path, replay, ARP poisoning, and DNS poisoning attacks and their mechanisms.</p>
+        <p>Identify man-in-the-middle, on-path, replay, <span class="tt" role="term" tabindex="0" aria-label="ARP poisoning: Corrupting a device&#39;s ARP cache with false MAC-to-IP mappings, causing traffic to be sent to an attacker-controlled host instead of the intended destination.">ARP poisoning<span class="tt-bubble" role="tooltip"><strong>ARP poisoning</strong>Corrupting a device's ARP cache with false MAC-to-IP mappings, causing traffic to be sent to an attacker-controlled host instead of the intended destination.</span></span>, and DNS poisoning attacks and their mechanisms.</p>
       </div>
       <div class="info-card danger-card">
         <h4>&#128165; Objective 2: Denial of Service</h4>
-        <p>Explain DoS and DDoS attack types — SYN flood, Smurf, DNS amplification, and volumetric/protocol/application-layer variants.</p>
+        <p>Explain <span class="tt" role="term" tabindex="0" aria-label="DoS: Denial of Service — an attack aimed at making a resource unavailable to legitimate users by overwhelming or crashing it.">DoS<span class="tt-bubble" role="tooltip"><strong>DoS</strong>Denial of Service — an attack aimed at making a resource unavailable to legitimate users by overwhelming or crashing it.</span></span> and <span class="tt" role="term" tabindex="0" aria-label="DDoS: Distributed Denial of Service — a DoS attack launched simultaneously from hundreds or thousands of compromised hosts (a botnet), making it much harder to block.">DDoS<span class="tt-bubble" role="tooltip"><strong>DDoS</strong>Distributed Denial of Service — a DoS attack launched simultaneously from hundreds or thousands of compromised hosts (a botnet), making it much harder to block.</span></span> attack types — <span class="tt" role="term" tabindex="0" aria-label="SYN flood: A DoS attack exploiting the TCP three-way handshake — the attacker sends many SYN packets with spoofed source IPs, exhausting the server&#39;s half-open connection table.">SYN flood<span class="tt-bubble" role="tooltip"><strong>SYN flood</strong>A DoS attack exploiting the TCP three-way handshake — the attacker sends many SYN packets with spoofed source IPs, exhausting the server's half-open connection table.</span></span>, Smurf, <span class="tt" role="term" tabindex="0" aria-label="DNS amplification: A DDoS reflection attack that sends small DNS queries with a spoofed victim IP to open resolvers, which return large responses — amplifying traffic toward the target.">DNS amplification<span class="tt-bubble" role="tooltip"><strong>DNS amplification</strong>A DDoS reflection attack that sends small DNS queries with a spoofed victim IP to open resolvers, which return large responses — amplifying traffic toward the target.</span></span>, and volumetric/protocol/application-layer variants.</p>
       </div>
       <div class="info-card warning-card">
         <h4>&#128187; Objective 3: Web Application Attacks</h4>
-        <p>Describe XSS, XSRF, SQL injection, command injection, directory traversal, and file inclusion vulnerabilities.</p>
+        <p>Describe <span class="tt" role="term" tabindex="0" aria-label="XSS: Cross-Site Scripting — an injection attack where malicious scripts are embedded in web pages viewed by victims, allowing cookie theft, session hijacking, or keylogging.">XSS<span class="tt-bubble" role="tooltip"><strong>XSS</strong>Cross-Site Scripting — an injection attack where malicious scripts are embedded in web pages viewed by victims, allowing cookie theft, session hijacking, or keylogging.</span></span>, <span class="tt" role="term" tabindex="0" aria-label="XSRF: Cross-Site Request Forgery — tricks an authenticated user&#39;s browser into sending an unintended request to a site where they are logged in, performing actions on their behalf.">XSRF<span class="tt-bubble" role="tooltip"><strong>XSRF</strong>Cross-Site Request Forgery — tricks an authenticated user's browser into sending an unintended request to a site where they are logged in, performing actions on their behalf.</span></span>, SQL injection, <span class="tt" role="term" tabindex="0" aria-label="command injection: An attack that passes malicious input to a system shell, causing the server to execute arbitrary OS commands with the web application&#39;s privilege level.">command injection<span class="tt-bubble" role="tooltip"><strong>command injection</strong>An attack that passes malicious input to a system shell, causing the server to execute arbitrary OS commands with the web application's privilege level.</span></span>, <span class="tt" role="term" tabindex="0" aria-label="directory traversal: Path traversal — using sequences like &#39;../&#39; in file path inputs to navigate outside the web root and access sensitive server files such as /etc/passwd or private keys.">directory traversal<span class="tt-bubble" role="tooltip"><strong>directory traversal</strong>Path traversal — using sequences like '../' in file path inputs to navigate outside the web root and access sensitive server files such as /etc/passwd or private keys.</span></span>, and file inclusion vulnerabilities.</p>
       </div>
       <div class="info-card">
         <h4>&#128737; Objective 4: Hijacking &amp; Overflow</h4>
-        <p>Explain session hijacking, URL/domain/clickjacking, buffer overflow, integer overflow, and privilege escalation.</p>
+        <p>Explain <span class="tt" role="term" tabindex="0" aria-label="session hijacking: Stealing or forging a valid session token to impersonate an authenticated user, gaining access to their account without knowing their credentials.">session hijacking<span class="tt-bubble" role="tooltip"><strong>session hijacking</strong>Stealing or forging a valid session token to impersonate an authenticated user, gaining access to their account without knowing their credentials.</span></span>, URL/domain/<span class="tt" role="term" tabindex="0" aria-label="clickjacking: UI redressing — overlaying a legitimate page with a transparent iframe to trick users into clicking on hidden elements, performing unintended actions.">clickjacking<span class="tt-bubble" role="tooltip"><strong>clickjacking</strong>UI redressing — overlaying a legitimate page with a transparent iframe to trick users into clicking on hidden elements, performing unintended actions.</span></span>, buffer overflow, <span class="tt" role="term" tabindex="0" aria-label="integer overflow: Occurs when an arithmetic operation produces a value larger than the data type can store, causing it to wrap around — exploitable to bypass bounds checks or allocate undersized buffers.">integer overflow<span class="tt-bubble" role="tooltip"><strong>integer overflow</strong>Occurs when an arithmetic operation produces a value larger than the data type can store, causing it to wrap around — exploitable to bypass bounds checks or allocate undersized buffers.</span></span>, and <span class="tt" role="term" tabindex="0" aria-label="privilege escalation: Gaining access rights beyond what was originally granted — vertical escalation elevates to admin/root; horizontal escalation accesses another user&#39;s resources at the same level.">privilege escalation<span class="tt-bubble" role="tooltip"><strong>privilege escalation</strong>Gaining access rights beyond what was originally granted — vertical escalation elevates to admin/root; horizontal escalation accesses another user's resources at the same level.</span></span>.</p>
       </div>
     </div>
 
@@ -788,23 +948,23 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
 <section class="lesson-section" id="section-1" aria-label="Interception Attacks">
   <div class="section-header">
     <h2>Interception Attacks</h2>
-    <span class="obj-tag">MITM &bull; On-Path &bull; Replay &bull; MITB</span>
+    <span class="obj-tag"><span class="tt" role="term" tabindex="0" aria-label="MITM: Man-in-the-Middle — an interception attack where the attacker secretly relays and may alter communications between two parties. SY0-701 prefers the term &#39;on-path attack&#39;.">MITM<span class="tt-bubble" role="tooltip"><strong>MITM</strong>Man-in-the-Middle — an interception attack where the attacker secretly relays and may alter communications between two parties. SY0-701 prefers the term 'on-path attack'.</span></span> &bull; On-Path &bull; Replay &bull; <span class="tt" role="term" tabindex="0" aria-label="MITB: Man-in-the-Browser — malware that hooks into a browser&#39;s API to intercept and modify web transactions in real time, after TLS decryption. HTTPS alone does not protect against MITB.">MITB<span class="tt-bubble" role="tooltip"><strong>MITB</strong>Man-in-the-Browser — malware that hooks into a browser's API to intercept and modify web transactions in real time, after TLS decryption. HTTPS alone does not protect against MITB.</span></span></span>
   </div>
   <div class="section-body">
 
     <h3>What Are Interception Attacks?</h3>
-    <p>Interception attacks involve a threat actor inserting themselves into a communication path between two parties—without either party's knowledge. The attacker may silently observe, record, or actively modify the data in transit. The Security+ SY0-701 exam uses the updated term <strong>on-path attack</strong> (previously man-in-the-middle) to reflect attacker positioning on the network path.</p>
+    <p>Interception attacks involve a threat actor inserting themselves into a communication path between two parties—without either party's knowledge. The attacker may silently observe, record, or actively modify the data in transit. The Security+ SY0-701 exam uses the updated term <strong><span class="tt" role="term" tabindex="0" aria-label="on-path attack: An attack where the adversary secretly positions themselves between two communicating parties to intercept, relay, or alter traffic. Formerly called Man-in-the-Middle (MITM). Key term on Security+ SY0-701.">on-path attack<span class="tt-bubble" role="tooltip"><strong>on-path attack</strong>An attack where the adversary secretly positions themselves between two communicating parties to intercept, relay, or alter traffic. Formerly called Man-in-the-Middle (MITM). Key term on Security+ SY0-701.</span></span></strong> (previously man-in-the-middle) to reflect attacker positioning on the network path.</p>
 
     <div class="sub-tabs" role="tablist" aria-label="Interception attack types">
       <button class="sub-tab-btn active" role="tab" aria-selected="true" data-tab="mitm-tab">On-Path / MITM</button>
-      <button class="sub-tab-btn" role="tab" aria-selected="false" data-tab="mitb-tab">Man-in-the-Browser</button>
+      <button data-tipterm="Man-in-the-Browser" data-tipdef="A MITM variant where malware hooks inside the browser, intercepting and altering web transactions after TLS decryption — bypassing HTTPS protections entirely." class="sub-tab-btn" role="tab" aria-selected="false" data-tab="mitb-tab">Man-in-the-Browser</button>
       <button class="sub-tab-btn" role="tab" aria-selected="false" data-tab="replay-tab">Replay Attacks</button>
-      <button class="sub-tab-btn" role="tab" aria-selected="false" data-tab="ssl-strip-tab">SSL Stripping</button>
+      <button data-tipterm="SSL Stripping" data-tipdef="A downgrade attack that converts HTTPS connections to plaintext HTTP by intercepting the initial HTTP request before a redirect to HTTPS. Defeated by HSTS." class="sub-tab-btn" role="tab" aria-selected="false" data-tab="ssl-strip-tab">SSL Stripping</button>
     </div>
 
     <div class="sub-tab-content active" id="mitm-tab">
       <h4>On-Path Attack (Man-in-the-Middle)</h4>
-      <p>In an on-path attack, the attacker intercepts traffic between a client and server, often using ARP spoofing or rogue access points to redirect traffic. The attacker can eavesdrop, inject content, or relay modified messages while both parties believe they are communicating directly with each other.</p>
+      <p>In an on-path attack, the attacker intercepts traffic between a client and server, often using <span class="tt" role="term" tabindex="0" aria-label="ARP spoofing: Sending forged ARP (Address Resolution Protocol) replies to associate the attacker&#39;s MAC address with a legitimate IP, poisoning ARP caches and redirecting traffic.">ARP spoofing<span class="tt-bubble" role="tooltip"><strong>ARP spoofing</strong>Sending forged ARP (Address Resolution Protocol) replies to associate the attacker's MAC address with a legitimate IP, poisoning ARP caches and redirecting traffic.</span></span> or rogue access points to redirect traffic. The attacker can eavesdrop, inject content, or relay modified messages while both parties believe they are communicating directly with each other.</p>
 
       <!-- Attack Flow Diagram -->
       <div class="attack-flow" role="img" aria-label="On-path attack flow diagram">
@@ -836,7 +996,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
           </div>
         </div>
         <div class="flow-detail" id="mitm-detail-0">Alice sends a request (e.g., HTTP GET or login form) believing she is communicating directly with Bob's server. Normally, traffic routes through the network path between them.</div>
-        <div class="flow-detail" id="mitm-detail-1">The attacker has positioned themselves on the network path — through ARP cache poisoning, rogue Wi-Fi AP, BGP hijacking, or DNS spoofing — so Alice's traffic is routed through the attacker's system first.</div>
+        <div class="flow-detail" id="mitm-detail-1">The attacker has positioned themselves on the network path — through ARP cache poisoning, rogue Wi-Fi AP, <span class="tt" role="term" tabindex="0" aria-label="BGP hijacking: Injecting false routing information into the Border Gateway Protocol (BGP) to redirect internet traffic through attacker-controlled infrastructure at a large scale.">BGP hijacking<span class="tt-bubble" role="tooltip"><strong>BGP hijacking</strong>Injecting false routing information into the Border Gateway Protocol (BGP) to redirect internet traffic through attacker-controlled infrastructure at a large scale.</span></span>, or DNS spoofing — so Alice's traffic is routed through the attacker's system first.</div>
         <div class="flow-detail" id="mitm-detail-2">The attacker forwards the (possibly modified) request to the real server. The server responds normally, believing it is communicating with Alice directly. The attacker receives the server's response.</div>
         <div class="flow-detail" id="mitm-detail-3">The attacker may modify the server's response — injecting malicious scripts, changing account numbers, downgrading security settings, or simply logging credentials — before forwarding it to Alice.</div>
         <div class="flow-detail" id="mitm-detail-4">Alice receives the (potentially modified) response and has no indication that her communication was intercepted. The entire attack is transparent to both parties when executed successfully.</div>
@@ -861,10 +1021,10 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
       <div class="highlight-card">
         <span class="card-label">Countermeasures</span>
         <ul>
-          <li><strong>HTTPS / TLS:</strong> Encrypts traffic so interception yields ciphertext only; certificate validation prevents spoofed servers</li>
-          <li><strong>HSTS:</strong> HTTP Strict Transport Security prevents SSL stripping by enforcing HTTPS</li>
-          <li><strong>Certificate Pinning:</strong> Applications verify server certificates match expected values</li>
-          <li><strong>Dynamic ARP Inspection (DAI):</strong> Switches validate ARP packets against a DHCP snooping table</li>
+          <li><strong>HTTPS / <span class="tt" role="term" tabindex="0" aria-label="TLS: Transport Layer Security — the standard cryptographic protocol for securing network communications, successor to SSL. Uses asymmetric crypto for key exchange and symmetric for bulk data encryption.">TLS<span class="tt-bubble" role="tooltip"><strong>TLS</strong>Transport Layer Security — the standard cryptographic protocol for securing network communications, successor to SSL. Uses asymmetric crypto for key exchange and symmetric for bulk data encryption.</span></span>:</strong> Encrypts traffic so interception yields ciphertext only; certificate validation prevents spoofed servers</li>
+          <li><strong><span class="tt" role="term" tabindex="0" aria-label="HSTS: HTTP Strict Transport Security — a response header that instructs browsers to connect only via HTTPS for a defined period, preventing SSL stripping and protocol downgrade attacks.">HSTS<span class="tt-bubble" role="tooltip"><strong>HSTS</strong>HTTP Strict Transport Security — a response header that instructs browsers to connect only via HTTPS for a defined period, preventing SSL stripping and protocol downgrade attacks.</span></span>:</strong> HTTP Strict Transport Security prevents SSL stripping by enforcing HTTPS</li>
+          <li><strong><span class="tt" role="term" tabindex="0" aria-label="Certificate Pinning: A technique where an application only accepts a specific certificate or public key for a server, preventing attacks using fraudulent but CA-signed certificates.">Certificate Pinning<span class="tt-bubble" role="tooltip"><strong>Certificate Pinning</strong>A technique where an application only accepts a specific certificate or public key for a server, preventing attacks using fraudulent but CA-signed certificates.</span></span>:</strong> Applications verify server certificates match expected values</li>
+          <li><strong><span class="tt" role="term" tabindex="0" aria-label="Dynamic ARP Inspection: DAI — a switch security feature that validates ARP packets against a DHCP snooping binding table, dropping packets with mismatched MAC-to-IP mappings to prevent ARP spoofing.">Dynamic ARP Inspection<span class="tt-bubble" role="tooltip"><strong>Dynamic ARP Inspection</strong>DAI — a switch security feature that validates ARP packets against a DHCP snooping binding table, dropping packets with mismatched MAC-to-IP mappings to prevent ARP spoofing.</span></span> (<span class="tt" role="term" tabindex="0" aria-label="DAI: Dynamic ARP Inspection — switch feature that validates ARP packets against trusted DHCP snooping tables to block ARP spoofing attacks.">DAI<span class="tt-bubble" role="tooltip"><strong>DAI</strong>Dynamic ARP Inspection — switch feature that validates ARP packets against trusted DHCP snooping tables to block ARP spoofing attacks.</span></span>):</strong> Switches validate ARP packets against a DHCP snooping table</li>
           <li><strong>802.1X Port Authentication:</strong> Prevents unauthorized devices from connecting to the network</li>
         </ul>
       </div>
@@ -921,7 +1081,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
 
     <div class="sub-tab-content" id="replay-tab">
       <h4>Replay Attacks</h4>
-      <p>In a replay attack, the attacker captures a valid data transmission (such as authentication credentials or a session token) and retransmits it later to authenticate as the legitimate user. The captured data may be encrypted — the attacker does not need to decrypt it, only to replay it.</p>
+      <p>In a <span class="tt" role="term" tabindex="0" aria-label="replay attack: An attack where a valid authentication token or message is captured and retransmitted later to impersonate the original sender. Defeated by nonces, timestamps, or session tokens.">replay attack<span class="tt-bubble" role="tooltip"><strong>replay attack</strong>An attack where a valid authentication token or message is captured and retransmitted later to impersonate the original sender. Defeated by nonces, timestamps, or session tokens.</span></span>, the attacker captures a valid data transmission (such as authentication credentials or a <span class="tt" role="term" tabindex="0" aria-label="session token: A unique identifier issued by a server after authentication; presented by the client on subsequent requests to prove the session is authenticated without re-sending credentials.">session token<span class="tt-bubble" role="tooltip"><strong>session token</strong>A unique identifier issued by a server after authentication; presented by the client on subsequent requests to prove the session is authenticated without re-sending credentials.</span></span>) and retransmits it later to authenticate as the legitimate user. The captured data may be encrypted — the attacker does not need to decrypt it, only to replay it.</p>
 
       <div class="resp-table-wrap">
         <table class="resp-table" aria-label="Replay attack scenarios">
@@ -950,7 +1110,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
               <td>Session Token Replay</td>
               <td>Session cookie from HTTP traffic</td>
               <td>Replayed to hijack authenticated session</td>
-              <td>Short-lived tokens, Secure/HttpOnly cookies</td>
+              <td>Short-lived tokens, Secure/<span class="tt" role="term" tabindex="0" aria-label="HttpOnly: A cookie attribute that prevents JavaScript from accessing the cookie, protecting session tokens from being stolen via XSS attacks.">HttpOnly<span class="tt-bubble" role="tooltip"><strong>HttpOnly</strong>A cookie attribute that prevents JavaScript from accessing the cookie, protecting session tokens from being stolen via XSS attacks.</span></span> cookies</td>
             </tr>
             <tr>
               <td>Wireless Frame Replay</td>
@@ -964,7 +1124,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
 
       <div class="highlight-card">
         <span class="card-label">Key Defense: Nonces &amp; Timestamps</span>
-        <p>Modern authentication protocols defeat replay attacks by including a <strong>nonce</strong> (number used once) or <strong>timestamp</strong> in each session. If the same message is replayed, the receiving system detects that the nonce has already been used or the timestamp has expired, and rejects the authentication.</p>
+        <p>Modern authentication protocols defeat replay attacks by including a <strong><span class="tt" role="term" tabindex="0" aria-label="nonce: Number Used Once — a random or pseudo-random value included in authentication protocols to prevent replay attacks. Each nonce is valid for only one use.">nonce<span class="tt-bubble" role="tooltip"><strong>nonce</strong>Number Used Once — a random or pseudo-random value included in authentication protocols to prevent replay attacks. Each nonce is valid for only one use.</span></span></strong> (number used once) or <strong>timestamp</strong> in each session. If the same message is replayed, the receiving system detects that the nonce has already been used or the timestamp has expired, and rejects the authentication.</p>
       </div>
     </div>
 
@@ -1043,13 +1203,13 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
         <li><strong>Dynamic ARP Inspection (DAI):</strong> Switch feature that validates ARP packets against the DHCP snooping binding table; drops packets with mismatched MAC-to-IP mappings</li>
         <li><strong>Static ARP entries:</strong> Manually configure ARP entries for critical systems (impractical at scale)</li>
         <li><strong>Port security:</strong> Limits number of MAC addresses per switch port</li>
-        <li><strong>Encrypted protocols:</strong> Even if traffic is redirected, TLS/IPsec encryption prevents data from being read</li>
+        <li><strong>Encrypted protocols:</strong> Even if traffic is redirected, TLS/<span class="tt" role="term" tabindex="0" aria-label="IPsec: Internet Protocol Security — a suite of protocols that authenticates and encrypts IP packets, commonly used for VPNs. Operates at the network layer.">IPsec<span class="tt-bubble" role="tooltip"><strong>IPsec</strong>Internet Protocol Security — a suite of protocols that authenticates and encrypts IP packets, commonly used for VPNs. Operates at the network layer.</span></span> encryption prevents data from being read</li>
         <li><strong>XDR/NDR tools:</strong> Detect anomalous ARP traffic patterns and gratuitous ARP broadcasts</li>
       </ul>
     </div>
 
     <!-- DNS Poisoning -->
-    <h3>DNS Poisoning (DNS Cache Poisoning / Spoofing)</h3>
+    <h3>DNS Poisoning (<span class="tt" role="term" tabindex="0" aria-label="DNS Cache Poisoning: Inserting fraudulent DNS records into a resolver&#39;s cache so that legitimate domain name lookups return attacker-controlled IP addresses.">DNS Cache Poisoning<span class="tt-bubble" role="tooltip"><strong>DNS Cache Poisoning</strong>Inserting fraudulent DNS records into a resolver's cache so that legitimate domain name lookups return attacker-controlled IP addresses.</span></span> / Spoofing)</h3>
     <p>The Domain Name System (DNS) translates human-readable hostnames into IP addresses. DNS poisoning injects false DNS records into a resolver's cache, causing clients that query that resolver to receive malicious IP addresses and connect to attacker-controlled servers instead of legitimate ones.</p>
 
     <div class="resp-table-wrap">
@@ -1067,7 +1227,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
             <td>Cache Poisoning (Kaminsky Attack)</td>
             <td>Flood resolver with forged responses; predict transaction ID</td>
             <td>Resolver caches malicious IP for entire domain</td>
-            <td>DNSSEC, source port randomization</td>
+            <td><span class="tt" role="term" tabindex="0" aria-label="DNSSEC: DNS Security Extensions — adds cryptographic signatures to DNS records so resolvers can verify authenticity and detect forged responses.">DNSSEC<span class="tt-bubble" role="tooltip"><strong>DNSSEC</strong>DNS Security Extensions — adds cryptographic signatures to DNS records so resolvers can verify authenticity and detect forged responses.</span></span>, source port randomization</td>
           </tr>
           <tr>
             <td>Local Hosts File Modification</td>
@@ -1079,7 +1239,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
             <td>Rogue DNS Server</td>
             <td>Configure victim device to use attacker's DNS server</td>
             <td>All DNS resolution under attacker control</td>
-            <td>DHCP snooping, 802.1X, DNS-over-HTTPS (DoH)</td>
+            <td>DHCP snooping, 802.1X, <span class="tt" role="term" tabindex="0" aria-label="DNS-over-HTTPS: DoH — encrypts DNS queries inside HTTPS traffic, preventing eavesdropping and tampering with DNS lookups.">DNS-over-HTTPS<span class="tt-bubble" role="tooltip"><strong>DNS-over-HTTPS</strong>DoH — encrypts DNS queries inside HTTPS traffic, preventing eavesdropping and tampering with DNS lookups.</span></span> (DoH)</td>
           </tr>
           <tr>
             <td>DNS Amplification (also a DDoS)</td>
@@ -1095,7 +1255,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
       <div class="compare-col attack-col">
         <h4>&#128165; DNSSEC — How It Works</h4>
         <p><strong>DNS Security Extensions (DNSSEC)</strong> adds cryptographic signatures to DNS records. Each zone signs its resource records with a private key; resolvers verify these signatures using the zone's public key. Forged DNS responses without valid signatures are rejected, preventing cache poisoning.</p>
-        <p>DNSSEC does <em>not</em> encrypt DNS traffic — it only provides authentication and integrity. DNS-over-HTTPS (DoH) and DNS-over-TLS (DoT) add privacy by encrypting the DNS query itself.</p>
+        <p>DNSSEC does <em>not</em> encrypt DNS traffic — it only provides authentication and integrity. DNS-over-HTTPS (DoH) and <span class="tt" role="term" tabindex="0" aria-label="DNS-over-TLS: DoT — encrypts DNS queries using TLS on port 853, protecting DNS traffic from interception and manipulation.">DNS-over-TLS<span class="tt-bubble" role="tooltip"><strong>DNS-over-TLS</strong>DoT — encrypts DNS queries using TLS on port 853, protecting DNS traffic from interception and manipulation.</span></span> (DoT) add privacy by encrypting the DNS query itself.</p>
       </div>
       <div class="compare-col defense-col">
         <h4>&#9989; Modern DNS Defenses</h4>
@@ -1121,7 +1281,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
       </div>
       <div class="info-card warning-card">
         <h4>Horizontal Privilege Escalation</h4>
-        <p>A user accesses resources or data of another user at the same privilege level — e.g., viewing another user's bank account by manipulating a URL parameter. Also called an Insecure Direct Object Reference (IDOR).</p>
+        <p>A user accesses resources or data of another user at the same privilege level — e.g., viewing another user's bank account by manipulating a URL parameter. Also called an Insecure Direct Object Reference (<span class="tt" role="term" tabindex="0" aria-label="IDOR: Insecure Direct Object Reference — a vulnerability where user-supplied identifiers (like order IDs) directly reference server-side objects without proper authorization checks.">IDOR<span class="tt-bubble" role="tooltip"><strong>IDOR</strong>Insecure Direct Object Reference — a vulnerability where user-supplied identifiers (like order IDs) directly reference server-side objects without proper authorization checks.</span></span>).</p>
         <span class="severity sev-high">High</span>
       </div>
       <div class="info-card">
@@ -1154,7 +1314,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
   <div class="section-body">
 
     <h3>What Is Denial of Service?</h3>
-    <p>A Denial of Service (DoS) attack attempts to make a system, network, or service unavailable to its intended users by overwhelming it with requests, consuming its resources, or exploiting a vulnerability that causes it to crash. Modern DoS attacks are almost always <strong>Distributed DoS (DDoS)</strong> — coordinated from hundreds or thousands of compromised devices (a botnet) simultaneously.</p>
+    <p>A Denial of Service (DoS) attack attempts to make a system, network, or service unavailable to its intended users by overwhelming it with requests, consuming its resources, or exploiting a vulnerability that causes it to crash. Modern DoS attacks are almost always <strong>Distributed DoS (DDoS)</strong> — coordinated from hundreds or thousands of compromised devices (a <span class="tt" role="term" tabindex="0" aria-label="botnet: A network of internet-connected devices infected with malware and controlled by a command-and-control (C2) server, often used to launch DDoS attacks or spread spam.">botnet<span class="tt-bubble" role="tooltip"><strong>botnet</strong>A network of internet-connected devices infected with malware and controlled by a command-and-control (C2) server, often used to launch DDoS attacks or spread spam.</span></span>) simultaneously.</p>
 
     <div class="card-grid">
       <div class="info-card danger-card">
@@ -1204,7 +1364,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
     <div class="highlight-card">
       <span class="card-label">SYN Flood Defenses</span>
       <ul>
-        <li><strong>SYN Cookies:</strong> Server generates a cryptographic SYN cookie instead of allocating state; only allocates resources when valid ACK is received</li>
+        <li><strong><span class="tt" role="term" tabindex="0" aria-label="SYN Cookies: A TCP defense mechanism where the server generates a cryptographic cookie instead of allocating state for a half-open connection; resources are only committed upon receiving a valid ACK.">SYN Cookies<span class="tt-bubble" role="tooltip"><strong>SYN Cookies</strong>A TCP defense mechanism where the server generates a cryptographic cookie instead of allocating state for a half-open connection; resources are only committed upon receiving a valid ACK.</span></span>:</strong> Server generates a cryptographic SYN cookie instead of allocating state; only allocates resources when valid ACK is received</li>
         <li><strong>Rate Limiting:</strong> Limit SYN packets per source IP per second</li>
         <li><strong>Firewall Stateful Inspection:</strong> Drop half-open connections after a timeout threshold</li>
         <li><strong>Anycast Network Diffusion:</strong> Distribute traffic across multiple global nodes to absorb volumetric attacks</li>
@@ -1212,7 +1372,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
     </div>
 
     <!-- DNS Amplification -->
-    <h3>DNS Amplification Attack</h3>
+    <h3>DNS <span class="tt" role="term" tabindex="0" aria-label="Amplification Attack: A DDoS technique that exploits protocols (DNS, NTP, SSDP) where a small request generates a large response, allowing attackers to multiply traffic volume toward a victim.">Amplification Attack<span class="tt-bubble" role="tooltip"><strong>Amplification Attack</strong>A DDoS technique that exploits protocols (DNS, NTP, SSDP) where a small request generates a large response, allowing attackers to multiply traffic volume toward a victim.</span></span></h3>
     <p>DNS amplification is a volumetric DDoS attack that exploits open DNS resolvers. The attacker sends small DNS queries (typically for large record types like ANY or TXT) with the victim's IP address as the spoofed source. The DNS servers send large responses to the victim, amplifying the attack traffic by a factor of 50–70x. A 100 Mbps attack input can generate a multi-Gbps flood against the victim.</p>
 
     <div class="resp-table-wrap">
@@ -1245,7 +1405,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
             <td>Never expose Memcached to internet; use TCP</td>
           </tr>
           <tr>
-            <td>Smurf Attack (ICMP)</td>
+            <td><span class="tt" role="term" tabindex="0" aria-label="Smurf Attack: A DDoS amplification attack that spoofs the victim&#39;s IP and sends ICMP echo requests to a broadcast address, causing all hosts on the subnet to reply to the victim.">Smurf Attack<span class="tt-bubble" role="tooltip"><strong>Smurf Attack</strong>A DDoS amplification attack that spoofs the victim's IP and sends ICMP echo requests to a broadcast address, causing all hosts on the subnet to reply to the victim.</span></span> (ICMP)</td>
             <td>ICMP</td>
             <td>Varies by subnet size</td>
             <td>Block directed broadcasts, ingress filtering</td>
@@ -1291,9 +1451,9 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
     <p>In an XSS attack, the attacker injects malicious client-side scripts (typically JavaScript) into web pages that are then viewed by other users. The injected script executes in the victim's browser with the same trust as the legitimate website, allowing the attacker to steal session cookies, redirect users, keylog input, or perform actions on behalf of the victim.</p>
 
     <div class="sub-tabs" role="tablist" aria-label="XSS attack types">
-      <button class="sub-tab-btn active" role="tab" aria-selected="true" data-tab="xss-stored">Stored XSS</button>
-      <button class="sub-tab-btn" role="tab" aria-selected="false" data-tab="xss-reflected">Reflected XSS</button>
-      <button class="sub-tab-btn" role="tab" aria-selected="false" data-tab="xss-dom">DOM-Based XSS</button>
+      <button data-tipterm="Stored XSS" data-tipdef="Persistent XSS — malicious script is saved to the server (e.g., in a database or comment field) and served to every user who views that content." class="sub-tab-btn active" role="tab" aria-selected="true" data-tab="xss-stored">Stored XSS</button>
+      <button data-tipterm="Reflected XSS" data-tipdef="Non-persistent XSS — the malicious script is in the URL or request and is immediately reflected back in the response; the victim must click a crafted link." class="sub-tab-btn" role="tab" aria-selected="false" data-tab="xss-reflected">Reflected XSS</button>
+      <button data-tipterm="DOM-Based XSS" data-tipdef="XSS that occurs entirely in the browser when JavaScript reads attacker-controlled data from the DOM (e.g., URL fragment) and writes it back without sanitization." class="sub-tab-btn" role="tab" aria-selected="false" data-tab="xss-dom">DOM-Based XSS</button>
     </div>
 
     <div class="sub-tab-content active" id="xss-stored">
@@ -1315,15 +1475,15 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
       <span class="card-label">XSS Countermeasures</span>
       <ul>
         <li><strong>Output Encoding:</strong> Encode all user-controlled data before rendering in HTML, JavaScript, CSS, or URLs</li>
-        <li><strong>Content Security Policy (CSP):</strong> HTTP header that restricts which scripts the browser will execute</li>
+        <li><strong><span class="tt" role="term" tabindex="0" aria-label="Content Security Policy: CSP — an HTTP response header that tells the browser which script sources are trusted, blocking unauthorized scripts and mitigating XSS attacks.">Content Security Policy<span class="tt-bubble" role="tooltip"><strong>Content Security Policy</strong>CSP — an HTTP response header that tells the browser which script sources are trusted, blocking unauthorized scripts and mitigating XSS attacks.</span></span> (<span class="tt" role="term" tabindex="0" aria-label="CSP: Content Security Policy — HTTP header defining trusted script and resource sources, blocking execution of injected or unauthorized scripts to mitigate XSS.">CSP<span class="tt-bubble" role="tooltip"><strong>CSP</strong>Content Security Policy — HTTP header defining trusted script and resource sources, blocking execution of injected or unauthorized scripts to mitigate XSS.</span></span>):</strong> HTTP header that restricts which scripts the browser will execute</li>
         <li><strong>HttpOnly cookies:</strong> Prevents JavaScript from accessing session cookies</li>
         <li><strong>Input Validation:</strong> Allowlist validation of all user input server-side</li>
-        <li><strong>WAF (Web Application Firewall):</strong> Detect and block common XSS payloads at the perimeter</li>
+        <li><strong><span class="tt" role="term" tabindex="0" aria-label="WAF: Web Application Firewall — a security layer that inspects HTTP traffic to detect and block common web attacks such as SQLi, XSS, and CSRF before they reach the application.">WAF<span class="tt-bubble" role="tooltip"><strong>WAF</strong>Web Application Firewall — a security layer that inspects HTTP traffic to detect and block common web attacks such as SQLi, XSS, and CSRF before they reach the application.</span></span> (Web Application Firewall):</strong> Detect and block common XSS payloads at the perimeter</li>
       </ul>
     </div>
 
     <!-- XSRF -->
-    <h3>Cross-Site Request Forgery (CSRF / XSRF)</h3>
+    <h3><span class="tt" role="term" tabindex="0" aria-label="Cross-Site Request Forgery: CSRF/XSRF — exploits a site&#39;s trust in the user&#39;s browser, tricking it into sending authenticated requests to perform actions the user did not intend.">Cross-Site Request Forgery<span class="tt-bubble" role="tooltip"><strong>Cross-Site Request Forgery</strong>CSRF/XSRF — exploits a site's trust in the user's browser, tricking it into sending authenticated requests to perform actions the user did not intend.</span></span> (<span class="tt" role="term" tabindex="0" aria-label="CSRF: Cross-Site Request Forgery — an attack that tricks the victim&#39;s browser into sending authenticated requests to another site, performing unintended actions like fund transfers.">CSRF<span class="tt-bubble" role="tooltip"><strong>CSRF</strong>Cross-Site Request Forgery — an attack that tricks the victim's browser into sending authenticated requests to another site, performing unintended actions like fund transfers.</span></span> / XSRF)</h3>
     <p>CSRF tricks a victim's browser into making an unintended request to a web application where the victim is authenticated. The attack leverages the browser's automatic inclusion of cookies and session credentials with every request. Unlike XSS (which attacks the user via the site), CSRF attacks the site via the user's authenticated session.</p>
 
     <div class="compare-columns">
@@ -1341,7 +1501,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
         <h4>CSRF Defenses</h4>
         <ul style="font-size:.88rem;">
           <li><strong>CSRF Tokens:</strong> Unique, secret, per-session token in each form; validated server-side</li>
-          <li><strong>SameSite Cookie Attribute:</strong> Prevents cookies from being sent in cross-site requests (<code>SameSite=Strict</code> or <code>Lax</code>)</li>
+          <li><strong><span class="tt" role="term" tabindex="0" aria-label="SameSite: A cookie attribute (Strict/Lax/None) that controls when cookies are sent in cross-site requests, preventing CSRF attacks by restricting cross-origin cookie transmission.">SameSite<span class="tt-bubble" role="tooltip"><strong>SameSite</strong>A cookie attribute (Strict/Lax/None) that controls when cookies are sent in cross-site requests, preventing CSRF attacks by restricting cross-origin cookie transmission.</span></span> Cookie Attribute:</strong> Prevents cookies from being sent in cross-site requests (<code>SameSite=Strict</code> or <code>Lax</code>)</li>
           <li><strong>Referer/Origin Header Validation:</strong> Reject requests from unexpected origins</li>
           <li><strong>Re-authentication for sensitive actions:</strong> Require password confirmation for high-risk operations</li>
         </ul>
@@ -1373,7 +1533,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
             <td>Extract data from other tables in the database</td>
           </tr>
           <tr>
-            <td>Blind SQLi (Boolean)</td>
+            <td>Blind <span class="tt" role="term" tabindex="0" aria-label="SQLi: SQL Injection — an attack that inserts malicious SQL statements into input fields to control or compromise the backend database.">SQLi<span class="tt-bubble" role="tooltip"><strong>SQLi</strong>SQL Injection — an attack that inserts malicious SQL statements into input fields to control or compromise the backend database.</span></span> (Boolean)</td>
             <td><code>' AND 1=1 --</code> vs <code>' AND 1=2 --</code></td>
             <td>Infer data by observing true/false response differences</td>
           </tr>
@@ -1394,7 +1554,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
     <div class="highlight-card">
       <span class="card-label">SQL Injection Defenses</span>
       <ul>
-        <li><strong>Parameterized Queries / Prepared Statements:</strong> The ONLY reliable defense — SQL structure is defined before user input is added; input is always treated as data, never as SQL code</li>
+        <li><strong><span class="tt" role="term" tabindex="0" aria-label="Parameterized Queries: A SQL defense where the query structure is defined before user input is added; input is always treated as data, never as SQL code — the only reliable defense against SQL injection.">Parameterized Queries<span class="tt-bubble" role="tooltip"><strong>Parameterized Queries</strong>A SQL defense where the query structure is defined before user input is added; input is always treated as data, never as SQL code — the only reliable defense against SQL injection.</span></span> / <span class="tt" role="term" tabindex="0" aria-label="Prepared Statements: Pre-compiled SQL statements where parameters are bound separately from the query structure, ensuring user input cannot alter query logic — primary defense against SQL injection.">Prepared Statements<span class="tt-bubble" role="tooltip"><strong>Prepared Statements</strong>Pre-compiled SQL statements where parameters are bound separately from the query structure, ensuring user input cannot alter query logic — primary defense against SQL injection.</span></span>:</strong> The ONLY reliable defense — SQL structure is defined before user input is added; input is always treated as data, never as SQL code</li>
         <li><strong>Stored Procedures:</strong> Pre-compiled SQL; user input passed as parameters</li>
         <li><strong>Input Validation:</strong> Reject unexpected characters; use allowlists</li>
         <li><strong>Least Privilege:</strong> Database user for the application should have minimal permissions (no DROP/ALTER rights)</li>
@@ -1427,7 +1587,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
       </div>
       <div class="accordion-item">
         <button class="accordion-header" aria-expanded="false">
-          API Attacks &amp; Broken Object Level Authorization (BOLA) <span class="acc-icon">&#9660;</span>
+          API Attacks &amp; Broken Object Level Authorization (<span class="tt" role="term" tabindex="0" aria-label="BOLA: Broken Object Level Authorization (OWASP API #1) — also called IDOR, occurs when an API uses user-supplied IDs to access objects without verifying the requester is authorized for that specific object.">BOLA<span class="tt-bubble" role="tooltip"><strong>BOLA</strong>Broken Object Level Authorization (OWASP API #1) — also called IDOR, occurs when an API uses user-supplied IDs to access objects without verifying the requester is authorized for that specific object.</span></span>) <span class="acc-icon">&#9660;</span>
         </button>
         <div class="accordion-body">
           <p>APIs are increasingly targeted because they often expose the same data and functions as web applications but with less security maturity. <strong>BOLA (IDOR)</strong> — the #1 OWASP API Security risk — occurs when an API uses user-supplied identifiers to access objects without verifying the requesting user is authorized for that specific object.</p>
@@ -1484,7 +1644,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
       </div>
     </div>
 
-    <h3>URL Hijacking &amp; Domain Hijacking</h3>
+    <h3>URL Hijacking &amp; <span class="tt" role="term" tabindex="0" aria-label="Domain Hijacking: Unauthorized transfer of a domain name registration, giving the attacker full control of the domain and its DNS, email, and web traffic.">Domain Hijacking<span class="tt-bubble" role="tooltip"><strong>Domain Hijacking</strong>Unauthorized transfer of a domain name registration, giving the attacker full control of the domain and its DNS, email, and web traffic.</span></span></h3>
     <div class="resp-table-wrap">
       <table class="resp-table" aria-label="URL and domain hijacking comparison">
         <thead>
@@ -1497,7 +1657,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
         </thead>
         <tbody>
           <tr>
-            <td><strong>URL Hijacking (Typosquatting)</strong></td>
+            <td><strong>URL Hijacking (<span class="tt" role="term" tabindex="0" aria-label="Typosquatting: Registering domain names that are slight misspellings of popular sites (e.g., &#39;googgle.com&#39;) to intercept users who mistype URLs, often for phishing or malware delivery.">Typosquatting<span class="tt-bubble" role="tooltip"><strong>Typosquatting</strong>Registering domain names that are slight misspellings of popular sites (e.g., 'googgle.com') to intercept users who mistype URLs, often for phishing or malware delivery.</span></span>)</strong></td>
             <td>Register domain names that are common misspellings of legitimate sites</td>
             <td>Ad revenue, credential theft, malware distribution</td>
             <td><code>goggle.com</code>, <code>amazon.cm</code></td>
@@ -1574,8 +1734,8 @@ main { max-width: 1280px; margin: 0 auto; padding: 24px; }
     <div class="highlight-card">
       <span class="card-label">Buffer Overflow Countermeasures</span>
       <ul>
-        <li><strong>ASLR (Address Space Layout Randomization):</strong> Randomizes memory addresses at runtime, making it difficult to predict where shellcode is placed</li>
-        <li><strong>DEP/NX (Data Execution Prevention / No-Execute):</strong> Marks memory regions as non-executable, preventing code execution from the stack or heap</li>
+        <li><strong><span class="tt" role="term" tabindex="0" aria-label="ASLR: Address Space Layout Randomization — randomizes memory addresses of key data areas (stack, heap, libraries) at runtime, making it harder for attackers to predict where to redirect execution.">ASLR<span class="tt-bubble" role="tooltip"><strong>ASLR</strong>Address Space Layout Randomization — randomizes memory addresses of key data areas (stack, heap, libraries) at runtime, making it harder for attackers to predict where to redirect execution.</span></span> (Address Space Layout Randomization):</strong> Randomizes memory addresses at runtime, making it difficult to predict where shellcode is placed</li>
+        <li><strong><span class="tt" role="term" tabindex="0" aria-label="DEP: Data Execution Prevention — marks memory regions as non-executable, preventing the CPU from running code injected into data regions like the stack or heap.">DEP<span class="tt-bubble" role="tooltip"><strong>DEP</strong>Data Execution Prevention — marks memory regions as non-executable, preventing the CPU from running code injected into data regions like the stack or heap.</span></span>/NX (Data Execution Prevention / No-Execute):</strong> Marks memory regions as non-executable, preventing code execution from the stack or heap</li>
         <li><strong>Stack Canaries:</strong> Place a known value before the return address; if overwritten, the program terminates rather than executing attacker code</li>
         <li><strong>Safe String Functions:</strong> Use bounded functions (<code>strncpy</code>, <code>snprintf</code>) instead of unbounded (<code>strcpy</code>, <code>sprintf</code>)</li>
         <li><strong>Memory-Safe Languages:</strong> Rust, Go, and modern C++ practices eliminate entire classes of memory safety vulnerabilities</li>
@@ -2558,6 +2718,159 @@ function resetQuiz() {
 }
 
 document.addEventListener('DOMContentLoaded', buildQuiz);
+
+/* ===================================================================
+   SMART TOOLTIP ENGINE — viewport-aware, ADA-compliant
+=================================================================== */
+(function() {
+  const MARGIN = 12;   // gap between trigger and bubble
+  const EDGE   = 10;   // minimum distance from viewport edge
+
+  let activeEl = null;
+
+  function positionBubble(trigger) {
+    const bubble = trigger.querySelector('.tt-bubble');
+    if (!bubble) return;
+
+    const tr = trigger.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const bw = bubble.offsetWidth  || 280;
+    const bh = bubble.offsetHeight || 100;
+
+    // ── Vertical: prefer above, fall back to below ──────────────────
+    let top, arrowClass;
+    const spaceAbove = tr.top;
+    const spaceBelow = vh - tr.bottom;
+
+    if (spaceAbove >= bh + MARGIN + EDGE) {
+      top = tr.top - bh - MARGIN;
+      arrowClass = 'tt-above';
+    } else if (spaceBelow >= bh + MARGIN + EDGE) {
+      top = tr.bottom + MARGIN;
+      arrowClass = 'tt-below';
+    } else if (spaceAbove >= spaceBelow) {
+      top = Math.max(EDGE, tr.top - bh - MARGIN);
+      arrowClass = 'tt-above';
+    } else {
+      top = tr.bottom + MARGIN;
+      arrowClass = 'tt-below';
+    }
+
+    // ── Horizontal: center on trigger, clamp to viewport ───────────
+    let left = tr.left + tr.width / 2 - bw / 2;
+    left = Math.max(EDGE, Math.min(left, vw - bw - EDGE));
+
+    // Arrow horizontal position relative to bubble
+    const arrowLeft = (tr.left + tr.width / 2) - left;
+    const arrowClamped = Math.max(12, Math.min(arrowLeft, bw - 12));
+
+    bubble.classList.remove('tt-above', 'tt-below');
+    bubble.classList.add(arrowClass);
+    bubble.style.setProperty('--arrow-left', arrowClamped + 'px');
+    bubble.style.top  = top  + 'px';
+    bubble.style.left = left + 'px';
+  }
+
+  function showTip(el) {
+    if (activeEl && activeEl !== el) hideTip(activeEl);
+    activeEl = el;
+    el.classList.add('tt-active');
+    // Position after browser paints so offsetHeight is accurate
+    requestAnimationFrame(() => positionBubble(el));
+  }
+
+  function hideTip(el) {
+    if (!el) return;
+    el.classList.remove('tt-active');
+    if (activeEl === el) activeEl = null;
+  }
+
+  function initTooltips() {
+    document.querySelectorAll('.tt').forEach(el => {
+      // Mouse
+      el.addEventListener('mouseenter', () => showTip(el));
+      el.addEventListener('mouseleave', () => hideTip(el));
+
+      // Keyboard / focus
+      el.addEventListener('focus', () => showTip(el));
+      el.addEventListener('blur',  () => hideTip(el));
+
+      // Touch: tap once to show, tap again or tap elsewhere to hide
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        el.classList.contains('tt-active') ? hideTip(el) : showTip(el);
+      });
+    });
+
+    // Close any open tip on outside click/touch
+    document.addEventListener('click', () => { if (activeEl) hideTip(activeEl); });
+
+    // Reposition on scroll / resize while tip is open
+    ['scroll', 'resize'].forEach(evt =>
+      window.addEventListener(evt, () => { if (activeEl) positionBubble(activeEl); }, { passive: true })
+    );
+
+    // Escape key closes tip
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && activeEl) { hideTip(activeEl); activeEl.focus(); }
+    });
+  }
+
+  // ── Tab info icon initializer (shares showTip/hideTip from this scope) ──────
+  function initTabInfoIcons() {
+    document.querySelectorAll('.sub-tab-btn[data-tipterm]').forEach(btn => {
+      const term = btn.dataset.tipterm;
+      const def  = btn.dataset.tipdef;
+      if (!term || !def) return;
+
+      // Wrap the button in a flex container
+      const wrap = document.createElement('span');
+      wrap.className = 'sub-tab-wrap';
+      btn.parentNode.insertBefore(wrap, btn);
+      wrap.appendChild(btn);
+
+      // Create the ⓘ info button as a sibling (NOT inside btn)
+      const infoBtn = document.createElement('button');
+      infoBtn.type = 'button';
+      infoBtn.className = 'tab-tip-btn tt';
+      infoBtn.setAttribute('aria-label', `Definition for ${term}: ${def}`);
+      infoBtn.setAttribute('tabindex', '0');
+      infoBtn.innerHTML = `ⓘ<span class="tab-tip-hint">definition</span>`;
+
+      // Build the tooltip bubble on the infoBtn
+      const bubble = document.createElement('span');
+      bubble.className = 'tt-bubble';
+      bubble.setAttribute('role', 'tooltip');
+      bubble.innerHTML = `<strong>${term}</strong>${def}`;
+      infoBtn.appendChild(bubble);
+
+      // Events — showTip/hideTip are in the same IIFE scope
+      infoBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        infoBtn.classList.contains('tt-active') ? hideTip(infoBtn) : showTip(infoBtn);
+      });
+      infoBtn.addEventListener('mouseenter', () => showTip(infoBtn));
+      infoBtn.addEventListener('mouseleave', () => hideTip(infoBtn));
+      infoBtn.addEventListener('focus',      () => showTip(infoBtn));
+      infoBtn.addEventListener('blur',       () => hideTip(infoBtn));
+
+      wrap.appendChild(infoBtn);
+    });
+  }
+
+  // Run both inits after DOM is ready
+  function initAll() {
+    initTooltips();
+    initTabInfoIcons();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
+  }
+})();
 
 /* ===================================================================
    SR-ONLY
