@@ -517,7 +517,7 @@ iframe { flex: 1; border: none; background: #fff; }
   <div class="divider" id="divider"></div>
   <div class="pane" id="pane-preview">
     <div class="pane-header"><span class="pane-dot"></span>Preview</div>
-    <iframe id="preview" sandbox="allow-scripts allow-same-origin allow-forms allow-modals" title="HTML Preview"></iframe>
+    <iframe id="preview" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups" title="HTML Preview"></iframe>
   </div>
 </div>
 
@@ -755,13 +755,21 @@ function closeSettingsOverlay(e) {
   if (e.target === document.getElementById('settings-modal')) closeSettings();
 }
 
+// ── Preview blob URL helper ────────────────────────────────────────────────
+let currentBlobUrl = null;
+function setPreviewContent(html) {
+  if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+  const blob = new Blob([html], { type: 'text/html' });
+  currentBlobUrl = URL.createObjectURL(blob);
+  preview.src = currentBlobUrl;
+}
+
 // ── Core functions ─────────────────────────────────────────────────────────
 function renderPreview() {
   const code = cm.getValue().trim();
   if (!code) { setStatus('No content to render', 'warning'); return; }
   try {
-    const doc = preview.contentDocument || preview.contentWindow.document;
-    doc.open(); doc.write(code); doc.close();
+    setPreviewContent(code);
     setStatus('Rendered', 'ready');
   } catch (e) {
     setStatus('Error: ' + e.message, 'error');
@@ -771,8 +779,7 @@ function renderPreview() {
 function clearEditor() {
   if (cm.getValue().length > 0 && !confirm('Clear the editor? This cannot be undone.')) return;
   cm.setValue('');
-  const doc = preview.contentDocument || preview.contentWindow.document;
-  doc.open(); doc.write(''); doc.close();
+  setPreviewContent('');
   setStatus('Editor cleared', 'warning');
   cm.focus();
 }
