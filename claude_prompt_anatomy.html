@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anatomy of a Claude Prompt</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --accent: #D97706;
+    --accent-dark: #B45309;
+    --bg: #FFFBF5;
+    --surface: #FFFFFF;
+    --dark: #1C1108;
+    --text: #3D2A0A;
+    --muted: #92400E;
+    --border: #E5C591;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: #F5F0E8; color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 32px 20px; }
+
+  /* PDF BUTTON */
+  .export-bar { width: 860px; display: flex; justify-content: flex-end; margin-bottom: 14px; }
+  .btn-pdf {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--dark); color: var(--bg);
+    font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 9px 18px; border-radius: 4px; border: none; cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-pdf:hover { background: var(--accent-dark); }
+  .btn-pdf:active { transform: scale(0.97); }
+  .btn-pdf svg { flex-shrink: 0; }
+
+  .page { width: 860px; background: var(--bg); padding: 44px 48px; border-radius: 4px; box-shadow: 0 4px 32px rgba(0,0,0,0.08); }
+
+  /* HEADER */
+  .header { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 28px; border-bottom: 2px solid var(--accent); margin-bottom: 36px; }
+  .header-left { flex: 1; }
+  .badge { display: inline-block; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); border: 1.5px solid var(--accent); padding: 4px 12px; border-radius: 2px; margin-bottom: 14px; }
+  h1 { font-family: 'Playfair Display', serif; font-size: 50px; font-weight: 900; color: var(--dark); line-height: 1.0; letter-spacing: -0.02em; }
+  h1 em { font-style: italic; color: var(--accent); }
+  .header-sub { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 480px; line-height: 1.5; }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding-top: 6px; }
+  .model-pill { background: var(--dark); color: var(--bg); font-family: 'DM Mono', monospace; font-size: 12px; padding: 6px 14px; border-radius: 20px; letter-spacing: 0.04em; }
+  .byline { font-size: 12px; color: var(--muted); font-weight: 300; }
+
+  /* MAIN GRID */
+  .anatomy-wrapper { display: grid; grid-template-columns: 1fr 300px; gap: 28px; margin-bottom: 32px; }
+
+  /* PROMPT BLOCK */
+  .prompt-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .prompt-container { border: 2px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .prompt-titlebar { background: var(--dark); padding: 10px 16px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #FF5F57; } .dot-y { background: #FFBD2E; } .dot-g { background: #28C940; }
+  .titlebar-text { font-family: 'DM Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin-left: 6px; letter-spacing: 0.06em; }
+  .layer { padding: 13px 18px; border-bottom: 1.5px solid var(--border); }
+  .layer:last-child { border-bottom: none; }
+  .layer-tag { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .layer-tag-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .layer-text { font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.5; color: var(--text); }
+
+  .layer-system  { background: #FEF9F0; } .layer-persona  { background: #FEF6E8; }
+  .layer-context { background: #FFFDF8; } .layer-task     { background: #FFFBF2; }
+  .layer-examples{ background: #F9F5EE; } .layer-format   { background: #FDF9F3; }
+  .layer-constraint { background: #F8F4EC; }
+
+  .dot-system{background:#C05621;} .dot-persona{background:#C05621;} .dot-context{background:#B7791F;}
+  .dot-task{background:#D97706;} .dot-examples{background:#975A16;} .dot-format{background:#744210;}
+  .dot-constraint{background:#92400E;}
+  .tag-system{color:#C05621;} .tag-persona{color:#C05621;} .tag-context{color:#B7791F;}
+  .tag-task{color:#D97706;} .tag-examples{color:#975A16;} .tag-format{color:#744210;}
+  .tag-constraint{color:#92400E;}
+
+  /* SIDEBAR */
+  .sidebar { display: flex; flex-direction: column; padding-top: 28px; }
+  .desc-cards { display: flex; flex-direction: column; gap: 9px; }
+  .desc-card { padding: 10px 13px; border-left: 3px solid; border-radius: 0 6px 6px 0; background: var(--surface); }
+  .desc-card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .desc-card-body { font-size: 11.5px; line-height: 1.4; color: var(--muted); font-weight: 300; }
+  .card-system{border-color:#C05621;} .card-persona{border-color:#C05621;} .card-context{border-color:#B7791F;}
+  .card-task{border-color:#D97706;} .card-examples{border-color:#975A16;} .card-format{border-color:#744210;}
+  .card-constraint{border-color:#92400E;}
+  .title-system{color:#C05621;} .title-persona{color:#C05621;} .title-context{color:#B7791F;}
+  .title-task{color:#D97706;} .title-examples{color:#975A16;} .title-format{color:#744210;}
+  .title-constraint{color:#92400E;}
+
+  /* TIPS */
+  .tips-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 32px; }
+  .tip-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px; padding: 14px; }
+  .tip-icon { font-size: 20px; margin-bottom: 7px; }
+  .tip-title { font-size: 12.5px; font-weight: 600; color: var(--dark); margin-bottom: 4px; }
+  .tip-body { font-size: 11.5px; color: var(--muted); line-height: 1.4; font-weight: 300; }
+
+  /* FOOTER */
+  .footer { border-top: 1.5px solid var(--border); padding-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .footer-left { font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .footer-right { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--border); letter-spacing: 0.08em; }
+
+  @media print { .export-bar { display: none; } body { background: white; padding: 0; } .page { box-shadow: none; border-radius: 0; } }
+</style>
+</head>
+<body>
+
+<div class="export-bar">
+  <button class="btn-pdf" onclick="exportPDF()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Save as PDF
+  </button>
+</div>
+
+<div class="page" id="page">
+
+  <div class="header">
+    <div class="header-left">
+      <div class="badge">Reference Guide</div>
+      <h1>Anatomy of a<br><em>Claude</em> Prompt</h1>
+      <p class="header-sub">Every well-crafted Claude prompt is built from layered components. Understanding each layer helps you write prompts that are clear, targeted, and effective.</p>
+    </div>
+    <div class="header-right">
+      <div class="model-pill">claude-sonnet-4 · 2026</div>
+      <div class="byline">Demystifying AI Workshop Series</div>
+    </div>
+  </div>
+
+  <div class="anatomy-wrapper">
+    <div class="prompt-visual">
+      <div class="prompt-label">← Prompt Structure (top to bottom)</div>
+      <div class="prompt-container">
+        <div class="prompt-titlebar">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <span class="titlebar-text">claude.ai · new conversation</span>
+        </div>
+        <div class="layer layer-system">
+          <div class="layer-tag"><div class="layer-tag-dot dot-system"></div><span class="tag-system">① System Prompt</span></div>
+          <div class="layer-text">You are an expert curriculum designer helping community college faculty develop inclusive, engaging course materials aligned to learning outcomes.</div>
+        </div>
+        <div class="layer layer-persona">
+          <div class="layer-tag"><div class="layer-tag-dot dot-persona"></div><span class="tag-persona">② Persona / Role</span></div>
+          <div class="layer-text">Act as a supportive instructional coach who is direct, practical, and avoids academic jargon whenever possible.</div>
+        </div>
+        <div class="layer layer-context">
+          <div class="layer-tag"><div class="layer-tag-dot dot-context"></div><span class="tag-context">③ Context</span></div>
+          <div class="layer-text">I'm redesigning my Intro to Psychology syllabus for fall 2026. Students are mostly first-generation, working adults in evening classes. Class meets twice a week for 75 minutes.</div>
+        </div>
+        <div class="layer layer-task">
+          <div class="layer-tag"><div class="layer-tag-dot dot-task"></div><span class="tag-task">④ Task / Instruction</span></div>
+          <div class="layer-text">Draft three active-learning activities for the first unit on Research Methods. Each should take 10–15 minutes and require no special materials.</div>
+        </div>
+        <div class="layer layer-examples">
+          <div class="layer-tag"><div class="layer-tag-dot dot-examples"></div><span class="tag-examples">⑤ Examples (Few-Shot)</span></div>
+          <div class="layer-text">Good: "Think-Pair-Share: students write a hypothesis, discuss with a partner, share with class." Bad: "Watch a 20-minute documentary."</div>
+        </div>
+        <div class="layer layer-format">
+          <div class="layer-tag"><div class="layer-tag-dot dot-format"></div><span class="tag-format">⑥ Output Format</span></div>
+          <div class="layer-text">Return each activity as: Name · Time · Materials · Step-by-step instructions · Why it works (1 sentence).</div>
+        </div>
+        <div class="layer layer-constraint">
+          <div class="layer-tag"><div class="layer-tag-dot dot-constraint"></div><span class="tag-constraint">⑦ Constraints / Guardrails</span></div>
+          <div class="layer-text">Do not suggest activities requiring smartphones, internet, or prior readings. Keep language at an 8th-grade reading level.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="desc-cards">
+        <div class="desc-card card-system"><div class="desc-card-title title-system">① System Prompt</div><div class="desc-card-body">Sets Claude's overall role and context. Placed before conversation begins. Invisible to end-users in deployed apps.</div></div>
+        <div class="desc-card card-persona"><div class="desc-card-title title-persona">② Persona / Role</div><div class="desc-card-body">Shapes Claude's voice, tone, and expertise level. "Act as…" framing calibrates formality, depth, and style.</div></div>
+        <div class="desc-card card-context"><div class="desc-card-title title-context">③ Context</div><div class="desc-card-body">Background info Claude needs to answer well. Who, what, where, when — the more specific, the better the output.</div></div>
+        <div class="desc-card card-task"><div class="desc-card-title title-task">④ Task / Instruction</div><div class="desc-card-body">The core ask. Use action verbs: draft, summarize, compare, list. One clear task avoids ambiguous outputs.</div></div>
+        <div class="desc-card card-examples"><div class="desc-card-title title-examples">⑤ Examples (Few-Shot)</div><div class="desc-card-body">Show Claude what "good" looks like. Even one example dramatically improves quality. Showing beats describing.</div></div>
+        <div class="desc-card card-format"><div class="desc-card-title title-format">⑥ Output Format</div><div class="desc-card-body">Specify structure: bullet list, table, JSON, markdown. Prevents Claude from guessing what form you need.</div></div>
+        <div class="desc-card card-constraint"><div class="desc-card-title title-constraint">⑦ Constraints</div><div class="desc-card-body">What to avoid, length limits, audience rules, tone. Negative instructions trim the output space just as well.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tips-row">
+    <div class="tip-card"><div class="tip-icon">🧱</div><div class="tip-title">Not all layers are required</div><div class="tip-body">A simple question might only need a task. Complex tasks benefit from all seven. Start minimal and add layers when output quality suffers.</div></div>
+    <div class="tip-card"><div class="tip-icon">🔁</div><div class="tip-title">Order matters — mostly</div><div class="tip-body">Claude reads top-to-bottom. Put system/role context early and your actual task near the end where it's freshest in attention.</div></div>
+    <div class="tip-card"><div class="tip-icon">🎯</div><div class="tip-title">Iterate, don't re-write</div><div class="tip-body">If output misses the mark, diagnose which layer is weak — context? format? task? Fix that layer specifically and re-run.</div></div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">Brookdale Community College · Demystifying AI Workshop Series<br>Faculty Professional Development · Spring 2026</div>
+    <div class="footer-right">CLAUDE · ANTHROPIC · PROMPT ANATOMY v2</div>
+  </div>
+</div>
+
+<script>
+async function exportPDF() {
+  const btn = document.querySelector('.btn-pdf');
+  btn.textContent = 'Generating…';
+  btn.disabled = true;
+  const el = document.getElementById('page');
+  try {
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#FFFBF5' });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+    pdf.save('claude-prompt-anatomy.pdf');
+  } catch(e) { alert('PDF export failed. Try using your browser\'s Print > Save as PDF.'); }
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Save as PDF';
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>

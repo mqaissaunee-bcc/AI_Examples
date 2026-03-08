@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anatomy of a Mistral Prompt</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --accent: #FF6F00;
+    --accent-dark: #D45C00;
+    --bg: #FFFAF5;
+    --surface: #FFFFFF;
+    --dark: #2A1200;
+    --text: #2C1400;
+    --muted: #9A3E00;
+    --border: #F5C490;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: #FBE8D0; color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 32px 20px; }
+
+  .export-bar { width: 860px; display: flex; justify-content: flex-end; margin-bottom: 14px; }
+  .btn-pdf { display: flex; align-items: center; gap: 8px; background: var(--dark); color: var(--bg); font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 9px 18px; border-radius: 4px; border: none; cursor: pointer; transition: background 0.2s, transform 0.1s; }
+  .btn-pdf:hover { background: var(--accent-dark); }
+  .btn-pdf:active { transform: scale(0.97); }
+
+  .page { width: 860px; background: var(--bg); padding: 44px 48px; border-radius: 4px; box-shadow: 0 4px 32px rgba(0,0,0,0.08); }
+
+  .header { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 28px; border-bottom: 2px solid var(--accent); margin-bottom: 36px; }
+  .header-left { flex: 1; }
+  .badge { display: inline-block; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); border: 1.5px solid var(--accent); padding: 4px 12px; border-radius: 2px; margin-bottom: 14px; }
+  h1 { font-family: 'Playfair Display', serif; font-size: 50px; font-weight: 900; color: var(--dark); line-height: 1.0; letter-spacing: -0.02em; }
+  h1 em { font-style: italic; color: var(--accent); }
+  .header-sub { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 480px; line-height: 1.5; }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding-top: 6px; }
+  .model-pill { background: var(--dark); color: var(--bg); font-family: 'DM Mono', monospace; font-size: 12px; padding: 6px 14px; border-radius: 20px; letter-spacing: 0.04em; }
+  .byline { font-size: 12px; color: var(--muted); font-weight: 300; }
+
+  .anatomy-wrapper { display: grid; grid-template-columns: 1fr 300px; gap: 28px; margin-bottom: 32px; }
+
+  .prompt-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .prompt-container { border: 2px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .prompt-titlebar { background: var(--dark); padding: 10px 16px; display: flex; align-items: center; gap: 8px; }
+  .dot{width:10px;height:10px;border-radius:50%;} .dot-r{background:#FF5F57;} .dot-y{background:#FFBD2E;} .dot-g{background:#28C940;}
+  .titlebar-text { font-family: 'DM Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin-left: 6px; letter-spacing: 0.06em; }
+  .layer { padding: 13px 18px; border-bottom: 1.5px solid var(--border); }
+  .layer:last-child { border-bottom: none; }
+  .layer-tag { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .layer-tag-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .layer-text { font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.5; color: var(--text); }
+
+  .layer-system   {background:#FFF6EE;} .layer-persona  {background:#FFF8F2;}
+  .layer-context  {background:#FFF3E8;} .layer-task     {background:#FFF5ED;}
+  .layer-examples {background:#FFF0E3;} .layer-format   {background:#FFFAF5;}
+  .layer-constraint{background:#FFEEDE;}
+
+  .c1{color:#C45000;} .c2{color:#D05800;} .c3{color:#D96200;} .c4{color:#FF6F00;}
+  .c5{color:#B04600;} .c6{color:#C45800;} .c7{color:#A03E00;}
+  .d1{background:#C45000;} .d2{background:#D05800;} .d3{background:#D96200;} .d4{background:#FF6F00;}
+  .d5{background:#B04600;} .d6{background:#C45800;} .d7{background:#A03E00;}
+
+  .sidebar { display: flex; flex-direction: column; padding-top: 28px; }
+  .desc-cards { display: flex; flex-direction: column; gap: 9px; }
+  .desc-card { padding: 10px 13px; border-left: 3px solid; border-radius: 0 6px 6px 0; background: var(--surface); }
+  .desc-card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .desc-card-body { font-size: 11.5px; line-height: 1.4; color: var(--muted); font-weight: 300; }
+
+  .tips-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 32px; }
+  .tip-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px; padding: 14px; }
+  .tip-icon { font-size: 20px; margin-bottom: 7px; }
+  .tip-title { font-size: 12.5px; font-weight: 600; color: var(--dark); margin-bottom: 4px; }
+  .tip-body { font-size: 11.5px; color: var(--muted); line-height: 1.4; font-weight: 300; }
+
+  .footer { border-top: 1.5px solid var(--border); padding-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .footer-left { font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .footer-right { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--border); letter-spacing: 0.08em; }
+
+  @media print { .export-bar{display:none;} body{background:white;padding:0;} .page{box-shadow:none;border-radius:0;} }
+</style>
+</head>
+<body>
+
+<div class="export-bar">
+  <button class="btn-pdf" onclick="exportPDF()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Save as PDF
+  </button>
+</div>
+
+<div class="page" id="page">
+  <div class="header">
+    <div class="header-left">
+      <div class="badge">Reference Guide</div>
+      <h1>Anatomy of a<br><em>Mistral</em> Prompt</h1>
+      <p class="header-sub">Mistral AI's models combine strong instruction-following with open-weight options for local use. They reward precise prompting and offer lighter safety defaults than other frontier models.</p>
+    </div>
+    <div class="header-right">
+      <div class="model-pill">mistral-large-2 · Mistral AI · 2026</div>
+      <div class="byline">Demystifying AI Workshop Series</div>
+    </div>
+  </div>
+
+  <div class="anatomy-wrapper">
+    <div class="prompt-visual">
+      <div class="prompt-label">← Prompt Structure (top to bottom)</div>
+      <div class="prompt-container">
+        <div class="prompt-titlebar">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <span class="titlebar-text">chat.mistral.ai · le chat</span>
+        </div>
+        <div class="layer layer-system">
+          <div class="layer-tag"><div class="layer-tag-dot d1"></div><span class="c1">① System Prompt</span></div>
+          <div class="layer-text">You are an expert curriculum designer helping community college faculty develop inclusive, engaging course materials aligned to learning outcomes.</div>
+        </div>
+        <div class="layer layer-persona">
+          <div class="layer-tag"><div class="layer-tag-dot d2"></div><span class="c2">② Persona / Role</span></div>
+          <div class="layer-text">Act as a supportive instructional coach who is direct, practical, and avoids academic jargon whenever possible.</div>
+        </div>
+        <div class="layer layer-context">
+          <div class="layer-tag"><div class="layer-tag-dot d3"></div><span class="c3">③ Context</span></div>
+          <div class="layer-text">I'm redesigning my Intro to Psychology syllabus for fall 2026. Students are mostly first-generation, working adults in evening classes. Class meets twice a week for 75 minutes.</div>
+        </div>
+        <div class="layer layer-task">
+          <div class="layer-tag"><div class="layer-tag-dot d4"></div><span class="c4">④ Task / Instruction</span></div>
+          <div class="layer-text">Draft three active-learning activities for the first unit on Research Methods. Each should take 10–15 minutes and require no special materials.</div>
+        </div>
+        <div class="layer layer-examples">
+          <div class="layer-tag"><div class="layer-tag-dot d5"></div><span class="c5">⑤ Examples (Few-Shot)</span></div>
+          <div class="layer-text">Good: "Think-Pair-Share: students write a hypothesis, discuss with a partner, share with class." Bad: "Watch a 20-minute documentary."</div>
+        </div>
+        <div class="layer layer-format">
+          <div class="layer-tag"><div class="layer-tag-dot d6"></div><span class="c6">⑥ Output Format</span></div>
+          <div class="layer-text">Return each activity as: Name · Time · Materials · Step-by-step instructions · Why it works (1 sentence).</div>
+        </div>
+        <div class="layer layer-constraint">
+          <div class="layer-tag"><div class="layer-tag-dot d7"></div><span class="c7">⑦ Constraints / Guardrails</span></div>
+          <div class="layer-text">Do not suggest activities requiring smartphones, internet, or prior readings. Keep language at an 8th-grade reading level.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="desc-cards">
+        <div class="desc-card" style="border-color:#C45000"><div class="desc-card-title" style="color:#C45000">① System Prompt</div><div class="desc-card-body">API: <code>role:"system"</code> message. Le Chat uses "Custom Instructions." Mistral is known for following system prompts very faithfully — one of its key strengths.</div></div>
+        <div class="desc-card" style="border-color:#D05800"><div class="desc-card-title" style="color:#D05800">② Persona / Role</div><div class="desc-card-body">"Act as…" framing works in system prompt or user turn. Mistral Nemo is particularly good at maintaining personas across long conversations.</div></div>
+        <div class="desc-card" style="border-color:#D96200"><div class="desc-card-title" style="color:#D96200">③ Context</div><div class="desc-card-body">128K context window. Mistral is recognized for strong precision when retrieving specific information from long documents — less "needle-in-haystack" drift.</div></div>
+        <div class="desc-card" style="border-color:#FF6F00"><div class="desc-card-title" style="color:#FF6F00">④ Task / Instruction</div><div class="desc-card-body">Excels at precise, well-scoped instructions. Strong function-calling support in the API. Clear tasks with defined scope consistently yield best results.</div></div>
+        <div class="desc-card" style="border-color:#B04600"><div class="desc-card-title" style="color:#B04600">⑤ Examples (Few-Shot)</div><div class="desc-card-body">Sample-efficient — often 1–2 examples suffice. Works especially well for structured output generation tasks and maintaining consistent response templates.</div></div>
+        <div class="desc-card" style="border-color:#C45800"><div class="desc-card-title" style="color:#C45800">⑥ Output Format</div><div class="desc-card-body">JSON mode supported in API. One of the stronger models for format compliance. Function calling enforces precise structure when used via API.</div></div>
+        <div class="desc-card" style="border-color:#A03E00"><div class="desc-card-title" style="color:#A03E00">⑦ Constraints</div><div class="desc-card-body">Lighter safety defaults than OpenAI/Google — more control but more responsibility. Negative constraints are followed well. Explicit guardrails are recommended.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tips-row">
+    <div class="tip-card">
+      <div class="tip-icon">🎯</div>
+      <div class="tip-title">Precision is Mistral's strength</div>
+      <div class="tip-body">Mistral models are built for precise instruction-following. The more specific your prompt scope, the better. Vague prompts waste its capabilities.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🌍</div>
+      <div class="tip-title">Excellent multilingual support</div>
+      <div class="tip-body">Based in France, Mistral has first-class support for French, Spanish, Italian, and German. Ideal for world language courses or multilingual student populations.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">💻</div>
+      <div class="tip-title">Mistral Nemo runs locally</div>
+      <div class="tip-body">Mistral Nemo (12B) is small enough to run on a modern laptop via LM Studio. It rivals much larger models on instruction-following and creative tasks.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">Brookdale Community College · Demystifying AI Workshop Series<br>Faculty Professional Development · Spring 2026</div>
+    <div class="footer-right">MISTRAL LARGE 2 · MISTRAL AI · PROMPT ANATOMY v2</div>
+  </div>
+</div>
+
+<script>
+async function exportPDF() {
+  const btn = document.querySelector('.btn-pdf');
+  btn.textContent = 'Generating…';
+  btn.disabled = true;
+  const el = document.getElementById('page');
+  try {
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#FFFAF5' });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+    pdf.save('mistral-prompt-anatomy.pdf');
+  } catch(e) { alert('PDF export failed. Try Print > Save as PDF.'); }
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Save as PDF';
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anatomy of a Llama Prompt</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --accent: #7C3AED;
+    --accent-dark: #6425D0;
+    --bg: #FAF7FF;
+    --surface: #FFFFFF;
+    --dark: #1E0A40;
+    --text: #200A42;
+    --muted: #5B21B6;
+    --border: #C4A8F5;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: #EDE4FB; color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 32px 20px; }
+
+  .export-bar { width: 860px; display: flex; justify-content: flex-end; margin-bottom: 14px; }
+  .btn-pdf { display: flex; align-items: center; gap: 8px; background: var(--dark); color: var(--bg); font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 9px 18px; border-radius: 4px; border: none; cursor: pointer; transition: background 0.2s, transform 0.1s; }
+  .btn-pdf:hover { background: var(--accent-dark); }
+  .btn-pdf:active { transform: scale(0.97); }
+
+  .page { width: 860px; background: var(--bg); padding: 44px 48px; border-radius: 4px; box-shadow: 0 4px 32px rgba(0,0,0,0.08); }
+
+  .header { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 28px; border-bottom: 2px solid var(--accent); margin-bottom: 36px; }
+  .header-left { flex: 1; }
+  .badge { display: inline-block; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); border: 1.5px solid var(--accent); padding: 4px 12px; border-radius: 2px; margin-bottom: 14px; }
+  h1 { font-family: 'Playfair Display', serif; font-size: 50px; font-weight: 900; color: var(--dark); line-height: 1.0; letter-spacing: -0.02em; }
+  h1 em { font-style: italic; color: var(--accent); }
+  .header-sub { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 480px; line-height: 1.5; }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding-top: 6px; }
+  .model-pill { background: var(--dark); color: var(--bg); font-family: 'DM Mono', monospace; font-size: 12px; padding: 6px 14px; border-radius: 20px; letter-spacing: 0.04em; }
+  .byline { font-size: 12px; color: var(--muted); font-weight: 300; }
+
+  .anatomy-wrapper { display: grid; grid-template-columns: 1fr 300px; gap: 28px; margin-bottom: 32px; }
+
+  .prompt-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .prompt-container { border: 2px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .prompt-titlebar { background: var(--dark); padding: 10px 16px; display: flex; align-items: center; gap: 8px; }
+  .dot{width:10px;height:10px;border-radius:50%;} .dot-r{background:#FF5F57;} .dot-y{background:#FFBD2E;} .dot-g{background:#28C940;}
+  .titlebar-text { font-family: 'DM Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin-left: 6px; letter-spacing: 0.06em; }
+  .layer { padding: 13px 18px; border-bottom: 1.5px solid var(--border); }
+  .layer:last-child { border-bottom: none; }
+  .layer-tag { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .layer-tag-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .layer-text { font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.5; color: var(--text); }
+
+  .layer-system   {background:#F4EEFF;} .layer-persona  {background:#F7F2FF;}
+  .layer-context  {background:#F0E8FF;} .layer-task     {background:#F5EFFF;}
+  .layer-examples {background:#EDE4FF;} .layer-format   {background:#F9F5FF;}
+  .layer-constraint{background:#EBE2FF;}
+
+  .c1{color:#5B1FBE;} .c2{color:#6425CC;} .c3{color:#6C2AD8;} .c4{color:#7C3AED;}
+  .c5{color:#4E1AAA;} .c6{color:#5A20C0;} .c7{color:#461898;}
+  .d1{background:#5B1FBE;} .d2{background:#6425CC;} .d3{background:#6C2AD8;} .d4{background:#7C3AED;}
+  .d5{background:#4E1AAA;} .d6{background:#5A20C0;} .d7{background:#461898;}
+
+  .sidebar { display: flex; flex-direction: column; padding-top: 28px; }
+  .desc-cards { display: flex; flex-direction: column; gap: 9px; }
+  .desc-card { padding: 10px 13px; border-left: 3px solid; border-radius: 0 6px 6px 0; background: var(--surface); }
+  .desc-card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .desc-card-body { font-size: 11.5px; line-height: 1.4; color: var(--muted); font-weight: 300; }
+
+  .tips-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 32px; }
+  .tip-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px; padding: 14px; }
+  .tip-icon { font-size: 20px; margin-bottom: 7px; }
+  .tip-title { font-size: 12.5px; font-weight: 600; color: var(--dark); margin-bottom: 4px; }
+  .tip-body { font-size: 11.5px; color: var(--muted); line-height: 1.4; font-weight: 300; }
+
+  .footer { border-top: 1.5px solid var(--border); padding-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .footer-left { font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .footer-right { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--border); letter-spacing: 0.08em; }
+
+  @media print { .export-bar{display:none;} body{background:white;padding:0;} .page{box-shadow:none;border-radius:0;} }
+</style>
+</head>
+<body>
+
+<div class="export-bar">
+  <button class="btn-pdf" onclick="exportPDF()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Save as PDF
+  </button>
+</div>
+
+<div class="page" id="page">
+  <div class="header">
+    <div class="header-left">
+      <div class="badge">Reference Guide</div>
+      <h1>Anatomy of a<br><em>Llama</em> Prompt</h1>
+      <p class="header-sub">Meta's Llama models run locally — no data sent to the cloud. They use the same seven-layer structure, but require more explicit prompting and offer total data privacy.</p>
+    </div>
+    <div class="header-right">
+      <div class="model-pill">llama-3.1 · Meta · LM Studio</div>
+      <div class="byline">Demystifying AI Workshop Series</div>
+    </div>
+  </div>
+
+  <div class="anatomy-wrapper">
+    <div class="prompt-visual">
+      <div class="prompt-label">← Prompt Structure (top to bottom)</div>
+      <div class="prompt-container">
+        <div class="prompt-titlebar">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <span class="titlebar-text">lmstudio · llama-3.1-8b-instruct</span>
+        </div>
+        <div class="layer layer-system">
+          <div class="layer-tag"><div class="layer-tag-dot d1"></div><span class="c1">① System Prompt</span></div>
+          <div class="layer-text">You are an expert curriculum designer helping community college faculty develop inclusive, engaging course materials aligned to learning outcomes.</div>
+        </div>
+        <div class="layer layer-persona">
+          <div class="layer-tag"><div class="layer-tag-dot d2"></div><span class="c2">② Persona / Role</span></div>
+          <div class="layer-text">Act as a supportive instructional coach who is direct, practical, and avoids academic jargon whenever possible.</div>
+        </div>
+        <div class="layer layer-context">
+          <div class="layer-tag"><div class="layer-tag-dot d3"></div><span class="c3">③ Context</span></div>
+          <div class="layer-text">I'm redesigning my Intro to Psychology syllabus for fall 2026. Students are mostly first-generation, working adults in evening classes. Class meets twice a week for 75 minutes.</div>
+        </div>
+        <div class="layer layer-task">
+          <div class="layer-tag"><div class="layer-tag-dot d4"></div><span class="c4">④ Task / Instruction</span></div>
+          <div class="layer-text">Draft three active-learning activities for the first unit on Research Methods. Each should take 10–15 minutes and require no special materials.</div>
+        </div>
+        <div class="layer layer-examples">
+          <div class="layer-tag"><div class="layer-tag-dot d5"></div><span class="c5">⑤ Examples (Few-Shot)</span></div>
+          <div class="layer-text">Good: "Think-Pair-Share: students write a hypothesis, discuss with a partner, share with class." Bad: "Watch a 20-minute documentary."</div>
+        </div>
+        <div class="layer layer-format">
+          <div class="layer-tag"><div class="layer-tag-dot d6"></div><span class="c6">⑥ Output Format</span></div>
+          <div class="layer-text">Return each activity as: Name · Time · Materials · Step-by-step instructions · Why it works (1 sentence).</div>
+        </div>
+        <div class="layer layer-constraint">
+          <div class="layer-tag"><div class="layer-tag-dot d7"></div><span class="c7">⑦ Constraints / Guardrails</span></div>
+          <div class="layer-text">Do not suggest activities requiring smartphones, internet, or prior readings. Keep language at an 8th-grade reading level.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="desc-cards">
+        <div class="desc-card" style="border-color:#5B1FBE"><div class="desc-card-title" style="color:#5B1FBE">① System Prompt</div><div class="desc-card-body">In LM Studio: enter in the System Prompt field. Llama 3 uses a clean chat template; Llama 2 used special <code>&lt;&lt;SYS&gt;&gt;</code> tokens. Always test — fine-tuned variants may ignore it.</div></div>
+        <div class="desc-card" style="border-color:#6425CC"><div class="desc-card-title" style="color:#6425CC">② Persona / Role</div><div class="desc-card-body">Works best when placed in the system prompt. Llama 3 Instruct responds well to "Act as…" framing; heavily fine-tuned models may ignore personas.</div></div>
+        <div class="desc-card" style="border-color:#6C2AD8"><div class="desc-card-title" style="color:#6C2AD8">③ Context</div><div class="desc-card-body">128K window (Llama 3.1). Local RAM limits actual usable context — an 8B model needs ~8GB RAM. Context injection is the main grounding method for local models.</div></div>
+        <div class="desc-card" style="border-color:#7C3AED"><div class="desc-card-title" style="color:#7C3AED">④ Task / Instruction</div><div class="desc-card-body">Clear, imperative instructions work best. Llama 3 Instruct is optimized for instruction-following. Complex multi-step tasks may need to be broken into sequential prompts.</div></div>
+        <div class="desc-card" style="border-color:#4E1AAA"><div class="desc-card-title" style="color:#4E1AAA">⑤ Examples (Few-Shot)</div><div class="desc-card-body">More reliant on examples than frontier models. Few-shot prompting is often necessary for format consistency, especially in local deployments with smaller models.</div></div>
+        <div class="desc-card" style="border-color:#5A20C0"><div class="desc-card-title" style="color:#5A20C0">⑥ Output Format</div><div class="desc-card-body">No native JSON mode — explicit instruction required. LM Studio and Ollama support grammar-constrained output. Format compliance varies by model size and fine-tune.</div></div>
+        <div class="desc-card" style="border-color:#461898"><div class="desc-card-title" style="color:#461898">⑦ Constraints</div><div class="desc-card-body">Self-hosted models have NO built-in safety filters. All guardrails must live in your prompt. Meta-Llama-Guard-3 can be added as a separate safety layer if needed.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tips-row">
+    <div class="tip-card">
+      <div class="tip-icon">🔒</div>
+      <div class="tip-title">Your data stays on your machine</div>
+      <div class="tip-body">When running Llama locally via LM Studio or Ollama, no data is sent to any server. Ideal for sensitive institutional data, student records, or proprietary content.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">📐</div>
+      <div class="tip-title">Match model size to task</div>
+      <div class="tip-body">8B models run on most laptops (8GB RAM). 70B models need a workstation. 405B rivals GPT-4 class but needs a server. Start small and scale up as needed.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🛠️</div>
+      <div class="tip-title">Fine-tuning is possible</div>
+      <div class="tip-body">Unlike closed models, Llama weights are open. You can fine-tune on your own course materials, institutional writing style, or discipline-specific vocabulary.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">Brookdale Community College · Demystifying AI Workshop Series<br>Faculty Professional Development · Spring 2026</div>
+    <div class="footer-right">LLAMA 3 · META AI · PROMPT ANATOMY v2</div>
+  </div>
+</div>
+
+<script>
+async function exportPDF() {
+  const btn = document.querySelector('.btn-pdf');
+  btn.textContent = 'Generating…';
+  btn.disabled = true;
+  const el = document.getElementById('page');
+  try {
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#FAF7FF' });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+    pdf.save('llama-prompt-anatomy.pdf');
+  } catch(e) { alert('PDF export failed. Try Print > Save as PDF.'); }
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Save as PDF';
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
