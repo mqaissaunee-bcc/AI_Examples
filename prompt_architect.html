@@ -1298,6 +1298,19 @@
       </div>
 
       <div class="field-group">
+        <label for="scope">Content Scope &amp; Depth</label>
+        <div class="tone-row">
+          <span>Brief</span>
+          <input type="range" id="scope" min="0" max="7" value="2" step="1" aria-label="Content scope and depth slider" />
+          <span>Extensive</span>
+        </div>
+        <div style="text-align:center; margin-top:0.3rem;">
+          <span class="tone-label" id="scopeLabel">Standard</span>
+          <span class="tone-label" id="scopeTime" style="font-weight:normal; color:var(--text3); margin-left:0.5rem;"></span>
+        </div>
+      </div>
+
+      <div class="field-group">
         <label for="extras">Additional Requirements / Context</label>
         <textarea id="extras" placeholder="e.g., Must align with NJCCC standards, include at least 10 questions, avoid medical jargon, use a progress bar, be embeddable in Canvas…" rows="3"></textarea>
       </div>
@@ -1481,6 +1494,17 @@
 <script>
 // ===================== DATA =====================
 const TONE_LABELS = ['Highly Formal & Academic', 'Formal', 'Balanced', 'Friendly & Approachable', 'Conversational & Casual'];
+
+const SCOPE_LABELS = [
+  { label: 'Brief Overview',    time: '~5 min',    prompt: 'Keep the interaction brief — a focused overview covering only the core concept. Target approximately 5 minutes of learner engagement. Prioritize clarity over completeness; cover the single most important idea well rather than surveying many topics shallowly.' },
+  { label: 'Focused',           time: '~10 min',   prompt: 'Build a focused interaction covering the key concepts without exhaustive detail. Target approximately 10 minutes of learner engagement. Include enough content for meaningful understanding but omit tangential topics.' },
+  { label: 'Standard',          time: '~15 min',   prompt: 'Build a standard-depth interaction with solid coverage of the main topic and its key subtopics. Target approximately 15 minutes of learner engagement. Balance breadth and depth — enough detail to be genuinely educational without overwhelming the learner.' },
+  { label: 'Comprehensive',     time: '~25 min',   prompt: 'Build a comprehensive interaction with thorough coverage of the topic, including important subtopics, nuances, and connections. Target approximately 25 minutes of learner engagement. Include multiple sections, varied activity types if appropriate, and sufficient depth for a learner to develop real understanding.' },
+  { label: 'Deep Dive',         time: '~30 min',   prompt: 'Build an extensive, deep-dive interaction with full coverage of the topic and its complexity. Target approximately 30 minutes of learner engagement. Include multiple modules or phases, rich examples, edge cases, and enough content that a learner could use this as a primary study resource for the topic.' },
+  { label: 'Extended Module',   time: '~60 min',   prompt: 'Build an extended learning module equivalent to a full hour of instruction. Target approximately 60 minutes of learner engagement. Structure the content into clearly delineated phases or chapters, each with its own objectives, explanations, examples, and formative checks. The interaction should feel like a complete standalone lesson — not a summary — with enough substance that a learner could work through it as the primary instructional resource for this topic.' },
+  { label: 'Full Unit',         time: '~2 hours',  prompt: 'Build a full instructional unit equivalent to approximately two hours of learning. Target approximately 120 minutes of learner engagement. Divide content into multiple major sections, each functioning as a mini-lesson with its own introduction, core instruction, worked examples, practice activities, and reflection prompts. Cover the topic with the depth and structure of a multi-session course unit. Include navigation between sections if appropriate.' },
+  { label: 'Full Lecture',      time: '~3 hours',  prompt: 'Build a comprehensive full-lecture interactive equivalent to a three-hour class session or a complete introductory treatment of the topic. Target approximately 180 minutes of learner engagement. Organize content into a rich, multi-part structure — introduction, several major instructional sections, applied practice, and a synthesizing conclusion. Every major concept should have explanation, examples, and at least one interactive or reflective element. The result should be substantial enough to serve as the primary instructional material for a complete class meeting or a self-paced module covering the full scope of the topic.' },
+];
 
 const TECH_SNIPPETS = [
   {
@@ -2159,6 +2183,8 @@ function updatePrompt() {
   const extras = document.getElementById('extras').value.trim();
   const toneVal = parseInt(document.getElementById('tone').value);
   const toneName = TONE_LABELS[toneVal];
+  const scopeVal = parseInt(document.getElementById('scope').value);
+  const scopeData = SCOPE_LABELS[scopeVal];
 
   const outputEl = document.getElementById('promptOutput');
 
@@ -2189,6 +2215,7 @@ function updatePrompt() {
   if (discipline) parts.push(`Discipline / Course Area: ${discipline}.`);
   if (audience) parts.push(`Target Audience: ${audience}.`);
   if (toneName) parts.push(`Instructional Tone: ${toneName}.`);
+  if (scopeData) parts.push(`Content Scope: ${scopeData.label} (${scopeData.time} of learner engagement). ${scopeData.prompt}`);
 
   // Active snippets
   const allSnippets = [...TECH_SNIPPETS, ...PED_SNIPPETS, ...OUT_SNIPPETS];
@@ -2245,6 +2272,19 @@ function bindEvents() {
   const toneSlider = document.getElementById('tone');
   toneSlider.addEventListener('input', () => {
     document.getElementById('toneLabel').textContent = TONE_LABELS[toneSlider.value];
+    updatePrompt();
+  });
+
+  // Scope slider
+  function updateScopeDisplay(val) {
+    const d = SCOPE_LABELS[val];
+    document.getElementById('scopeLabel').textContent = d.label;
+    document.getElementById('scopeTime').textContent = d.time;
+  }
+  const scopeSlider = document.getElementById('scope');
+  updateScopeDisplay(scopeSlider.value); // init display
+  scopeSlider.addEventListener('input', () => {
+    updateScopeDisplay(scopeSlider.value);
     updatePrompt();
   });
 
@@ -2312,6 +2352,8 @@ function bindEvents() {
     document.getElementById('extras').value = '';
     document.getElementById('tone').value = 2;
     document.getElementById('toneLabel').textContent = 'Balanced';
+    document.getElementById('scope').value = 2;
+    updateScopeDisplay(2);
 
     state.activeSnippets.clear();
     if (typeof hideVideoGate === 'function') hideVideoGate();
