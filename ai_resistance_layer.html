@@ -128,6 +128,15 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;hei
 .change-item .ci-bullet{color:var(--shield);flex-shrink:0;}
 .change-item .ci-text{font-size:.8rem;color:var(--text2);line-height:1.4;}
 .handoff-banner{background:var(--shield-light);border:1px solid var(--shield);color:var(--shield2);border-radius:var(--radius-sm);padding:.5rem .8rem;font-size:.78rem;margin-top:.5rem;display:flex;align-items:center;gap:6px;}
+/* ===================== OUTPUT MODE TOGGLE ===================== */
+.output-mode-toggle{display:flex;gap:0;border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:.75rem;}
+.out-mode-btn{flex:1;padding:.5rem .4rem;background:var(--bg2);border:none;cursor:pointer;font-size:.75rem;font-family:var(--font-ui);font-weight:600;color:var(--text2);transition:all var(--transition);text-align:center;line-height:1.3;}
+.out-mode-btn:not(:last-child){border-right:1.5px solid var(--border);}
+.out-mode-btn.active{background:var(--accent);color:white;}
+.out-mode-btn:hover:not(.active){background:var(--accent-light);color:var(--accent);}
+.revision-step{margin-bottom:.9em;padding:.6em .8em;background:rgba(255,255,255,.05);border-left:3px solid #52b788;border-radius:0 4px 4px 0;}
+.revision-step-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#95d5b2;margin-bottom:.3em;font-family:var(--font-ui);}
+.revision-instruction{font-family:var(--font-body);font-size:.88rem;color:var(--output-text);line-height:1.75;white-space:pre-wrap;}
 footer{text-align:center;padding:2rem;border-top:1px solid var(--border);color:var(--text3);font-size:.78rem;margin-top:1rem;}
 footer a{color:var(--accent);text-decoration:none;}
 footer a:hover{text-decoration:underline;}
@@ -152,7 +161,7 @@ footer a:hover{text-decoration:underline;}
 
 <div class="hero-strip" role="region" aria-label="Tool introduction">
   <h1>&#x1F6E1; AI Resistance Layer</h1>
-  <p>Paste any assignment prompt. Select your strategies. Strengthen it instantly &mdash; no account required.</p>
+  <p>Paste an existing assignment or a new prompt. Select your strategies. Get a strengthened version or a ready-to-use LLM revision prompt &mdash; no account required.</p>
 </div>
 
 <main id="main-content">
@@ -167,9 +176,9 @@ footer a:hover{text-decoration:underline;}
     <div class="panel-body">
 
       <div class="field-group">
-        <label for="assignment-input">Paste or type your assignment prompt</label>
-        <textarea id="assignment-input" placeholder="e.g. Write a 500-word essay analyzing the causes of World War I using at least three credible sources." aria-describedby="input-hint"></textarea>
-        <p class="hint" id="input-hint">Any assignment type works &mdash; essays, projects, discussions, presentations, problem sets.</p>
+        <label for="assignment-input">Paste your assignment (or a draft prompt)</label>
+        <textarea id="assignment-input" placeholder="Paste your full assignment here — instructions, requirements, grading notes. Or paste a simple prompt to start from scratch." aria-describedby="input-hint"></textarea>
+        <p class="hint" id="input-hint">Works with any format: essays, projects, discussions, problem sets, lab reports, rubrics.</p>
         <div id="handoff-banner" style="display:none;" class="handoff-banner" role="status">
           &#x1F6E1; <span>Prompt received &mdash; configure options below and click <strong>Strengthen This Assignment</strong>.</span>
         </div>
@@ -287,14 +296,24 @@ footer a:hover{text-decoration:underline;}
 
       <div id="active-tags" style="margin-bottom:.8rem;min-height:1.6rem;" aria-live="polite"></div>
 
-      <div class="section-label">Strengthened Prompt</div>
+      <!-- Output mode toggle -->
+      <div class="output-mode-toggle" role="group" aria-label="Output mode">
+        <button class="out-mode-btn active" id="modeStrengthened" onclick="setOutputMode('strengthened')" aria-pressed="true">
+          &#x1F6E1; Strengthened Prompt<br><span style="font-weight:400;font-size:.7rem;">Append resistance requirements</span>
+        </button>
+        <button class="out-mode-btn" id="modeRevision" onclick="setOutputMode('revision')" aria-pressed="false">
+          &#x1F4DD; LLM Revision Prompt<br><span style="font-weight:400;font-size:.7rem;">Take to AI with your document</span>
+        </button>
+      </div>
+
+      <div class="section-label" id="output-mode-label">Strengthened Prompt</div>
       <div class="output-panel" id="output-panel" role="region" aria-live="polite" aria-label="Strengthened assignment output">
         <span class="output-placeholder">Your strengthened assignment will appear here. Configure your options and click &ldquo;Strengthen This Assignment.&rdquo;</span>
       </div>
 
       <div class="output-actions" id="output-actions" style="display:none;">
-        <button class="copy-btn" id="copy-full-btn" onclick="copyOutput()">&#x1F4CB; Copy Full Prompt</button>
-        <button class="copy-btn" id="copy-orig-btn" onclick="copyOriginal()">&#x1F4C4; Copy Original</button>
+        <button class="copy-btn" id="copy-full-btn" onclick="copyOutput()">&#x1F4CB; Copy</button>
+        <button class="copy-btn" id="copy-orig-btn" onclick="copyOriginal()" style="display:none;">&#x1F4C4; Copy Original Only</button>
         <button class="btn-secondary" onclick="clearAll()">&#x21BA; Start Over</button>
       </div>
 
@@ -437,6 +456,8 @@ var selectedStrategies = new Set();
 var processLevel = 3;
 var lastOutput = "";
 var lastInput = "";
+var lastRevisionPrompt = "";
+var currentOutputMode = "strengthened"; // 'strengthened' | 'revision'
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
 function toggleTheme() {
@@ -593,6 +614,45 @@ function buildStrengthened() {
   }
   lastOutput = lines.join("\n");
 
+  // Build LLM revision prompt (plain text, takes the doc to an LLM)
+  var rlines = [];
+  rlines.push("I am attaching an existing assignment. Please revise it to incorporate the following AI-resistance requirements while preserving the original structure, tone, and formatting.");
+  rlines.push("Return the complete revised assignment — do not summarize, truncate, or omit any section. Do not add new learning objectives or substantially change the core task. Strengthen what is already there.\n");
+  rlines.push("=".repeat(56));
+  rlines.push("AI-RESISTANCE REQUIREMENTS TO INCORPORATE");
+  rlines.push("=".repeat(56) + "\n");
+  rlines.push("AI USE POLICY (AIAS LEVEL " + selectedAIAS + ")");
+  rlines.push(AIAS_POLICY[selectedAIAS]);
+  rlines.push("");
+  strategies.forEach(function(s) {
+    var d = STRATEGY_DATA[s];
+    rlines.push(d.emoji + " " + d.heading.toUpperCase());
+    d.bullets.forEach(function(b) { rlines.push("* " + b); });
+    rlines.push("");
+  });
+  if (processLevel >= 4 && PROCESS_ADDITION[processLevel] && !selectedStrategies.has("process")) {
+    var pa3 = PROCESS_ADDITION[processLevel];
+    rlines.push(pa3.heading.toUpperCase());
+    pa3.bullets.forEach(function(b) { rlines.push("* " + b); });
+    rlines.push("");
+  }
+  if (discipline) {
+    rlines.push("DISCIPLINE CONTEXT");
+    rlines.push("This assignment is situated within " + discipline + ". Ensure examples, sources, and analysis reflect the standards and real-world contexts of this field.");
+    rlines.push("");
+  }
+  rlines.push("=".repeat(56));
+  rlines.push("HOW TO USE THIS PROMPT");
+  rlines.push("=".repeat(56));
+  rlines.push("1. Copy this entire prompt.");
+  rlines.push("2. Open your preferred LLM (Claude, ChatGPT, Gemini, etc.).");
+  rlines.push("3. Paste this prompt, then attach or paste your assignment document below it.");
+  rlines.push("4. Review the output carefully — the LLM should return your assignment with the resistance requirements woven in.");
+  lastRevisionPrompt = rlines.join("\n");
+
+  // Render correct mode
+  renderOutputMode();
+
   // What-changed
   var wc = document.getElementById("what-changed");
   if (changes.length === 0) {
@@ -623,8 +683,92 @@ function makeSection(heading, bullets) {
   return sec;
 }
 
+// ── OUTPUT MODE ───────────────────────────────────────────────────────────────
+function setOutputMode(mode) {
+  currentOutputMode = mode;
+  document.getElementById("modeStrengthened").classList.toggle("active", mode === "strengthened");
+  document.getElementById("modeStrengthened").setAttribute("aria-pressed", mode === "strengthened" ? "true" : "false");
+  document.getElementById("modeRevision").classList.toggle("active", mode === "revision");
+  document.getElementById("modeRevision").setAttribute("aria-pressed", mode === "revision" ? "true" : "false");
+  renderOutputMode();
+}
+
+function renderOutputMode() {
+  var panel = document.getElementById("output-panel");
+  var label = document.getElementById("output-mode-label");
+  var copyOrigBtn = document.getElementById("copy-orig-btn");
+  var copyFullBtn = document.getElementById("copy-full-btn");
+
+  if (currentOutputMode === "revision") {
+    label.textContent = "LLM Revision Prompt";
+    if (copyOrigBtn) copyOrigBtn.style.display = "none";
+    if (copyFullBtn) copyFullBtn.textContent = "\uD83D\uDCCB Copy Revision Prompt";
+    if (!lastRevisionPrompt) return;
+    panel.innerHTML = "";
+
+    // Intro
+    var intro = document.createElement("div");
+    intro.className = "revision-instruction";
+    intro.textContent = "I am attaching an existing assignment. Please revise it to incorporate the following AI-resistance requirements while preserving the original structure, tone, and formatting.\nReturn the complete revised assignment \u2014 do not summarize, truncate, or omit any section. Do not add new learning objectives or substantially change the core task. Strengthen what is already there.";
+    panel.appendChild(intro);
+
+    // Requirements
+    var strategies = Array.from(selectedStrategies);
+    var discipline = document.getElementById("discipline").value.trim();
+
+    var aiasEl = makeRevStep("AI Use Policy (AIAS Level " + selectedAIAS + ")", AIAS_POLICY[selectedAIAS]);
+    panel.appendChild(aiasEl);
+
+    strategies.forEach(function(s) {
+      var d = STRATEGY_DATA[s];
+      panel.appendChild(makeRevStep(d.emoji + " " + d.heading, d.bullets.join("\n\n")));
+    });
+
+    if (processLevel >= 4 && PROCESS_ADDITION[processLevel] && !selectedStrategies.has("process")) {
+      var pa = PROCESS_ADDITION[processLevel];
+      panel.appendChild(makeRevStep(pa.heading, pa.bullets.join("\n\n")));
+    }
+
+    if (discipline) {
+      panel.appendChild(makeRevStep("Discipline Context", "This assignment is situated within " + discipline + ". Ensure examples, sources, and analysis reflect the standards and real-world contexts of this field."));
+    }
+
+    var howto = document.createElement("div");
+    howto.style.cssText = "margin-top:1.2em;padding:.7em .9em;background:rgba(255,255,255,.04);border-radius:4px;font-size:.75rem;color:rgba(184,240,244,.7);font-family:var(--font-ui);line-height:1.6;";
+    howto.innerHTML = "<strong style='color:#95d5b2;'>How to use:</strong> Copy this prompt &rarr; open your LLM &rarr; paste it &rarr; then attach or paste your assignment document. The LLM will return the strengthened version.";
+    panel.appendChild(howto);
+
+  } else {
+    label.textContent = "Strengthened Prompt";
+    if (copyOrigBtn) copyOrigBtn.style.display = "";
+    if (copyFullBtn) copyFullBtn.textContent = "\uD83D\uDCCB Copy Full Prompt";
+    // Re-render the strengthened view if we have output
+    if (lastOutput && lastInput) {
+      // Just restore the existing DOM — re-call buildStrengthened would be redundant
+      // so we only touch the copy buttons and label
+    }
+  }
+}
+
+function makeRevStep(heading, body) {
+  var el = document.createElement("div");
+  el.className = "revision-step";
+  var lbl = document.createElement("div");
+  lbl.className = "revision-step-label";
+  lbl.textContent = heading;
+  el.appendChild(lbl);
+  var txt = document.createElement("div");
+  txt.style.cssText = "font-size:.81rem;color:#c8e8d0;line-height:1.55;white-space:pre-wrap;";
+  txt.textContent = body;
+  el.appendChild(txt);
+  return el;
+}
+
 // ── COPY ──────────────────────────────────────────────────────────────────────
-function copyOutput() { if (lastOutput) writeClip(lastOutput, document.getElementById("copy-full-btn")); }
+function copyOutput() {
+  var text = currentOutputMode === "revision" ? lastRevisionPrompt : lastOutput;
+  if (text) writeClip(text, document.getElementById("copy-full-btn"));
+}
 function copyOriginal() { if (lastInput) writeClip(lastInput, document.getElementById("copy-orig-btn")); }
 function writeClip(text, btn) {
   var orig = btn ? btn.textContent : "";
@@ -649,13 +793,24 @@ function clearAll() {
   processLevel = 3;
   document.getElementById("process-slider").value = 3;
   updateSlider(); setAIAS(3);
-  lastOutput = ""; lastInput = "";
+  lastOutput = ""; lastInput = ""; lastRevisionPrompt = "";
   document.getElementById("output-panel").innerHTML = '<span class="output-placeholder">Your strengthened assignment will appear here. Configure your options and click &ldquo;Strengthen This Assignment.&rdquo;</span>';
   document.getElementById("output-actions").style.display = "none";
   document.getElementById("active-tags").innerHTML = "";
   document.getElementById("what-changed").innerHTML = "Resistance elements added will be listed here after generation.";
   document.getElementById("strategy-note").classList.remove("visible");
   document.getElementById("handoff-banner").style.display = "none";
+  // Reset output mode to default
+  currentOutputMode = "strengthened";
+  document.getElementById("modeStrengthened").classList.add("active");
+  document.getElementById("modeStrengthened").setAttribute("aria-pressed", "true");
+  document.getElementById("modeRevision").classList.remove("active");
+  document.getElementById("modeRevision").setAttribute("aria-pressed", "false");
+  document.getElementById("output-mode-label").textContent = "Strengthened Prompt";
+  var copyOrigBtn = document.getElementById("copy-orig-btn");
+  if (copyOrigBtn) copyOrigBtn.style.display = "";
+  var copyFullBtn = document.getElementById("copy-full-btn");
+  if (copyFullBtn) copyFullBtn.textContent = "\uD83D\uDCCB Copy Full Prompt";
   updateScore();
 }
 
