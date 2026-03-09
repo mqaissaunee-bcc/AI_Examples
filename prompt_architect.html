@@ -1669,6 +1669,14 @@
       </div>
       <div class="chip-grid" id="outChips" role="group" aria-label="Output and format snippet toggles"></div>
 
+      <!-- Accessibility Snippets -->
+      <div class="section-label">
+        ♿ Accessibility Snippets
+        <span class="active-count" id="accCount" aria-live="polite">0</span>
+      </div>
+      <p style="font-size:0.78rem;color:var(--text3);margin-bottom:0.6rem;font-family:var(--font-ui);">Add accessibility features to the generated application. Mix and match as needed for your audience.</p>
+      <div class="chip-grid" id="accChips" role="group" aria-label="Accessibility snippet toggles"></div>
+
       <!-- Video count — shown when Multimedia chip is active -->
       <div class="video-gate" id="videoGate" style="display:none;" aria-live="polite">
         <div class="video-gate-title">🎬 Multimedia Video Count</div>
@@ -2054,6 +2062,45 @@ const OUT_SNIPPETS = [
     label: '🎬 Multimedia',
     detail: '<strong>Two-phase workflow:</strong> The LLM will first suggest specific YouTube videos with search queries, then pause and ask you to verify and provide the real IDs before generating any code. This ensures no placeholder IDs ever appear in the final application.<br><br><strong>Covers:</strong> YouTube embeds · GitHub-hosted MP4/WebM/MP3/OGG · Unsplash / Pexels / Wikimedia Commons images · Accessible fallbacks throughout.',
     prompt: 'MULTIMEDIA FEATURE — TWO-PHASE WORKFLOW. You must follow this exact two-phase process. Do not skip Phase 1 or proceed to code generation until the user provides confirmed video IDs.\n\n== PHASE 1: VIDEO RESEARCH (do this first, before any code) ==\nBefore writing any code, suggest specific YouTube videos for this application. For each video slot required:\n  1. Suggest a specific, real video title and channel that fits the topic and audience\n  2. Provide the exact YouTube search query the user should use (specific enough to find it in top 3 results)\n  3. Explain in one sentence why this video fits the educational context\n\nAfter listing all suggestions, output this exact message (replace N with the number of videos):\n\n"I have suggested N video(s) above. Please go to YouTube, search for each one, confirm it plays publicly, and copy the 11-character video ID from the URL (the part after ?v=). Paste all confirmed IDs here and I will complete the application."\n\nThen STOP. Do not write any HTML, CSS, or JavaScript until the user replies with confirmed IDs.\n\n== PHASE 2: CODE GENERATION (only after user provides confirmed IDs) ==\nOnce the user provides the confirmed YouTube video IDs, generate the complete application using ONLY those exact IDs. Never substitute or invent different IDs.\n\nFor all video embeds use ONLY the iframe format:\n  <iframe src="https://www.youtube.com/embed/[CONFIRMED_ID]" title="[descriptive title]" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>\n\n== AUDIO ==\nUse HTML5 <audio controls> only — never autoplay. Include a visible transcript or caption link near every audio element.\n\n== IMAGES ==\nPrefer in this order: Wikimedia Commons (full direct URLs) · Unsplash (https://images.unsplash.com/photo-[ID]?w=800) · Pexels · placehold.co fallback. Every <img> must have a descriptive alt attribute.\n\n== GENERAL ==\nAll media must degrade gracefully with fallback text. Never use autoplay for any media type.',
+  },
+  {
+    id: 'pdfexport',
+    label: '🖨️ Print / Save as PDF',
+    detail: 'Adds a "Print / Save as PDF" button that triggers the browser print dialog — the most reliable way to produce a PDF from an HTML application without external libraries. Includes a print stylesheet that hides UI controls, removes navigation, and optimizes layout for a clean printed page or PDF export.',
+    prompt: 'Add a "Print / Save as PDF" button to the application. Requirements:\n1. BUTTON: A visible "🖨️ Print / Save as PDF" button positioned at the top-right or bottom of the page. Clicking it calls window.print().\n2. PRINT STYLESHEET: Include a comprehensive @media print block that: hides the print button itself, hides any navigation, sidebar, controls, or UI chrome; sets background to white and text to black; removes box-shadows and unnecessary borders; ensures all content is visible (no overflow:hidden clipping); sets page margins to 0.75in; uses page-break-avoid on key content blocks to prevent awkward splits; sets font sizes to print-appropriate sizes (body 11pt, headings 14–18pt).\n3. For infographics specifically: ensure the full infographic width fits on a single page by scaling to fit within the print area using @page { size: A4 landscape; } or A4 portrait depending on the layout orientation.',
+  },
+];
+
+const ACC_SNIPPETS = [
+  {
+    id: 'fontresize',
+    label: '🔡 Font Size Controls',
+    detail: 'Adds accessible + / − font size buttons that increase or decrease text size in 2px increments (range: 12px–24px). Uses a CSS custom property on :root so all text scales proportionally. Persists across sections within the session.',
+    prompt: 'Add font size controls to the application: a "A−" (decrease) and "A+" (increase) button, visible at the top of the page. Clicking them adjusts a --base-font-size CSS custom property on :root in 2px increments, clamped between 12px and 24px. All text in the application must use this variable (directly or via em/rem). Label the controls clearly and include aria-label="Decrease font size" and aria-label="Increase font size". Show the current size value next to the buttons (e.g. "16px").',
+  },
+  {
+    id: 'highcontrast',
+    label: '🌓 High Contrast Mode',
+    detail: 'Adds a toggle button that switches between the standard color scheme and a WCAG AAA high-contrast mode (black background, white text, yellow highlights, no background images). Uses a CSS class on <body> so all styles respond to a single toggle.',
+    prompt: 'Add a "High Contrast" toggle button to the application. When activated, it adds a class "high-contrast" to the <body> element. In the high-contrast CSS block: set background to #000000, all text to #FFFFFF, links and highlights to #FFFF00, borders to #FFFFFF, remove all background images and gradients, and ensure all interactive elements have a 2px solid #FFFF00 focus ring. The toggle button must clearly show the current state ("High Contrast: ON / OFF") and use aria-pressed="true/false" to communicate state to screen readers.',
+  },
+  {
+    id: 'screenreader',
+    label: '♿ Screen Reader Friendly',
+    detail: 'Ensures the application is fully usable with a screen reader: semantic HTML landmarks, ARIA labels on all interactive elements, live regions for dynamic content, descriptive alt text on all images and SVGs, and skip navigation link.',
+    prompt: 'Ensure the application is fully screen reader accessible:\n1. Use semantic HTML landmarks: <header>, <main>, <nav>, <section>, <footer> with appropriate aria-label attributes.\n2. Every interactive element (buttons, inputs, toggles) must have a descriptive aria-label or be associated with a visible <label>.\n3. Dynamic content that updates (feedback messages, score displays, progress) must use aria-live="polite" regions so screen readers announce changes.\n4. All <img> elements must have descriptive alt text. All inline SVGs must include <title> and role="img" with aria-labelledby pointing to the title.\n5. Include a "Skip to main content" link as the first focusable element in the page.\n6. Ensure logical tab order throughout — never use tabindex > 0.\n7. All color-conveyed information must also be conveyed through text or shape.',
+  },
+  {
+    id: 'dyslexia',
+    label: '📖 Dyslexia-Friendly Font',
+    detail: 'Adds a toggle that switches body text to OpenDyslexic — a font designed to improve readability for users with dyslexia. Loaded from a CDN with a system-font fallback. The toggle is clearly labeled and remembers its state within the session.',
+    prompt: 'Add a "Dyslexia-Friendly Font" toggle button to the application. When activated: load OpenDyslexic from https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/OpenDyslexic-Regular.otf as a @font-face, then apply font-family: "OpenDyslexic", sans-serif to the body. Increase line-height to 1.8 and letter-spacing to 0.05em when active. The toggle must show its current state clearly ("Dyslexia Font: ON / OFF") and use aria-pressed to communicate state. Revert all changes when toggled off.',
+  },
+  {
+    id: 'reducedmotion',
+    label: '🧘 Reduced Motion',
+    detail: 'Adds a manual "Reduce Motion" toggle in addition to automatically respecting the OS-level prefers-reduced-motion setting. When active, all CSS animations, transitions, and scroll effects are disabled. Users who prefer less motion but haven\'t set the OS preference can still control it.',
+    prompt: 'Implement comprehensive reduced motion support:\n1. AUTOMATIC: Include @media (prefers-reduced-motion: reduce) CSS blocks that disable all animations, transitions, and scroll effects for users who have set this preference at the OS level.\n2. MANUAL TOGGLE: Add a "Reduce Motion" toggle button (aria-pressed) that adds a class "motion-reduced" to <body>. All animation and transition CSS must also be suppressed under the .motion-reduced selector, mirroring the @media block.\n3. When reduced motion is active, content that would animate in must be immediately visible at full opacity with no transform offset.',
   },
 ];
 
@@ -2560,6 +2607,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderChips('techChips', TECH_SNIPPETS, 'techCount');
   renderChips('pedChips', PED_SNIPPETS, 'pedCount');
   renderChips('outChips', OUT_SNIPPETS, 'outCount');
+  renderChips('accChips', ACC_SNIPPETS, 'accCount');
   bindEvents();
   updatePrompt();
 });
@@ -2618,7 +2666,7 @@ function toggleSnippet(snip, chipEl, countId) {
     chipEl.querySelector('.chip-check').textContent = '✓ ';
     if (snip.id === 'multimedia') showVideoGate();
   }
-  updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS].flat());
+  updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS].flat());
   updatePrompt();
 }
 
@@ -2627,7 +2675,7 @@ function doDeactivateSnippet(snip, chipEl, countId) {
   chipEl.classList.remove('active');
   chipEl.setAttribute('aria-pressed', 'false');
   chipEl.querySelector('.chip-check').textContent = '';
-  updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS].flat());
+  updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS].flat());
   updatePrompt();
 }
 
@@ -2637,6 +2685,7 @@ function updateCountBadge(countId, allSnippets) {
     { id: 'techCount', snips: TECH_SNIPPETS },
     { id: 'pedCount', snips: PED_SNIPPETS },
     { id: 'outCount', snips: OUT_SNIPPETS },
+    { id: 'accCount', snips: ACC_SNIPPETS },
   ];
   groups.forEach(g => {
     const count = g.snips.filter(s => state.activeSnippets.has(s.id)).length;
@@ -2798,7 +2847,7 @@ function updatePrompt() {
   if (toneName) parts.push(`Instructional Tone: ${toneName}.`);
   if (scopeData) parts.push(`Content Scope: ${scopeData.label} (${scopeData.time} of learner engagement). ${scopeData.prompt}`);
 
-  const allSnippets = [...TECH_SNIPPETS, ...PED_SNIPPETS, ...OUT_SNIPPETS];
+  const allSnippets = [...TECH_SNIPPETS, ...PED_SNIPPETS, ...OUT_SNIPPETS, ...ACC_SNIPPETS];
   const activeSnippetPrompts = allSnippets
     .filter(s => state.activeSnippets.has(s.id))
     .map(s => s.prompt);
