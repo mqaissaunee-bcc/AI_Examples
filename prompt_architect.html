@@ -1833,20 +1833,60 @@
 
 <!-- ===== VIDEO SEARCH PROMPT MODAL ===== -->
 <div class="confirm-overlay" id="videoSearchOverlay" role="dialog" aria-modal="true" aria-labelledby="vsTitle" style="display:none;">
-  <div class="confirm-box" style="max-width:640px;width:90vw;">
-    <h3 id="vsTitle" style="margin-bottom:0.25rem;">🔍 Video Search Prompt</h3>
-    <p style="font-size:0.8rem;color:var(--text3);margin-bottom:0.75rem;line-height:1.5;">Copy this prompt and paste it into <strong>Perplexity</strong> or <strong>Gemini</strong> (recommended — both have live YouTube search). The LLM will return only the YouTube IDs you need. Paste those IDs back into the Video ID Checker below.</p>
-    <div style="position:relative;">
-      <textarea id="videoSearchPromptText" rows="12" readonly
-        style="width:100%;box-sizing:border-box;font-family:var(--font-ui);font-size:0.8rem;line-height:1.6;padding:0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text1);resize:vertical;"
+  <div class="confirm-box" style="max-width:660px;width:92vw;max-height:90vh;overflow-y:auto;">
+
+    <!-- Step 1: Generated prompt -->
+    <div class="vs-step" id="vsStep1">
+      <h3 id="vsTitle" style="margin-bottom:0.25rem;">🔍 Video Search Prompt</h3>
+      <p style="font-size:0.8rem;color:var(--text3);margin-bottom:0.75rem;line-height:1.5;">
+        <strong>Step 1:</strong> Copy this prompt and paste it into <strong>Perplexity</strong> or <strong>Gemini</strong> — both have live YouTube search and will return real video IDs.
+      </p>
+      <textarea id="videoSearchPromptText" rows="10" readonly
+        style="width:100%;box-sizing:border-box;font-family:var(--font-ui);font-size:0.79rem;line-height:1.6;padding:0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text1);resize:vertical;"
         aria-label="Generated video search prompt"></textarea>
+      <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary btn-sm" id="vssCopyBtn" type="button">📋 Copy Prompt</button>
+        <button class="btn btn-teal btn-sm" id="vssPerplexityBtn" type="button">Open Perplexity ↗</button>
+        <button class="btn btn-teal btn-sm" id="vssGeminiBtn" type="button">Open Gemini ↗</button>
+      </div>
     </div>
-    <div style="display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap;align-items:center;">
-      <button class="btn btn-primary btn-sm" id="vssCopyBtn" type="button">📋 Copy Prompt</button>
-      <button class="btn btn-gold btn-sm" id="vssPerplexityBtn" type="button">Open Perplexity ↗</button>
-      <button class="btn btn-gold btn-sm" id="vssGeminiBtn" type="button">Open Gemini ↗</button>
-      <button class="btn btn-ghost btn-sm" id="vssCloseBtn" type="button" style="margin-left:auto;">Close</button>
+
+    <!-- Divider -->
+    <div style="border-top:1px solid var(--border);margin:1rem 0;"></div>
+
+    <!-- Step 2: Paste results back -->
+    <div class="vs-step" id="vsStep2">
+      <p style="font-size:0.8rem;color:var(--text3);margin-bottom:0.5rem;line-height:1.5;">
+        <strong>Step 2:</strong> Paste the LLM's response below. IDs will be extracted automatically.
+      </p>
+      <textarea id="vssResultsPaste" rows="7" 
+        placeholder="Paste the full response from Perplexity or Gemini here…"
+        style="width:100%;box-sizing:border-box;font-family:var(--font-ui);font-size:0.79rem;line-height:1.6;padding:0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text1);resize:vertical;"
+        aria-label="Paste LLM video search results here"></textarea>
+
+      <!-- Extracted IDs display -->
+      <div id="vssExtracted" style="display:none;margin-top:0.6rem;">
+        <div style="font-size:0.78rem;font-weight:600;color:var(--text2);font-family:var(--font-ui);margin-bottom:0.35rem;">
+          ✅ Extracted IDs — <span id="vssExtractedCount">0</span> found:
+        </div>
+        <div id="vssIdTags" style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.5rem;"></div>
+        <div id="vssWarning" style="display:none;font-size:0.76rem;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:0.4rem 0.6rem;margin-bottom:0.5rem;" role="alert"></div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" id="vssSendCheckerBtn" type="button">🔍 Send to ID Checker</button>
+          <button class="btn btn-ghost btn-sm" id="vssCopyIdsBtn" type="button">📋 Copy IDs only</button>
+        </div>
+      </div>
+
+      <!-- No IDs found message -->
+      <div id="vssNoIds" style="display:none;margin-top:0.5rem;font-size:0.78rem;color:#b45309;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:0.4rem 0.6rem;" role="alert">
+        No YouTube IDs found in that text. Make sure you pasted the full LLM response, or try re-running the search prompt.
+      </div>
     </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:0.75rem;">
+      <button class="btn btn-ghost btn-sm" id="vssCloseBtn" type="button">Close</button>
+    </div>
+
   </div>
 </div>
 
@@ -3210,17 +3250,20 @@ function flashBtn(id, label, cls) {
     document.getElementById('genVideoSearchBtn').addEventListener('click', () => {
       const prompt = buildVideoSearchPrompt();
       document.getElementById('videoSearchPromptText').value = prompt;
+      // Reset step 2 state on open
+      document.getElementById('vssResultsPaste').value = '';
+      document.getElementById('vssExtracted').style.display = 'none';
+      document.getElementById('vssNoIds').style.display = 'none';
       document.getElementById('videoSearchOverlay').style.display = 'flex';
     });
 
+    // Paste area — live parse as user types/pastes
+    document.getElementById('vssResultsPaste').addEventListener('input', parseAndDisplayIDs);
+
     // Modal close
-    document.getElementById('vssCloseBtn').addEventListener('click', () => {
-      document.getElementById('videoSearchOverlay').style.display = 'none';
-    });
+    document.getElementById('vssCloseBtn').addEventListener('click', closeVideoModal);
     document.getElementById('videoSearchOverlay').addEventListener('click', (e) => {
-      if (e.target === document.getElementById('videoSearchOverlay')) {
-        document.getElementById('videoSearchOverlay').style.display = 'none';
-      }
+      if (e.target === document.getElementById('videoSearchOverlay')) closeVideoModal();
     });
 
     // Copy search prompt
@@ -3245,7 +3288,126 @@ function flashBtn(id, label, cls) {
       window.open('https://gemini.google.com/app', '_blank');
     });
 
+    // Send to ID Checker
+    document.getElementById('vssSendCheckerBtn').addEventListener('click', () => {
+      const ids = getExtractedIDs();
+      if (!ids.length) return;
+      // Populate checker input
+      document.getElementById('checkerInput').value = ids.join(', ');
+      // Open the checker panel if collapsed
+      const body = document.getElementById('videoCheckerBody');
+      const toggle = document.getElementById('videoCheckerToggle');
+      if (body && body.style.display === 'none') {
+        body.style.display = 'block';
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+      }
+      // Close modal, scroll to checker, run check
+      closeVideoModal();
+      const panel = document.getElementById('videoCheckerPanel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => {
+        const runBtn = document.getElementById('checkerRunBtn');
+        if (runBtn) runBtn.click();
+      }, 400);
+    });
+
+    // Copy IDs only
+    document.getElementById('vssCopyIdsBtn').addEventListener('click', () => {
+      const ids = getExtractedIDs();
+      navigator.clipboard.writeText(ids.join(', ')).then(() => {
+        const btn = document.getElementById('vssCopyIdsBtn');
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy IDs only'; }, 2000);
+      });
+    });
+
   });
+
+  // ── Close modal helper ───────────────────────────────────────────────────
+  function closeVideoModal() {
+    document.getElementById('videoSearchOverlay').style.display = 'none';
+  }
+
+  // ── ID extraction state ──────────────────────────────────────────────────
+  let _extractedIDs = [];
+
+  function getExtractedIDs() { return _extractedIDs; }
+
+  function parseAndDisplayIDs() {
+    const text = document.getElementById('vssResultsPaste').value;
+    const countEl = document.getElementById('videoCount');
+    const expectedCount = countEl ? (parseInt(countEl.value) || 1) : 1;
+
+    // Extract all 11-char YouTube IDs from the pasted text
+    // Match IDs in context: after "ID:", "v=", "youtu.be/", or standalone 11-char tokens
+    const found = new Set();
+
+    // Pattern 1: explicit "YouTube ID: XXXXXXXXXXX" or "ID: XXXXXXXXXXX"
+    const explicit = text.matchAll(/(?:youtube\s*id|video\s*id|id)\s*[:\-]\s*([A-Za-z0-9_-]{11})/gi);
+    for (const m of explicit) found.add(m[1]);
+
+    // Pattern 2: URL params v=ID or youtu.be/ID
+    const urls = text.matchAll(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/gi);
+    for (const m of urls) found.add(m[1]);
+
+    // Pattern 3: bare 11-char tokens on their own (word boundary, not part of longer string)
+    if (found.size < expectedCount) {
+      const bare = text.matchAll(/(?<![A-Za-z0-9_-])([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/g);
+      for (const m of bare) {
+        // Exclude common false positives: pure words, timestamps, etc.
+        if (/[A-Za-z]/.test(m[1]) && /[0-9_-]/.test(m[1])) {
+          found.add(m[1]);
+        }
+        if (found.size >= expectedCount * 3) break; // cap false positive sweep
+      }
+    }
+
+    _extractedIDs = Array.from(found).slice(0, expectedCount * 2); // show up to 2× expected
+
+    const extractedDiv = document.getElementById('vssExtracted');
+    const noIdsDiv = document.getElementById('vssNoIds');
+    const tagsDiv = document.getElementById('vssIdTags');
+    const countSpan = document.getElementById('vssExtractedCount');
+    const warnDiv = document.getElementById('vssWarning');
+
+    if (_extractedIDs.length === 0) {
+      extractedDiv.style.display = 'none';
+      noIdsDiv.style.display = 'block';
+      return;
+    }
+
+    noIdsDiv.style.display = 'none';
+    extractedDiv.style.display = 'block';
+    countSpan.textContent = _extractedIDs.length;
+
+    // Render ID tags
+    tagsDiv.innerHTML = '';
+    _extractedIDs.forEach(id => {
+      const tag = document.createElement('a');
+      tag.href = `https://www.youtube.com/watch?v=${id}`;
+      tag.target = '_blank';
+      tag.rel = 'noopener';
+      tag.textContent = id;
+      tag.style.cssText = 'font-family:monospace;font-size:0.8rem;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:0.2rem 0.5rem;color:var(--accent);text-decoration:none;cursor:pointer;';
+      tag.title = 'Open on YouTube to verify';
+      tag.addEventListener('mouseenter', () => tag.style.textDecoration = 'underline');
+      tag.addEventListener('mouseleave', () => tag.style.textDecoration = 'none');
+      tagsDiv.appendChild(tag);
+    });
+
+    // Warning if count mismatch
+    if (_extractedIDs.length !== expectedCount) {
+      warnDiv.style.display = 'block';
+      if (_extractedIDs.length < expectedCount) {
+        warnDiv.textContent = `⚠️ Expected ${expectedCount} ID${expectedCount > 1 ? 's' : ''} but only found ${_extractedIDs.length}. Try re-running the search prompt or manually add the missing ones to the ID Checker.`;
+      } else {
+        warnDiv.textContent = `ℹ️ Found ${_extractedIDs.length} IDs but you requested ${expectedCount}. Only the first ${expectedCount} will be used — review them before sending to the checker.`;
+        _extractedIDs = _extractedIDs.slice(0, expectedCount);
+      }
+    } else {
+      warnDiv.style.display = 'none';
+    }
+  }
 
   // ── Build the video search prompt ───────────────────────────────────────
   function buildVideoSearchPrompt() {
