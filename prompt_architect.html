@@ -1497,6 +1497,31 @@
         </div>
       </div>
 
+      <!-- Math + Accessibility tip -->
+      <div id="math-a11y-tip" role="status" aria-live="polite" style="display:none;margin-top:10px;">
+        <div style="
+          display:flex;align-items:flex-start;gap:10px;
+          background:linear-gradient(135deg,rgba(26,107,114,0.10),rgba(184,134,11,0.08));
+          border:1px solid rgba(184,134,11,0.35);
+          border-radius:8px;padding:10px 14px;
+          font-family:var(--font-ui);font-size:0.82rem;line-height:1.5;
+          color:var(--text2);
+        ">
+          <span style="font-size:1.1rem;flex-shrink:0;margin-top:1px;">📐</span>
+          <span>
+            <strong style="color:var(--gold);">Tip — math + accessibility:</strong>
+            The <strong>Accessibility Suite</strong> ensures MathML equations are fully navigable by screen readers and that the axe-core audit catches any rendering gaps. Consider enabling it alongside Math &amp; Equations.
+            <button onclick="activateMathA11y()" style="
+              margin-left:8px;padding:3px 12px;
+              background:var(--gold);color:var(--bg);
+              border:none;border-radius:50px;
+              font-size:0.78rem;font-weight:700;cursor:pointer;
+              font-family:var(--font-ui);
+            ">Add Accessibility Suite</button>
+          </span>
+        </div>
+      </div>
+
       <!-- SCORM Guide Accordion -->
       <details class="scorm-guide" id="scormGuide">
         <summary>📡 New to SCORM? What it is &amp; which chips to use</summary>
@@ -1818,6 +1843,12 @@ const TECH_SNIPPETS = [
     label: '♿ Accessibility Suite',
     detail: 'Full accessibility implementation beyond basic WCAG compliance. Includes: <strong>skip navigation link</strong> (visible on focus), <strong>ARIA landmarks</strong> on all major regions, <strong>ARIA live regions</strong> (<code>aria-live="polite"</code>) for all dynamic content (feedback, scores, loading states), <strong>logical tab order</strong> with programmatic focus management (modals, overlays, multi-step flows), <strong>visible focus indicators</strong> on every interactive element, <strong>iframe-safe embedding</strong> (no X-Frame-Options block, works in Canvas LMS), and a <strong>collapsible axe-core self-audit panel</strong> that runs on page load and lists any remaining violations in a dev overlay. Stacks cleanly on top of the ADA / WCAG 2.1 AA snippet for a complete implementation.',
     prompt: 'Implement the full Accessibility Suite: (1) Skip navigation link — a visually hidden <a href="#main-content"> that becomes visible on keyboard focus, styled with high contrast. (2) ARIA landmarks — every major region must have role="main", role="banner", role="navigation", role="contentinfo", or role="complementary" with descriptive aria-label attributes. (3) ARIA live regions — wrap all dynamic content (quiz feedback, score updates, loading messages, error alerts) in elements with aria-live="polite" and aria-atomic="true" so screen readers announce changes without disrupting flow. (4) Focus management — when modals, drawers, or multi-step panels open, programmatically move focus to the first interactive element inside them; restore focus to the trigger element on close. Trap focus inside open modals using a focus trap loop. (5) Visible focus indicators — every button, link, and input must have a clearly visible :focus-visible outline (minimum 3px, high-contrast color, never outline:none). (6) Logical tab order — all interactive elements must be reachable in a meaningful sequence via Tab; use tabindex="0" for custom interactive elements, tabindex="-1" only for programmatic focus targets. (7) iframe-safe embedding — do not set X-Frame-Options or a frame-blocking CSP; the page must load cleanly inside a Canvas LMS iframe or any parent frame. (8) axe-core self-audit panel — inject axe-core (https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js) and on DOMContentLoaded run axe.run(); render results in a collapsible <details> element at the bottom of the page showing violation count, each violation impact level, WCAG criterion, and affected selector. Style the panel with a dark background and color-coded severity labels. Hide the panel by default but keep it present in the DOM.',
+  },
+  {
+    id: 'mathequations',
+    label: '📐 Math & Equations',
+    detail: 'Accessible, cross-LLM-safe math rendering. All equations use <strong>MathML</strong> natively in HTML5 for screen reader compatibility (JAWS, NVDA, VoiceOver). For complex expressions, supplements with <strong>MathJax 3</strong> (accessibility mode, <code>assistive-mml</code> enabled) — compatible with Claude, GPT-4, Gemini, and other LLMs. <strong>Never</strong> uses plain text (x^2), Unicode substitutes (x²), or image-only equations. Every equation includes a human-readable <code>aria-label</code> fallback.',
+    prompt: 'Render all mathematical content accessibly using this cross-LLM-compatible approach: (1) Native MathML — write valid HTML5 MathML inline for all equations using <math>, <mrow>, <msup>, <mfrac>, <msqrt>, <mn>, <mi>, <mo> and related elements. MathML is a W3C standard requiring no library and is natively readable by screen readers. (2) MathJax 3 enhancement — after the closing </body> tag, load MathJax 3 with accessibility mode using this exact inline config placed BEFORE the script src tag: window.MathJax = { options: { enableAssistiveMml: true }, tex: { inlineMath: [["\\(","\\)"]], displayMath: [["\\[","\\]"]] }, startup: { typeset: true } }; Load from https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js — this CDN is reliable across all environments. (3) aria-label fallback — every <math> element must include aria-label with a plain English spoken reading (e.g., aria-label="x squared plus y squared equals r squared"). (4) Never use plain text approximations (x^2, sqrt(x)), Unicode substitutes (x², ½, √), or <img> tags for equations — these are inaccessible or ambiguous to screen readers. (5) Display equations use display="block" on the <math> element and \\[...\\] MathJax delimiters. Inline equations use \\(...\\) delimiters. (6) If the activity includes an equation reference panel, wrap each entry in <figure> with a <figcaption> giving the equation name and spoken form.',
   },
 ];
 
@@ -2358,11 +2389,18 @@ function toggleSnippet(snip, chipEl, countId) {
 
 function checkA11yTip() {
   const A11Y_TRIO = ['ada', 'colorsafe', 'a11ysuite'];
-  const active = A11Y_TRIO.filter(id => state.activeSnippets.has(id));
-  const tip = document.getElementById('a11y-tip');
-  if (!tip) return;
-  // Show tip if at least one but not all three are active
-  tip.style.display = (active.length > 0 && active.length < 3) ? 'block' : 'none';
+  const trioActive = A11Y_TRIO.filter(id => state.activeSnippets.has(id));
+  const mathActive = state.activeSnippets.has('mathequations');
+  const tip  = document.getElementById('a11y-tip');
+  const mathTip = document.getElementById('math-a11y-tip');
+  if (tip) {
+    // Show trio tip if at least one but not all three are active
+    tip.style.display = (trioActive.length > 0 && trioActive.length < 3) ? 'block' : 'none';
+  }
+  if (mathTip) {
+    // Show math tip if math is on but accessibility suite is not
+    mathTip.style.display = (mathActive && !state.activeSnippets.has('a11ysuite')) ? 'block' : 'none';
+  }
 }
 
 function activateA11yTrio() {
@@ -2383,6 +2421,23 @@ function activateA11yTrio() {
   updateCountBadge('techCount', TECH_SNIPPETS);
   updatePrompt();
   document.getElementById('a11y-tip').style.display = 'none';
+}
+
+function activateMathA11y() {
+  const id = 'a11ysuite';
+  if (!state.activeSnippets.has(id)) {
+    const snip = TECH_SNIPPETS.find(s => s.id === id);
+    const chip = document.querySelector('[data-id="a11ysuite"]');
+    if (snip && chip) {
+      state.activeSnippets.add(id);
+      chip.classList.add('active');
+      chip.setAttribute('aria-pressed', 'true');
+      chip.querySelector('.chip-check').textContent = '✓ ';
+    }
+  }
+  updateCountBadge('techCount', TECH_SNIPPETS);
+  updatePrompt();
+  checkA11yTip();
 }
 
 function doDeactivateSnippet(snip, chipEl, countId) {
