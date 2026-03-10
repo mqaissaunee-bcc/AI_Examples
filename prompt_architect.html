@@ -1719,6 +1719,15 @@
 
         <p style="font-size:0.76rem;color:var(--text2);font-family:var(--font-ui);margin:0 0 0.75rem;line-height:1.5;">The LLM will suggest videos in Phase 1, then pause and wait for confirmed IDs before generating any code. Use the button below to get a focused search prompt to take to a search-capable LLM.</p>
 
+        <div style="font-size:0.78rem;font-family:var(--font-ui);background:var(--accent-light,#e8f4f8);border:1px solid var(--accent,#028090);border-radius:7px;padding:0.55rem 0.75rem;margin-bottom:0.75rem;line-height:1.6;">
+          <strong>Already have your IDs?</strong> Paste them into the
+          <button type="button" id="jumpToCheckerBtn"
+            style="background:none;border:none;color:var(--accent,#028090);font-weight:700;font-size:0.78rem;font-family:var(--font-ui);cursor:pointer;padding:0;text-decoration:underline;">
+            🎬 YouTube Video ID Checker ↓
+          </button>
+          at the bottom of this page to verify them — then copy the Phase 2 message back to your LLM.
+        </div>
+
         <!-- Video search prompt generator -->
         <button class="btn btn-teal btn-sm" id="genVideoSearchBtn" type="button" style="margin-bottom:0.75rem;">
           🔍 Generate Video Search Prompt
@@ -1783,6 +1792,7 @@
       <span class="panel-icon" aria-hidden="true">✨</span>
       <h2 id="output-heading">Generated Prompt</h2>
       <span class="badge" style="margin-left:auto;">Live Preview</span>
+      <span id="videoConfirmedBadge" style="display:none;background:#059669;color:white;font-size:0.7rem;font-weight:700;padding:0.2rem 0.55rem;border-radius:20px;font-family:var(--font-ui);margin-left:0.4rem;">🎬 IDs embedded</span>
     </div>
     <div class="panel-body">
 
@@ -2955,12 +2965,23 @@ function updatePrompt() {
       if (state.activeSnippets.has('multimedia')) {
         const countEl = document.getElementById('videoCount');
         const videoCount = countEl ? (parseInt(countEl.value) || 1) : 1;
+        const confirmedIDs = typeof getVerifiedIDs === 'function' ? getVerifiedIDs() : [];
         const lengthPref = getVideoLengthPref();
         const qualityPrefs = getVideoQualityPrefs();
-        let videoReqs = `\n\n== VIDEO COUNT FOR THIS PROJECT ==\nThis application requires exactly ${videoCount} embedded video${videoCount > 1 ? 's' : ''}. Suggest ${videoCount} video${videoCount > 1 ? 's' : ''} in Phase 1, then wait for ${videoCount} confirmed ID${videoCount > 1 ? 's' : ''} before proceeding to Phase 2.`;
-        if (lengthPref) videoReqs += `\n\n== VIDEO LENGTH PREFERENCE ==\n${lengthPref}`;
-        if (qualityPrefs) videoReqs += `\n\n== VIDEO QUALITY REQUIREMENTS ==\n${qualityPrefs}`;
-        return p + videoReqs;
+
+        if (confirmedIDs.length > 0) {
+          // IDs already confirmed — skip Phase 1, embed IDs directly
+          const idLines = confirmedIDs.map((id, i) => `Video ${i + 1}: ${id}`).join('\n');
+          let confirmed = `\n\n== CONFIRMED VIDEO IDs ==\nThe following YouTube video IDs have already been verified and are ready to use. Do NOT suggest alternative videos or ask for confirmation — use these exact IDs:\n${idLines}\n\nProceed directly to generating the complete application using these IDs.`;
+          if (lengthPref) confirmed += `\n(Selected for: ${lengthPref})`;
+          return p + confirmed;
+        } else {
+          // No IDs yet — use Phase 1/2 workflow
+          let videoReqs = `\n\n== VIDEO COUNT FOR THIS PROJECT ==\nThis application requires exactly ${videoCount} embedded video${videoCount > 1 ? 's' : ''}. Suggest ${videoCount} video${videoCount > 1 ? 's' : ''} in Phase 1, then wait for ${videoCount} confirmed ID${videoCount > 1 ? 's' : ''} before proceeding to Phase 2.`;
+          if (lengthPref) videoReqs += `\n\n== VIDEO LENGTH PREFERENCE ==\n${lengthPref}`;
+          if (qualityPrefs) videoReqs += `\n\n== VIDEO QUALITY REQUIREMENTS ==\n${qualityPrefs}`;
+          return p + videoReqs;
+        }
       }
       return p;
     });
@@ -2984,6 +3005,14 @@ function updatePrompt() {
   outputEl.textContent = fullPrompt;
   updateMeta(fullPrompt);
   updateResistNote(itSelections);
+
+  // Show/hide IDs-embedded badge
+  const badge = document.getElementById('videoConfirmedBadge');
+  if (badge) {
+    const hasIds = state.activeSnippets.has('multimedia') &&
+      typeof getVerifiedIDs === 'function' && getVerifiedIDs().length > 0;
+    badge.style.display = hasIds ? 'inline-block' : 'none';
+  }
 }
 
 function updateMeta(text) {
@@ -3218,6 +3247,19 @@ function flashBtn(id, label, cls) {
 
   // ── DOMContentLoaded wiring ─────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
+
+    // Jump to checker link
+    document.getElementById('jumpToCheckerBtn').addEventListener('click', () => {
+      const panel  = document.getElementById('videoCheckerPanel');
+      const body   = document.getElementById('videoCheckerBody');
+      const toggle = document.getElementById('videoCheckerToggle');
+      if (body && !panel.classList.contains('open')) {
+        panel.classList.add('open');
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+      }
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => document.getElementById('checkerInput').focus(), 400);
+    });
 
     // Video count spinner
     document.getElementById('videoCount').addEventListener('input', () => {
@@ -3614,6 +3656,8 @@ Return only the structured list above. Do not include any other text.`;
 
     // After all checks complete, render the Phase 2 action bar if any valid IDs
     renderPhase2Bar(resultsEl);
+    // Refresh main prompt so confirmed IDs are baked in
+    if (typeof updatePrompt === 'function') updatePrompt();
   }
 
   // ── Phase 2 action bar ────────────────────────────────────────────────────
@@ -3634,7 +3678,7 @@ Return only the structured list above. Do not include any other text.`;
 
 ${videoLines}
 
-Please now generate the complete application using these exact IDs.`;
+These are verified and publicly available. Please now generate the complete application using these exact IDs.`;
 
     const bar = document.createElement('div');
     bar.id = 'phase2Bar';
@@ -3642,26 +3686,24 @@ Please now generate the complete application using these exact IDs.`;
 
     bar.innerHTML = `
       <div style="font-size:0.82rem;font-weight:700;color:var(--accent,#028090);font-family:var(--font-ui);margin-bottom:0.35rem;">
-        ✅ ${_confirmedIDs.length} video${_confirmedIDs.length > 1 ? 's' : ''} confirmed — ready for Phase 2
+        ✅ ${_confirmedIDs.length} video${_confirmedIDs.length > 1 ? 's' : ''} confirmed — your prompt is ready
       </div>
-      <div style="font-size:0.77rem;color:var(--text2);font-family:var(--font-ui);margin-bottom:0.6rem;line-height:1.5;">
-        Copy the message below and paste it into your LLM to trigger Phase 2 (code generation).
+      <div style="font-size:0.77rem;color:var(--text2);font-family:var(--font-ui);margin-bottom:0.5rem;line-height:1.5;">
+        The confirmed IDs have been added directly to your generated prompt above. <strong>Copy the prompt and paste it into your LLM in one go</strong> — no Phase 1, no back-and-forth.
       </div>
-      <textarea id="phase2Text" rows="5" readonly
-        style="width:100%;box-sizing:border-box;font-family:var(--font-ui);font-size:0.78rem;line-height:1.6;padding:0.6rem 0.75rem;border:1px solid var(--border);border-radius:7px;background:var(--surface,#fff);color:var(--text1);resize:vertical;margin-bottom:0.5rem;"
-        aria-label="Phase 2 message to paste into your LLM">${escHTML(phase2Message)}</textarea>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <button class="btn btn-primary btn-sm" id="copyPhase2Btn" type="button">📋 Copy Phase 2 Message</button>
+        <button class="btn btn-primary btn-sm" id="copyPhase2Btn" type="button">📋 Copy Full Prompt</button>
         <button class="btn btn-ghost btn-sm" id="copyIdsOnlyBtn" type="button">Copy IDs only: ${escHTML(idList)}</button>
       </div>`;
 
     resultsEl.appendChild(bar);
 
     document.getElementById('copyPhase2Btn').addEventListener('click', () => {
-      navigator.clipboard.writeText(phase2Message).then(() => {
+      const promptText = document.getElementById('promptOutput').textContent;
+      navigator.clipboard.writeText(promptText).then(() => {
         const btn = document.getElementById('copyPhase2Btn');
         btn.textContent = '✅ Copied!';
-        setTimeout(() => { btn.textContent = '📋 Copy Phase 2 Message'; }, 2000);
+        setTimeout(() => { btn.textContent = '📋 Copy Full Prompt'; }, 2000);
       });
     });
 
