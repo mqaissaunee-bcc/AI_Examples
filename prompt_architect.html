@@ -3569,6 +3569,13 @@ Return only the structured list above. Do not include any other text.`;
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  // ── Confirmed ID tracking ─────────────────────────────────────────────────
+  let _confirmedIDs = []; // { id, title, author }
+
+  window.getVerifiedIDs = function() {
+    return _confirmedIDs.map(v => v.id);
+  };
+
   // ── Main check runner ─────────────────────────────────────────────────────
   async function runCheck() {
     const raw = document.getElementById('checkerInput').value;
@@ -3582,6 +3589,7 @@ Return only the structured list above. Do not include any other text.`;
     const tokens = raw.split(/[\n,]+/).map(t => t.trim()).filter(Boolean);
 
     resultsEl.innerHTML = '';
+    _confirmedIDs = [];
 
     // Build card placeholders immediately
     const jobs = tokens.map(token => {
@@ -3599,9 +3607,71 @@ Return only the structured list above. Do not include any other text.`;
     // Verify all IDs in parallel, replace cards as results arrive
     await Promise.all(jobs.map(async ({ id, card }) => {
       const result = await verifyID(id);
+      if (result.ok) _confirmedIDs.push({ id, title: result.title, author: result.author });
       const newCard = makeCard(id, result.ok ? 'valid' : 'invalid', result);
       card.replaceWith(newCard);
     }));
+
+    // After all checks complete, render the Phase 2 action bar if any valid IDs
+    renderPhase2Bar(resultsEl);
+  }
+
+  // ── Phase 2 action bar ────────────────────────────────────────────────────
+  function renderPhase2Bar(resultsEl) {
+    // Remove any existing bar
+    const old = document.getElementById('phase2Bar');
+    if (old) old.remove();
+
+    if (_confirmedIDs.length === 0) return;
+
+    const idList = _confirmedIDs.map(v => v.id).join(', ');
+    const videoLines = _confirmedIDs.map((v, i) =>
+      `Video ${i + 1}: "${v.title}" by ${v.author} — ID: ${v.id}`
+    ).join('\n');
+
+    const phase2Message =
+`Here are my confirmed YouTube video IDs:
+
+${videoLines}
+
+Please now generate the complete application using these exact IDs.`;
+
+    const bar = document.createElement('div');
+    bar.id = 'phase2Bar';
+    bar.style.cssText = 'margin-top:1rem;padding:0.85rem 1rem;background:var(--accent-light,#e8f4f8);border:1px solid var(--accent,#028090);border-radius:10px;';
+
+    bar.innerHTML = `
+      <div style="font-size:0.82rem;font-weight:700;color:var(--accent,#028090);font-family:var(--font-ui);margin-bottom:0.35rem;">
+        ✅ ${_confirmedIDs.length} video${_confirmedIDs.length > 1 ? 's' : ''} confirmed — ready for Phase 2
+      </div>
+      <div style="font-size:0.77rem;color:var(--text2);font-family:var(--font-ui);margin-bottom:0.6rem;line-height:1.5;">
+        Copy the message below and paste it into your LLM to trigger Phase 2 (code generation).
+      </div>
+      <textarea id="phase2Text" rows="5" readonly
+        style="width:100%;box-sizing:border-box;font-family:var(--font-ui);font-size:0.78rem;line-height:1.6;padding:0.6rem 0.75rem;border:1px solid var(--border);border-radius:7px;background:var(--surface,#fff);color:var(--text1);resize:vertical;margin-bottom:0.5rem;"
+        aria-label="Phase 2 message to paste into your LLM">${escHTML(phase2Message)}</textarea>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" id="copyPhase2Btn" type="button">📋 Copy Phase 2 Message</button>
+        <button class="btn btn-ghost btn-sm" id="copyIdsOnlyBtn" type="button">Copy IDs only: ${escHTML(idList)}</button>
+      </div>`;
+
+    resultsEl.appendChild(bar);
+
+    document.getElementById('copyPhase2Btn').addEventListener('click', () => {
+      navigator.clipboard.writeText(phase2Message).then(() => {
+        const btn = document.getElementById('copyPhase2Btn');
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy Phase 2 Message'; }, 2000);
+      });
+    });
+
+    document.getElementById('copyIdsOnlyBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(idList).then(() => {
+        const btn = document.getElementById('copyIdsOnlyBtn');
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => { btn.textContent = `Copy IDs only: ${idList}`; }, 2000);
+      });
+    });
   }
 
   // ── Toggle panel open/close ───────────────────────────────────────────────
