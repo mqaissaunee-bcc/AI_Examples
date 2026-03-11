@@ -1576,7 +1576,7 @@
   }
 </style>
 </head>
-<body data-theme="light">
+<body data-theme="light" class="simple-mode">
 
 <header>
   <div class="logo">
@@ -1605,10 +1605,10 @@
       <!-- Complexity Toggle -->
       <div class="complexity-bar" role="group" aria-label="Interface complexity">
         <span class="complexity-bar-label">Interface</span>
-        <span class="complexity-bar-desc" id="complexityDesc">Showing all options</span>
+        <span class="complexity-bar-desc" id="complexityDesc">Core fields only — use Quick Options below</span>
         <div class="complexity-switch">
-          <button class="complexity-btn" id="btnSimple" type="button" aria-pressed="false" onclick="setComplexity('simple')">Simple</button>
-          <button class="complexity-btn active" id="btnFull" type="button" aria-pressed="true" onclick="setComplexity('full')">Full</button>
+          <button class="complexity-btn active" id="btnSimple" type="button" aria-pressed="true" onclick="setComplexity('simple')">Simple</button>
+          <button class="complexity-btn" id="btnFull" type="button" aria-pressed="false" onclick="setComplexity('full')">Full</button>
         </div>
       </div>
 
@@ -1837,6 +1837,32 @@
         </div>
       </div>
       </div> <!-- /section-snippets -->
+
+      <!-- Reference Materials — visible in interactive mode, both Simple and Full complexity -->
+      <div class="mode-section visible" id="section-reference">
+      <div class="section-label" style="margin-top:1.1rem;">
+        📎 Reference Materials
+        <span class="active-count" id="refCount" aria-live="polite">0</span>
+      </div>
+      <p style="font-size:0.78rem;color:var(--text3);margin-bottom:0.6rem;font-family:var(--font-ui);">Tell the LLM you'll be uploading a file. The prompt will instruct it to use your document as a primary content source.</p>
+      <div class="chip-grid" id="refChips" role="group" aria-label="Reference material chip toggles"></div>
+
+      <!-- File upload gate — shown when fileupload chip is active -->
+      <div id="fileUploadGate" style="display:none;margin-top:0.75rem;padding:0.85rem 1rem;background:var(--surface2,#f4f7fb);border:1px solid var(--border);border-radius:10px;" aria-live="polite">
+        <div style="font-size:0.82rem;font-weight:700;color:var(--text1);font-family:var(--font-ui);margin-bottom:0.6rem;">📎 What kind of file will you upload?</div>
+        <div class="chip-grid" role="group" aria-label="Reference file type" id="fileTypeChips">
+          <button class="chip file-type-chip active" data-filetype="lesson plan" aria-pressed="true">Lesson plan</button>
+          <button class="chip file-type-chip" data-filetype="slide deck" aria-pressed="false">Slide deck / PowerPoint</button>
+          <button class="chip file-type-chip" data-filetype="syllabus" aria-pressed="false">Syllabus</button>
+          <button class="chip file-type-chip" data-filetype="rubric" aria-pressed="false">Rubric</button>
+          <button class="chip file-type-chip" data-filetype="reading or article" aria-pressed="false">Reading / article</button>
+          <button class="chip file-type-chip" data-filetype="other document" aria-pressed="false">Other document</button>
+        </div>
+        <p style="font-size:0.74rem;color:var(--text3);margin:0.6rem 0 0;font-family:var(--font-ui);line-height:1.5;">
+          💡 After copying your prompt, paste it into your LLM and then attach your file before submitting.
+        </p>
+      </div>
+      </div> <!-- /section-reference -->
 
       <!-- Video Gate — lives here so it's always visible in both Simple and Full modes -->
       <!-- showVideoGate/hideVideoGate control display:none; this element is never inside a full-only container -->
@@ -2121,7 +2147,10 @@ const TECH_SNIPPETS = [
     id: 'ada',
     label: 'ADA / WCAG 2.1 AA',
     detail: 'Full WCAG 2.1 Level AA compliance: all images have meaningful <code>alt</code> text, all interactive elements are keyboard-reachable with visible focus indicators, color is never the sole conveyor of information, forms have explicit <code>&lt;label&gt;</code> associations, ARIA landmarks and live regions are used where appropriate.',
-    prompt: 'The application must meet WCAG 2.1 Level AA accessibility standards: all images include descriptive alt text, all interactive elements are fully keyboard-navigable with visible focus indicators (outline), color is never the sole conveyor of meaning, form inputs have explicit label associations, and ARIA landmarks (role="main", aria-label, aria-live) are used throughout.',
+    // standalone: used when no specialist accessibility chips are active
+    promptStandalone: 'The application must meet WCAG 2.1 Level AA accessibility standards: all images include descriptive alt text, all interactive elements are fully keyboard-navigable with visible focus indicators (outline), color is never the sole conveyor of meaning, form inputs have explicit label associations, and ARIA landmarks (role="main", aria-label, aria-live) are used throughout.',
+    // companion: used when screenreader/keyboard/colorsafe chips are also active (avoids restating their specifics)
+    prompt: 'The application must meet WCAG 2.1 Level AA accessibility standards. Detailed implementation requirements are covered by the active accessibility chips below — follow all of them precisely.',
   },
   {
     id: 'colorsafe',
@@ -2163,7 +2192,10 @@ const TECH_SNIPPETS = [
     id: 'scorebridge',
     label: '\uD83D\uDD17 Score \u2192 SCORM Bridge',
     detail: 'Wires the <code>ScoreManager</code> (Score Ready snippet) directly to the SCORM 1.2 API. On activity completion, automatically pushes the final score to <code>cmi.core.score.raw</code>, sets <code>cmi.core.lesson_status</code> based on a configurable passing threshold, and calls <code>LMSCommit</code>. Best used with both Score Ready and SCORM 1.2 Wrapper active.',
-    prompt: 'Connect the ScoreManager scoring system to the SCORM 1.2 API using the following cross-origin-safe bridge. This is critical: the findAPI() and getAPI() functions MUST use try/catch to silently handle SecurityError exceptions thrown when traversing cross-origin iframe parent chains during previewing or testing outside Canvas.\n\nRequired implementation:\n\nconst PASSING_THRESHOLD = 0.70; // Adjust as needed\n\nfunction findAPI(win) {\n  let attempts = 0;\n  while (attempts < 7) {\n    attempts++;\n    try {\n      if (win.API != null) return win.API;\n      if (win.parent == null || win.parent === win) break;\n      win = win.parent;\n    } catch(e) {\n      break; // Cross-origin frame — stop traversing silently\n    }\n  }\n  return null;\n}\n\nfunction getAPI() {\n  let theAPI = findAPI(window);\n  if (theAPI == null) {\n    try {\n      if (window.opener != null) theAPI = findAPI(window.opener);\n    } catch(e) { /* cross-origin opener — fail silently */ }\n  }\n  return theAPI;\n}\n\nWhen the learner completes the activity, the bridge must: (1) push ScoreManager final raw score to cmi.core.score.raw, (2) set cmi.core.score.min to 0 and cmi.core.score.max to total possible points, (3) set cmi.core.lesson_status to "passed" if score meets or exceeds PASSING_THRESHOLD, otherwise "failed", (4) call LMSCommit immediately after all setValues so Canvas gradebook receives the data, (5) degrade with zero errors and zero console warnings if getAPI() returns null (i.e., outside an LMS). Expose PASSING_THRESHOLD as a clearly labeled constant at the top of the script.',
+    // standalone: used when scorm chip is NOT also active
+    promptStandalone: 'Connect the ScoreManager scoring system to the SCORM 1.2 API using the following cross-origin-safe bridge. This is critical: the findAPI() and getAPI() functions MUST use try/catch to silently handle SecurityError exceptions thrown when traversing cross-origin iframe parent chains during previewing or testing outside Canvas.\n\nRequired implementation:\n\nconst PASSING_THRESHOLD = 0.70; // Adjust as needed\n\nfunction findAPI(win) {\n  let attempts = 0;\n  while (attempts < 7) {\n    attempts++;\n    try {\n      if (win.API != null) return win.API;\n      if (win.parent == null || win.parent === win) break;\n      win = win.parent;\n    } catch(e) {\n      break; // Cross-origin frame — stop traversing silently\n    }\n  }\n  return null;\n}\n\nfunction getAPI() {\n  let theAPI = findAPI(window);\n  if (theAPI == null) {\n    try {\n      if (window.opener != null) theAPI = findAPI(window.opener);\n    } catch(e) { /* cross-origin opener — fail silently */ }\n  }\n  return theAPI;\n}\n\nWhen the learner completes the activity, the bridge must: (1) push ScoreManager final raw score to cmi.core.score.raw, (2) set cmi.core.score.min to 0 and cmi.core.score.max to total possible points, (3) set cmi.core.lesson_status to "passed" if score meets or exceeds PASSING_THRESHOLD, otherwise "failed", (4) call LMSCommit immediately after all setValues so Canvas gradebook receives the data, (5) degrade with zero errors and zero console warnings if getAPI() returns null (i.e., outside an LMS). Expose PASSING_THRESHOLD as a clearly labeled constant at the top of the script.',
+    // companion: used when scorm chip IS also active — findAPI/getAPI already defined, just wire the bridge
+    prompt: 'Wire the ScoreManager to the SCORM 1.2 API using the findAPI()/getAPI() functions already defined in the SCORM 1.2 Wrapper requirement above — do not redefine them. Add the bridge logic:\n\nconst PASSING_THRESHOLD = 0.70; // Adjust as needed\n\nWhen the learner completes the activity: (1) push ScoreManager final raw score to cmi.core.score.raw, (2) set cmi.core.score.min to 0 and cmi.core.score.max to total possible points, (3) set cmi.core.lesson_status to "passed" if score meets or exceeds PASSING_THRESHOLD, otherwise "failed", (4) call LMSCommit immediately after all setValues so Canvas gradebook receives the data, (5) degrade silently (zero errors, zero console warnings) if getAPI() returns null. Expose PASSING_THRESHOLD as a clearly labeled constant at the top of the script.',
   },
   {
     id: 'keyboard',
@@ -2424,6 +2456,15 @@ const RESIST_SNIPPETS = [
     weight: 2,
     detail: 'Randomizes key variables in the scenario or prompt — names, contexts, numbers, or situations — so each student receives a meaningfully different version. Makes sharing answers between students ineffective.',
     prompt: 'Randomize key variables in the activity scenario or prompts so each student receives a unique version. Identify 3–5 variable elements (e.g., character names, dollar amounts, locations, time periods, ethical dilemmas) and create 4–6 alternatives for each. On load, randomly select one value per variable and inject it consistently throughout the activity. Display a unique session seed (e.g., "Session ID: #4821") at the top so students can reference it if they have questions. Store the selected variables and display them in the summary so instructors can verify which version a student received.',
+  },
+];
+
+const REF_SNIPPETS = [
+  {
+    id: 'fileupload',
+    label: '📎 I\'ll Upload a Reference File',
+    detail: 'Tells the LLM to expect an uploaded document and use it as a primary content source. A sub-selector lets you specify what kind of file you\'re providing — lesson plan, slide deck, syllabus, rubric, or other. The generated prompt instructs the LLM to prioritize the uploaded document and not invent content that contradicts it.',
+    prompt: null, // built dynamically in updatePrompt based on file type selection
   },
 ];
 
@@ -2994,6 +3035,7 @@ function setMode(mode) {
   document.getElementById('section-interactive').classList.toggle('visible', mode === 'interactive');
   document.getElementById('section-document').classList.toggle('visible', mode === 'document');
   document.getElementById('section-snippets').classList.toggle('visible', mode === 'interactive');
+  document.getElementById('section-reference').classList.toggle('visible', mode === 'interactive');
   // Update resist note
   const rn = document.getElementById('resistNote');
   if (rn && mode === 'document') rn.style.display = 'none';
@@ -3001,7 +3043,7 @@ function setMode(mode) {
 }
 
 // ===================== COMPLEXITY TOGGLE =====================
-var currentComplexity = 'full';
+var currentComplexity = 'simple';
 
 function setComplexity(level) {
   currentComplexity = level;
@@ -3104,7 +3146,7 @@ function toggleSuperSnippet(ss, btn) {
   }
 
   // Sync count badges
-  updateCountBadge(null, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS, RESIST_SNIPPETS].flat());
+  updateCountBadge(null, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS, RESIST_SNIPPETS, REF_SNIPPETS].flat());
   updatePrompt();
 }
 
@@ -3121,6 +3163,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderChips('outChips', OUT_SNIPPETS, 'outCount');
   renderChips('accChips', ACC_SNIPPETS, 'accCount');
   renderChips('resistChips', RESIST_SNIPPETS, 'resistChipCount');
+  renderChips('refChips', REF_SNIPPETS, 'refCount');
   renderSuperChips();
   bindEvents();
   updatePrompt();
@@ -3173,14 +3216,16 @@ function toggleSnippet(snip, chipEl, countId) {
 
   if (isActive) {
     doDeactivateSnippet(snip, chipEl, countId);
+    if (snip.id === 'fileupload') hideFileUploadGate();
   } else {
     state.activeSnippets.add(snip.id);
     chipEl.classList.add('active');
     chipEl.setAttribute('aria-pressed', 'true');
     chipEl.querySelector('.chip-check').textContent = '✓ ';
     if (snip.id === 'multimedia') showVideoGate();
+    if (snip.id === 'fileupload') showFileUploadGate();
   }
-  updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS, RESIST_SNIPPETS].flat());
+  updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS, RESIST_SNIPPETS, REF_SNIPPETS].flat());
   syncSuperChipVisuals();
   updatePrompt();
 }
@@ -3190,7 +3235,7 @@ function doDeactivateSnippet(snip, chipEl, countId) {
   chipEl.classList.remove('active');
   chipEl.setAttribute('aria-pressed', 'false');
   chipEl.querySelector('.chip-check').textContent = '';
-  updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS, RESIST_SNIPPETS].flat());
+  updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS, RESIST_SNIPPETS, REF_SNIPPETS].flat());
   syncSuperChipVisuals();
   updatePrompt();
 }
@@ -3330,6 +3375,12 @@ function updatePrompt() {
     if (toneName) parts.push(`Tone: ${toneName}.`);
     if (extras) parts.push(`\n--- ADDITIONAL CONTEXT & REQUIREMENTS ---\n${extras}`);
 
+    // Reference file injection
+    if (state.activeSnippets.has('fileupload')) {
+      const fileType = typeof getSelectedFileType === 'function' ? getSelectedFileType() : 'document';
+      parts.push(`\n--- REFERENCE DOCUMENT ---\nThe user will upload a ${fileType} along with this prompt. Use it as a primary content source and structural reference. Prioritize the uploaded document's content, terminology, and organization. Do not invent material that contradicts or ignores it. If the uploaded document is incomplete or ambiguous on a point, note this briefly and make a reasonable assumption.`);
+    }
+
     const isPresentation = docType && /(presentation|slide deck|slides|deck)/i.test(docType);
     const isDesignedInfographic = docType && /infographic/i.test(docType) && !/content outline/i.test(docType);
     const isInfographicOutline = docType && /infographic content outline/i.test(docType);
@@ -3387,14 +3438,52 @@ function updatePrompt() {
   if (toneName) parts.push(`Instructional Tone: ${toneName}.`);
   if (scopeData) parts.push(`Content Scope: ${scopeData.label} (${scopeData.time} of learner engagement). ${scopeData.prompt}`);
 
+
+  // ── Deduplication-aware snippet assembly ──────────────────────────────────
+  const active = state.activeSnippets;
   const allSnippets = [...TECH_SNIPPETS, ...PED_SNIPPETS, ...OUT_SNIPPETS, ...ACC_SNIPPETS, ...RESIST_SNIPPETS];
+
+  // Specialist chips that cover the same ground as 'ada'
+  const adaSpecialistActive = active.has('screenreader') || active.has('keyboard') || active.has('colorsafe');
+  // Whether reducedmotion chip is handling the prefers-reduced-motion requirement
+  const reducedMotionActive = active.has('reducedmotion');
+  // Whether scorm chip is active (so scorebridge can skip re-defining findAPI/getAPI)
+  const scormActive = active.has('scorm');
+
   const activeSnippetPrompts = allSnippets
-    .filter(s => state.activeSnippets.has(s.id))
-    .map(s => s.prompt);
+    .filter(s => active.has(s.id))
+    .map(s => {
+      // Tier 1: scorebridge — use companion prompt (no code block) when scorm is co-active
+      if (s.id === 'scorebridge' && scormActive && s.prompt) {
+        return s.prompt; // s.prompt is already the companion (no findAPI block)
+      }
+      // Tier 1: scorebridge standalone — use promptStandalone
+      if (s.id === 'scorebridge' && !scormActive && s.promptStandalone) {
+        return s.promptStandalone;
+      }
+
+      // Tier 2: ada — use companion when specialist chips are active, standalone otherwise
+      if (s.id === 'ada') {
+        return adaSpecialistActive ? s.prompt : s.promptStandalone;
+      }
+
+      // Tier 3: strip prefers-reduced-motion paragraph from cssanim/scrollreveal/tooltips
+      // when reducedmotion chip is also active (it handles this more completely)
+      if (reducedMotionActive && (s.id === 'cssanim' || s.id === 'scrollreveal' || s.id === 'tooltips')) {
+        // Remove the sentence/clause about prefers-reduced-motion from these chips' prompts
+        return s.prompt
+          .replace(/,?\s*and include a @media \(prefers-reduced-motion[^.]+\.[^)]*\)/gi, '')
+          .replace(/Include a prefers-reduced-motion check[^.]+\./gi, '(prefers-reduced-motion handling covered by Reduced Motion requirement.)')
+          .replace(/REDUCED MOTION:[^\n]+\n/gi, '(prefers-reduced-motion handling covered by Reduced Motion requirement.)\n')
+          .trim();
+      }
+
+      return s.prompt;
+    });
 
   if (activeSnippetPrompts.length > 0) {
     const processedPrompts = activeSnippetPrompts.map(p => {
-      if (state.activeSnippets.has('multimedia')) {
+      if (active.has('multimedia')) {
         const countEl = document.getElementById('videoCount');
         const videoCount = countEl ? (parseInt(countEl.value) || 1) : 1;
         const confirmedIDs = typeof getVerifiedIDs === 'function' ? getVerifiedIDs() : [];
@@ -3402,13 +3491,11 @@ function updatePrompt() {
         const qualityPrefs = getVideoQualityPrefs();
 
         if (confirmedIDs.length > 0) {
-          // IDs already confirmed — skip Phase 1, embed IDs directly
           const idLines = confirmedIDs.map((id, i) => `Video ${i + 1}: ${id}`).join('\n');
           let confirmed = `\n\n== CONFIRMED VIDEO IDs ==\nThe following YouTube video IDs have already been verified and are ready to use. Do NOT suggest alternative videos or ask for confirmation — use these exact IDs:\n${idLines}\n\nProceed directly to generating the complete application using these IDs.`;
           if (lengthPref) confirmed += `\n(Selected for: ${lengthPref})`;
           return p + confirmed;
         } else {
-          // No IDs yet — use Phase 1/2 workflow
           let videoReqs = `\n\n== VIDEO COUNT FOR THIS PROJECT ==\nThis application requires exactly ${videoCount} embedded video${videoCount > 1 ? 's' : ''}. Suggest ${videoCount} video${videoCount > 1 ? 's' : ''} in Phase 1, then wait for ${videoCount} confirmed ID${videoCount > 1 ? 's' : ''} before proceeding to Phase 2.`;
           if (lengthPref) videoReqs += `\n\n== VIDEO LENGTH PREFERENCE ==\n${lengthPref}`;
           if (qualityPrefs) videoReqs += `\n\n== VIDEO QUALITY REQUIREMENTS ==\n${qualityPrefs}`;
@@ -3423,6 +3510,12 @@ function updatePrompt() {
 
   if (extras) {
     parts.push(`\n--- ADDITIONAL CONTEXT & REQUIREMENTS ---\n${extras}`);
+  }
+
+  // Reference file injection
+  if (state.activeSnippets.has('fileupload')) {
+    const fileType = typeof getSelectedFileType === 'function' ? getSelectedFileType() : 'document';
+    parts.push(`\n--- REFERENCE DOCUMENT ---\nThe user will upload a ${fileType} along with this prompt. Use it as a primary content source and structural reference. Prioritize the uploaded document's content, terminology, and organization. Do not invent material that contradicts or ignores it. If the uploaded document is incomplete or ambiguous on a point, note this briefly and make a reasonable assumption.`);
   }
 
   const isDesignedInfog = itSelections.some(s => /fully designed infographic/i.test(s.value));
@@ -3743,6 +3836,34 @@ function flashBtn(id, label, cls) {
     document.getElementById('videoGate').style.display = 'none';
     updatePrompt();
   };
+
+  window.showFileUploadGate = function() {
+    document.getElementById('fileUploadGate').style.display = 'block';
+    updatePrompt();
+  };
+
+  window.hideFileUploadGate = function() {
+    document.getElementById('fileUploadGate').style.display = 'none';
+    updatePrompt();
+  };
+
+  window.getSelectedFileType = function() {
+    const active = document.querySelector('#fileTypeChips .file-type-chip.active');
+    return active ? active.dataset.filetype : 'document';
+  };
+
+  // File type chip single-select behaviour
+  document.getElementById('fileTypeChips').addEventListener('click', e => {
+    const chip = e.target.closest('.file-type-chip');
+    if (!chip) return;
+    document.querySelectorAll('#fileTypeChips .file-type-chip').forEach(c => {
+      c.classList.remove('active');
+      c.setAttribute('aria-pressed', 'false');
+    });
+    chip.classList.add('active');
+    chip.setAttribute('aria-pressed', 'true');
+    updatePrompt();
+  });
 
   // ── DOMContentLoaded wiring ─────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
