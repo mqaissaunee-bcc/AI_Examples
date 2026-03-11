@@ -1849,17 +1849,21 @@
 
       <!-- File upload gate — shown when fileupload chip is active -->
       <div id="fileUploadGate" style="display:none;margin-top:0.75rem;padding:0.85rem 1rem;background:var(--surface2,#f4f7fb);border:1px solid var(--border);border-radius:10px;" aria-live="polite">
-        <div style="font-size:0.82rem;font-weight:700;color:var(--text1);font-family:var(--font-ui);margin-bottom:0.6rem;">📎 What kind of file will you upload?</div>
-        <div class="chip-grid" role="group" aria-label="Reference file type" id="fileTypeChips">
-          <button class="chip file-type-chip active" data-filetype="lesson plan" aria-pressed="true">Lesson plan</button>
-          <button class="chip file-type-chip" data-filetype="slide deck" aria-pressed="false">Slide deck / PowerPoint</button>
-          <button class="chip file-type-chip" data-filetype="syllabus" aria-pressed="false">Syllabus</button>
-          <button class="chip file-type-chip" data-filetype="rubric" aria-pressed="false">Rubric</button>
-          <button class="chip file-type-chip" data-filetype="reading or article" aria-pressed="false">Reading / article</button>
-          <button class="chip file-type-chip" data-filetype="other document" aria-pressed="false">Other document</button>
+        <div style="font-size:0.82rem;font-weight:700;color:var(--text1);font-family:var(--font-ui);margin-bottom:0.25rem;">📎 What kind of files will you upload?</div>
+        <p style="font-size:0.74rem;color:var(--text3);margin:0 0 0.5rem;font-family:var(--font-ui);line-height:1.5;">Select all that apply — you can attach multiple files.</p>
+        <div class="chip-grid" role="group" aria-label="Reference file types (select all that apply)" id="fileTypeChips">
+          <button class="chip file-type-chip" data-filetype="lesson plan" aria-pressed="false">📋 Lesson plan</button>
+          <button class="chip file-type-chip" data-filetype="slide deck or PowerPoint" aria-pressed="false">📊 Slide deck / PowerPoint</button>
+          <button class="chip file-type-chip" data-filetype="syllabus" aria-pressed="false">📅 Syllabus</button>
+          <button class="chip file-type-chip" data-filetype="rubric" aria-pressed="false">✅ Rubric</button>
+          <button class="chip file-type-chip" data-filetype="reading or article" aria-pressed="false">📖 Reading / article</button>
+          <button class="chip file-type-chip" data-filetype="data set or spreadsheet" aria-pressed="false">📈 Data / spreadsheet</button>
+          <button class="chip file-type-chip" data-filetype="student work sample" aria-pressed="false">✏️ Student work sample</button>
+          <button class="chip file-type-chip" data-filetype="image or diagram" aria-pressed="false">🖼️ Image / diagram</button>
+          <button class="chip file-type-chip" data-filetype="other document" aria-pressed="false">📄 Other document</button>
         </div>
         <p style="font-size:0.74rem;color:var(--text3);margin:0.6rem 0 0;font-family:var(--font-ui);line-height:1.5;">
-          💡 After copying your prompt, paste it into your LLM and then attach your file before submitting.
+          💡 After copying your prompt, paste it into your LLM and attach your files before submitting.
         </p>
       </div>
       </div> <!-- /section-reference -->
@@ -3378,7 +3382,9 @@ function updatePrompt() {
     // Reference file injection
     if (state.activeSnippets.has('fileupload')) {
       const fileType = typeof getSelectedFileType === 'function' ? getSelectedFileType() : 'document';
-      parts.push(`\n--- REFERENCE DOCUMENT ---\nThe user will upload a ${fileType} along with this prompt. Use it as a primary content source and structural reference. Prioritize the uploaded document's content, terminology, and organization. Do not invent material that contradicts or ignores it. If the uploaded document is incomplete or ambiguous on a point, note this briefly and make a reasonable assumption.`);
+      const activeCount = document.querySelectorAll('#fileTypeChips .file-type-chip.active').length;
+      const plural = activeCount > 1;
+      parts.push(`\n--- REFERENCE DOCUMENT${plural ? 'S' : ''} ---\nThe user will upload the following ${plural ? 'files' : 'file'} along with this prompt: ${fileType}. Use ${plural ? 'them' : 'it'} as a primary content source and structural reference. Prioritize the uploaded ${plural ? 'documents\'' : 'document\'s'} content, terminology, and organization. Do not invent material that contradicts or ignores ${plural ? 'them' : 'it'}. If the uploaded ${plural ? 'documents are' : 'document is'} incomplete or ambiguous on a point, note this briefly and make a reasonable assumption.`);
     }
 
     const isPresentation = docType && /(presentation|slide deck|slides|deck)/i.test(docType);
@@ -3515,7 +3521,9 @@ function updatePrompt() {
   // Reference file injection
   if (state.activeSnippets.has('fileupload')) {
     const fileType = typeof getSelectedFileType === 'function' ? getSelectedFileType() : 'document';
-    parts.push(`\n--- REFERENCE DOCUMENT ---\nThe user will upload a ${fileType} along with this prompt. Use it as a primary content source and structural reference. Prioritize the uploaded document's content, terminology, and organization. Do not invent material that contradicts or ignores it. If the uploaded document is incomplete or ambiguous on a point, note this briefly and make a reasonable assumption.`);
+    const activeCount = document.querySelectorAll('#fileTypeChips .file-type-chip.active').length;
+    const plural = activeCount > 1;
+    parts.push(`\n--- REFERENCE DOCUMENT${plural ? 'S' : ''} ---\nThe user will upload the following ${plural ? 'files' : 'file'} along with this prompt: ${fileType}. Use ${plural ? 'them' : 'it'} as a primary content source and structural reference. Prioritize the uploaded ${plural ? 'documents\'' : 'document\'s'} content, terminology, and organization. Do not invent material that contradicts or ignores ${plural ? 'them' : 'it'}. If the uploaded ${plural ? 'documents are' : 'document is'} incomplete or ambiguous on a point, note this briefly and make a reasonable assumption.`);
   }
 
   const isDesignedInfog = itSelections.some(s => /fully designed infographic/i.test(s.value));
@@ -3848,20 +3856,20 @@ function flashBtn(id, label, cls) {
   };
 
   window.getSelectedFileType = function() {
-    const active = document.querySelector('#fileTypeChips .file-type-chip.active');
-    return active ? active.dataset.filetype : 'document';
+    const active = document.querySelectorAll('#fileTypeChips .file-type-chip.active');
+    if (!active.length) return 'document';
+    const types = Array.from(active).map(c => c.dataset.filetype);
+    if (types.length === 1) return types[0];
+    const last = types.pop();
+    return types.join(', ') + ', and ' + last;
   };
 
-  // File type chip single-select behaviour
+  // File type chip multi-select behaviour
   document.getElementById('fileTypeChips').addEventListener('click', e => {
     const chip = e.target.closest('.file-type-chip');
     if (!chip) return;
-    document.querySelectorAll('#fileTypeChips .file-type-chip').forEach(c => {
-      c.classList.remove('active');
-      c.setAttribute('aria-pressed', 'false');
-    });
-    chip.classList.add('active');
-    chip.setAttribute('aria-pressed', 'true');
+    const isActive = chip.classList.toggle('active');
+    chip.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     updatePrompt();
   });
 
