@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workforce Prompt Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #f0ebe3;
+  --paper:    #faf8f5;
+  --card:     #ffffff;
+  --ink:      #1c1917;
+  --ink2:     #292524;
+  --rust:     #b45309;
+  --rust2:    #d97706;
+  --rust-lt:  #fef3c7;
+  --teal:     #0f766e;
+  --teal-lt:  #ccfbf1;
+  --slate:    #57534e;
+  --muted:    #78716c;
+  --border:   #e7e5e4;
+  --fog:      #f5f4f2;
+  --white:    #ffffff;
+  --red:      #b91c1c;
+  --green:    #15803d;
+  --copied:   #0f766e;
+}
+
+/* ── ROLE CHIPS ── */
+.role-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--fog);
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--slate);
+  cursor: pointer;
+  transition: all 0.13s;
+  user-select: none;
+  line-height: 1;
+}
+.role-chip:hover {
+  border-color: var(--rust2);
+  background: var(--rust-lt);
+  color: var(--rust);
+}
+.role-chip.selected {
+  background: var(--rust);
+  border-color: var(--rust);
+  color: var(--white);
+  font-weight: 600;
+}
+.role-chip.selected::after {
+  content: '✕';
+  font-size: 0.65rem;
+  opacity: 0.8;
+  margin-left: 2px;
+}
+.role-preview {
+  font-size: 0.75rem;
+  color: var(--teal);
+  font-style: italic;
+  margin-top: 4px;
+  min-height: 18px;
+  line-height: 1.4;
+}
+
+/* ── TASK TEMPLATE SELECTOR ── */
+.task-cat-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.task-cat-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--fog);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--slate);
+  cursor: pointer;
+  transition: all 0.13s;
+}
+.task-cat-btn:hover { border-color: var(--rust2); color: var(--rust); background: var(--rust-lt); }
+.task-cat-btn.active { background: var(--rust); border-color: var(--rust); color: var(--white); }
+
+.task-templates {
+  display: none;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding: 10px;
+  background: var(--fog);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.task-templates.visible { display: flex; }
+.task-tpl-btn {
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--ink2);
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: left;
+}
+.task-tpl-btn:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-lt); }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+header {
+  background: var(--ink);
+  padding: 22px 40px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  position: relative;
+  overflow: hidden;
+}
+header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 80% at 80% 50%, rgba(180,83,9,0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 60% at 20% 50%, rgba(15,118,110,0.08) 0%, transparent 70%);
+}
+header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--teal), var(--rust2), var(--teal));
+}
+.h-icon {
+  font-size: 28px;
+  position: relative;
+  line-height: 1;
+}
+.h-text { position: relative; flex: 1; }
+.h-text h1 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--white);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.h-text p {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.45);
+  margin-top: 3px;
+  font-weight: 400;
+}
+.h-badge {
+  position: relative;
+  background: rgba(180,83,9,0.2);
+  border: 1px solid rgba(180,83,9,0.4);
+  color: var(--rust2);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 13px;
+  border-radius: 20px;
+}
+
+/* ── TEMPLATE TABS ── */
+.tab-bar {
+  background: var(--paper);
+  border-bottom: 2px solid var(--border);
+  padding: 0 32px;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+}
+.tab {
+  padding: 14px 20px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  user-select: none;
+}
+.tab:hover { color: var(--ink); }
+.tab.active {
+  color: var(--rust);
+  border-bottom-color: var(--rust);
+}
+.tab-icon { font-size: 14px; }
+
+/* ── LAYOUT ── */
+.main {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 880px) {
+  .main { grid-template-columns: 1fr; }
+  .sticky-col { position: static !important; }
+}
+
+/* ── FORM CARD ── */
+.form-card {
+  background: var(--card);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 12px rgba(28,25,23,0.07);
+  overflow: hidden;
+  position: sticky;
+  top: 24px;
+}
+.fc-head {
+  background: var(--ink2);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.fc-head h2 {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--white);
+}
+.fc-body { padding: 20px; max-height: calc(100vh - 160px); overflow-y: auto; }
+
+/* ── TEMPLATE PANELS ── */
+.template-panel { display: none; }
+.template-panel.active { display: block; }
+
+/* ── FORM ELEMENTS ── */
+.fg { margin-bottom: 18px; }
+.fg-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rust);
+  margin-bottom: 9px;
+  padding-bottom: 5px;
+  border-bottom: 1.5px solid var(--fog);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.field { margin-bottom: 10px; }
+.field label {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--slate);
+  margin-bottom: 4px;
+}
+.field label .req { color: var(--rust2); margin-left: 2px; }
+
+input[type="text"], select, textarea {
+  width: 100%;
+  padding: 8px 11px;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: var(--fog);
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--rust);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(180,83,9,0.10);
+}
+textarea { resize: vertical; min-height: 62px; line-height: 1.55; }
+select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2378716c' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hint {
+  font-size: 0.67rem;
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+/* ── SECTIONS CHECKLIST ── */
+.chk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.chk {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 8px; border-radius: 5px;
+  cursor: pointer; font-size: 0.76rem; font-weight: 500;
+  color: var(--ink2); transition: background 0.1s;
+}
+.chk:hover { background: var(--fog); }
+.chk input[type="checkbox"] {
+  width: 13px; height: 13px;
+  accent-color: var(--rust);
+  flex-shrink: 0;
+}
+
+/* ── BUILD BUTTON ── */
+.build-btn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, var(--rust) 0%, var(--ink2) 100%);
+  color: var(--white);
+  border: none;
+  border-radius: 9px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.14s, box-shadow 0.14s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  box-shadow: 0 3px 14px rgba(180,83,9,0.28);
+  margin-top: 6px;
+  letter-spacing: 0.01em;
+}
+.build-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(180,83,9,0.35);
+}
+.build-btn:active { transform: translateY(0); }
+
+/* ── OUTPUT CARD ── */
+.output-card {
+  background: var(--card);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 12px rgba(28,25,23,0.07);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+}
+.oc-head {
+  background: var(--ink2);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.oc-head h2 {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.oc-actions { display: flex; gap: 7px; }
+.oc-btn {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: rgba(255,255,255,0.75);
+  padding: 5px 13px;
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.73rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.oc-btn:hover { background: rgba(255,255,255,0.2); }
+
+.oc-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── PLACEHOLDER ── */
+.placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 52px 36px;
+  text-align: center;
+  gap: 14px;
+  color: var(--muted);
+}
+.ph-orb {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  background: var(--fog);
+  border: 2px dashed var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px;
+}
+.placeholder h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink2);
+}
+.placeholder p { font-size: 0.86rem; max-width: 320px; line-height: 1.65; }
+
+/* ── PROMPT OUTPUT AREA ── */
+.prompt-output {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.prompt-meta {
+  padding: 14px 20px;
+  background: var(--rust-lt);
+  border-bottom: 1px solid #fde68a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.prompt-meta-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pm-badge {
+  background: var(--rust);
+  color: var(--white);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+.pm-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.pm-chars {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.copy-big {
+  background: var(--rust);
+  color: var(--white);
+  border: none;
+  padding: 8px 18px;
+  border-radius: 7px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(180,83,9,0.25);
+}
+.copy-big:hover { background: #92400e; transform: translateY(-1px); }
+.copy-big.copied { background: var(--copied); }
+
+.prompt-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 380px;
+  padding: 20px 22px;
+  border: none;
+  border-top: 1px solid var(--border);
+  font-family: 'Lora', Georgia, serif;
+  font-size: 0.88rem;
+  line-height: 1.75;
+  color: var(--ink);
+  background: var(--paper);
+  resize: none;
+  outline: none;
+  transition: background 0.15s;
+}
+.prompt-textarea:focus { background: var(--white); }
+
+/* ── HOW TO USE STRIP ── */
+.how-strip {
+  padding: 12px 20px;
+  background: var(--fog);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.how-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.73rem;
+  color: var(--slate);
+  font-weight: 500;
+}
+.how-num {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--rust);
+  color: var(--white);
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.how-arrow { color: var(--border); font-size: 0.75rem; }
+
+/* ── LLM BUTTONS ── */
+.llm-row {
+  padding: 12px 20px;
+  background: var(--fog);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.llm-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-right: 2px;
+}
+.llm-btn {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink2);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.llm-btn:hover { border-color: var(--rust); background: var(--rust-lt); color: var(--rust); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-icon">✍️</div>
+  <div class="h-text">
+    <h1>Workforce Prompt Builder</h1>
+    <p>Fill in the fields → copy the prompt → paste into any AI tool</p>
+  </div>
+  <div class="h-badge">No API Needed</div>
+</header>
+
+<!-- TEMPLATE TABS -->
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('course')" id="tab-course">
+    <span class="tab-icon">🔍</span> Course Demand Check
+  </div>
+  <div class="tab" onclick="switchTab('program')" id="tab-program">
+    <span class="tab-icon">📊</span> Program Feasibility Study
+  </div>
+  <div class="tab" onclick="switchTab('custom')" id="tab-custom">
+    <span class="tab-icon">🧩</span> Custom Prompt
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ── FORM CARD ── -->
+  <div class="form-card">
+    <div class="fc-head">
+      <span>📝</span>
+      <h2 id="formTitle">Course Demand Check</h2>
+    </div>
+    <div class="fc-body">
+
+      <!-- ══════════════ COURSE TAB ══════════════ -->
+      <div class="template-panel active" id="panel-course">
+
+        <div class="fg">
+          <div class="fg-label">📚 Course</div>
+          <div class="field">
+            <label>Course Topic / Title <span class="req">*</span></label>
+            <input type="text" id="c-topic" placeholder="e.g. Docker and Containers" value="Docker and Containers">
+          </div>
+          <div class="field">
+            <label>Brief Description</label>
+            <textarea id="c-desc" rows="2" placeholder="What the course covers...">Intro course covering containerization concepts, Docker CLI, images, volumes, Docker Compose, and Kubernetes basics.</textarea>
+          </div>
+          <div class="field">
+            <label>Related Skills / Technologies</label>
+            <input type="text" id="c-skills" placeholder="e.g. Docker, Kubernetes, DevOps, CI/CD" value="Docker, Kubernetes, DevOps, CI/CD, containerization, microservices">
+          </div>
+          <div class="two-col">
+            <div class="field">
+              <label>Discipline</label>
+              <select id="c-disc">
+                <option>Information Technology</option>
+                <option>Computer Science</option>
+                <option>Cybersecurity</option>
+                <option>Networking</option>
+                <option>Data Science</option>
+                <option>Software Development</option>
+                <option>Healthcare</option>
+                <option>Business</option>
+                <option>Engineering Technology</option>
+                <option>Manufacturing</option>
+                <option>Education</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Credential Level</label>
+              <select id="c-cred">
+                <option value="standalone credit course">Credit Course</option>
+                <option value="non-credit workforce training">Non-Credit</option>
+                <option value="certificate program course">Certificate</option>
+                <option value="associate degree">Associate Degree</option>
+                <option value="continuing education">Continuing Ed</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">🗺️ Location</div>
+          <div class="field">
+            <label>College / Institution <span class="req">*</span></label>
+            <input type="text" id="c-college" placeholder="e.g. Brookdale Community College" value="Brookdale Community College">
+          </div>
+          <div class="two-col">
+            <div class="field">
+              <label>City / County <span class="req">*</span></label>
+              <input type="text" id="c-loc" placeholder="e.g. Monmouth County, NJ" value="Monmouth County, NJ">
+            </div>
+            <div class="field">
+              <label>Search Radius</label>
+              <select id="c-radius">
+                <option value="50 miles">50 miles</option>
+                <option value="75 miles">75 miles</option>
+                <option value="100 miles" selected>100 miles</option>
+                <option value="150 miles">150 miles</option>
+                <option value="national / remote-inclusive">National/Remote</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">📋 Sections to Include</div>
+          <div class="chk-grid">
+            <label class="chk"><input type="checkbox" class="c-sec" value="Executive Summary and Demand Verdict" checked> Summary & Verdict</label>
+            <label class="chk"><input type="checkbox" class="c-sec" value="Job Postings Analysis" checked> Job Postings</label>
+            <label class="chk"><input type="checkbox" class="c-sec" value="Salary Premium Analysis" checked> Salary Premium</label>
+            <label class="chk"><input type="checkbox" class="c-sec" value="Industries and Employers Hiring" checked> Employers Hiring</label>
+            <label class="chk"><input type="checkbox" class="c-sec" value="Competing Courses at Nearby Colleges" checked> Competing Courses</label>
+            <label class="chk"><input type="checkbox" class="c-sec" value="Recommended Course Topics and Learning Outcomes" checked> Course Design</label>
+            <label class="chk"><input type="checkbox" class="c-sec" value="Stackable Credentials and Certifications" checked> Certifications</label>
+            <label class="chk"><input type="checkbox" class="c-sec" value="Recommendation and Next Steps" checked> Recommendation</label>
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">🎯 Audience</div>
+          <div class="field">
+            <label>Report Audience</label>
+            <select id="c-audience">
+              <option value="faculty and curriculum committee">Faculty / Curriculum Committee</option>
+              <option value="college leadership and deans">College Leadership</option>
+              <option value="workforce development board">Workforce Board</option>
+              <option value="grant reviewers">Grant Reviewers</option>
+              <option value="all of the above">All of the Above</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Additional Context (optional)</label>
+            <textarea id="c-context" rows="2" placeholder="Any local context, competing programs, known employers, strategic priorities..."></textarea>
+          </div>
+        </div>
+
+        <button class="build-btn" onclick="build('course')">✍️ Build Prompt</button>
+      </div>
+
+      <!-- ══════════════ PROGRAM TAB ══════════════ -->
+      <div class="template-panel" id="panel-program">
+
+        <div class="fg">
+          <div class="fg-label">🎓 Program</div>
+          <div class="field">
+            <label>Program Name / Title <span class="req">*</span></label>
+            <input type="text" id="p-program" placeholder="e.g. Aerospace Manufacturing Technician" value="Aerospace Manufacturing Technician">
+          </div>
+          <div class="two-col">
+            <div class="field">
+              <label>Credential Type</label>
+              <select id="p-cred">
+                <option value="Certificate and AAS Degree">Certificate + AAS</option>
+                <option value="Certificate only">Certificate Only</option>
+                <option value="Associate in Applied Science (AAS)">AAS Degree</option>
+                <option value="Associate of Science (AS)">AS Degree</option>
+                <option value="Workforce Training / Non-Credit">Workforce Training</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Industry Sector</label>
+              <select id="p-sector">
+                <option>Aerospace & Defense</option>
+                <option>Advanced Manufacturing</option>
+                <option>Cybersecurity</option>
+                <option>Healthcare / Nursing</option>
+                <option>Information Technology</option>
+                <option>Automotive / EV</option>
+                <option>Renewable Energy</option>
+                <option>Biotechnology</option>
+                <option>Construction / Trades</option>
+                <option>Logistics / Supply Chain</option>
+                <option>Culinary / Hospitality</option>
+                <option>Education</option>
+                <option>Criminal Justice</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Key Occupations to Analyze</label>
+            <textarea id="p-occupations" rows="2" placeholder="e.g. CNC Machinists, Avionics Technicians, Quality Control Inspectors">CNC Machinists, Aerospace Engineering Technicians, Avionics Technicians, Quality Control Inspectors, Robotics Technicians</textarea>
+            <div class="hint">Comma-separated job titles or SOC occupations</div>
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">🗺️ Location & Scope</div>
+          <div class="field">
+            <label>College / Institution <span class="req">*</span></label>
+            <input type="text" id="p-college" placeholder="e.g. Brookdale Community College" value="Brookdale Community College">
+          </div>
+          <div class="two-col">
+            <div class="field">
+              <label>County / City <span class="req">*</span></label>
+              <input type="text" id="p-county" placeholder="e.g. Monmouth County, NJ" value="Monmouth County, NJ">
+            </div>
+            <div class="field">
+              <label>Primary State</label>
+              <input type="text" id="p-state" placeholder="e.g. New Jersey" value="New Jersey">
+            </div>
+          </div>
+          <div class="field">
+            <label>Regional States to Include</label>
+            <input type="text" id="p-states" placeholder="e.g. New Jersey, New York, Pennsylvania, Connecticut" value="New Jersey, New York, Pennsylvania, Connecticut, Delaware">
+            <div class="hint">Comma-separated — include all states within commuting/placement distance</div>
+          </div>
+          <div class="field">
+            <label>Employer Search Radius</label>
+            <select id="p-radius">
+              <option value="75 miles">75 miles</option>
+              <option value="100 miles">100 miles</option>
+              <option value="150 miles" selected>150 miles</option>
+              <option value="200 miles">200 miles</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">📋 Report Sections</div>
+          <div class="chk-grid">
+            <label class="chk"><input type="checkbox" class="p-sec" value="Executive Summary" checked> Executive Summary</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Regional Industry Analysis" checked> Industry Analysis</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Supply Chain Mapping" checked> Supply Chain</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Occupational Demand Analysis" checked> Occupational Demand</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Job Posting Skill Analysis" checked> Skill Analysis</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Workforce Gap Analysis" checked> Workforce Gap</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Education and Training Pipeline" checked> Training Pipeline</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Salary and Career Pathways" checked> Career Pathways</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Program Design Recommendations" checked> Program Design</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Employer Partnerships" checked> Employer Partners</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Economic and Workforce Impact" checked> Economic Impact</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Final Recommendation" checked> Recommendation</label>
+            <label class="chk"><input type="checkbox" class="p-sec" value="Top 25 Employer List" checked> Top 25 Employers</label>
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">🎯 Audience</div>
+          <div class="field">
+            <label>Report Audience</label>
+            <select id="p-audience">
+              <option value="college leadership, workforce boards, grant reviewers, and economic development agencies">All (Leadership, Boards, Grants)</option>
+              <option value="college leadership and curriculum committee">College Leadership</option>
+              <option value="grant reviewers and funding agencies">Grant Reviewers</option>
+              <option value="workforce development boards">Workforce Boards</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Additional Context (optional)</label>
+            <textarea id="p-context" rows="2" placeholder="Known employers, competing programs, strategic priorities, funding context..."></textarea>
+          </div>
+        </div>
+
+        <button class="build-btn" onclick="build('program')">✍️ Build Prompt</button>
+      </div>
+
+      <!-- ══════════════ CUSTOM TAB ══════════════ -->
+      <div class="template-panel" id="panel-custom">
+
+        <div class="fg">
+          <div class="fg-label">🤖 AI Role — Select all that apply</div>
+
+          <div class="role-chips-wrap" id="roleChips">
+            <!-- Workforce & Labor Market -->
+            <span class="role-chip" data-role="labor market economist" onclick="toggleRole(this)">📊 Labor Market Economist</span>
+            <span class="role-chip" data-role="workforce development strategist" onclick="toggleRole(this)">🏗️ Workforce Strategist</span>
+            <span class="role-chip" data-role="industry workforce analyst" onclick="toggleRole(this)">🔍 Industry Analyst</span>
+            <!-- Curriculum & Instruction -->
+            <span class="role-chip" data-role="higher education curriculum designer" onclick="toggleRole(this)">🎓 Curriculum Designer</span>
+            <span class="role-chip" data-role="instructional designer" onclick="toggleRole(this)">📐 Instructional Designer</span>
+            <span class="role-chip" data-role="community college faculty development specialist" onclick="toggleRole(this)">👩‍🏫 Faculty Developer</span>
+            <span class="role-chip" data-role="academic program director" onclick="toggleRole(this)">🏫 Program Director</span>
+            <!-- Assessment & Accreditation -->
+            <span class="role-chip" data-role="accreditation and assessment specialist" onclick="toggleRole(this)">✅ Accreditation Specialist</span>
+            <span class="role-chip" data-role="learning outcomes assessment expert" onclick="toggleRole(this)">📋 Assessment Expert</span>
+            <!-- Strategy & Policy -->
+            <span class="role-chip" data-role="higher education strategic planner" onclick="toggleRole(this)">🗺️ Strategic Planner</span>
+            <span class="role-chip" data-role="grant writer and funding strategist" onclick="toggleRole(this)">💰 Grant Writer</span>
+            <span class="role-chip" data-role="policy analyst" onclick="toggleRole(this)">📜 Policy Analyst</span>
+            <!-- HR & Talent -->
+            <span class="role-chip" data-role="human resources and talent development consultant" onclick="toggleRole(this)">👥 HR Consultant</span>
+            <span class="role-chip" data-role="organizational development specialist" onclick="toggleRole(this)">🔧 Org Development</span>
+            <!-- Research & Data -->
+            <span class="role-chip" data-role="institutional research analyst" onclick="toggleRole(this)">🔬 Institutional Researcher</span>
+            <span class="role-chip" data-role="data analyst and researcher" onclick="toggleRole(this)">📈 Data Analyst</span>
+            <!-- Communication -->
+            <span class="role-chip" data-role="professional writer and editor" onclick="toggleRole(this)">✍️ Professional Writer</span>
+            <span class="role-chip" data-role="communications and marketing strategist" onclick="toggleRole(this)">📣 Communications</span>
+          </div>
+
+          <div class="role-preview" id="rolePreview">No roles selected — or type a custom role below.</div>
+
+          <div class="field" style="margin-top:8px;">
+            <label>Custom role (or override above)</label>
+            <input type="text" id="x-role-custom" placeholder="e.g. nursing program director and clinical educator" oninput="updateRolePreview()">
+            <div class="hint">Leave blank to use selected chips. Type here to override with your own role.</div>
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">🎯 Task — Choose a category, then a template</div>
+
+          <div class="task-cat-row" id="taskCatRow">
+            <button class="task-cat-btn" onclick="selectTaskCat(this, 'workforce')">📊 Workforce & Labor Market</button>
+            <button class="task-cat-btn" onclick="selectTaskCat(this, 'curriculum')">📚 Curriculum & Course Design</button>
+            <button class="task-cat-btn" onclick="selectTaskCat(this, 'assessment')">✅ Assessment & Outcomes</button>
+            <button class="task-cat-btn" onclick="selectTaskCat(this, 'planning')">🗺️ Strategic Planning</button>
+            <button class="task-cat-btn" onclick="selectTaskCat(this, 'grants')">💰 Grants & Funding</button>
+            <button class="task-cat-btn" onclick="selectTaskCat(this, 'communication')">📣 Writing & Communication</button>
+          </div>
+
+          <div class="task-templates" id="taskTemplates"></div>
+
+          <div class="field">
+            <label>Task Description <span class="req">*</span></label>
+            <textarea id="x-task" rows="4" placeholder="Describe exactly what you want the AI to do — or pick a template above to pre-fill this..."></textarea>
+            <div class="hint">Templates pre-fill this box. Edit freely after selecting.</div>
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">📦 Context Variables</div>
+          <div class="field">
+            <label>Subject / Topic</label>
+            <input type="text" id="x-subject" placeholder="e.g. Docker and Containers, Cybersecurity, Nursing">
+          </div>
+          <div class="two-col">
+            <div class="field">
+              <label>Institution</label>
+              <input type="text" id="x-institution" placeholder="e.g. Brookdale CC">
+            </div>
+            <div class="field">
+              <label>Location</label>
+              <input type="text" id="x-location" placeholder="e.g. Monmouth County, NJ">
+            </div>
+          </div>
+          <div class="field">
+            <label>Additional Variable 1</label>
+            <input type="text" id="x-var1" placeholder="Label: Value (e.g. Industry Sector: Healthcare)">
+          </div>
+          <div class="field">
+            <label>Additional Variable 2</label>
+            <input type="text" id="x-var2" placeholder="Label: Value (e.g. Target Audience: Working adults)">
+          </div>
+          <div class="field">
+            <label>Additional Variable 3</label>
+            <input type="text" id="x-var3" placeholder="Label: Value (e.g. Geographic Radius: 100 miles)">
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">📋 Required Sections</div>
+          <div class="field">
+            <label>List sections you want (one per line)</label>
+            <textarea id="x-sections" rows="5" placeholder="Executive Summary&#10;Analysis&#10;Recommendations">Executive Summary
+Analysis
+Key Findings
+Recommendations
+Next Steps</textarea>
+          </div>
+        </div>
+
+        <div class="fg">
+          <div class="fg-label">✏️ Output Format</div>
+          <div class="field">
+            <label>Tone / Style</label>
+            <select id="x-tone">
+              <option value="professional and formal, suitable for college leadership and grant reviewers">Professional / Formal</option>
+              <option value="collegial and direct, suitable for faculty">Collegial / Faculty</option>
+              <option value="concise executive brief style">Executive Brief</option>
+              <option value="detailed and comprehensive academic style">Academic / Detailed</option>
+              <option value="plain language suitable for general audiences">Plain Language</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Formatting Preferences</label>
+            <select id="x-format">
+              <option value="Use clear headings, tables where applicable, bullet points for lists, and bold for key findings.">Headings + Tables + Bullets</option>
+              <option value="Use numbered sections with bullet points. No tables.">Numbered Sections + Bullets</option>
+              <option value="Write in flowing prose paragraphs. Use headings only for major sections.">Prose Paragraphs</option>
+              <option value="Use a structured executive brief format with a summary box followed by supporting detail.">Executive Brief Format</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Special Instructions (optional)</label>
+            <textarea id="x-special" rows="2" placeholder="e.g. Cite BLS and O*NET data sources. Include a top 10 employer table. Keep total length under 1,500 words."></textarea>
+          </div>
+        </div>
+
+        <button class="build-btn" onclick="build('custom')">✍️ Build Prompt</button>
+      </div>
+
+    </div><!-- /fc-body -->
+  </div><!-- /form-card -->
+
+  <!-- ── OUTPUT CARD ── -->
+  <div class="output-card">
+    <div class="oc-head">
+      <h2 id="oc-title">✍️ Your Prompt</h2>
+      <div class="oc-actions">
+        <button class="oc-btn" id="clearBtn" onclick="clearPrompt()" style="display:none">✕ Clear</button>
+      </div>
+    </div>
+    <div class="oc-body" id="ocBody">
+      <div class="placeholder" id="phHolder">
+        <div class="ph-orb">✍️</div>
+        <h3>Your prompt will appear here</h3>
+        <p>Fill in the fields on the left and click <strong>Build Prompt</strong>. Then copy it and paste it into any AI tool — Claude, ChatGPT, Gemini, Perplexity, or others.</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ── TAB SWITCHING ────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.template-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  const titles = { course: 'Course Demand Check', program: 'Program Feasibility Study', custom: 'Custom Prompt' };
+  document.getElementById('formTitle').textContent = titles[name];
+  clearPrompt();
+}
+
+// ── PROMPT BUILDERS ──────────────────────────────────────────────────────────
+function buildCoursePrompt() {
+  const g = id => document.getElementById(id).value.trim();
+  const topic    = g('c-topic') || '[Course Topic]';
+  const desc     = g('c-desc');
+  const skills   = g('c-skills');
+  const disc     = g('c-disc');
+  const cred     = g('c-cred');
+  const college  = g('c-college') || '[College Name]';
+  const loc      = g('c-loc') || '[Location]';
+  const radius   = g('c-radius');
+  const audience = g('c-audience');
+  const context  = g('c-context');
+  const sections = [...document.querySelectorAll('.c-sec:checked')].map((c,i) => `${i+1}. ${c.value}`).join('\n');
+
+  return `You are a labor market analyst and higher education curriculum consultant specializing in workforce demand analysis for community and technical colleges.
+
+Your task is to produce a concise, data-informed labor market demand analysis for a proposed course — not a full program feasibility study, but a focused course-level market check.
+
+---
+
+COURSE DETAILS
+Course Topic / Title: ${topic}${desc ? `\nCourse Description: ${desc}` : ''}${skills ? `\nRelated Skills / Technologies: ${skills}` : ''}
+Discipline / Department: ${disc}
+Credential Level: ${cred}
+
+INSTITUTION & LOCATION
+College: ${college}
+Location: ${loc}
+Geographic Search Radius: ${radius}
+Note: For technology topics, also consider the national/remote market since many roles are location-flexible.
+${context ? `\nADDITIONAL CONTEXT\n${context}` : ''}
+
+REPORT AUDIENCE
+${audience}
+
+---
+
+REQUIRED REPORT SECTIONS
+Produce ALL of the following sections in the order listed:
+
+${sections}
+
+---
+
+SECTION GUIDANCE
+
+Executive Summary and Demand Verdict
+Rate demand as HIGH, MEDIUM, or LOW with clear rationale. Provide 3–5 key bullet-point takeaways. State whether offering this course at ${college} appears justified based on the data.
+
+Job Postings Analysis
+Estimate the number of regional job postings within ${radius} of ${loc} that list ${topic} or related skills (${skills}) as a requirement or preference. Present top job titles in a table: Job Title | Est. Regional Postings | Trend Direction. Note whether remote/hybrid roles meaningfully expand the effective market.
+
+Salary Premium Analysis
+Compare median salaries for workers with vs. without ${topic} skills. Present a table: Experience Level | Without Skill | With Skill | Premium ($). Call out which specific sub-skills command the highest premium.
+
+Industries and Employers Hiring
+List the top industries hiring for this skill. Then identify 10–15 specific employers in or near ${loc} (within ${radius}) actively hiring for these skills. Table: Company | Location | Industry | Role Types.
+
+Competing Courses at Nearby Colleges
+Identify institutions within approximately 75 miles of ${loc} that currently offer courses on ${topic} or closely related content. Table: Institution | Course Name | Format (online/hybrid/in-person) | Credits or Cost | Notes. Identify any gap or differentiation opportunity for ${college}.
+
+Recommended Course Topics and Learning Outcomes
+Based on job posting skill frequency, recommend the top 8–10 topics the course should cover, ranked by employer demand. Table: Topic | Employer Demand Signal | Why It Matters. Then list 5–6 measurable learning outcomes using action verbs (e.g., "Students will be able to...").
+
+Stackable Credentials and Certifications
+List industry certifications students could pursue after or alongside this course. Table: Certification | Issuing Body | Approximate Cost | Value to Students | Alignment to Course Content.
+
+Recommendation and Next Steps
+Provide a clear recommendation: Offer / Pilot with employer partners / Defer. Then list 3–4 concrete, actionable next steps.
+
+---
+
+FORMATTING REQUIREMENTS
+- Use Markdown headings (## for sections, ### for subsections)
+- Use tables wherever data is presented
+- Use bullet points for lists
+- Bold key numbers and findings
+- Cite data sources where relevant (BLS, O*NET, Lightcast/EMSI, CompTIA, vendor certification bodies, etc.)
+- Write in ${audience} tone — collegial, direct, and evidence-based
+- Every sentence should earn its place — faculty are busy`;
+}
+
+function buildProgramPrompt() {
+  const g = id => document.getElementById(id).value.trim();
+  const program    = g('p-program') || '[Program Name]';
+  const cred       = g('p-cred');
+  const sector     = g('p-sector');
+  const occs       = g('p-occupations');
+  const college    = g('p-college') || '[College Name]';
+  const county     = g('p-county') || '[Location]';
+  const state      = g('p-state');
+  const states     = g('p-states');
+  const radius     = g('p-radius');
+  const audience   = g('p-audience');
+  const context    = g('p-context');
+  const sections   = [...document.querySelectorAll('.p-sec:checked')].map((c,i) => `${i+1}. ${c.value}`).join('\n');
+
+  return `You are a labor market economist, workforce development strategist, and industry analyst specializing in technician and professional workforce pipelines and community college program development.
+
+Your task is to conduct a comprehensive labor market feasibility study to determine whether there is sufficient workforce demand to justify creating a ${program} (${cred}) program at ${college} located in ${county}${state ? ', ' + state : ''}.
+
+---
+
+PROGRAM DETAILS
+Proposed Program: ${program}
+Credential Type: ${cred}
+Industry Sector: ${sector}${occs ? `\nKey Occupations to Analyze: ${occs}` : ''}
+
+INSTITUTION & REGIONAL SCOPE
+College: ${college}
+Location: ${county}${state ? ', ' + state : ''}
+Regional Labor Market: ${states || state || 'State and surrounding region'}
+Employer Search Radius: ${radius} from ${county}
+${context ? `\nADDITIONAL CONTEXT\n${context}` : ''}
+
+REPORT AUDIENCE
+${audience}
+
+---
+
+REQUIRED REPORT SECTIONS
+Produce ALL of the following sections:
+
+${sections}
+
+---
+
+SECTION GUIDANCE
+
+Executive Summary
+State demand level (HIGH / MODERATE / LOW). Provide estimated annual regional job openings, typical entry-level salaries, and a clear verdict on whether the program is justified at ${college}.
+
+Regional Industry Analysis
+Identify major aerospace, defense, and advanced manufacturing employers in the region. Table: Company | Location | Industry Segment | Estimated Workforce Size.
+
+Supply Chain Mapping
+Identify supply chain companies (precision machining, component suppliers, systems integrators, etc.) within commuting distance. Highlight employer clusters within ${radius} of ${county}.
+
+Occupational Demand Analysis
+For each key occupation, provide: Occupation | Regional Job Postings/Year | Median Salary | Entry-Level Salary | Projected Growth (10yr). Use BLS OEWS and Lightcast data.
+
+Job Posting Skill Analysis
+Rank the top 15 most-requested technical skills from job postings. Table: Rank | Skill / Competency | Frequency in Postings | Notes.
+
+Workforce Gap Analysis
+Quantify the annual gap between technician demand and training supply. Discuss retirement waves, time-to-fill trends, and employer hiring challenges. State clearly whether a shortage exists.
+
+Education and Training Pipeline
+Identify existing programs in the region. Table: Institution | Program | Degree/Certificate | Est. Annual Graduates. Identify pipeline gaps and the differentiation opportunity for ${college}.
+
+Salary and Career Pathways
+Show 2–3 career tracks with salary progression from graduation through 10+ years. Include tables and named pathway examples (e.g., CNC Operator → Programmer → Manufacturing Engineer).
+
+Program Design Recommendations
+Recommend curriculum areas, sample course titles, and credit distribution. List required lab equipment and estimated startup costs.
+
+Employer Partnerships
+Table of high-priority employer partners: Company | Distance from ${college} | Partnership Type | Segment. Include advisory board, internship, apprenticeship, and equipment donation candidates.
+
+Economic and Workforce Impact
+Estimate workforce, student wage, and regional economic benefits. Quantify the return on investment for students and the region.
+
+Final Recommendation
+Give a clear YES / NO verdict. Recommend program size, initial enrollment target, projected graduate placement rate, and 5–6 numbered next steps with timeline.
+
+Top 25 Employer List
+Table: Rank | Company | Location | Segment | Approximate Distance from ${county}.
+
+---
+
+FORMATTING REQUIREMENTS
+- Use Markdown headings (# for major sections, ## for subsections)
+- Use tables wherever data is tabular
+- Use bullet points for lists; bold key numbers and findings
+- Cite data sources (BLS, O*NET, Lightcast, state LMI, AIA, NAM, etc.)
+- Write in a professional tone appropriate for ${audience}
+- Be comprehensive — this is a formal planning document`;
+}
+
+function buildCustomPrompt() {
+  const g = id => document.getElementById(id).value.trim();
+
+  // Role: custom override takes priority, else assemble from chips
+  const customRole = g('x-role-custom');
+  let role;
+  if (customRole) {
+    role = customRole;
+  } else {
+    const selected = [...document.querySelectorAll('.role-chip.selected')].map(c => c.dataset.role);
+    role = selected.length ? selected.join(', ') : 'expert analyst';
+  }
+
+  const task        = g('x-task') || '[Describe the task]';
+  const subject     = g('x-subject');
+  const institution = g('x-institution');
+  const location    = g('x-location');
+  const var1        = g('x-var1');
+  const var2        = g('x-var2');
+  const var3        = g('x-var3');
+  const tone        = g('x-tone');
+  const format      = g('x-format');
+  const special     = g('x-special');
+
+  const rawSections = g('x-sections');
+  const sectionList = rawSections
+    ? rawSections.split('\n').filter(s => s.trim()).map((s,i) => `${i+1}. ${s.trim()}`).join('\n')
+    : '';
+
+  const contextLines = [];
+  if (subject)     contextLines.push(`Subject / Topic: ${subject}`);
+  if (institution) contextLines.push(`Institution: ${institution}`);
+  if (location)    contextLines.push(`Location: ${location}`);
+  if (var1)        contextLines.push(var1);
+  if (var2)        contextLines.push(var2);
+  if (var3)        contextLines.push(var3);
+
+  return `You are a ${role}.
+
+${task}
+
+---
+${contextLines.length ? `CONTEXT\n${contextLines.join('\n')}\n\n---` : ''}
+
+REQUIRED SECTIONS
+Produce ALL of the following sections in order:
+
+${sectionList || '[List your required sections here]'}
+
+---
+
+FORMATTING AND STYLE
+Tone / Style: ${tone}
+Format: ${format}${special ? `\nAdditional Instructions: ${special}` : ''}`;
+}
+
+// ── ROLE CHIP LOGIC ──────────────────────────────────────────────────────────
+function toggleRole(chip) {
+  chip.classList.toggle('selected');
+  updateRolePreview();
+}
+
+function updateRolePreview() {
+  const custom = document.getElementById('x-role-custom').value.trim();
+  const preview = document.getElementById('rolePreview');
+  if (custom) {
+    preview.textContent = `Role: "${custom}"`;
+    preview.style.color = 'var(--rust)';
+    return;
+  }
+  const selected = [...document.querySelectorAll('.role-chip.selected')].map(c => c.dataset.role);
+  if (!selected.length) {
+    preview.textContent = 'No roles selected — or type a custom role below.';
+    preview.style.color = 'var(--muted)';
+  } else {
+    preview.textContent = `"You are a ${selected.join(', and ')}"`;
+    preview.style.color = 'var(--teal)';
+  }
+}
+
+// ── TASK TEMPLATE DATA ────────────────────────────────────────────────────────
+const TASK_TEMPLATES = {
+  workforce: [
+    { label: 'Course Demand Check', text: 'Produce a concise labor market demand analysis for a proposed course at [COLLEGE] in [LOCATION]. Assess job posting volume, salary premium, hiring industries, competing courses at nearby colleges, recommended topics, and relevant certifications.' },
+    { label: 'Program Feasibility Study', text: 'Conduct a comprehensive labor market feasibility study to determine whether there is sufficient workforce demand to justify creating a [PROGRAM NAME] program at [COLLEGE] in [LOCATION]. Analyze occupational demand, employer landscape, workforce gaps, training pipeline, and career pathways.' },
+    { label: 'Workforce Gap Analysis', text: 'Analyze the workforce supply-demand gap for [OCCUPATION/FIELD] in [LOCATION]. Quantify annual hiring demand, current training capacity, retirement attrition, and the resulting shortage. Identify root causes and recommend interventions.' },
+    { label: 'Employer Landscape Report', text: 'Identify and profile the top employers in [INDUSTRY] within [RADIUS] of [LOCATION]. For each employer, note company size, role types hiring, preferred qualifications, and partnership potential with [COLLEGE].' },
+    { label: 'Salary & Career Pathway Analysis', text: 'Map out career pathways and salary progression for graduates entering [FIELD] from [COLLEGE]. Show entry-level to senior roles, typical timelines, salary ranges at each stage, and the certifications or skills that accelerate advancement.' },
+    { label: 'Skill Gap & Job Posting Analysis', text: 'Analyze recent job postings for [JOB TITLE / FIELD] in [LOCATION] to identify the most in-demand skills and competencies. Rank skills by frequency, note emerging vs. declining requirements, and recommend how [COLLEGE] should update its curriculum.' },
+  ],
+  curriculum: [
+    { label: 'New Course Design', text: 'Design a complete new course on [TOPIC] for [COLLEGE]. Include course description, target student population, prerequisite assumptions, 6–8 learning outcomes using Bloom\'s taxonomy action verbs, a 15-week topic outline, and assessment strategy.' },
+    { label: 'Curriculum Mapping', text: 'Map the curriculum for the [PROGRAM NAME] program at [COLLEGE] against current industry skill requirements and any relevant accreditation standards. Identify gaps, redundancies, and sequencing issues. Recommend specific changes with rationale.' },
+    { label: 'Course Revision / Update', text: 'Review and update the existing [COURSE NAME] course at [COLLEGE] to reflect current industry practices in [FIELD]. Identify outdated content, add emerging topics, update learning outcomes, and recommend new assessments.' },
+    { label: 'Learning Outcomes Writing', text: 'Write a complete set of measurable learning outcomes for a [COURSE/PROGRAM] in [FIELD]. Use Bloom\'s taxonomy action verbs. Include course-level outcomes and module-level outcomes for at least 5 major topics. Align outcomes to industry competencies where applicable.' },
+    { label: 'Competency-Based Framework', text: 'Develop a competency-based framework for [PROGRAM/FIELD] at [COLLEGE]. Define the core competencies students must demonstrate, map them to specific courses and assessments, and describe evidence of mastery at each level.' },
+    { label: 'Textbook / Resource Evaluation', text: 'Evaluate and recommend the best available textbooks, open educational resources (OER), and learning tools for a [COURSE/PROGRAM] in [FIELD]. Compare options on currency, readability, cost, digital features, and alignment to learning outcomes.' },
+  ],
+  assessment: [
+    { label: 'AI-Resistant Assessment Design', text: 'Design a suite of assessments for [COURSE/PROGRAM] that are meaningful and rigorous in an AI-assisted world. Include a mix of authentic tasks, performance assessments, and formative checks that emphasize critical thinking, original analysis, and real-world application.' },
+    { label: 'Rubric Creation', text: 'Create a detailed grading rubric for [ASSIGNMENT/PROJECT TYPE] in [COURSE]. Include 4 performance levels (Exemplary, Proficient, Developing, Beginning) across all key dimensions. Write descriptors that are specific enough for students to self-assess.' },
+    { label: 'Program Assessment Plan', text: 'Develop a comprehensive student learning outcomes assessment plan for the [PROGRAM NAME] program at [COLLEGE]. Include how each program outcome will be measured, who is responsible, when data will be collected, and how results will be used for continuous improvement.' },
+    { label: 'Accreditation Self-Study Support', text: 'Help draft the [STANDARD/CRITERION] section of an accreditation self-study for [COLLEGE / PROGRAM]. Describe current practices, provide evidence of effectiveness, acknowledge areas for improvement, and outline action plans.' },
+    { label: 'Exam / Quiz Writing', text: 'Write a bank of [NUMBER] assessment questions for [COURSE/TOPIC]. Include a mix of multiple choice, short answer, and application questions. Align each question to a specific learning outcome. Include an answer key with rationale.' },
+  ],
+  planning: [
+    { label: 'Strategic Plan Section', text: 'Draft the [SECTION NAME] section of a strategic plan for [COLLEGE / DEPARTMENT]. Address current state, environmental scan findings, strategic priorities, measurable goals with 3-year targets, and key initiatives. Write in a formal, board-ready tone.' },
+    { label: 'New Program Business Case', text: 'Write a business case for launching a new [PROGRAM NAME] program at [COLLEGE]. Address market demand, competitive differentiation, resource requirements, projected enrollment and revenue, student outcomes, and risk factors. Format for college leadership review.' },
+    { label: 'Enrollment Projection Model', text: 'Develop an enrollment projection model for [PROGRAM/COURSE] at [COLLEGE]. Estimate Year 1–3 enrollment based on population data, transfer rates, market demand, and comparable programs at peer institutions. State assumptions clearly.' },
+    { label: 'Partnership Development Plan', text: 'Create a plan for developing employer and community partnerships to support [PROGRAM/INITIATIVE] at [COLLEGE]. Identify target organizations, describe partnership models (advisory board, internships, apprenticeships, donations), and outline an outreach strategy.' },
+    { label: 'Policy Brief', text: 'Write a 2–3 page policy brief on [TOPIC] for [AUDIENCE]. Summarize the issue, present evidence-based findings, explain implications for [COLLEGE / REGION], and recommend 3–5 specific policy actions. Use a formal but accessible tone.' },
+  ],
+  grants: [
+    { label: 'Grant Narrative (General)', text: 'Write a compelling grant narrative for a [GRANT NAME / FUNDING SOURCE] application. Address the statement of need, project goals and objectives, methodology, evaluation plan, sustainability, and organizational capacity. Target length: [LENGTH]. Funder priorities: [PRIORITIES].' },
+    { label: 'NSF ATE Grant Section', text: 'Draft the [PROJECT DESCRIPTION / EVALUATION / BROADER IMPACTS] section of an NSF Advanced Technological Education (ATE) grant proposal for [PROJECT NAME] at [COLLEGE]. Address technician education goals, partnerships, evidence of need, and expected outcomes.' },
+    { label: 'DOL WIOA Proposal', text: 'Write a workforce development proposal for a DOL WIOA-funded initiative at [COLLEGE]. Describe the target population, skills training program, employer partnerships, support services, and measurable outcomes including employment and wage gains.' },
+    { label: 'Logic Model', text: 'Create a logic model for [PROJECT/PROGRAM] at [COLLEGE]. Include inputs, activities, outputs, short-term outcomes, long-term outcomes, and underlying assumptions. Format as a table suitable for a grant application.' },
+    { label: 'Budget Narrative', text: 'Write a budget narrative justifying the requested funds for [PROJECT] at [COLLEGE]. Explain and justify each budget line item — personnel, fringe, travel, equipment, supplies, contractual, indirect — in terms of their necessity and reasonableness for achieving project goals.' },
+  ],
+  communication: [
+    { label: 'Faculty / Staff Memo', text: 'Write a professional internal memo from [SENDER ROLE] to [AUDIENCE] at [COLLEGE] regarding [TOPIC]. Cover the background, key information, any required actions, and timeline. Keep it clear, collegial, and under one page.' },
+    { label: 'Program Marketing Copy', text: 'Write compelling marketing copy for the [PROGRAM NAME] program at [COLLEGE]. Include a headline, 2–3 sentence program overview, key benefits for students, career outcomes with salary data, and a call to action. Tone: welcoming and motivating.' },
+    { label: 'Email to Employer Partner', text: 'Write a professional outreach email from [COLLEGE] to [COMPANY/CONTACT] inviting them to [PARTNER / SPEAK / JOIN ADVISORY BOARD / HIRE INTERNS] in connection with the [PROGRAM NAME] program. Keep it concise, value-focused, and easy to respond to.' },
+    { label: 'Student-Facing Announcement', text: 'Write a student-facing announcement about [TOPIC/OPPORTUNITY] at [COLLEGE]. Use plain, encouraging language. Explain what it is, why students should care, what they need to do, and by when. Suitable for LMS, email, or social media.' },
+    { label: 'Press Release', text: 'Write a press release announcing [NEWS/EVENT] at [COLLEGE]. Include a headline, dateline, lead paragraph (who, what, when, where, why), supporting details, one or two quotes from college leaders, and boilerplate about [COLLEGE]. AP style.' },
+    { label: 'Board Presentation Summary', text: 'Write a concise executive summary of [TOPIC/INITIATIVE] for presentation to the Board of Trustees at [COLLEGE]. Cover the background, current status, key data points, decision or action needed from the board, and next steps.' },
+  ],
+};
+
+// ── TASK CATEGORY / TEMPLATE LOGIC ───────────────────────────────────────────
+function selectTaskCat(btn, cat) {
+  document.querySelectorAll('.task-cat-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const container = document.getElementById('taskTemplates');
+  const templates = TASK_TEMPLATES[cat] || [];
+
+  container.innerHTML = templates.map(t =>
+    `<button class="task-tpl-btn" onclick="applyTemplate(${JSON.stringify(t.text).replace(/'/g, '&#39;')})">${t.label}</button>`
+  ).join('');
+  container.classList.add('visible');
+}
+
+function applyTemplate(text) {
+  document.getElementById('x-task').value = text;
+  document.getElementById('x-task').focus();
+  // Flash the textarea to confirm
+  const ta = document.getElementById('x-task');
+  ta.style.borderColor = 'var(--teal)';
+  ta.style.background = 'var(--teal-lt)';
+  setTimeout(() => { ta.style.borderColor = ''; ta.style.background = ''; }, 600);
+}
+
+// ── BUILD + RENDER ────────────────────────────────────────────────────────────
+function build(type) {
+  let promptText = '';
+  let label = '';
+
+  if (type === 'course') {
+    const topic = document.getElementById('c-topic').value.trim() || '[Course Topic]';
+    const college = document.getElementById('c-college').value.trim() || '[College]';
+    promptText = buildCoursePrompt();
+    label = `Course Demand: ${topic} — ${college}`;
+  } else if (type === 'program') {
+    const program = document.getElementById('p-program').value.trim() || '[Program]';
+    const college = document.getElementById('p-college').value.trim() || '[College]';
+    promptText = buildProgramPrompt();
+    label = `Program Feasibility: ${program} — ${college}`;
+  } else {
+    const subject = document.getElementById('x-subject').value.trim() || 'Custom Analysis';
+    promptText = buildCustomPrompt();
+    label = `Custom Prompt: ${subject}`;
+  }
+
+  const charCount = promptText.length.toLocaleString();
+  const wordCount = promptText.split(/\s+/).filter(Boolean).length.toLocaleString();
+
+  const ocBody = document.getElementById('ocBody');
+  document.getElementById('oc-title').textContent = `✍️ ${label}`;
+  document.getElementById('clearBtn').style.display = 'flex';
+
+  ocBody.innerHTML = `
+    <div class="prompt-output">
+      <div class="prompt-meta">
+        <div class="prompt-meta-left">
+          <span class="pm-badge">${type === 'course' ? 'Course Check' : type === 'program' ? 'Program Feasibility' : 'Custom'}</span>
+          <span class="pm-title">${label}</span>
+          <span class="pm-chars">${wordCount} words · ${charCount} chars</span>
+        </div>
+        <button class="copy-big" id="mainCopyBtn" onclick="copyPrompt()">📋 Copy Prompt</button>
+      </div>
+      <textarea class="prompt-textarea" id="promptTextarea" spellcheck="false">${escHtml(promptText)}</textarea>
+      <div class="how-strip">
+        <div class="how-step"><div class="how-num">1</div> Click Copy Prompt above</div>
+        <div class="how-arrow">→</div>
+        <div class="how-step"><div class="how-num">2</div> Open your AI tool</div>
+        <div class="how-arrow">→</div>
+        <div class="how-step"><div class="how-num">3</div> Paste and send</div>
+      </div>
+      <div class="llm-row">
+        <span class="llm-label">Open in:</span>
+        <a class="llm-btn" href="https://claude.ai" target="_blank">🤖 Claude</a>
+        <a class="llm-btn" href="https://chatgpt.com" target="_blank">💬 ChatGPT</a>
+        <a class="llm-btn" href="https://gemini.google.com" target="_blank">✨ Gemini</a>
+        <a class="llm-btn" href="https://www.perplexity.ai" target="_blank">🔍 Perplexity</a>
+        <a class="llm-btn" href="https://copilot.microsoft.com" target="_blank">🪟 Copilot</a>
+      </div>
+    </div>`;
+
+  // Store raw for copy
+  ocBody.dataset.raw = promptText;
+
+  // Scroll output into view on mobile
+  if (window.innerWidth < 880) {
+    document.querySelector('.output-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function escHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function copyPrompt() {
+  const raw = document.getElementById('ocBody').dataset.raw || '';
+  if (!raw) return;
+  navigator.clipboard.writeText(raw).then(() => {
+    const btn = document.getElementById('mainCopyBtn');
+    if (btn) {
+      btn.textContent = '✅ Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.innerHTML = '📋 Copy Prompt';
+        btn.classList.remove('copied');
+      }, 2500);
+    }
+  }).catch(() => {
+    // Fallback: select textarea
+    const ta = document.getElementById('promptTextarea');
+    if (ta) { ta.select(); document.execCommand('copy'); }
+  });
+}
+
+function clearPrompt() {
+  const ocBody = document.getElementById('ocBody');
+  document.getElementById('oc-title').textContent = '✍️ Your Prompt';
+  document.getElementById('clearBtn').style.display = 'none';
+  ocBody.innerHTML = `<div class="placeholder" id="phHolder">
+    <div class="ph-orb">✍️</div>
+    <h3>Your prompt will appear here</h3>
+    <p>Fill in the fields on the left and click <strong>Build Prompt</strong>. Then copy it and paste it into any AI tool — Claude, ChatGPT, Gemini, Perplexity, or others.</p>
+  </div>`;
+}
+</script>
+</body>
+</html>
