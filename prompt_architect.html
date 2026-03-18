@@ -1890,7 +1890,21 @@
 
       <div class="field-group">
         <label for="extras">Additional Requirements / Context</label>
-        <textarea id="extras" placeholder="e.g., Must align with NJCCC standards, include at least 10 questions, avoid medical jargon, use a progress bar, be embeddable in Canvas…" rows="3"></textarea>
+        <textarea id="extras" placeholder="e.g., Must align with NJCCC standards, include at least 10 questions, avoid medical jargon, use a progress bar, be embeddable in Canvas… | Reference and compare similar features in ChatGPT, Gemini, and Copilot… | Include a real-world scenario set in a community college context…" rows="3"></textarea>
+      </div>
+
+      <!-- Clarifying Questions Toggle -->
+      <div class="field-group" id="clarifGroup" style="margin-bottom:0.5rem;">
+        <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+          <button type="button" id="clarifBtn" class="chip" data-active="false" aria-pressed="false"
+            onclick="toggleClarif()"
+            style="font-size:0.82rem;padding:0.4rem 0.9rem;border-radius:20px;">
+            ❓ Ask clarifying questions first
+          </button>
+          <span style="font-size:0.76rem;color:var(--text3);font-family:var(--font-ui);line-height:1.4;">
+            LLM will pause and ask before building — <strong>recommended for complex prompts</strong>
+          </span>
+        </div>
       </div>
 
       <!-- Super Snippets (Simple mode only) -->
@@ -3584,6 +3598,18 @@ function setComplexity(level) {
   updatePrompt();
 }
 
+function toggleClarif() {
+  const btn = document.getElementById('clarifBtn');
+  if (!btn) return;
+  const isActive = btn.dataset.active === 'true';
+  btn.dataset.active = String(!isActive);
+  btn.setAttribute('aria-pressed', String(!isActive));
+  btn.style.background = !isActive ? 'var(--chip-active-bg)' : '';
+  btn.style.color = !isActive ? 'var(--chip-active-text)' : '';
+  btn.style.borderColor = !isActive ? 'var(--chip-active-bg)' : '';
+  updatePrompt();
+}
+
 function renderSuperChips() {
   const grid = document.getElementById('superChipGrid');
   if (!grid) return;
@@ -4176,6 +4202,12 @@ function updatePrompt() {
     parts.push(`\n--- DELIVERABLE ---\nProvide the complete, ready-to-use deliverable. Do not truncate or summarize the code. Include all content needed for a fully functional, standalone application.`);
   }
 
+  // Clarifying questions injection — appended last so it's the final instruction the LLM sees
+  const clarifBtn = document.getElementById('clarifBtn');
+  if (clarifBtn && clarifBtn.dataset.active === 'true') {
+    parts.push(`\n--- BEFORE YOU BEGIN ---\nDo not start building yet. First, ask me any clarifying questions that would help you produce a better result — about content, structure, audience, technical constraints, or anything else that would affect your approach. Wait for my answers before generating any code or content.`);
+  }
+
   const fullPrompt = parts.join('\n');
 
   outputEl.textContent = fullPrompt;
@@ -4546,6 +4578,15 @@ function bindEvents() {
     document.getElementById('toneLabel').textContent = 'Balanced';
     document.getElementById('scope').value = 2;
     updateScopeDisplay(2);
+    // Reset clarifying questions toggle
+    const clarifBtn = document.getElementById('clarifBtn');
+    if (clarifBtn) {
+      clarifBtn.dataset.active = 'false';
+      clarifBtn.setAttribute('aria-pressed', 'false');
+      clarifBtn.style.background = '';
+      clarifBtn.style.color = '';
+      clarifBtn.style.borderColor = '';
+    }
 
     state.activeSnippets.clear();
     if (typeof hideVideoGate === 'function') hideVideoGate();
