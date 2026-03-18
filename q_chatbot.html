@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Q — AI Chatbot Widget</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:Verdana,Geneva,Tahoma,sans-serif;}
+body{
+  background:#f4f1eb;
+  color:#1c2333;
+  display:flex;flex-direction:column;
+  min-height:100vh;
+}
+a:focus,button:focus,input:focus,textarea:focus,[tabindex]:focus{
+  outline:3px solid #b8860b;outline-offset:2px;
+}
+/* SKIP LINK */
+.skip-link{
+  position:absolute;top:-50px;left:0;
+  background:#1a6b72;color:#fff;
+  padding:8px 16px;font-size:0.82rem;
+  border-radius:0 0 6px 0;text-decoration:none;
+  z-index:9999;transition:top .2s;
+}
+.skip-link:focus{top:0;}
+/* HEADER */
+.chat-header{
+  background:#1a6b72;
+  padding:0.9rem 1.25rem;
+  display:flex;align-items:center;gap:0.85rem;
+  box-shadow:0 2px 12px rgba(28,35,51,0.10);
+  position:sticky;top:0;z-index:100;
+  flex-shrink:0;
+}
+.header-avatar{
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(255,255,255,0.15);
+  border:2px solid rgba(255,255,255,0.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;flex-shrink:0;
+}
+.header-name{
+  font-family:Georgia,'Times New Roman',serif;
+  font-size:1.1rem;color:#ffffff;line-height:1.2;
+}
+.header-role{
+  font-size:0.72rem;color:rgba(255,255,255,0.65);margin-top:2px;
+}
+.header-right{margin-left:auto;display:flex;gap:0.5rem;align-items:center;}
+.header-btn{
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:16px;padding:4px 12px;
+  font-size:0.72rem;font-family:Verdana,sans-serif;
+  color:rgba(255,255,255,0.85);cursor:pointer;
+  transition:background .2s;white-space:nowrap;
+}
+.header-btn:hover{background:rgba(255,255,255,0.22);}
+/* MAIN LAYOUT */
+.chat-wrap{
+  flex:1;display:flex;flex-direction:column;
+  max-width:760px;width:100%;margin:0 auto;
+  padding:1rem 1rem 0;
+}
+/* MESSAGES */
+.messages{
+  flex:1;overflow-y:auto;
+  display:flex;flex-direction:column;gap:0.75rem;
+  padding-bottom:0.75rem;
+  scroll-behavior:smooth;
+}
+.messages::-webkit-scrollbar{width:5px;}
+.messages::-webkit-scrollbar-thumb{background:#cec7b8;border-radius:3px;}
+.msg{display:flex;gap:0.6rem;align-items:flex-start;animation:msgIn .25s ease;}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.msg.bot{flex-direction:row;}
+.msg.user{flex-direction:row-reverse;}
+.msg-avatar{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;flex-shrink:0;
+  background:#ddf0f1;
+  border:1px solid #cec7b8;
+}
+.msg.user .msg-avatar{background:#1a6b72;border-color:#1a6b72;}
+.bubble{
+  max-width:78%;padding:0.65rem 0.9rem;
+  border-radius:0 12px 12px 12px;
+  font-size:0.85rem;line-height:1.6;
+}
+.msg.bot .bubble{
+  background:#ffffff;color:#1c2333;
+  border:1px solid #cec7b8;
+  box-shadow:0 1px 6px rgba(28,35,51,0.10);
+}
+.msg.user .bubble{
+  background:#1a6b72;color:#ffffff;
+  border-radius:12px 0 12px 12px;
+  box-shadow:0 1px 6px rgba(28,35,51,0.10);
+}
+/* STARTER CHIPS */
+.starter-chips{
+  display:flex;flex-wrap:wrap;gap:0.4rem;
+  margin:0.25rem 0 0.5rem 2.4rem;
+}
+.starter-chip{
+  background:#ddf0f1;color:#0f4a50;
+  border:1px solid #1a6b72;
+  border-radius:16px;padding:5px 13px;
+  font-size:0.76rem;font-family:Verdana,sans-serif;
+  cursor:pointer;transition:all .18s;
+}
+.starter-chip:hover{opacity:0.8;transform:translateY(-1px);}
+/* INPUT ROW */
+.input-row{
+  display:flex;gap:0.5rem;align-items:flex-end;
+  padding:0.85rem 0;
+  border-top:1px solid #cec7b8;
+  background:#f4f1eb;
+  position:sticky;bottom:0;
+}
+.input-row textarea{
+  flex:1;background:#ffffff;
+  border:1px solid #cec7b8;
+  border-radius:20px;padding:0.6rem 1rem;
+  font-size:0.85rem;color:#1c2333;
+  font-family:Verdana,sans-serif;
+  resize:none;line-height:1.5;
+  max-height:120px;min-height:42px;
+  outline:none;transition:border-color .2s;
+}
+.input-row textarea:focus{border-color:#1a6b72;}
+.send-btn{
+  width:42px;height:42px;border-radius:50%;
+  background:#1a6b72;border:none;
+  color:#fff;font-size:1.1rem;
+  cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .18s;box-shadow:0 2px 8px rgba(28,35,51,0.10);
+}
+.send-btn:hover{transform:scale(1.08);}
+.send-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+/* SYSTEM PROMPT DRAWER */
+.prompt-drawer{
+  max-width:760px;width:100%;margin:0 auto 0.5rem;
+  padding:0 1rem;
+}
+details.prompt-details{
+  border:1px solid #cec7b8;
+  border-radius:8px;overflow:hidden;
+  background:#ffffff;
+}
+details.prompt-details summary{
+  cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:0.5rem;
+  padding:0.6rem 1rem;font-size:0.74rem;font-weight:700;
+  font-family:Verdana,sans-serif;
+  color:#1a6b72;
+  background:#ffffff;
+  transition:background .15s;
+}
+details.prompt-details summary::-webkit-details-marker{display:none;}
+details.prompt-details summary:hover{background:#ddf0f1;}
+details.prompt-details summary::after{
+  content:'▼';font-size:0.58rem;color:#48536a;
+  margin-left:auto;transition:transform .2s;
+}
+details[open].prompt-details summary::after{transform:rotate(180deg);}
+.prompt-body{
+  padding:0.75rem 1rem 1rem;
+  font-family:'Courier New',monospace;font-size:0.73rem;
+  color:#48536a;line-height:1.7;
+  white-space:pre-wrap;word-break:break-word;
+  border-top:1px solid #cec7b8;
+  max-height:240px;overflow-y:auto;
+}
+.prompt-copy-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  margin-top:0.65rem;
+  background:#1a6b72;color:#fff;
+  border:none;border-radius:6px;
+  padding:5px 14px;font-size:0.74rem;
+  font-family:Verdana,sans-serif;font-weight:600;
+  cursor:pointer;transition:background .18s;
+}
+.prompt-copy-btn:hover{opacity:.88;}
+/* HOW TO USE CARD */
+.how-to-use{
+  max-width:760px;width:100%;margin:0.5rem auto 0.75rem;
+  padding:0 1rem;
+}
+.how-card{
+  background:#ffffff;
+  border:1px solid #cec7b8;
+  border-left:4px solid #1a6b72;
+  border-radius:8px;
+  padding:1rem 1.1rem 0.9rem;
+}
+.how-card-title{
+  font-size:0.8rem;font-weight:700;
+  font-family:Verdana,sans-serif;
+  color:#1a6b72;
+  margin-bottom:0.65rem;
+  display:flex;align-items:center;gap:0.4rem;
+}
+.how-steps{
+  display:flex;flex-direction:column;gap:0.5rem;
+}
+.how-step{
+  display:flex;align-items:flex-start;gap:0.65rem;
+  font-size:0.8rem;font-family:Verdana,sans-serif;
+  color:#1c2333;line-height:1.5;
+}
+.how-step-num{
+  width:22px;height:22px;border-radius:50%;
+  background:#1a6b72;color:#fff;
+  font-size:0.68rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;
+}
+.how-step strong{color:#1a6b72;}
+/* PLATFORM LINKS */
+.platform-section{
+  max-width:760px;width:100%;margin:0 auto 0.75rem;
+  padding:0 1rem;
+}
+.platform-label{
+  font-size:0.75rem;font-weight:700;
+  color:#1c2333;
+  margin-bottom:0.5rem;font-family:Verdana,sans-serif;
+}
+.platform-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:0.4rem;
+}
+@media(max-width:500px){.platform-grid{grid-template-columns:1fr 1fr;}}
+.platform-btn{
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  padding:7px 10px;
+  background:#ffffff;border:1px solid #cec7b8;
+  border-radius:8px;font-size:0.72rem;font-family:Verdana,sans-serif;
+  color:#48536a;text-decoration:none;font-weight:600;
+  transition:all .18s;
+}
+.platform-btn:hover{border-color:#1a6b72;color:#1a6b72;}
+/* FOOTER */
+.chat-footer{
+  background:#ece8e0;
+  border-top:1px solid #cec7b8;
+  padding:0.5rem 1rem;
+  text-align:center;
+  font-size:0.67rem;color:#7a849e;
+  font-family:Verdana,sans-serif;
+  flex-shrink:0;
+}
+/* TOAST */
+#toast{
+  position:fixed;bottom:1.5rem;left:50%;
+  transform:translateX(-50%) translateY(12px);
+  background:#1a6b72;color:#fff;
+  padding:8px 20px;border-radius:20px;
+  font-size:0.8rem;font-family:Verdana,sans-serif;font-weight:600;
+  box-shadow:0 4px 16px rgba(28,35,51,0.10);
+  opacity:0;transition:opacity .25s,transform .25s;
+  pointer-events:none;z-index:9999;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<a href="#chat-input" class="skip-link">Skip to chat input</a>
+<div aria-live="assertive" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);" id="ariaLive"></div>
+
+<!-- HEADER -->
+<header class="chat-header" role="banner">
+  <div class="header-avatar" aria-hidden="true">🤖</div>
+  <div>
+    <div class="header-name">Q</div>
+    <div class="header-role">Artificial intelligence (AI) tutor.</div>
+  </div>
+  <div class="header-right">
+    <button class="header-btn" onclick="clearChat()" aria-label="Clear conversation and start over">↺ Clear</button>
+  </div>
+</header>
+
+<!-- MAIN CHAT -->
+<main role="main">
+<div class="chat-wrap">
+  <div class="messages" id="messages" role="log" aria-label="Conversation" aria-live="polite">
+  </div>
+
+  <div class="input-row" role="form" aria-label="Send a message">
+    <label for="chat-input" class="skip-link" style="position:static;clip:auto;width:auto;height:auto;overflow:visible;white-space:normal;">Your message</label>
+    <textarea
+      id="chat-input"
+      rows="1"
+      placeholder="Type your message…"
+      aria-label="Type your message"
+      maxlength="2000"
+      onkeydown="handleKey(event)"
+      oninput="autoResize(this)"
+    ></textarea>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send message">➤</button>
+  </div>
+</div>
+
+<!-- HOW TO USE -->
+<div class="how-to-use" role="region" aria-label="How to use this chatbot widget">
+  <div class="how-card">
+    <div class="how-card-title">📋 How to use Q</div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-step-num" aria-hidden="true">1</div>
+        <div><strong>Copy the system prompt</strong> — click the <em>"Copy System Prompt"</em> button below, or open the <em>"View system prompt"</em> section and copy it from there.</div>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num" aria-hidden="true">2</div>
+        <div><strong>Open a free AI platform</strong> — use one of the buttons below to open ChatGPT, Claude, Gemini, or Perplexity in a new tab. <strong>A free account is all you need</strong> — you do not need a paid or premium subscription to use this chatbot. These tools work in any web browser, no software to install.</div>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num" aria-hidden="true">3</div>
+        <div><strong>Start a new conversation</strong> — in ChatGPT or Claude, look for a <em>"New chat"</em> button. In the chat box, paste the copied system prompt as your very first message, then press Enter or Send.</div>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num" aria-hidden="true">4</div>
+        <div><strong>Begin your session</strong> — the AI will now behave as Q. Type your questions or use the example prompts below to get started.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PLATFORM LINKS -->
+<div class="platform-section">
+  <div class="platform-label">Step 2 — Open a free AI platform in a new tab:</div>
+  <div class="platform-grid">
+    <a href="https://claude.ai" target="_blank" rel="noopener noreferrer" class="platform-btn" aria-label="Open Claude.ai in new tab">✦ Claude.ai ↗</a>
+            <a href="https://chatgpt.com" target="_blank" rel="noopener noreferrer" class="platform-btn" aria-label="Open ChatGPT in new tab">⬡ ChatGPT ↗</a>
+            <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" class="platform-btn" aria-label="Open Gemini in new tab">◈ Gemini ↗</a>
+            <a href="https://www.perplexity.ai" target="_blank" rel="noopener noreferrer" class="platform-btn" aria-label="Open Perplexity in new tab">◎ Perplexity ↗</a>
+  </div>
+  <div style="margin-top:0.6rem;padding:0.55rem 0.85rem;background:#ddf0f1;border:1px solid #1a6b72;border-radius:6px;font-size:0.76rem;font-family:Verdana,sans-serif;color:#1a6b72;">
+    ✅ <strong>All four platforms offer free accounts.</strong> You do not need a paid subscription. Simply sign up with an email address and you're ready to go.
+  </div>
+</div>
+
+<!-- COPY PROMPT SHORTCUT -->
+<div style="max-width:760px;width:100%;margin:0 auto 0.75rem;padding:0 1rem;">
+  <button class="prompt-copy-btn" style="width:100%;justify-content:center;padding:10px 14px;font-size:0.82rem;border-radius:8px;" onclick="copySystemPrompt()" aria-label="Copy system prompt to clipboard">
+    📋 Step 1 — Copy System Prompt
+  </button>
+</div>
+
+<!-- SYSTEM PROMPT DRAWER -->
+<div class="prompt-drawer">
+  <details class="prompt-details">
+    <summary>📄 View &amp; copy the system prompt (needed for Step 1)</summary>
+    <div class="prompt-body" id="promptBody"></div>
+    <div style="padding:0 1rem 0.75rem;">
+      <button class="prompt-copy-btn" onclick="copySystemPrompt()" aria-label="Copy system prompt to clipboard">📋 Copy System Prompt</button>
+    </div>
+  </details>
+</div>
+</main>
+
+<footer class="chat-footer" role="contentinfo">
+  Demystifying AI · Brookdale Community College
+</footer>
+
+<div id="toast" role="alert" aria-live="assertive"></div>
+
+<script>
+const BOT_NAME    = "Q";
+const BOT_AVATAR  = "🤖";
+const GREETING    = "Hello, I'm Q. I'm your AI Assistant, I'm here to provide you with answers to questions about applied AI and its use in teaching and learning";
+const STARTER_QS  = [];
+const SYSTEM_PROMPT = "# SYSTEM PROMPT: Q\n\n## IDENTITY\nYou are Q, a Artificial intelligence (AI) tutor..\nYour primary users are: college faculty, administrators and staff, workforce development staff, students.\n\n## PURPOSE\nA tutor to answer questions about artificial intelligence, particularly applied artificial intelligence for use by faculty, staff, and students at community colleges.\n\n## PERSONA & TONE\nYour communication style is: friendly, conversational, witty.\n- Ask clarifying questions when the request is ambiguous.\n- Provide concrete examples to illustrate concepts.\n- Break complex topics into clear, numbered steps.\n- Summarize key takeaways at the end of longer responses.\n- Check for user understanding before moving on.\n- Offer alternative approaches when relevant.\nAvoid jargon. If necessary, provide definitions as you're adding terms and use plain language whenever possible.\n\n## OPENING GREETING\nWhen starting a new conversation, begin with: \"Hello, I'm Q. I'm your AI Assistant, I'm here to provide you with answers to questions about applied AI and its use in teaching and learning\"\n\n## KNOWLEDGE SCOPE\nSubject domain: Applied artificial intelligence for use by community college faculty, staff, and administrators..\nYour knowledge is grounded in professional domain expertise and industry-standard practices.\n\n### What you should DECLINE or redirect:\nPolitely decline questions about: Do not answer questions about controversial topics such as energy usage, water usage, safety, and ethics. Reply with something like, \"I'm just a bot that's beyond the scope of my understanding.\"\nWhen declining, briefly explain why and suggest where the user might find better help.\n\n## CONVERSATION STYLE\nResponse length: moderate. Adjust based on complexity of the question.\nLanguage level: plain, everyday language — avoid jargon.\n- When a request is ambiguous, ask one clarifying question before answering.\n- End each response with a relevant follow-up question to keep the conversation moving.\n- Use numbered or bulleted lists when presenting multiple items or steps.\n\n## GUARDRAILS & SAFETY\n- Academic integrity: Do not complete assignments, write essays, solve exam problems, or produce work that substitutes for a student's own effort. You may explain, guide, and discuss — but not do the work for them.\n- Acknowledge uncertainty: When you are not confident in an answer, say so clearly. Do not fabricate information. Recommend consulting authoritative sources.\n- Hard refusals: Never provide diagnoses, legal advice, personal counseling, or anything personal, and never share anyone's personal information.\n- If a user needs help beyond your scope, direct them to human support. Specifically: Redirect questions to Professor Qaissaunee or the Teaching and Learning Center.\n- Identity disclosure: If asked whether you are an AI, confirm that you are. Remind users that your responses may contain errors and should be verified for critical decisions.\n\n---\n# END OF SYSTEM PROMPT\n# Generated by Chatbot Builder — Demystifying AI · Brookdale Community College";
+
+const messagesEl = document.getElementById('messages');
+const inputEl    = document.getElementById('chat-input');
+const sendBtn    = document.getElementById('sendBtn');
+
+function speak(msg) {
+  const r = document.getElementById('ariaLive');
+  r.textContent = ''; setTimeout(() => { r.textContent = msg; }, 50);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function addMessage(text, role) {
+  const msg = document.createElement('div');
+  msg.className = 'msg ' + role;
+  msg.setAttribute('role', 'article');
+  msg.setAttribute('aria-label', (role === 'bot' ? BOT_NAME : 'You') + ' said');
+
+  const av = document.createElement('div');
+  av.className = 'msg-avatar';
+  av.setAttribute('aria-hidden','true');
+  av.textContent = role === 'bot' ? BOT_AVATAR : '🧑';
+
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.innerHTML = formatText(text);
+
+  msg.appendChild(av); msg.appendChild(bub);
+  messagesEl.appendChild(msg);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  speak((role === 'bot' ? BOT_NAME : 'You') + ': ' + text.slice(0,80));
+  return msg;
+}
+
+function formatText(t) {
+  return esc(t)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+}
+
+function addStarters() {
+  if (!STARTER_QS.length) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'starter-chips';
+  wrap.setAttribute('role','group');
+  wrap.setAttribute('aria-label','Starter questions');
+  STARTER_QS.forEach(q => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'starter-chip';
+    btn.textContent = q;
+    btn.addEventListener('click', () => {
+      inputEl.value = q;
+      sendMessage();
+      wrap.remove();
+    });
+    wrap.appendChild(btn);
+  });
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function useStarterQ(btn) {
+  inputEl.value = btn.textContent;
+  sendMessage();
+  btn.closest('.starter-chips')?.remove();
+}
+
+function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text) return;
+  addMessage(text, 'user');
+  inputEl.value = '';
+  autoResize(inputEl);
+  sendBtn.disabled = true;
+
+  // Brief thinking delay then show clear, friendly guidance
+  setTimeout(() => {
+    const helpMsg = 'Hi! I'm ' + BOT_NAME + '. I'm not a live AI — I'm a guided launcher that helps you get started.
+
+Here's what to do:
+
+1. Click the 📋 Copy System Prompt button above.
+2. Open ChatGPT, Claude, or Gemini using the buttons above (they're free and open in a new tab).
+3. Start a new chat on that platform, paste what you copied as your first message, and press Send.
+4. The AI will then respond as ' + BOT_NAME + ' and you can ask your question: "' + text.slice(0, 80) + (text.length > 80 ? '…' : '') + '"
+
+Need help? Show this page to your instructor or IT support.';
+    addMessage(helpMsg, 'bot');
+    sendBtn.disabled = false;
+    document.querySelector('.prompt-drawer details')?.setAttribute('open','');
+  }, 600);
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function clearChat() {
+  messagesEl.innerHTML = '';
+  addMessage(GREETING, 'bot');
+  addStarters();
+  speak('Conversation cleared.');
+}
+
+function copySystemPrompt() {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(SYSTEM_PROMPT)
+      .then(() => showToast('System prompt copied!'))
+      .catch(() => fbCopy());
+  } else { fbCopy(); }
+}
+
+function fbCopy() {
+  const ta = document.createElement('textarea');
+  ta.value = SYSTEM_PROMPT;
+  ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+  document.body.removeChild(ta); showToast('Copied!');
+}
+
+// Init
+document.getElementById('promptBody').textContent = SYSTEM_PROMPT;
+addMessage(GREETING, 'bot');
+addStarters();
+</script>
+</body>
+</html>
