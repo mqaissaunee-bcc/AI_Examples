@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartoon Image Prompt Builder – Julia Evans Style</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Special+Elite&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:#1a1a2e; --blue:#1a4bcc; --orange:#cc6600;
+  --green:#2d7a2d; --purple:#6600cc; --red:#cc3300;
+  --paper:#fdf8f0; --card:#fffef9; --border:#2a2a2a; --shadow:#c0b8a8;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--paper);
+  background-image:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(180,160,120,.018) 40px,rgba(180,160,120,.018) 41px);
+  font-family:'Patrick Hand',cursive;color:var(--ink);min-height:100vh;padding:2.5rem 1rem 5rem;
+}
+
+/* ── Header ── */
+header{text-align:center;margin-bottom:2rem;}
+header h1{font-family:'Special Elite',monospace;font-size:2.1rem;letter-spacing:.04em;line-height:1.2;}
+header p{font-size:1rem;color:#666;margin-top:.45rem;}
+header a{color:var(--blue);font-weight:bold;text-decoration:underline;}
+
+/* ── Cards ── */
+.card{
+  background:var(--card);border:2.5px solid var(--border);border-radius:12px;
+  max-width:680px;margin:0 auto 1.6rem;padding:1.6rem 2rem;
+  box-shadow:5px 5px 0 var(--shadow);
+}
+.card h2{font-family:'Special Elite',monospace;font-size:1.15rem;color:var(--blue);margin-bottom:1.1rem;}
+
+/* ── Form fields ── */
+label{display:block;font-size:1rem;font-weight:bold;margin-bottom:.3rem;}
+label span{font-weight:normal;font-size:.82rem;color:#999;}
+input[type="text"],textarea{
+  width:100%;border:2px solid #bbb;border-radius:6px;
+  padding:.5rem .7rem;font-family:'Patrick Hand',cursive;font-size:1rem;
+  background:#fafaf7;color:var(--ink);margin-bottom:1rem;transition:border-color .2s;
+}
+input:focus,textarea:focus{outline:none;border-color:var(--blue);background:#fff;}
+textarea{resize:vertical;min-height:68px;}
+
+/* ── Tool Selector ── */
+.tool-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem;
+  margin-bottom:1.1rem;
+}
+.tool-btn{
+  border:2px solid #ccc;border-radius:8px;background:#fafaf7;
+  padding:.6rem .4rem;cursor:pointer;text-align:center;
+  transition:border-color .2s,background .2s,transform .1s;
+  font-family:'Patrick Hand',cursive;
+}
+.tool-btn:hover{border-color:var(--blue);background:#eef2ff;transform:translateY(-1px);}
+.tool-btn.selected{border-color:var(--border);background:#fff;box-shadow:3px 3px 0 var(--shadow);}
+.tool-btn .tool-icon{font-size:1.6rem;display:block;margin-bottom:.2rem;}
+.tool-btn .tool-name{font-size:.88rem;font-weight:bold;color:var(--ink);display:block;}
+.tool-btn .tool-note{font-size:.72rem;color:#888;display:block;margin-top:.1rem;}
+
+/* Highlight borders per tool */
+.tool-btn[data-tool="chatgpt"].selected   {border-color:#10a37f;}
+.tool-btn[data-tool="gemini"].selected    {border-color:#4285f4;}
+.tool-btn[data-tool="ideogram"].selected  {border-color:var(--purple);}
+.tool-btn[data-tool="midjourney"].selected{border-color:var(--ink);}
+.tool-btn[data-tool="firefly"].selected   {border-color:var(--red);}
+.tool-btn[data-tool="generic"].selected   {border-color:var(--orange);}
+
+/* ── Output card ── */
+.output-card{
+  background:var(--card);border:2.5px solid var(--border);border-radius:12px;
+  max-width:680px;margin:0 auto 1.6rem;padding:1.6rem 2rem;
+  box-shadow:5px 5px 0 var(--shadow);display:none;
+}
+.output-card h2{font-family:'Special Elite',monospace;font-size:1.15rem;color:var(--green);margin-bottom:.6rem;}
+
+/* How-to banner */
+.howto-banner{
+  border-radius:8px;padding:.7rem 1rem;margin-bottom:.9rem;
+  font-size:.9rem;line-height:1.55;border:1.5px solid;
+}
+.howto-banner strong{display:block;margin-bottom:.2rem;font-family:'Special Elite',monospace;font-size:.95rem;letter-spacing:.02em;}
+.howto-banner a{font-weight:bold;text-decoration:underline;}
+
+#promptOutput{
+  width:100%;min-height:260px;border:2px solid #ccc;border-radius:8px;
+  padding:.9rem 1rem;font-family:'Patrick Hand',cursive;font-size:.97rem;
+  line-height:1.65;background:#f8f7f3;color:var(--ink);resize:vertical;
+}
+.copy-row{display:flex;align-items:center;gap:.8rem;margin-top:.8rem;flex-wrap:wrap;}
+.copy-note{font-size:.82rem;color:#aaa;}
+#copyFeedback{font-size:.85rem;color:var(--green);font-weight:bold;display:none;}
+
+/* ── Buttons ── */
+.btn{
+  display:inline-flex;align-items:center;gap:.4rem;
+  background:var(--ink);color:#fff;border:none;border-radius:8px;
+  padding:.65rem 1.5rem;font-family:'Special Elite',monospace;font-size:.95rem;
+  cursor:pointer;letter-spacing:.04em;box-shadow:3px 3px 0 #888;
+  transition:transform .1s,background .15s,box-shadow .1s;
+}
+.btn:hover{background:#2d2d50;transform:translateY(-1px);box-shadow:4px 4px 0 #666;}
+.btn:active{transform:none;box-shadow:2px 2px 0 #888;}
+.btn-green{background:var(--green);}
+.btn-green:hover{background:#1f5a1f;}
+.btn-outline{background:transparent;color:var(--blue);border:2px solid var(--blue);box-shadow:2px 2px 0 #aac;}
+.btn-outline:hover{background:#eef2ff;color:var(--blue);}
+
+/* ── Tips ── */
+.tips{
+  max-width:680px;margin:0 auto;font-size:.85rem;color:#aaa;
+  line-height:1.6;text-align:center;padding-top:.8rem;
+  border-top:1.5px dashed #ddd;
+}
+.tips strong{color:#888;}
+.tips a{color:var(--blue);}
+
+@media(max-width:480px){.tool-grid{grid-template-columns:repeat(2,1fr);}}
+.tool-link{
+  display:inline-block;margin-top:.3rem;
+  font-size:.72rem;color:var(--blue);text-decoration:underline;
+  font-family:'Patrick Hand',cursive;
+}
+.tool-link:hover{color:var(--purple);}
+.tool-btn .tool-link{pointer-events:all;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✏️ Cartoon Image Prompt Builder</h1>
+  <p>Fill in your details, pick your AI tool, and get a ready-to-paste image prompt.<br>
+  <em>Creates cartoons in the style of <a href="https://wizardzines.com" target="_blank">Julia Evans / wizardzines.com</a></em></p>
+</header>
+
+<!-- FORM -->
+<div class="card">
+  <h2>📝 Your Cartoon Details</h2>
+
+  <label for="topic">Topic <span>(required — what concept should the cartoon explain?)</span></label>
+  <input type="text" id="topic" placeholder="e.g. how DNS works, photosynthesis, the water cycle, HTTP cookies…"/>
+
+  <label for="discipline">Discipline / Subject Area <span>(optional)</span></label>
+  <input type="text" id="discipline" placeholder="e.g. computer networking, biology, chemistry, education…"/>
+
+  <label for="audience">Target Audience <span>(optional)</span></label>
+  <input type="text" id="audience" placeholder="e.g. community college students, high school beginners, faculty new to AI…"/>
+
+  <label for="extra">Anything else to include? <span>(optional)</span></label>
+  <textarea id="extra" placeholder="e.g. include a common misconception, add a fun fact, show a real-world analogy, focus on the 'why'…"></textarea>
+</div>
+
+<!-- TOOL SELECTOR -->
+<div class="card">
+  <h2>🛠 Which AI tool will you use?</h2>
+  <div class="tool-grid">
+
+    <div class="tool-btn selected" data-tool="chatgpt" onclick="selectTool(this)">
+      <span class="tool-icon">💬</span>
+      <span class="tool-name">ChatGPT</span>
+      <span class="tool-note">DALL-E 3 · Good text</span>
+      <a class="tool-link" href="https://chat.openai.com" target="_blank" onclick="event.stopPropagation()">chat.openai.com ↗</a>
+    </div>
+
+    <div class="tool-btn" data-tool="gemini" onclick="selectTool(this)">
+      <span class="tool-icon">✨</span>
+      <span class="tool-name">Gemini</span>
+      <span class="tool-note">Imagen · Google</span>
+      <a class="tool-link" href="https://gemini.google.com" target="_blank" onclick="event.stopPropagation()">gemini.google.com ↗</a>
+    </div>
+
+    <div class="tool-btn" data-tool="ideogram" onclick="selectTool(this)">
+      <span class="tool-icon">🎨</span>
+      <span class="tool-name">Ideogram</span>
+      <span class="tool-note">⭐ Best for text</span>
+      <a class="tool-link" href="https://ideogram.ai" target="_blank" onclick="event.stopPropagation()">ideogram.ai ↗</a>
+    </div>
+
+    <div class="tool-btn" data-tool="midjourney" onclick="selectTool(this)">
+      <span class="tool-icon">🌀</span>
+      <span class="tool-name">Midjourney</span>
+      <span class="tool-note">Beautiful style</span>
+      <a class="tool-link" href="https://midjourney.com" target="_blank" onclick="event.stopPropagation()">midjourney.com ↗</a>
+    </div>
+
+    <div class="tool-btn" data-tool="firefly" onclick="selectTool(this)">
+      <span class="tool-icon">🔥</span>
+      <span class="tool-name">Adobe Firefly</span>
+      <span class="tool-note">Great text + layout</span>
+      <a class="tool-link" href="https://firefly.adobe.com" target="_blank" onclick="event.stopPropagation()">firefly.adobe.com ↗</a>
+    </div>
+
+    <div class="tool-btn" data-tool="generic" onclick="selectTool(this)">
+      <span class="tool-icon">🤖</span>
+      <span class="tool-name">Other / Generic</span>
+      <span class="tool-note">Any image AI</span>
+      <a class="tool-link" href="https://www.bing.com/images/create" target="_blank" onclick="event.stopPropagation()">Try Bing Image Creator ↗</a>
+    </div>
+
+  </div>
+  <button class="btn" onclick="buildPrompt()">✏️ Build My Prompt</button>
+</div>
+
+<!-- OUTPUT -->
+<div class="output-card" id="outputCard">
+  <h2 id="outputTitle">📋 Your Prompt</h2>
+  <div class="howto-banner" id="howtoBanner"></div>
+  <textarea id="promptOutput" readonly></textarea>
+  <div class="copy-row">
+    <button class="btn btn-green" onclick="copyPrompt()">📋 Copy to Clipboard</button>
+    <button class="btn btn-outline" onclick="resetForm()">↩ Start Over</button>
+    <span id="copyFeedback">✅ Copied!</span>
+    <span class="copy-note">Paste directly into your chosen tool.</span>
+  </div>
+</div>
+
+<div class="tips">
+  <strong>💡 Tip:</strong> For cartoons with readable text labels, <strong>Ideogram</strong> and <strong>Adobe Firefly</strong> handle in-image text far better than most tools.<br>
+  Inspired by <a href="https://wizardzines.com" target="_blank">Julia Evans · wizardzines.com</a>
+</div>
+
+<script>
+var selectedTool = 'chatgpt';
+
+function selectTool(el) {
+  document.querySelectorAll('.tool-btn').forEach(function(b){ b.classList.remove('selected'); });
+  el.classList.add('selected');
+  selectedTool = el.getAttribute('data-tool');
+}
+
+/* ── Per-tool how-to text and colors ── */
+var TOOL_INFO = {
+  chatgpt: {
+    color: '#d4f4e8', border: '#10a37f', textColor: '#0a5a3a',
+    label: '💬 ChatGPT (DALL-E 3)',
+    howto: 'Paste this prompt directly into the <strong>ChatGPT chat box</strong> at <a href="https://chat.openai.com" target="_blank">chat.openai.com</a>. Make sure you\'re using GPT-4o or a plan that includes image generation. The image will appear inline in the conversation.'
+  },
+  gemini: {
+    color: '#e8f0fe', border: '#4285f4', textColor: '#1a3a8a',
+    label: '✨ Gemini (Imagen)',
+    howto: 'Paste this prompt into <strong>Gemini</strong> at <a href="https://gemini.google.com" target="_blank">gemini.google.com</a>. Image generation is available on Gemini Advanced. The image will appear in the chat — click to expand and download.'
+  },
+  ideogram: {
+    color: '#f3e8ff', border: '#6600cc', textColor: '#3d0080',
+    label: '🎨 Ideogram — ⭐ Recommended for text in images',
+    howto: 'Go to <a href="https://ideogram.ai" target="_blank">ideogram.ai</a> and paste this into the prompt box. Ideogram excels at readable text inside images — great for labeled diagrams and cartoons. Select <strong>Illustration</strong> as the style and <strong>16:9</strong> for landscape layout.'
+  },
+  midjourney: {
+    color: '#f0f0f0', border: '#333', textColor: '#222',
+    label: '🌀 Midjourney',
+    howto: 'In the <strong>Midjourney Discord</strong> or at <a href="https://midjourney.com" target="_blank">midjourney.com</a>, type <strong>/imagine</strong> then paste this prompt. The <code>--ar 16:9</code> and style flags are already included. Note: Midjourney struggles with readable text — expect some imperfect labels.'
+  },
+  firefly: {
+    color: '#fde8e8', border: '#cc3300', textColor: '#7a1a00',
+    label: '🔥 Adobe Firefly',
+    howto: 'Go to <a href="https://firefly.adobe.com" target="_blank">firefly.adobe.com</a> and choose <strong>Text to Image</strong>. Paste the prompt and select <strong>Landscape (16:9)</strong>. Firefly handles illustrated text very well. If you have Adobe Creative Cloud, Firefly is also available directly in Photoshop.'
+  },
+  generic: {
+    color: '#fff8e1', border: '#cc6600', textColor: '#7a4000',
+    label: '🤖 Generic Image AI Prompt',
+    howto: 'Paste this prompt into any image generation tool of your choice. Works with most AI image generators. For best results with readable text labels, try <strong>Ideogram</strong> or <strong>Adobe Firefly</strong>.'
+  }
+};
+
+/* ── Prompt templates per tool ── */
+function buildCoreDescription(topic, discipline, audience, extra) {
+  var desc = 'An educational explainer cartoon about "' + topic + '"';
+  if (discipline) desc += ' in the field of ' + discipline;
+  if (audience)   desc += ', designed for ' + audience;
+  return desc;
+}
+
+function buildPrompts(topic, discipline, audience, extra) {
+  var core = buildCoreDescription(topic, discipline, audience, extra);
+  var extraLine = extra ? ' ' + extra + '.' : '';
+
+  var prompts = {
+
+    chatgpt:
+'Create an educational explainer illustration in the hand-drawn zine style of Julia Evans (wizardzines.com).\n\n' +
+'Subject: ' + topic + (discipline ? ' (' + discipline + ')' : '') + '\n' +
+(audience ? 'Audience: ' + audience + '\n' : '') +
+(extra    ? 'Also include: ' + extra + '\n' : '') +
+'\n' +
+'Visual style:\n' +
+'- Warm cream/off-white background\n' +
+'- 5 clearly divided rectangular panels in a grid (2 large on top, 3 smaller on bottom)\n' +
+'- Each panel has a bold colored heading in red, blue, orange, green, or purple\n' +
+'- Casual handwriting-style fonts throughout\n' +
+'- Simple stick figures, speech bubbles with tails, terminal/computer box illustrations\n' +
+'- Small arrows connecting ideas\n' +
+'- Friendly, warm, approachable tone\n' +
+'- Sketchy/hand-drawn borders on each panel\n' +
+'- A "fun fact" callout in a yellow dashed box\n' +
+'- Large readable title at the top\n' +
+'- Small text at bottom right: "in the style of Julia Evans · wizardzines.com"\n' +
+'\n' +
+'Panel content:\n' +
+'Panel 1 (large): What is it? Simple plain-language definition\n' +
+'Panel 2 (large): How does it work? Key mechanism or analogy\n' +
+'Panel 3 (small): A real example\n' +
+'Panel 4 (small): Common mistake or gotcha\n' +
+'Panel 5 (small): Tips or key takeaways\n' +
+'\n' +
+'Make all text clearly readable. Landscape orientation.',
+
+    gemini:
+'Generate an educational infographic illustration in the style of Julia Evans hand-drawn zines.\n\n' +
+'Topic: ' + topic + (discipline ? ' — ' + discipline : '') + '\n' +
+(audience ? 'For: ' + audience + '\n' : '') +
+(extra    ? 'Include: ' + extra + '\n' : '') +
+'\n' +
+'Style: hand-drawn cartoon illustration, warm cream background, 5 labeled panels arranged in a grid layout, bold colored section headings (red/blue/orange/green/purple), casual handwriting font, simple stick figure drawings, speech bubbles, friendly educational tone, sketchy panel borders\n' +
+'\n' +
+'Content: Panel 1 — definition; Panel 2 — how it works; Panel 3 — real example; Panel 4 — common mistake; Panel 5 — tips. Include a fun fact callout, simple illustrations, and a large title. Make all text legible.\n' +
+'\n' +
+'Landscape 16:9 format.',
+
+    ideogram:
+'Hand-drawn educational cartoon poster explaining "' + topic + '"' +
+(discipline ? ' (' + discipline + ')' : '') + '. ' +
+(audience ? 'Audience: ' + audience + '. ' : '') +
+(extra ? extra + '. ' : '') +
+'\n\n' +
+'Style: Julia Evans wizardzines illustration style. Warm cream background. 5 rectangular panels in a 2+3 grid layout. Each panel has a bold colored heading (cycling red, blue, orange, green, purple). Casual handwriting font. Simple stick figures and speech bubbles. Sketchy hand-drawn panel borders. Friendly and approachable.\n' +
+'\n' +
+'Panel 1 (large, top-left): What is it? Core definition.\n' +
+'Panel 2 (large, top-right): How it works.\n' +
+'Panel 3 (small, bottom-left): Real example.\n' +
+'Panel 4 (small, bottom-center): Common mistake.\n' +
+'Panel 5 (small, bottom-right): Key tips.\n' +
+'\n' +
+'Include: fun fact in a yellow dashed callout box, stick figure illustration, speech bubble dialogue, large title at top. All text must be clearly legible. Landscape orientation.\n' +
+'\n' +
+'Style tags: illustration, hand-drawn, educational, infographic, zine, notebook',
+
+    midjourney:
+'/imagine prompt: hand-drawn educational zine-style cartoon explaining ' + topic +
+(discipline ? ' in ' + discipline : '') +
+(audience ? ' for ' + audience : '') +
+', Julia Evans wizardzines illustration style, warm cream background, 5 rectangular panels in a grid layout, bold colored headings in red blue orange green purple, casual handwriting font, simple stick figures, speech bubbles, sketchy panel borders, fun fact callout box, friendly educational tone, all text legible' +
+(extra ? ', ' + extra : '') +
+' --ar 16:9 --style raw --stylize 200 --v 6',
+
+    firefly:
+'An educational explainer cartoon in the hand-drawn illustrated style of Julia Evans (wizardzines.com), explaining: ' + topic +
+(discipline ? ' (' + discipline + ')' : '') + '.' +
+(audience ? ' Designed for ' + audience + '.' : '') +
+(extra ? ' ' + extra + '.' : '') +
+'\n\n' +
+'Visual style: warm cream background, 5 clearly bordered rectangular panels arranged in a 2-on-top / 3-on-bottom grid, bold colored headings in each panel (rotating red, blue, orange, green, purple), casual handwriting-style font, simple stick figure characters, speech bubbles with triangular tails, hand-drawn sketchy panel borders, warm and friendly educational tone.\n' +
+'\n' +
+'Panels: (1) Core definition, (2) How it works, (3) Real example, (4) Common mistake, (5) Key tips. Include a fun fact in a dashed yellow callout box. Large title at top. Attribution at bottom right.\n' +
+'\n' +
+'All text must be clearly readable. Landscape format.',
+
+    generic:
+'Create an educational explainer cartoon illustration in the hand-drawn style of Julia Evans (wizardzines.com).\n\n' +
+'Topic: ' + topic + (discipline ? '\nDiscipline: ' + discipline : '') +
+(audience ? '\nAudience: ' + audience : '') +
+(extra    ? '\nAlso include: ' + extra : '') +
+'\n\n' +
+'Style:\n' +
+'- Hand-drawn, sketchy illustration style\n' +
+'- Warm cream/off-white background\n' +
+'- 5 rectangular panels: 2 large on top row, 3 smaller on bottom row\n' +
+'- Each panel has a bold colored heading (red, blue, orange, green, purple)\n' +
+'- Casual handwriting-style font throughout\n' +
+'- Simple stick figures, speech bubbles, and small illustrations\n' +
+'- Sketchy hand-drawn borders on each panel\n' +
+'- A fun fact callout in a yellow dashed box\n' +
+'- Large readable title at top\n' +
+'\n' +
+'Panel content:\n' +
+'1. What is it? (plain language definition)\n' +
+'2. How it works (key mechanism or analogy)\n' +
+'3. A real example\n' +
+'4. A common mistake or gotcha\n' +
+'5. Tips and key takeaways\n' +
+'\n' +
+'All text must be clearly legible. Landscape orientation.'
+
+  };
+
+  return prompts;
+}
+
+function buildPrompt() {
+  var topic      = document.getElementById('topic').value.trim();
+  var discipline = document.getElementById('discipline').value.trim();
+  var audience   = document.getElementById('audience').value.trim();
+  var extra      = document.getElementById('extra').value.trim();
+
+  if (!topic) {
+    alert('Please enter a topic — that\'s the only required field!');
+    document.getElementById('topic').focus();
+    return;
+  }
+
+  var prompts = buildPrompts(topic, discipline, audience, extra);
+  var info    = TOOL_INFO[selectedTool];
+  var prompt  = prompts[selectedTool];
+
+  // Set output
+  document.getElementById('promptOutput').value = prompt;
+
+  // Set how-to banner
+  var banner = document.getElementById('howtoBanner');
+  banner.style.background   = info.color;
+  banner.style.borderColor  = info.border;
+  banner.style.color        = info.textColor;
+  banner.innerHTML = '<strong>' + info.label + '</strong>' + info.howto;
+
+  document.getElementById('outputTitle').textContent = '📋 Your ' + info.label + ' Prompt';
+  document.getElementById('outputCard').style.display = 'block';
+  document.getElementById('outputCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function copyPrompt() {
+  var text = document.getElementById('promptOutput').value;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch(e) {
+    document.getElementById('promptOutput').select();
+    document.execCommand('copy');
+  }
+  var fb = document.getElementById('copyFeedback');
+  fb.style.display = 'inline';
+  setTimeout(function(){ fb.style.display = 'none'; }, 2500);
+}
+
+function resetForm() {
+  ['topic','discipline','audience','extra'].forEach(function(id){
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('outputCard').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
