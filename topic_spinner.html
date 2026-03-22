@@ -555,9 +555,23 @@ textarea:focus, input[type="text"]:focus { outline: none; border-color: var(--ac
   animation: chipIn 0.2s ease;
   border: 1px solid rgba(255,255,255,0.18);
   color: #ffffff;
+  cursor: default;
+  transition: opacity 0.15s, box-shadow 0.15s;
 }
-@keyframes chipIn { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.chip.dragging   { opacity: 0.35; box-shadow: none; }
+.chip.drag-over  { box-shadow: 0 0 0 2px var(--highlight), 0 0 8px rgba(255,204,0,0.4); }
 .chip.pinned { border-style: dashed; opacity: 0.75; }
+
+/* Drag handle */
+.chip-drag {
+  cursor: grab; color: rgba(255,255,255,0.35); font-size: 0.82rem;
+  padding: 0 2px; flex-shrink: 0; line-height: 1;
+  transition: color 0.15s;
+  touch-action: none;
+}
+.chip-drag:hover  { color: rgba(255,255,255,0.8); }
+.chip-drag:active { cursor: grabbing; }
+@keyframes chipIn { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .chip-pin { font-size: 0.72rem; }
 .chip-del {
   background: none; border: none; cursor: pointer;
@@ -750,6 +764,22 @@ textarea:focus, input[type="text"]:focus { outline: none; border-color: var(--ac
 .theme-btn.active { background: var(--accent); border-color: var(--accent-light); color: #ffffff; font-weight: bold; }
 .theme-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
+/* Mute button */
+.mute-btn {
+  background: rgba(255,255,255,0.07); border: 1px solid var(--border-soft);
+  border-radius: 6px; color: var(--text-mid);
+  font-family: Verdana, sans-serif; font-size: 0.72rem;
+  padding: 3px 9px; cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.mute-btn:hover { background: rgba(255,255,255,0.14); color: var(--text-main); }
+.mute-btn.muted {
+  background: rgba(200,50,50,0.2); border-color: rgba(200,80,80,0.5);
+  color: #ff8888;
+}
+.mute-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
 /* Color theme swatches */
 .color-theme-grid {
   display: grid; grid-template-columns: 1fr 1fr;
@@ -863,7 +893,10 @@ footer {
 
               <!-- Sound theme -->
               <div class="settings-section">
-                <div class="settings-label">🔊 Sound Theme</div>
+                <div class="settings-label" style="display:flex;align-items:center;justify-content:space-between;">
+                  <span>🔊 Sound Theme</span>
+                  <button class="mute-btn" id="muteBtn" aria-pressed="false" aria-label="Mute all sounds">🔊 Mute</button>
+                </div>
                 <div class="theme-btns" role="group" aria-label="Sound theme">
                   <button class="theme-btn active" data-sound="electronic" aria-pressed="true">Electronic</button>
                   <button class="theme-btn" data-sound="wood" aria-pressed="false">Wood Click</button>
@@ -1067,8 +1100,10 @@ let spinning     = false;
 let spinCount    = 0;
 let rotation     = 0;
 let soundTheme   = 'electronic';
+let soundMuted   = false;
 let colorTheme   = 'ocean';
-let lastWinText  = null;  // track last result for defer button
+let lastWinText  = null;
+let dragSrcIdx   = null;  // index of chip being dragged
 
 /* Timer state */
 let timerTotal    = 90 * 60;  // seconds, set from input
@@ -1091,7 +1126,7 @@ const LS_KEY = 'topicSpinner_v4';
 function saveState() {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify({
-      topics, deferred, spinCount, soundTheme, colorTheme,
+      topics, deferred, spinCount, soundTheme, soundMuted, colorTheme,
       timerTotal, timerRemain, timerWarnSecs, timerCloserFired,
       removeAfterSpin: document.getElementById('removeAfterSpin').checked,
       history: getHistoryData()
@@ -1108,6 +1143,7 @@ function loadState() {
     deferred   = s.deferred   || [];
     spinCount  = s.spinCount  || 0;
     soundTheme = s.soundTheme || 'electronic';
+    soundMuted = s.soundMuted || false;
     colorTheme = s.colorTheme || 'ocean';
     timerTotal       = s.timerTotal    || 90 * 60;
     timerRemain      = s.timerRemain   || timerTotal;
@@ -1267,6 +1303,7 @@ function getAudio() {
   return audioCtx;
 }
 function playTick(pitch=880, vol=0.18) {
+  if (soundMuted) return;
   try {
     const ctx = getAudio();
     if (soundTheme === 'electronic') {
@@ -1299,6 +1336,7 @@ function playTick(pitch=880, vol=0.18) {
   } catch(e){}
 }
 function playWinFanfare() {
+  if (soundMuted) return;
   try {
     const ctx=getAudio();
     [523,659,784,1046].forEach((freq,i)=>{
@@ -1518,19 +1556,29 @@ function renderTopics() {
     li.className = 'chip' + (isPinned ? ' pinned' : '');
     li.style.background  = SEG_COLORS[i % SEG_COLORS.length][0] + '44';
     li.style.borderColor = SEG_COLORS[i % SEG_COLORS.length][0] + '99';
+    li.setAttribute('draggable', 'true');
+    li.dataset.index = i;
+
+    // Drag handle (⠿ six-dot grip)
+    const handle = document.createElement('span');
+    handle.className = 'chip-drag';
+    handle.textContent = '⠿';
+    handle.setAttribute('aria-hidden', 'true');
+    handle.title = 'Drag to reorder';
+    li.appendChild(handle);
 
     // START / END badge
     if (isFirst && topics.length > 1) {
       const badge = document.createElement('span');
       badge.className = 'chip-role start';
       badge.textContent = 'START';
-      badge.title = 'This topic auto-spins when the timer starts';
+      badge.title = 'Auto-spins when timer starts';
       li.appendChild(badge);
     } else if (isLast && topics.length > 1) {
       const badge = document.createElement('span');
       badge.className = 'chip-role end';
       badge.textContent = 'END';
-      badge.title = 'This topic auto-spins at the warning threshold';
+      badge.title = 'Auto-spins at warning threshold';
       li.appendChild(badge);
     }
 
@@ -1547,10 +1595,9 @@ function renderTopics() {
     span.textContent = t.text;
     li.appendChild(span);
 
-    // Reorder arrows
+    // Arrow buttons (keyboard / accessibility fallback — visually compact)
     const reorderWrap = document.createElement('span');
     reorderWrap.className = 'chip-reorder';
-    reorderWrap.setAttribute('aria-label', `Reorder ${t.text}`);
 
     const upBtn = document.createElement('button');
     upBtn.className = 'chip-arrow';
@@ -1577,6 +1624,36 @@ function renderTopics() {
     btn.textContent = '×';
     btn.addEventListener('click', () => removeTopic(i));
     li.appendChild(btn);
+
+    // ── Drag events ──
+    li.addEventListener('dragstart', (e) => {
+      dragSrcIdx = i;
+      li.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', i); // required by Firefox
+    });
+    li.addEventListener('dragend', () => {
+      li.classList.remove('dragging');
+      document.querySelectorAll('.chip.drag-over').forEach(el => el.classList.remove('drag-over'));
+    });
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.chip.drag-over').forEach(el => el.classList.remove('drag-over'));
+      if (dragSrcIdx !== i) li.classList.add('drag-over');
+    });
+    li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
+    li.addEventListener('drop', (e) => {
+      e.preventDefault();
+      li.classList.remove('drag-over');
+      if (dragSrcIdx !== null && dragSrcIdx !== i) {
+        const moved = topics.splice(dragSrcIdx, 1)[0];
+        topics.splice(i, 0, moved);
+        dragSrcIdx = null;
+        renderTopics();
+        announce(`Topic reordered`);
+      }
+    });
 
     list.appendChild(li);
   });
@@ -2013,12 +2090,27 @@ document.querySelectorAll('.theme-btn').forEach(btn => {
   });
 });
 
+// Mute button
+function applyMuteUI() {
+  const btn = document.getElementById('muteBtn');
+  if (!btn) return;
+  btn.classList.toggle('muted', soundMuted);
+  btn.textContent = soundMuted ? '🔇 Unmute' : '🔊 Mute';
+  btn.setAttribute('aria-pressed', soundMuted ? 'true' : 'false');
+  btn.setAttribute('aria-label', soundMuted ? 'Unmute sounds' : 'Mute all sounds');
+}
+document.getElementById('muteBtn').addEventListener('click', () => {
+  soundMuted = !soundMuted;
+  applyMuteUI();
+  saveState();
+});
+
 document.getElementById('resetSessionBtn').addEventListener('click', resetSession);
 
 document.getElementById('clearStorageBtn').addEventListener('click', () => {
   if (!confirm('Clear ALL saved data? This cannot be undone.')) return;
   localStorage.removeItem(LS_KEY);
-  topics=[]; deferred=[]; spinCount=0; soundTheme='electronic'; colorTheme='ocean';
+  topics=[]; deferred=[]; spinCount=0; soundTheme='electronic'; soundMuted=false; colorTheme='ocean';
   timerRunning=false; clearInterval(timerInterval); timerInterval=null;
   timerTotal=90*60; timerRemain=90*60; timerWarnSecs=5*60; timerCloserFired=false;
   document.getElementById('removeAfterSpin').checked=false;
@@ -2126,6 +2218,7 @@ if (restored) {
     b.classList.toggle('active',b.dataset.sound===soundTheme);
     b.setAttribute('aria-pressed',b.dataset.sound===soundTheme?'true':'false');
   });
+  applyMuteUI();
   renderTopics();
   renderDeferred();
   document.getElementById('spinCount').textContent = spinCount;
@@ -2134,6 +2227,7 @@ if (restored) {
 } else {
   drawWheel(rotation);
   updateTimerUI();
+  applyMuteUI();
 }
 
 </script>
