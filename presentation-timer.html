@@ -170,7 +170,7 @@
 
   /* ========== POPUP MODE SELECTOR ========== */
   .mode-selector {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;
   }
 
   .mode-card {
@@ -218,6 +218,27 @@
   }
   .preview-full .pf-time { font-family: var(--font-display); font-size: 0.9rem; color: var(--green-text); font-weight: 500; }
   .preview-full .pf-sub { font-size: 0.3rem; color: var(--text-muted); margin-top: 1px; }
+
+  /* Traffic light preview */
+  .preview-traffic {
+    width: 36px; height: 36px; margin: 0 auto;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #28A745 0%, #28A745 100%);
+    border: 1px solid rgba(0,0,0,0.1);
+  }
+
+  /* Size selector within traffic light mode card */
+  .size-selector {
+    display: flex; gap: 4px; justify-content: center; margin-top: 8px;
+  }
+  .size-btn {
+    font-family: var(--font-display); font-size: 0.6rem; font-weight: 500;
+    padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--bg-card); color: var(--text-muted); cursor: pointer;
+    transition: all 0.15s ease; line-height: 1.3;
+  }
+  .size-btn:hover { border-color: var(--text-secondary); }
+  .size-btn.active { background: var(--green-text); color: #FFF; border-color: var(--green-text); }
 
   .launch-btn {
     width: 100%; font-family: var(--font-body); font-size: 0.95rem; font-weight: 700;
@@ -272,7 +293,7 @@
     .duration-grid { grid-template-columns: repeat(2, 1fr); }
     .controls-row { flex-wrap: wrap; }
     .btn { flex: 1 1 45%; }
-    .mode-selector { grid-template-columns: 1fr; }
+    .mode-selector { grid-template-columns: repeat(2, 1fr); }
   }
 </style>
 </head>
@@ -373,6 +394,21 @@
           </div>
         </div>
       </div>
+
+      <!-- TRAFFIC LIGHT -->
+      <div class="mode-card" role="radio" aria-checked="false" tabindex="0" data-mode="traffic" onclick="selectMode('traffic', this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMode('traffic',this)}">
+        <span class="mode-card-icon" aria-hidden="true">&#128998;</span>
+        <div class="mode-card-title">Traffic Light</div>
+        <div class="mode-card-desc">Pure color block. No text. Ambient only.</div>
+        <div class="mode-preview">
+          <div class="preview-traffic"></div>
+        </div>
+        <div class="size-selector" onclick="event.stopPropagation()">
+          <button class="size-btn" onclick="event.stopPropagation();selectTrafficSize('small',this)" aria-label="Small 60 by 60">60</button>
+          <button class="size-btn active" onclick="event.stopPropagation();selectTrafficSize('medium',this)" aria-label="Medium 80 by 80">80</button>
+          <button class="size-btn" onclick="event.stopPropagation();selectTrafficSize('large',this)" aria-label="Large 120 by 120">120</button>
+        </div>
+      </div>
     </div>
 
     <button class="launch-btn" id="btnPopup" onclick="launchPopup()" aria-label="Open floating timer window">&#8599; Launch Floating Timer</button>
@@ -382,6 +418,7 @@
       <p><strong>Compact Box</strong> &mdash; small window you drag to a corner. Time + progress bar + status badge.</p>
       <p><strong>Minimal Bar</strong> &mdash; thin 420&times;64 strip. Just a color-shifting bar with tiny time readout. Designed to be nearly invisible while presenting.</p>
       <p><strong>Full Screen</strong> &mdash; fills the popup with huge digits, a progress ring, and status. Great for a second monitor or across-the-room visibility.</p>
+      <p><strong>Traffic Light</strong> &mdash; pure color block with no text. Smoothly transitions green &rarr; yellow &rarr; red as time elapses. Pulses in the final minute. Choose 60, 80, or 120px size.</p>
       <p>Use <kbd>Space</kbd> to start/pause, <kbd>R</kbd> to reset &mdash; works from this page <em>or</em> from any popup window.</p>
       <p>Color shifts: <strong style="color:var(--green-text)">Green</strong> &rarr; <strong style="color:var(--yellow-text)">Yellow</strong> at 75% &rarr; <strong style="color:var(--red-text)">Red + Pulse</strong> in final minute.</p>
     </div>
@@ -407,6 +444,12 @@ let popupWindow = null;
 let segments = [];
 let lastAnnouncedPhase = '';
 let currentMode = 'compact';
+let trafficSize = 'medium';
+var trafficDims = { small: 60, medium: 80, large: 120 };
+
+// Wall-clock timer engine — immune to browser throttling
+let startedAt = null;        // Date.now() when timer was started/resumed
+let elapsedBeforePause = 0;  // seconds accumulated before the current run
 
 // ========== DOM REFS ==========
 const timerDisplay = document.getElementById('timerDisplay');
@@ -453,6 +496,38 @@ function selectMode(mode, el) {
   if (popupWindow && !popupWindow.closed) { popupWindow.close(); popupWindow = null; }
 }
 
+function selectTrafficSize(size, btnEl) {
+  trafficSize = size;
+  document.querySelectorAll('.size-btn').forEach(function(b) { b.classList.remove('active'); });
+  btnEl.classList.add('active');
+  // If traffic popup is already open, close and relaunch at new size
+  if (currentMode === 'traffic' && popupWindow && !popupWindow.closed) {
+    popupWindow.close(); popupWindow = null;
+    launchPopup();
+  }
+}
+
+// Smooth color interpolation: green -> yellow -> red based on elapsed percentage
+function getTrafficColor(remaining, total) {
+  if (total <= 0) return 'rgb(40,167,69)';
+  var pct = ((total - remaining) / total); // 0.0 to 1.0
+  pct = Math.max(0, Math.min(1, pct));
+  // 0.0 = green(40,167,69), 0.75 = yellow(212,160,18), 1.0 = red(220,53,69)
+  var r, g, b;
+  if (pct <= 0.75) {
+    var t = pct / 0.75; // normalize to 0-1 within green-to-yellow
+    r = Math.round(40 + (212 - 40) * t);
+    g = Math.round(167 + (160 - 167) * t);
+    b = Math.round(69 + (18 - 69) * t);
+  } else {
+    var t = (pct - 0.75) / 0.25; // normalize to 0-1 within yellow-to-red
+    r = Math.round(212 + (220 - 212) * t);
+    g = Math.round(160 + (53 - 160) * t);
+    b = Math.round(18 + (69 - 18) * t);
+  }
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
 // ========== DURATION SELECTION ==========
 function selectDuration(mins, btnEl) {
   if (isRunning) return;
@@ -486,6 +561,8 @@ function selectCustomDuration() {
 function setDuration(mins) {
   totalSeconds = mins * 60;
   remainingSeconds = totalSeconds;
+  startedAt = null;
+  elapsedBeforePause = 0;
   updateDisplay();
   announce('Timer set to ' + mins + ' minutes');
 }
@@ -540,18 +617,23 @@ function startTimer() {
   if (remainingSeconds <= 0) { resetTimer(); return; }
   isRunning = true;
   isPaused = false;
+  startedAt = Date.now();
   btnStart.disabled = true;
   btnPause.disabled = false;
   btnPause.innerHTML = '&#9208; Pause';
   announce('Timer started. ' + fmt(remainingSeconds) + ' remaining.');
 
   timerInterval = setInterval(function() {
-    remainingSeconds--;
+    // Calculate remaining from wall clock, not tick count
+    var nowElapsed = elapsedBeforePause + Math.floor((Date.now() - startedAt) / 1000);
+    remainingSeconds = Math.max(0, totalSeconds - nowElapsed);
+
     if (remainingSeconds <= 0) {
       remainingSeconds = 0;
       clearInterval(timerInterval);
       timerInterval = null;
       isRunning = false;
+      startedAt = null;
       btnStart.disabled = false;
       btnStart.innerHTML = '&#9654; Start';
       btnPause.disabled = true;
@@ -559,7 +641,7 @@ function startTimer() {
       announce("Time is up! Segment logged.");
     }
     updateDisplay();
-  }, 1000);
+  }, 250); // tick 4x/sec so display catches up fast after throttle
 
   updateDisplay();
 }
@@ -567,6 +649,10 @@ function startTimer() {
 function pauseTimer() {
   if (!isRunning && !isPaused) return;
   if (isRunning) {
+    // Snapshot elapsed time from wall clock
+    elapsedBeforePause = elapsedBeforePause + Math.floor((Date.now() - startedAt) / 1000);
+    remainingSeconds = Math.max(0, totalSeconds - elapsedBeforePause);
+    startedAt = null;
     clearInterval(timerInterval);
     timerInterval = null;
     isRunning = false;
@@ -585,6 +671,8 @@ function resetTimer() {
   timerInterval = null;
   isRunning = false;
   isPaused = false;
+  startedAt = null;
+  elapsedBeforePause = 0;
   remainingSeconds = totalSeconds;
   lastAnnouncedPhase = '';
   btnStart.disabled = false;
@@ -739,6 +827,29 @@ function buildFullHTML() {
 '</body></html>';
 }
 
+function buildTrafficHTML(size) {
+  var px = trafficDims[size] || 80;
+  return '<!DOCTYPE html>\n' +
+'<html lang="en"><head><meta charset="UTF-8"><title>Timer</title>\n' +
+'<style>\n' +
+'*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n' +
+'html,body{height:100%;overflow:hidden}\n' +
+'body{display:flex;align-items:center;justify-content:center;background:transparent;margin:0;padding:0}\n' +
+'.block{width:100%;height:100%;border-radius:8px;background:rgb(40,167,69);transition:background-color 0.8s ease}\n' +
+'@keyframes block-pulse{0%,100%{opacity:1}50%{opacity:0.35}}\n' +
+'.block.pulsing{animation:block-pulse 1s ease-in-out infinite}\n' +
+'</style></head>\n' +
+'<body>\n' +
+'<div class="block" id="pBlock" title="Timer"></div>\n' +
+'<scr' + 'ipt>\n' +
+'document.addEventListener("keydown",function(e){\n' +
+'  if(e.code==="Space"){e.preventDefault();try{var p=window.opener;if(p&&!p.closed){if(p.isRunning)p.pauseTimer();else p.startTimer()}}catch(x){}}\n' +
+'  if(e.code==="KeyR"&&!e.ctrlKey&&!e.metaKey){e.preventDefault();try{var p=window.opener;if(p&&!p.closed)p.resetTimer()}catch(x){}}\n' +
+'});\n' +
+'<\/scr' + 'ipt>\n' +
+'</body></html>';
+}
+
 // ============================================================
 //  POPUP LAUNCH + SYNC
 // ============================================================
@@ -753,6 +864,10 @@ function launchPopup() {
   } else if (currentMode === 'minimal') {
     html = buildMinimalHTML();
     features = 'width=420,height=64,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no';
+  } else if (currentMode === 'traffic') {
+    var px = trafficDims[trafficSize] || 80;
+    html = buildTrafficHTML(trafficSize);
+    features = 'width=' + px + ',height=' + px + ',resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no';
   } else {
     html = buildFullHTML();
     features = 'width=800,height=600,resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no';
@@ -782,10 +897,21 @@ function syncPopup() {
     var phaseClass = (phase === 'none') ? 'green' : phase;
 
     // Detect mode by unique elements
+    var hasBlock = doc.getElementById('pBlock');
     var hasStrip = doc.getElementById('pStrip');
     var hasRing = doc.getElementById('pRing');
 
-    if (hasStrip) {
+    if (hasBlock) {
+      // ======= TRAFFIC LIGHT =======
+      var color = (isRunning || isPaused) ? getTrafficColor(remainingSeconds, totalSeconds) : 'rgb(40,167,69)';
+      if (!isRunning && !isPaused && remainingSeconds === totalSeconds) color = 'rgb(200,200,192)'; // neutral gray when idle
+      if (remainingSeconds <= 0 && !isRunning) color = 'rgb(220,53,69)';
+      hasBlock.style.backgroundColor = color;
+      hasBlock.className = 'block';
+      if (isFinalMin) hasBlock.classList.add('pulsing');
+      hasBlock.title = fmt(remainingSeconds) + ' remaining';
+
+    } else if (hasStrip) {
       // ======= MINIMAL BAR =======
       var pFill = doc.getElementById('pFill');
       var pDot = doc.getElementById('pDot');
