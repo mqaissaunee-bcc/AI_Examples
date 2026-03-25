@@ -205,6 +205,16 @@ textarea { resize: vertical; min-height: 66px; line-height: 1.5; }
 .dq-include-row label { font-size: 0.72rem; font-weight: 600; color: #3a2a5a; cursor: pointer; display: flex; align-items: center; gap: 0.38rem; margin: 0; }
 .dq-include-row input[type="checkbox"] { width: 14px; height: 14px; accent-color: #6b4fa0; cursor: pointer; flex-shrink: 0; }
 
+/* Context chips */
+.ctx-row { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.3rem; flex-wrap: wrap; }
+.ctx-label { font-size: 0.71rem; font-weight: 700; color: #5a3a8a; white-space: nowrap; padding-top: 0.2rem; }
+.ctx-chips { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.ctx-chip { padding: 0.25rem 0.62rem; border-radius: 20px; border: 1.5px solid #c8b8ee; background: #fff; font-size: 0.7rem; color: #6b4fa0; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+.ctx-chip:hover { border-color: #6b4fa0; background: #f3f0ff; }
+.ctx-chip.active { background: #6b4fa0; border-color: #6b4fa0; color: #fff; font-weight: 600; }
+.dq-list { margin: 0; padding-left: 1.15rem; }
+.dq-list li { margin-bottom: 0.32rem; }
+
 /* Responsive */
 @media (max-width: 600px) {
   .form-row { grid-template-columns: 1fr; }
@@ -857,11 +867,29 @@ function buildStep3() {
 
   function renderDQPanel(idx, v) {
     const dqEl   = document.getElementById(`dq-${idx}`);
-    const level  = dqStore[idx] ? dqStore[idx].level : 'low';
-    const qs     = makeDQ(v.title, topic, audience, level);
-    dqStore[idx] = { level, qs };
+    const prev   = dqStore[idx] || {};
+    const level  = prev.level  || 'low';
+    const ctx    = prev.ctx    || ['experience'];   // default: work/life experience
+    const rot    = prev.rot    !== undefined ? prev.rot : (idx % 3);
+
+    const qs = makeDQ(v.title, topic, audience, level, rot, ctx);
+    dqStore[idx] = { level, ctx, rot, qs };
 
     const levelLabel = { low: '🟢 Low', med: '🟡 Medium', high: '🔴 High' };
+
+    const ctxDefs = [
+      { key:'readings',   label:'📚 Readings / textbook' },
+      { key:'discussion', label:'💬 Prior class discussion' },
+      { key:'experience', label:'💼 Work / life experience' },
+      { key:'local',      label:'📍 Local community context' },
+      { key:'standalone', label:'🔓 Standalone resource' },
+    ];
+    const ctxChips = ctxDefs.map(c =>
+      `<button class="ctx-chip${ctx.includes(c.key)?' active':''}" data-ctx="${c.key}" type="button">${c.label}</button>`
+    ).join('');
+
+    const variantLabel = `Variant ${rot+1}/3`;
+
     dqEl.innerHTML = `
       <div class="resistance-row">
         <span class="resistance-label">🛡 AI Resistance: <span style="font-size:0.63rem;font-weight:600;background:#fdf6e0;color:#b07800;border:1px solid #e6c84a;border-radius:10px;padding:0.1rem 0.45rem;vertical-align:middle;letter-spacing:0.03em;">Experimental</span></span>
@@ -871,9 +899,17 @@ function buildStep3() {
           <button class="r-chip r-high${level==='high'?' active':''}" data-level="high" data-idx="${idx}" type="button">🔴 High</button>
         </div>
       </div>
-      <p style="font-size:0.68rem;color:#8a6800;font-style:italic;margin-bottom:0.5rem;">AI resistance ratings are experimental — review questions before sharing with students.</p>
-      <strong style="font-size:0.72rem;display:block;margin-bottom:0.3rem;color:#3a2a5a;">Discussion Questions — Video ${idx+1} <span style="font-weight:400">(${levelLabel[level]})</span>:</strong>
-      <ol>${qs.map(q=>`<li>${esc(q)}</li>`).join('')}</ol>
+      <p style="font-size:0.68rem;color:#8a6800;font-style:italic;margin-bottom:0.6rem;">AI resistance ratings are experimental — review questions before sharing with students.</p>
+      <div class="ctx-row">
+        <span class="ctx-label">📋 Context:</span>
+        <div class="ctx-chips">${ctxChips}</div>
+      </div>
+      <p style="font-size:0.68rem;color:#5a3a8a;font-style:italic;margin-bottom:0.6rem;">Select what applies — questions adjust to match your context.</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;flex-wrap:wrap;gap:0.4rem;">
+        <strong style="font-size:0.72rem;color:#3a2a5a;">Discussion Questions — Video ${idx+1} <span style="font-weight:400">(${levelLabel[level]})</span></strong>
+        <button class="btn btn-ghost btn-sm reshuffle-btn" data-idx="${idx}" type="button" style="font-size:0.68rem;">🔀 Reshuffle <span class="variant-label" style="font-size:0.65rem;color:var(--text3);margin-left:0.2rem;">${variantLabel}</span></button>
+      </div>
+      <ol class="dq-list">${qs.map(q=>`<li>${esc(q)}</li>`).join('')}</ol>
       <button class="btn btn-ghost btn-sm" style="margin-top:0.5rem;font-size:0.7rem;" id="copyDQ-${idx}" type="button">📋 Copy Questions</button>`;
 
     dqEl.classList.add('visible');
@@ -886,6 +922,33 @@ function buildStep3() {
         regenerateOutputs();
       };
     });
+
+    // Context chip handlers (multi-select, standalone exclusive)
+    dqEl.querySelectorAll('.ctx-chip').forEach(chip => {
+      chip.onclick = () => {
+        const key = chip.dataset.ctx;
+        let cur = [...(dqStore[idx].ctx || [])];
+        if (key === 'standalone') {
+          // standalone clears all others
+          cur = cur.includes('standalone') ? [] : ['standalone'];
+        } else {
+          // selecting any other key clears standalone
+          cur = cur.filter(k => k !== 'standalone');
+          if (cur.includes(key)) cur = cur.filter(k => k !== key);
+          else cur.push(key);
+        }
+        dqStore[idx].ctx = cur;
+        renderDQPanel(idx, v);
+        regenerateOutputs();
+      };
+    });
+
+    // Reshuffle handler — advance rotation by 1
+    dqEl.querySelector('.reshuffle-btn').onclick = () => {
+      dqStore[idx].rot = ((dqStore[idx].rot || 0) + 1) % 3;
+      renderDQPanel(idx, v);
+      regenerateOutputs();
+    };
 
     document.getElementById(`copyDQ-${idx}`).onclick = function() {
       copyText(`Discussion Questions — Video ${idx+1}: ${v.title}\n\n` + qs.map((q,n)=>`${n+1}. ${q}`).join('\n'), this);
@@ -938,31 +1001,109 @@ function buildStep3() {
   regenerateOutputs();
 }
 
-function makeDQ(title, topic, audience, level) {
-  const tr  = s => (s||'').length>52 ? (s||'').slice(0,52).trim()+'…' : (s||'');
-  const subj = topic ? tr(topic) : 'this subject';
-  const vid  = tr(title);
-
-  if (level === 'high') {
-    return [
-      `This video presents specific claims about ${subj}. Find one piece of outside evidence — from a news article, study, or primary source — that either supports or challenges what the video says, and bring it to our next class to share.`,
-      `Based on what you know about ${subj} and what you saw in this video, make a specific, testable prediction: what do you think will happen next, or what outcome would you expect in a related situation? Explain your reasoning.`,
-      `The video covers ${vid}. How does this connect to something you have personally experienced, observed in your community, or encountered in your coursework? Be specific — generic answers won't count.`,
-    ];
-  }
-  if (level === 'med') {
-    return [
-      `How does what the video says about ${subj} compare to what we covered in class or in the assigned readings? Where do they align — and where, if anywhere, do they differ?`,
-      `Think about your own life, career goals, or community. Where do you see the ideas from this video showing up in a real context you care about? Give a concrete example.`,
-      `If you had to apply the main argument of this video to a local issue — something happening in your town, your field, or your own institution — how would you do it?`,
-    ];
-  }
-  // low (default)
-  return [
-    `After watching this video, how does ${vid} connect to what you've learned about ${subj}? Give a specific example from the video.`,
-    `What was one idea or claim in this video that surprised you, challenged your thinking, or raised a new question for you?`,
-    `In 2–3 sentences, how would you explain the main point of this video to a classmate who hadn't seen it?`,
+// ── Title keyword extractor (Option B) ──────────────────────────────────────
+// Strips filler prefixes and returns the core concept from a video title.
+function extractConcept(title) {
+  const fillers = [
+    /^(introduction to|intro to|overview of|what is|what are|how to|understanding|exploring|learning about|basics of|foundations of|principles of|the basics of|a guide to|guide to|all about|about)\s+/i,
+    /^(chapter \d+[:\s]*|unit \d+[:\s]*|lesson \d+[:\s]*|part \d+[:\s]*)/i,
+    /\s*[\|\-–—]\s*.+$/,   // strip everything after | - – —
+    /\s*\([^)]*\)\s*$/,    // strip trailing parenthetical
+    /\s*(explained|explanation|tutorial|lecture|course|full video|hd|2024|2023|2022)\s*$/i,
   ];
+  let c = (title || '').trim();
+  for (const re of fillers) c = c.replace(re, '').trim();
+  // Cap length, lowercase for mid-sentence use
+  c = c.length > 48 ? c.slice(0, 48).trim() + '…' : c;
+  return c || title.slice(0, 48);
+}
+
+// ── Question template sets ────────────────────────────────────────────────────
+// Each level has 3 banks of 3 questions, tagged by context requirement.
+// makeDQ filters candidates by ctx flags and picks the best-fitting 3.
+function makeDQ(title, topic, audience, level, rot, ctx) {
+  const concept  = extractConcept(title);
+  const subj     = topic ? (topic.length > 48 ? topic.slice(0,48).trim()+'…' : topic) : 'this subject';
+  const r        = (rot !== undefined ? rot : 0) % 3;
+  const hasCtx   = k => !ctx || !ctx.length || ctx.includes(k) || ctx.includes('standalone') === false;
+  const hasAny   = (...keys) => !ctx || !ctx.length || keys.some(k => ctx.includes(k));
+  const standalone = ctx && ctx.includes('standalone');
+  const hasReadings   = !standalone && (!ctx || !ctx.length || ctx.includes('readings'));
+  const hasDiscussion = !standalone && (!ctx || !ctx.length || ctx.includes('discussion'));
+  const hasExperience = !ctx || !ctx.length || ctx.includes('experience');
+  const hasLocal      = !standalone && (!ctx || !ctx.length || ctx.includes('local'));
+
+  // ── Candidate pools — tagged by what context they require ──────────────────
+  // Each entry: { q, needs: 'readings'|'discussion'|'experience'|'local'|null }
+  // null = always available (pure reflection, no external context needed)
+
+  const lowPool = [
+    // always available
+    { q: `After watching this video, what is the single most important idea about ${concept} that you want to remember? Explain why you chose it.`, needs: null },
+    { q: `What was one moment in this video that challenged something you already believed or assumed about ${subj}?`, needs: null },
+    { q: `In 2–3 sentences, summarize the video's main argument as if you were explaining it to someone who has never studied ${subj}.`, needs: null },
+    { q: `The video makes a case about ${concept}. Do you find that case convincing? What would make it stronger or weaker?`, needs: null },
+    { q: `What question did this video leave unanswered for you — something you'd want to look into further?`, needs: null },
+    { q: `Choose one specific detail, example, or visual from the video and explain what it helped you understand about ${subj}.`, needs: null },
+    { q: `How does the video's explanation of ${concept} compare to what you expected going in? What surprised you?`, needs: null },
+    { q: `If you had to push back on one claim in this video, what would it be and why?`, needs: null },
+    { q: `Imagine a friend asks you "why does ${concept} matter?" Based on this video, what would you say?`, needs: null },
+  ];
+
+  const medPool = [
+    // readings / discussion
+    { q: `How does what the video says about ${concept} connect to something we've discussed in class or read this semester? Where do they agree — and where do they diverge?`, needs: 'readings' },
+    { q: `The video covers ${concept}. Find one place where it connects to our course readings or class discussions — and one place where it goes beyond them. Explain both.`, needs: 'discussion' },
+    { q: `Compare the video's perspective on ${subj} with at least one other source we've used this semester. What does each one emphasize that the other doesn't?`, needs: 'readings' },
+    // experience
+    { q: `Think about your own life or career goals. Describe a specific situation where understanding ${concept} would actually make a difference.`, needs: 'experience' },
+    { q: `Where have you personally seen ${concept} at work — in your job, your neighborhood, your family, or your daily life? Be concrete.`, needs: 'experience' },
+    { q: `Describe a real decision — one you've made or might face — that this video's ideas about ${concept} would inform. What would you do differently because of what you watched?`, needs: 'experience' },
+    // local
+    { q: `Apply the video's main idea to a problem or situation in your own field or community. What would that look like in practice?`, needs: 'local' },
+    { q: `If a local organization or employer in your field had to act on the ideas in this video, what's the first thing they should change or do differently?`, needs: 'local' },
+    { q: `How would someone who disagrees with the video's take on ${concept} respond? What would their strongest counterargument be?`, needs: null },
+    // always
+    { q: `What aspect of ${concept} do you think is most often misunderstood by people encountering it for the first time? How does this video help or not help?`, needs: null },
+    { q: `If you had to teach the main idea of this video to someone else, what's the one thing you'd make sure they understood?`, needs: null },
+  ];
+
+  const highPool = [
+    // evidence / verification
+    { q: `The video makes claims about ${concept}. Find one piece of outside evidence — a news article, data set, or primary source — that either supports or challenges those claims. Be ready to explain your reasoning.`, needs: null },
+    { q: `Identify one factual claim in this video about ${concept} that could be independently verified. Find a credible source that confirms or disputes it and bring your findings to share.`, needs: null },
+    { q: `The video presents a particular view of ${subj}. Find a source — academic, journalistic, or primary — that takes a meaningfully different position. What accounts for the difference, and which do you find more credible?`, needs: null },
+    // prediction
+    { q: `Based on the video and what you know about ${subj}, make a specific, falsifiable prediction: what outcome would you expect in a situation related to ${concept}? What evidence would prove you wrong?`, needs: null },
+    { q: `Make a prediction about how ${concept} will develop or change in the next five years. Ground your prediction in specific evidence from the video plus at least one outside source.`, needs: null },
+    { q: `If you were designing a study or experiment to test the video's main claim about ${concept}, what would it look like? What would you measure, and what result would change your mind?`, needs: null },
+    // experience
+    { q: `Describe a personal or professional experience that gives you a unique lens on ${concept}. How does your experience support, complicate, or contradict what the video argues?`, needs: 'experience' },
+    { q: `Think of a time when you witnessed or experienced something directly related to ${concept}. How does that firsthand knowledge change how you read the video's argument?`, needs: 'experience' },
+    // local
+    { q: `Connect ${concept} to a specific issue in your local community, workplace, or institution. Use at least one concrete detail from your own experience — not just the video — to support your point.`, needs: 'local' },
+    // readings
+    { q: `The video and our course readings may approach ${subj} differently. Identify one tension between them and argue which perspective you find more useful — and why.`, needs: 'readings' },
+  ];
+
+  // ── Filter pool by context, then pick 3 using rotation offset ──────────────
+  function pickQuestions(pool) {
+    const ctxMap = { readings: hasReadings, discussion: hasDiscussion, experience: hasExperience, local: hasLocal };
+    const eligible = pool.filter(item => item.needs === null || ctxMap[item.needs]);
+    // If filtering leaves fewer than 3, fall back to all
+    const source = eligible.length >= 3 ? eligible : pool;
+    // Rotate start point by r so reshuffle gives different questions
+    const result = [];
+    const len = source.length;
+    for (let i = 0; i < len && result.length < 3; i++) {
+      result.push(source[(r * 3 + i) % len].q);
+    }
+    return result;
+  }
+
+  if (level === 'high') return pickQuestions(highPool);
+  if (level === 'med')  return pickQuestions(medPool);
+  return pickQuestions(lowPool);
 }
 
 function getMeta(i) {
