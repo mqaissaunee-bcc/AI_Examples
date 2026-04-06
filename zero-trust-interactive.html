@@ -1,0 +1,2576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zero Trust Security | Interactive Learning Module</title>
+<style>
+/* ============================================================
+   CSS CUSTOM PROPERTIES — all design tokens in one place
+   ============================================================ */
+:root {
+  /* Color palette — dark cyberpunk-meets-blueprint aesthetic */
+  --color-bg:          #0a0e17;
+  --color-surface:     #111827;
+  --color-surface-2:   #1a2235;
+  --color-border:      #1e3a5f;
+  --color-border-glow: #1e6faa;
+  --color-accent:      #00c8ff;
+  --color-accent-dim:  #0084aa;
+  --color-accent-2:    #f97316;
+  --color-accent-3:    #22d3a0;
+  --color-text:        #e2e8f0;
+  --color-text-muted:  #8ba3c2;
+  --color-text-faint:  #4a6080;
+  --color-correct:     #22c55e;
+  --color-incorrect:   #ef4444;
+  --color-warning:     #f59e0b;
+  --color-overlay:     rgba(0,0,0,0.75);
+
+  /* Typography */
+  --font-display: 'Courier New', 'Consolas', monospace;
+  --font-body:    Georgia, 'Times New Roman', serif;
+  --font-ui:      'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+  /* Spacing */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  40px;
+  --space-2xl: 64px;
+
+  /* Border radius */
+  --radius-sm:  4px;
+  --radius-md:  8px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
+
+  /* Font size base — controlled by font-size controls */
+  --base-font-size: 16px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-mid:  300ms ease;
+  --transition-slow: 500ms ease;
+
+  /* Grid / layout */
+  --content-max: 900px;
+  --sidebar-w: 260px;
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--base-font-size);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.7;
+  min-height: 100vh;
+  overflow-x: hidden;
+  /* Subtle grid background texture */
+  background-image:
+    linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+img { max-width: 100%; height: auto; display: block; }
+
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button { cursor: pointer; font-family: var(--font-ui); }
+
+/* ============================================================
+   REDUCED MOTION — automatic (OS preference)
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .fade-in, .slide-up { opacity: 1 !important; transform: none !important; }
+}
+
+/* ============================================================
+   REDUCED MOTION — manual toggle class on body
+   ============================================================ */
+body.motion-reduced *, body.motion-reduced *::before, body.motion-reduced *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+body.motion-reduced .fade-in,
+body.motion-reduced .slide-up { opacity: 1 !important; transform: none !important; }
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(0,200,255,0.3); }
+  50%       { box-shadow: 0 0 20px rgba(0,200,255,0.7); }
+}
+@keyframes scan-line {
+  0%   { top: 0; }
+  100% { top: 100%; }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.fade-in {
+  opacity: 0;
+  animation: fadeIn 0.5s var(--transition-mid) forwards;
+}
+
+/* ============================================================
+   ACCESSIBILITY TOOLBAR (top bar)
+   ============================================================ */
+#a11y-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(10,14,23,0.97);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  backdrop-filter: blur(8px);
+}
+
+.a11y-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.a11y-label {
+  font-size: 0.7em;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Small utility buttons */
+.btn-util {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-family: var(--font-ui);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  white-space: nowrap;
+}
+.btn-util:hover { background: var(--color-border); border-color: var(--color-border-glow); }
+.btn-util[aria-pressed="true"] {
+  background: var(--color-accent-dim);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+#font-size-display {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  min-width: 36px;
+  text-align: center;
+}
+
+/* ============================================================
+   PROGRESS BAR
+   ============================================================ */
+#progress-wrap {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+#progress-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--color-surface-2);
+  border-radius: 99px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+#progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent-dim), var(--color-accent));
+  border-radius: 99px;
+  transition: width var(--transition-mid);
+  box-shadow: 0 0 8px rgba(0,200,255,0.5);
+}
+
+#progress-label {
+  font-size: 0.75rem;
+  font-family: var(--font-ui);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  min-width: 80px;
+  text-align: right;
+}
+
+#module-indicator {
+  font-size: 0.75rem;
+  font-family: var(--font-ui);
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+#app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 90px);
+}
+
+/* Navigation sidebar (hidden on mobile, visible on wider screens) */
+#nav-sidebar {
+  display: none;
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  padding: var(--space-lg) var(--space-md);
+  position: sticky;
+  top: 90px;
+  height: calc(100vh - 90px);
+  overflow-y: auto;
+}
+
+#main-content-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+#content-panel {
+  width: 100%;
+  max-width: var(--content-max);
+  padding: var(--space-lg) var(--space-md) var(--space-2xl);
+}
+
+/* Desktop layout */
+@media (min-width: 768px) {
+  #app-shell { flex-direction: row; }
+  #nav-sidebar { display: flex; flex-direction: column; gap: var(--space-md); }
+  #content-panel { padding: var(--space-xl) var(--space-xl) var(--space-2xl); }
+}
+
+/* Sidebar nav items */
+.nav-module-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  background: none;
+  text-align: left;
+  width: 100%;
+  min-height: 44px;
+}
+.nav-module-item:hover { background: var(--color-surface-2); border-color: var(--color-border); }
+.nav-module-item.active { background: rgba(0,200,255,0.08); border-color: var(--color-accent-dim); color: var(--color-accent); }
+.nav-module-item.completed .nav-check { color: var(--color-correct); }
+.nav-check { font-size: 0.9em; min-width: 16px; }
+.nav-title { flex: 1; line-height: 1.3; }
+.nav-section-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-faint);
+  font-family: var(--font-ui);
+  padding: var(--space-sm) var(--space-md) 0;
+}
+
+/* ============================================================
+   SECTION / MODULE SCREENS
+   ============================================================ */
+.module-screen {
+  display: none;
+}
+.module-screen.active {
+  display: block;
+  animation: fadeIn 0.4s ease forwards;
+}
+
+/* ============================================================
+   TYPOGRAPHY WITHIN CONTENT
+   ============================================================ */
+.module-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  color: var(--color-accent);
+  letter-spacing: 0.04em;
+  margin-bottom: var(--space-xs);
+  line-height: 1.2;
+  text-shadow: 0 0 20px rgba(0,200,255,0.3);
+}
+
+.module-subtitle {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-md);
+}
+
+.section-heading {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--color-accent-3);
+  letter-spacing: 0.05em;
+  margin: var(--space-xl) 0 var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.section-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-border), transparent);
+}
+
+.content-p {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--color-text);
+  margin-bottom: var(--space-md);
+}
+
+.callout {
+  background: var(--color-surface-2);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: var(--space-md) var(--space-lg);
+  margin: var(--space-lg) 0;
+  font-size: 0.95rem;
+}
+
+.callout.warning {
+  border-left-color: var(--color-warning);
+}
+.callout.success {
+  border-left-color: var(--color-correct);
+}
+.callout.danger {
+  border-left-color: var(--color-incorrect);
+}
+
+.callout-title {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-accent);
+  margin-bottom: var(--space-sm);
+}
+.callout.warning .callout-title { color: var(--color-warning); }
+.callout.success .callout-title { color: var(--color-correct); }
+.callout.danger .callout-title { color: var(--color-incorrect); }
+
+.highlight { color: var(--color-accent); font-style: normal; }
+.highlight-2 { color: var(--color-accent-2); }
+.highlight-3 { color: var(--color-accent-3); }
+
+/* Key term tooltip trigger */
+.key-term {
+  color: var(--color-accent);
+  border-bottom: 1px dotted var(--color-accent-dim);
+  cursor: help;
+  transition: color var(--transition-fast);
+}
+.key-term:hover { color: #fff; }
+
+/* ============================================================
+   HERO / WELCOME SCREEN
+   ============================================================ */
+#hero-screen {
+  text-align: center;
+  padding: var(--space-xl) 0;
+}
+
+.hero-badge {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-dim);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: 99px;
+  margin-bottom: var(--space-lg);
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  color: #fff;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  margin-bottom: var(--space-md);
+  text-shadow: 0 0 40px rgba(0,200,255,0.4);
+}
+.hero-title span { color: var(--color-accent); }
+
+.hero-subtitle {
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+  max-width: 560px;
+  margin: 0 auto var(--space-xl);
+  line-height: 1.7;
+}
+
+.hero-meta {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+
+.hero-meta-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  padding: var(--space-xs) var(--space-md);
+  font-size: 0.8rem;
+  font-family: var(--font-ui);
+  color: var(--color-text-muted);
+}
+
+.hero-modules-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: center;
+  margin-bottom: var(--space-xl);
+}
+
+.module-pill {
+  background: rgba(0,200,255,0.06);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  padding: var(--space-xs) var(--space-md);
+  font-size: 0.78rem;
+  font-family: var(--font-ui);
+  color: var(--color-text-muted);
+}
+
+/* ============================================================
+   PRIMARY BUTTONS
+   ============================================================ */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  background: linear-gradient(135deg, var(--color-accent-dim), var(--color-accent));
+  color: #000;
+  font-family: var(--font-display);
+  font-weight: bold;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: var(--space-md) var(--space-xl);
+  border: none;
+  border-radius: var(--radius-md);
+  min-height: 52px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 4px 20px rgba(0,200,255,0.35);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0,200,255,0.5);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  padding: var(--space-md) var(--space-xl);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  min-height: 52px;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.btn-secondary:hover { background: var(--color-border); border-color: var(--color-border-glow); }
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+  justify-content: flex-start;
+}
+
+/* ============================================================
+   VIDEO EMBED
+   ============================================================ */
+.video-container {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  margin: var(--space-lg) 0;
+  background: #000;
+}
+.video-container iframe {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  border: none;
+}
+
+.video-caption {
+  font-size: 0.8rem;
+  color: var(--color-text-faint);
+  font-family: var(--font-ui);
+  text-align: center;
+  margin-top: var(--space-sm);
+}
+
+/* ============================================================
+   INFO CARDS / GRID
+   ============================================================ */
+.card-grid {
+  display: grid;
+  gap: var(--space-md);
+  grid-template-columns: 1fr;
+  margin: var(--space-lg) 0;
+}
+@media (min-width: 600px) {
+  .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+.info-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+.info-card:hover {
+  border-color: var(--color-border-glow);
+  transform: translateY(-2px);
+}
+
+.info-card-icon {
+  font-size: 1.8rem;
+  margin-bottom: var(--space-sm);
+}
+
+.info-card-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: var(--space-sm);
+}
+
+.info-card-body {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* ============================================================
+   PILLAR DIAGRAM (visual Zero Trust model)
+   ============================================================ */
+.pillar-diagram {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-sm);
+  margin: var(--space-lg) 0;
+}
+
+.pillar {
+  background: linear-gradient(180deg, var(--color-surface-2), var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-accent-dim);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  text-align: center;
+  transition: border-top-color var(--transition-fast), transform var(--transition-fast);
+  cursor: default;
+}
+.pillar:hover {
+  border-top-color: var(--color-accent);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,200,255,0.15);
+}
+
+.pillar-icon { font-size: 1.5rem; margin-bottom: var(--space-xs); }
+.pillar-name {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+}
+
+/* ============================================================
+   COMPARISON TABLE
+   ============================================================ */
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-lg) 0;
+  font-size: 0.88rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.compare-table th {
+  background: var(--color-surface-2);
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-md);
+  border-bottom: 2px solid var(--color-accent-dim);
+  text-align: left;
+}
+
+.compare-table td {
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  vertical-align: top;
+}
+
+.compare-table tr:last-child td { border-bottom: none; }
+.compare-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+.compare-table .col-old { color: #ef8888; }
+.compare-table .col-new { color: var(--color-accent-3); }
+
+/* ============================================================
+   INTERACTIVE SCENARIO / ACCORDION
+   ============================================================ */
+.accordion {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin: var(--space-lg) 0;
+}
+
+.accordion-item { border-bottom: 1px solid var(--color-border); }
+.accordion-item:last-child { border-bottom: none; }
+
+.accordion-trigger {
+  width: 100%;
+  background: var(--color-surface);
+  border: none;
+  padding: var(--space-md) var(--space-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  min-height: 56px;
+}
+.accordion-trigger:hover { background: var(--color-surface-2); }
+.accordion-trigger[aria-expanded="true"] { background: rgba(0,200,255,0.06); }
+
+.accordion-trigger-title {
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  color: var(--color-text);
+  font-weight: 600;
+  flex: 1;
+}
+
+.accordion-chevron {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+.accordion-trigger[aria-expanded="true"] .accordion-chevron { transform: rotate(180deg); }
+
+.accordion-body {
+  display: none;
+  padding: var(--space-md) var(--space-lg) var(--space-lg);
+  background: var(--color-surface-2);
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}
+.accordion-body.open { display: block; animation: fadeIn 0.25s ease forwards; }
+
+/* ============================================================
+   QUIZ SECTION
+   ============================================================ */
+.quiz-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.quiz-counter {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.quiz-question-text {
+  font-size: 1.05rem;
+  color: var(--color-text);
+  line-height: 1.6;
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border-left: 3px solid var(--color-accent-dim);
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.quiz-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md) var(--space-lg);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  min-height: 56px;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.quiz-option:hover:not(:disabled) {
+  background: var(--color-surface-2);
+  border-color: var(--color-border-glow);
+}
+.quiz-option:disabled { cursor: not-allowed; }
+
+.quiz-option.correct {
+  background: rgba(34,197,94,0.1);
+  border-color: var(--color-correct);
+  color: #fff;
+}
+.quiz-option.incorrect {
+  background: rgba(239,68,68,0.1);
+  border-color: var(--color-incorrect);
+  color: var(--color-text-muted);
+}
+.quiz-option.revealed {
+  background: rgba(34,197,94,0.05);
+  border-color: rgba(34,197,94,0.3);
+}
+
+.option-letter {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--color-text-faint);
+  min-width: 20px;
+  padding-top: 2px;
+}
+.quiz-option.correct .option-letter { color: var(--color-correct); }
+.quiz-option.incorrect .option-letter { color: var(--color-incorrect); }
+
+.quiz-feedback {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  font-size: 0.9rem;
+  display: none;
+}
+.quiz-feedback.show { display: block; animation: fadeIn 0.3s ease forwards; }
+.quiz-feedback.correct { background: rgba(34,197,94,0.1); border: 1px solid var(--color-correct); color: var(--color-correct); }
+.quiz-feedback.incorrect { background: rgba(239,68,68,0.1); border: 1px solid var(--color-incorrect); color: #ff9999; }
+
+/* ============================================================
+   RESULTS SCREEN
+   ============================================================ */
+#results-screen {
+  text-align: center;
+  padding: var(--space-xl) 0;
+}
+
+.results-score-ring {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: conic-gradient(var(--color-accent) var(--score-pct, 0%), var(--color-surface-2) 0%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-lg);
+  position: relative;
+}
+.results-score-ring::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  background: var(--color-bg);
+  border-radius: 50%;
+}
+.results-score-number {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  color: var(--color-accent);
+}
+
+.results-title {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: #fff;
+  margin-bottom: var(--space-sm);
+}
+.results-message {
+  font-size: 1rem;
+  color: var(--color-text-muted);
+  max-width: 480px;
+  margin: 0 auto var(--space-lg);
+}
+
+.results-stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-xl);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-xl);
+}
+
+.results-stat {
+  text-align: center;
+}
+.results-stat-value {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--color-accent);
+}
+.results-stat-label {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ============================================================
+   INTERACTIVE SCENARIO EXPLORER
+   ============================================================ */
+.scenario-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-sm);
+}
+
+.scenario-tab {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  min-height: 44px;
+}
+.scenario-tab:hover { background: var(--color-surface-2); color: var(--color-text); }
+.scenario-tab.active { background: var(--color-accent-dim); border-color: var(--color-accent); color: #fff; }
+
+.scenario-panel { display: none; }
+.scenario-panel.active { display: block; animation: fadeIn 0.25s ease; }
+
+/* ============================================================
+   POLICY ENGINE SIMULATOR
+   ============================================================ */
+.policy-sim {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin: var(--space-lg) 0;
+}
+
+.policy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.policy-label {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.policy-select {
+  flex: 1;
+  min-width: 180px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+.policy-select:focus { outline: 2px solid var(--color-accent); border-color: var(--color-accent); }
+
+.policy-result {
+  margin-top: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  text-align: center;
+  transition: background var(--transition-mid), color var(--transition-mid);
+}
+.policy-result.allow { background: rgba(34,197,94,0.12); border: 1px solid var(--color-correct); color: var(--color-correct); }
+.policy-result.deny  { background: rgba(239,68,68,0.12);  border: 1px solid var(--color-incorrect); color: var(--color-incorrect); }
+.policy-result.mfa   { background: rgba(249,115,22,0.12); border: 1px solid var(--color-accent-2); color: var(--color-accent-2); }
+
+/* ============================================================
+   PRINT STYLESHEET
+   ============================================================ */
+@media print {
+  @page { margin: 0.75in; size: A4 portrait; }
+
+  #a11y-bar,
+  #progress-wrap,
+  #nav-sidebar,
+  .btn-primary,
+  .btn-secondary,
+  .btn-util,
+  .btn-row,
+  #btn-print,
+  .video-container,
+  .video-caption,
+  .quiz-options button,
+  .quiz-feedback,
+  .scenario-tabs,
+  .policy-sim button { display: none !important; }
+
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    font-size: 11pt !important;
+    background-image: none !important;
+  }
+
+  .module-screen { display: block !important; page-break-inside: avoid; }
+
+  .module-title { color: #003366 !important; font-size: 18pt !important; text-shadow: none !important; }
+  .section-heading { color: #005577 !important; font-size: 14pt !important; }
+  .content-p { color: #222 !important; }
+  .callout { border-left-color: #003366 !important; background: #f0f4ff !important; color: #222 !important; page-break-inside: avoid; }
+  .info-card { border: 1px solid #ccc !important; background: #fafafa !important; page-break-inside: avoid; box-shadow: none !important; }
+  .info-card-title { color: #003366 !important; }
+  .info-card-body { color: #333 !important; }
+  .compare-table th { background: #e0ecf8 !important; color: #003366 !important; }
+  .compare-table td { color: #333 !important; }
+  .pillar { border: 1px solid #ccc !important; page-break-inside: avoid; }
+  .pillar-name { color: #003366 !important; }
+  .highlight { color: #003366 !important; }
+  .key-term { border-bottom: 1px solid #333 !important; color: #003366 !important; }
+  #results-screen .results-score-ring { background: none !important; border: 4px solid #003366 !important; }
+}
+
+/* ============================================================
+   MOBILE NAV BOTTOM BAR
+   ============================================================ */
+#mobile-nav {
+  display: flex;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  background: rgba(10,14,23,0.97);
+  border-top: 1px solid var(--color-border);
+  backdrop-filter: blur(8px);
+  justify-content: space-around;
+  padding: var(--space-sm) 0;
+}
+@media (min-width: 768px) { #mobile-nav { display: none; } }
+
+.mobile-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.6rem;
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 44px;
+  min-width: 44px;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.mobile-nav-btn:hover, .mobile-nav-btn.active { color: var(--color-accent); }
+.mobile-nav-icon { font-size: 1.1rem; }
+
+/* Bottom padding so content clears mobile nav */
+@media (max-width: 767px) {
+  #content-panel { padding-bottom: 80px; }
+}
+
+/* ============================================================
+   GLOSSARY TOOLTIP
+   ============================================================ */
+.tooltip-wrap { position: relative; display: inline; }
+.tooltip-box {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-accent-dim);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.78rem;
+  color: var(--color-text);
+  width: 220px;
+  z-index: 100;
+  line-height: 1.5;
+  font-style: normal;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.tooltip-wrap:hover .tooltip-box,
+.tooltip-wrap:focus-within .tooltip-box { display: block; }
+
+/* ============================================================
+   TIMELINE
+   ============================================================ */
+.timeline {
+  position: relative;
+  padding-left: 32px;
+  margin: var(--space-lg) 0;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--color-accent-dim), transparent);
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: var(--space-lg);
+  page-break-inside: avoid;
+}
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -26px;
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 8px rgba(0,200,255,0.5);
+}
+
+.timeline-year {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: var(--color-accent);
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-xs);
+}
+
+.timeline-event {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-xs);
+}
+
+.timeline-desc {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* ============================================================
+   UTILITY
+   ============================================================ */
+.mt-sm { margin-top: var(--space-sm); }
+.mt-md { margin-top: var(--space-md); }
+.mt-lg { margin-top: var(--space-lg); }
+.mb-md { margin-bottom: var(--space-md); }
+.text-center { text-align: center; }
+.text-muted { color: var(--color-text-muted); font-size: 0.85rem; }
+
+/* Screen-reader only */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     ACCESSIBILITY TOOLBAR
+     ============================================================ -->
+<div id="a11y-bar" role="toolbar" aria-label="Accessibility controls">
+  <div class="a11y-group">
+    <span class="a11y-label">Text size</span>
+    <button class="btn-util" id="btn-font-down" aria-label="Decrease font size">A−</button>
+    <span id="font-size-display" aria-live="polite">16px</span>
+    <button class="btn-util" id="btn-font-up" aria-label="Increase font size">A+</button>
+  </div>
+  <div class="a11y-group">
+    <button class="btn-util" id="btn-reduce-motion" aria-pressed="false" aria-label="Toggle reduced motion">⚡ Reduce Motion</button>
+    <button class="btn-util" id="btn-print" aria-label="Print or save as PDF" onclick="window.print()">🖨️ Print / PDF</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     PROGRESS BAR
+     ============================================================ -->
+<div id="progress-wrap">
+  <span id="module-indicator">Module 0 / 6</span>
+  <div id="progress-bar-track">
+    <div id="progress-bar-fill"
+         role="progressbar"
+         aria-valuenow="0"
+         aria-valuemax="100"
+         aria-label="Course progress"
+         style="width: 0%"></div>
+  </div>
+  <span id="progress-label">0% Complete</span>
+</div>
+
+<!-- ============================================================
+     MAIN APP SHELL
+     ============================================================ -->
+<div id="app-shell">
+
+  <!-- SIDEBAR NAVIGATION -->
+  <nav id="nav-sidebar" aria-label="Module navigation">
+    <div class="nav-section-label">Course Modules</div>
+
+    <button class="nav-module-item active" data-target="screen-hero" onclick="goToScreen('screen-hero')">
+      <span class="nav-check" id="nav-check-hero">⬜</span>
+      <span class="nav-title">Welcome</span>
+    </button>
+
+    <button class="nav-module-item" data-target="screen-m1" onclick="goToScreen('screen-m1')">
+      <span class="nav-check" id="nav-check-m1">⬜</span>
+      <span class="nav-title">1 · What Is Zero Trust?</span>
+    </button>
+
+    <button class="nav-module-item" data-target="screen-m2" onclick="goToScreen('screen-m2')">
+      <span class="nav-check" id="nav-check-m2">⬜</span>
+      <span class="nav-title">2 · The Five Pillars</span>
+    </button>
+
+    <button class="nav-module-item" data-target="screen-m3" onclick="goToScreen('screen-m3')">
+      <span class="nav-check" id="nav-check-m3">⬜</span>
+      <span class="nav-title">3 · Identity &amp; MFA</span>
+    </button>
+
+    <button class="nav-module-item" data-target="screen-m4" onclick="goToScreen('screen-m4')">
+      <span class="nav-check" id="nav-check-m4">⬜</span>
+      <span class="nav-title">4 · Micro-Segmentation</span>
+    </button>
+
+    <button class="nav-module-item" data-target="screen-m5" onclick="goToScreen('screen-m5')">
+      <span class="nav-check" id="nav-check-m5">⬜</span>
+      <span class="nav-title">5 · Policy Engine &amp; SASE</span>
+    </button>
+
+    <button class="nav-module-item" data-target="screen-quiz" onclick="goToScreen('screen-quiz')">
+      <span class="nav-check" id="nav-check-quiz">⬜</span>
+      <span class="nav-title">6 · Knowledge Check</span>
+    </button>
+
+    <button class="nav-module-item" data-target="screen-results" onclick="goToScreen('screen-results')">
+      <span class="nav-check" id="nav-check-results">⬜</span>
+      <span class="nav-title">Results</span>
+    </button>
+  </nav>
+
+  <!-- CONTENT AREA -->
+  <div id="main-content-area">
+    <main id="content-panel" role="main">
+
+      <!-- ==========================================
+           HERO / WELCOME SCREEN
+           ========================================== -->
+      <section id="screen-hero" class="module-screen active" aria-labelledby="hero-h1">
+        <div id="hero-screen">
+          <div class="hero-badge">🔐 Cybersecurity Fundamentals</div>
+          <h1 id="hero-h1" class="hero-title">ZERO <span>TRUST</span></h1>
+          <p class="hero-subtitle">
+            The modern security model that says: <em>never trust, always verify</em>. 
+            In a world where the network perimeter has dissolved, Zero Trust is the answer. 
+            Let's explore it together — no jargon gatekeeping, just clear explanations and real examples.
+          </p>
+
+          <div class="hero-meta">
+            <div class="hero-meta-chip">📚 6 Modules</div>
+            <div class="hero-meta-chip">⏱ ~30 Minutes</div>
+            <div class="hero-meta-chip">🎯 Freshmen / Sophomores</div>
+            <div class="hero-meta-chip">📝 Knowledge Check Included</div>
+          </div>
+
+          <div class="hero-modules-preview">
+            <div class="module-pill">What Is Zero Trust?</div>
+            <div class="module-pill">The Five Pillars</div>
+            <div class="module-pill">Identity &amp; MFA</div>
+            <div class="module-pill">Micro-Segmentation</div>
+            <div class="module-pill">Policy Engine &amp; SASE</div>
+            <div class="module-pill">Knowledge Check</div>
+          </div>
+
+          <div class="video-container" style="max-width:640px; margin: 0 auto var(--space-lg);">
+            <iframe src="https://www.youtube.com/embed/jmCrj9kp1SM"
+              title="Introduction to Zero Trust Security"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen loading="lazy"></iframe>
+          </div>
+          <p class="video-caption">🎬 An accessible, beginner-friendly introduction to Zero Trust. Watch before beginning.</p>
+
+          <div class="btn-row" style="justify-content: center;">
+            <button class="btn-primary" onclick="goToScreen('screen-m1')">
+              Begin Course →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           MODULE 1 — WHAT IS ZERO TRUST?
+           ========================================== -->
+      <section id="screen-m1" class="module-screen" aria-labelledby="m1-title">
+        <p class="module-subtitle">Module 1 of 6</p>
+        <h2 id="m1-title" class="module-title">// What Is Zero Trust?</h2>
+
+        <p class="content-p">
+          For decades, network security operated on a simple idea: build a strong wall around everything, and trust whatever is inside it. This model — called <span class="highlight">perimeter-based security</span> — worked reasonably well when all employees sat in an office, all data lived in on-premises data centers, and the only threats came from outside the corporate network. Think of it like a castle: once you got past the moat and the drawbridge, you were essentially trusted to wander the halls freely.
+        </p>
+
+        <p class="content-p">
+          But that world no longer exists. Today, employees work from coffee shops, home offices, and airports. Applications run in public clouds like AWS and Azure. Partners and contractors access corporate systems. And attackers have learned that once they crack a single endpoint inside the perimeter — through phishing, a stolen password, or a vulnerable application — they can roam the network almost unchallenged. The castle walls have holes everywhere, and the "trusted" insiders can be attackers in disguise.
+        </p>
+
+        <div class="callout warning">
+          <div class="callout-title">⚠️ The Perimeter Is Dead</div>
+          The 2020 SolarWinds attack is a chilling example. Attackers compromised a software update mechanism and gained access to thousands of organizations' internal networks — having already breached the "perimeter." Once inside, they moved laterally for months without detection. Traditional security models had no answer.
+        </div>
+
+        <h3 class="section-heading">The Zero Trust Answer</h3>
+
+        <p class="content-p">
+          <span class="highlight">Zero Trust</span> is a security philosophy — and increasingly a set of concrete technical practices — built on a radically different assumption: <strong>trust nothing and no one by default, regardless of whether they are inside or outside the network</strong>. The term was coined by John Kindervag at Forrester Research in 2010, though the underlying ideas had been percolating in security research for years. Google's internal implementation, called <em>BeyondCorp</em>, launched around the same time and became one of the most influential real-world examples of Zero Trust at scale.
+        </p>
+
+        <p class="content-p">
+          The core mantra of Zero Trust is simple: <span class="highlight">"Never Trust, Always Verify."</span> Every request to access any resource — whether it comes from an employee laptop on the corporate network, a mobile phone on public Wi-Fi, or an internal server making an API call — must be authenticated, authorized, and continuously validated. Location on the network (inside or outside) is irrelevant. Identity, device health, and context are everything.
+        </p>
+
+        <h3 class="section-heading">A Quick History</h3>
+
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-year">1994</div>
+            <div class="timeline-event">Stephen Paul Marsh coins "Zero Trust"</div>
+            <div class="timeline-desc">The phrase appears in a doctoral thesis at the University of Stirling, though it referred to computational trust models, not network security.</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-year">2010</div>
+            <div class="timeline-event">John Kindervag at Forrester popularizes Zero Trust for networking</div>
+            <div class="timeline-desc">Kindervag publishes research explicitly applying "Zero Trust" to network security architecture, arguing that internal network traffic should not be trusted by default.</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-year">2011–2014</div>
+            <div class="timeline-event">Google's BeyondCorp initiative launches</div>
+            <div class="timeline-desc">Following the Operation Aurora attack (which targeted Google through a browser zero-day), Google redesigns its internal network using Zero Trust principles. Employees eventually access corporate apps from any device, anywhere, without a VPN.</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-year">2018–2020</div>
+            <div class="timeline-event">Cloud adoption accelerates Zero Trust adoption</div>
+            <div class="timeline-desc">As Microsoft Azure, AWS, and SaaS platforms become dominant, the traditional perimeter becomes meaningless for many organizations. Zero Trust frameworks go mainstream.</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-year">2021</div>
+            <div class="timeline-event">U.S. Executive Order on Cybersecurity mandates Zero Trust</div>
+            <div class="timeline-desc">President Biden's Executive Order 14028 requires federal agencies to implement Zero Trust architecture, cementing it as the official U.S. government security framework. NIST SP 800-207 becomes the reference standard.</div>
+          </div>
+        </div>
+
+        <h3 class="section-heading">Old Model vs. Zero Trust: A Comparison</h3>
+
+        <table class="compare-table" aria-label="Perimeter security vs Zero Trust comparison">
+          <thead>
+            <tr>
+              <th>Aspect</th>
+              <th class="col-old">Perimeter / "Castle &amp; Moat"</th>
+              <th class="col-new">Zero Trust</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Core assumption</td>
+              <td class="col-old">Inside = trusted; outside = untrusted</td>
+              <td class="col-new">Nothing is trusted by default, anywhere</td>
+            </tr>
+            <tr>
+              <td>Authentication</td>
+              <td class="col-old">Verify once at the perimeter (VPN login, badge in)</td>
+              <td class="col-new">Continuously verify every access request</td>
+            </tr>
+            <tr>
+              <td>Lateral movement</td>
+              <td class="col-old">Freely allowed once inside the network</td>
+              <td class="col-new">Blocked by micro-segmentation and least privilege</td>
+            </tr>
+            <tr>
+              <td>Remote work</td>
+              <td class="col-old">Requires VPN tunnel to the perimeter</td>
+              <td class="col-new">Access is identity-based, no VPN tunnel needed</td>
+            </tr>
+            <tr>
+              <td>Breach impact</td>
+              <td class="col-old">Attacker can move freely through "trusted" network</td>
+              <td class="col-new">Movement is limited; attacker must re-authenticate for each resource</td>
+            </tr>
+            <tr>
+              <td>Cloud-readiness</td>
+              <td class="col-old">Poor — cloud traffic bypasses the perimeter</td>
+              <td class="col-new">Excellent — cloud, on-prem, and SaaS treated consistently</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="goToScreen('screen-hero')">← Back</button>
+          <button class="btn-primary" onclick="goToScreen('screen-m2')">Module 2: The Five Pillars →</button>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           MODULE 2 — THE FIVE PILLARS
+           ========================================== -->
+      <section id="screen-m2" class="module-screen" aria-labelledby="m2-title">
+        <p class="module-subtitle">Module 2 of 6</p>
+        <h2 id="m2-title" class="module-title">// The Five Pillars of Zero Trust</h2>
+
+        <p class="content-p">
+          Zero Trust isn't a single product you can buy. It's an architectural philosophy — a set of principles that you apply across your entire IT environment. The <span class="highlight">Cybersecurity and Infrastructure Security Agency (CISA)</span> and <span class="highlight">NIST SP 800-207</span> both organize Zero Trust into distinct capability areas, sometimes called <em>pillars</em>. Understanding these pillars gives you a mental map for how Zero Trust works across a real organization.
+        </p>
+
+        <div class="pillar-diagram" role="list" aria-label="Zero Trust pillars">
+          <div class="pillar" role="listitem" tabindex="0">
+            <div class="pillar-icon">👤</div>
+            <div class="pillar-name">Identity</div>
+          </div>
+          <div class="pillar" role="listitem" tabindex="0">
+            <div class="pillar-icon">💻</div>
+            <div class="pillar-name">Device / Endpoint</div>
+          </div>
+          <div class="pillar" role="listitem" tabindex="0">
+            <div class="pillar-icon">🌐</div>
+            <div class="pillar-name">Network</div>
+          </div>
+          <div class="pillar" role="listitem" tabindex="0">
+            <div class="pillar-icon">🗂️</div>
+            <div class="pillar-name">Application / Workload</div>
+          </div>
+          <div class="pillar" role="listitem" tabindex="0">
+            <div class="pillar-icon">🔒</div>
+            <div class="pillar-name">Data</div>
+          </div>
+        </div>
+
+        <h3 class="section-heading">Pillar 1 — Identity</h3>
+
+        <p class="content-p">
+          In Zero Trust, <span class="highlight">identity is the new perimeter</span>. Instead of relying on network location to determine trust, you rely on who (or what) is making the request. This means every user, service account, and application must have a verifiable identity, and that identity must be authenticated before access is granted. Identity is verified using strong authentication mechanisms — ideally <span class="tooltip-wrap"><span class="key-term">multi-factor authentication (MFA)</span><span class="tooltip-box">MFA requires a user to provide two or more verification factors: something you know (password), something you have (phone/hardware token), or something you are (biometric).</span></span> — and the credentials themselves must be protected by a modern Identity Provider (IdP) like Azure AD, Okta, or Google Workspace.
+        </p>
+
+        <p class="content-p">
+          An important concept here is <span class="highlight">continuous authentication</span> — verifying identity not just at login, but throughout the session. If a user's behavior suddenly changes (e.g., they start downloading huge amounts of data they normally don't touch), the system can trigger re-authentication or revoke access automatically. This is called <em>risk-based or adaptive authentication</em>.
+        </p>
+
+        <h3 class="section-heading">Pillar 2 — Device / Endpoint</h3>
+
+        <p class="content-p">
+          Your identity being valid doesn't mean your device is safe. Zero Trust requires that every device accessing corporate resources be known, registered, and assessed for health. A device health assessment might check whether the operating system is up to date, whether antivirus is running, whether the disk is encrypted, and whether the device is enrolled in <span class="tooltip-wrap"><span class="key-term">Mobile Device Management (MDM)</span><span class="tooltip-box">MDM solutions (like Microsoft Intune or Jamf) allow organizations to remotely manage, configure, and enforce security policies on employee devices.</span></span>. Unmanaged or unhealthy devices are denied access or granted only limited access to low-sensitivity resources.
+        </p>
+
+        <h3 class="section-heading">Pillar 3 — Network</h3>
+
+        <p class="content-p">
+          The network pillar addresses how traffic flows between users, applications, and data. Under Zero Trust, network access is <em>least-privileged</em>: users only get network connectivity to the specific resources they need, not broad access to entire network segments. Techniques like <span class="highlight">micro-segmentation</span> (dividing the network into tiny isolated zones) and <span class="highlight">Software-Defined Perimeters (SDP)</span> enforce this. We'll dig deeply into micro-segmentation in Module 4.
+        </p>
+
+        <h3 class="section-heading">Pillar 4 — Application / Workload</h3>
+
+        <p class="content-p">
+          Applications themselves must be hardened and access-controlled. This means authorizing users at the application level (not just the network level), securing APIs with authentication tokens, continuously scanning workloads for vulnerabilities, and treating every application interaction as potentially untrusted. This pillar has become especially critical as organizations move to <span class="highlight">microservices and containers</span>, where dozens of application components communicate with each other over APIs.
+        </p>
+
+        <h3 class="section-heading">Pillar 5 — Data</h3>
+
+        <p class="content-p">
+          Ultimately, everything in security is about protecting data — customer records, intellectual property, financial transactions. The data pillar focuses on classifying data by sensitivity, encrypting it at rest and in transit, and ensuring that only authorized identities can access specific data sets. Modern <span class="tooltip-wrap"><span class="key-term">Data Loss Prevention (DLP)</span><span class="tooltip-box">DLP tools monitor and control data movement to prevent sensitive data from being sent outside the organization — for example, blocking an employee from emailing a spreadsheet of customer credit card numbers.</span></span> tools integrate with Zero Trust frameworks to enforce data access policies automatically.
+        </p>
+
+        <div class="video-container">
+          <iframe src="https://www.youtube.com/embed/wpAjYp0yiSs"
+            title="Zero Trust Architecture - The Five Pillars Explained"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen loading="lazy"></iframe>
+        </div>
+        <p class="video-caption">🎬 A closer look at Zero Trust architecture and its core components. (~8 min)</p>
+
+        <div class="callout success">
+          <div class="callout-title">✅ Key Takeaway</div>
+          No single pillar is sufficient on its own. Verifying identity but ignoring device health, or securing the network but ignoring data encryption, still leaves major gaps. Zero Trust is a <em>defense-in-depth</em> strategy that stacks multiple layers of protection, so that compromising one layer doesn't give an attacker the keys to the kingdom.
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="goToScreen('screen-m1')">← Back</button>
+          <button class="btn-primary" onclick="goToScreen('screen-m3')">Module 3: Identity &amp; MFA →</button>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           MODULE 3 — IDENTITY & MFA
+           ========================================== -->
+      <section id="screen-m3" class="module-screen" aria-labelledby="m3-title">
+        <p class="module-subtitle">Module 3 of 6</p>
+        <h2 id="m3-title" class="module-title">// Identity &amp; Multi-Factor Authentication</h2>
+
+        <p class="content-p">
+          If Zero Trust has a single most important pillar, it is <span class="highlight">identity</span>. Everything else in the framework — network controls, device policies, data encryption — depends on knowing with high confidence <em>who or what</em> is making a request. This module dives deep into how modern organizations establish and verify identity, and why basic username/password authentication is woefully insufficient for a Zero Trust world.
+        </p>
+
+        <h3 class="section-heading">Why Passwords Alone Are Not Enough</h3>
+
+        <p class="content-p">
+          Passwords have been the primary authentication mechanism since the dawn of computing. The problem? Humans are terrible at creating and managing them. Research from Verizon's Data Breach Investigations Report has consistently shown that roughly <span class="highlight">80% of hacking-related breaches involve stolen or weak credentials</span>. Attackers use techniques like <em>phishing</em> (tricking users into entering credentials on fake sites), <em>credential stuffing</em> (reusing breached username/password pairs from data leaks), and <em>brute force attacks</em> (automated guessing). A password alone, no matter how complex, can be stolen without the user even knowing.
+        </p>
+
+        <h3 class="section-heading">Multi-Factor Authentication (MFA) Explained</h3>
+
+        <p class="content-p">
+          <span class="highlight">Multi-Factor Authentication (MFA)</span> adds one or more additional verification steps beyond the password. The idea is based on three classic authentication factors:
+        </p>
+
+        <div class="card-grid cols-3">
+          <div class="info-card">
+            <div class="info-card-icon">🧠</div>
+            <div class="info-card-title">Something You Know</div>
+            <div class="info-card-body">A password, PIN, or the answer to a security question. This factor alone is vulnerable to phishing and data breaches.</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-icon">📱</div>
+            <div class="info-card-title">Something You Have</div>
+            <div class="info-card-body">A phone (for SMS codes or authenticator apps like Google Authenticator), a hardware security key (like a YubiKey), or a smart card. Much harder for attackers to steal remotely.</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-icon">👁️</div>
+            <div class="info-card-title">Something You Are</div>
+            <div class="info-card-body">A biometric: fingerprint, face recognition, retina scan, or voice pattern. Built into most modern smartphones and laptops. Convenient and strong, but not infallible.</div>
+          </div>
+        </div>
+
+        <p class="content-p mt-md">
+          True MFA requires at least <em>two different types</em> of factors. Requiring a password plus a PIN is not MFA — both are "something you know." True MFA would be a password <em>plus</em> a code from an authenticator app (something you know + something you have).
+        </p>
+
+        <h3 class="section-heading">MFA Methods: A Spectrum of Strength</h3>
+
+        <p class="content-p">
+          Not all MFA is created equal. Here's how common methods stack up, from weakest to strongest:
+        </p>
+
+        <div class="accordion" id="mfa-accordion">
+
+          <div class="accordion-item">
+            <button class="accordion-trigger" aria-expanded="false" aria-controls="acc-sms" onclick="toggleAccordion(this)">
+              <span class="accordion-trigger-title">📨 SMS / Text Message Codes</span>
+              <span class="accordion-chevron">▼</span>
+            </button>
+            <div class="accordion-body" id="acc-sms" role="region">
+              <p>A one-time code is sent via text message. This is the most widely deployed form of MFA and is significantly better than passwords alone. However, it has known vulnerabilities: <em>SIM swapping</em> (an attacker convinces a carrier to transfer your phone number to their SIM card) and <em>SS7 attacks</em> (exploiting weaknesses in the telephony protocol). Real-time phishing sites can also trick users into entering their SMS code on a fake login page. NIST now discourages SMS OTP for high-security environments but still considers it acceptable for general use.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger" aria-expanded="false" aria-controls="acc-totp" onclick="toggleAccordion(this)">
+              <span class="accordion-trigger-title">⏰ Authenticator Apps (TOTP)</span>
+              <span class="accordion-chevron">▼</span>
+            </button>
+            <div class="accordion-body" id="acc-totp" role="region">
+              <p>Apps like Google Authenticator, Microsoft Authenticator, and Authy generate <em>Time-based One-Time Passwords (TOTP)</em> — six-digit codes that change every 30 seconds. These codes are generated locally on the device, without needing network access, using a shared secret established during setup. They are immune to SIM swapping and SS7 attacks. However, they are still vulnerable to real-time phishing (the attacker can relay the code before it expires) and to malware that can read codes from a compromised device. Widely recommended for most enterprise environments.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger" aria-expanded="false" aria-controls="acc-push" onclick="toggleAccordion(this)">
+              <span class="accordion-trigger-title">📲 Push Notifications (Number Matching)</span>
+              <span class="accordion-chevron">▼</span>
+            </button>
+            <div class="accordion-body" id="acc-push" role="region">
+              <p>Apps like Duo Security or Microsoft Authenticator send a push notification to the user's phone when a login is attempted. The user taps "Approve" or "Deny." This is convenient and broadly deployed in enterprise settings. However, attackers have successfully used <em>MFA fatigue attacks</em> (also called push bombing) — flooding users with approval requests until they accidentally or frustratedly tap "Approve." Modern implementations counter this with <em>number matching</em>: the app displays a number from the login screen, and the user must enter that same number in the app, making accidental approval nearly impossible.</p>
+            </div>
+          </div>
+
+          <div class="accordion-item">
+            <button class="accordion-trigger" aria-expanded="false" aria-controls="acc-fido" onclick="toggleAccordion(this)">
+              <span class="accordion-trigger-title">🔑 Hardware Keys &amp; Passkeys (FIDO2 / WebAuthn)</span>
+              <span class="accordion-chevron">▼</span>
+            </button>
+            <div class="accordion-body" id="acc-fido" role="region">
+              <p>Physical hardware security keys (like YubiKey) and the software-based <em>passkeys</em> standard are the strongest and most phishing-resistant form of MFA available today. They use the <strong>FIDO2 / WebAuthn</strong> standard: during authentication, the device cryptographically proves it possesses a private key without ever sending that key over the network. Critically, the authentication is bound to the specific website's domain — a phishing site cannot intercept the response because the device detects the domain mismatch. Passkeys are now supported by Apple, Google, and Microsoft, and are considered the future of authentication. For high-security Zero Trust environments, FIDO2 is the gold standard.</p>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="section-heading">Adaptive / Risk-Based Authentication</h3>
+
+        <p class="content-p">
+          Zero Trust doesn't just check identity once — it uses <span class="highlight">adaptive authentication</span> to continuously evaluate risk throughout a session. The system considers signals like: Is this the user's normal location? Is this a registered device? Is the login happening at an unusual time? Has the user's behavior changed since login? If any signal looks suspicious, the system can require step-up authentication (additional MFA factor), limit the user's access, or terminate the session. This is why Zero Trust can often provide a <em>better user experience</em> than traditional VPNs — trusted users on trusted devices in trusted locations may not need to re-authenticate constantly, while anomalous sessions get flagged immediately.
+        </p>
+
+        <div class="callout">
+          <div class="callout-title">💡 Real-World Example: Lapsus$ Attacks (2021–2022)</div>
+          The Lapsus$ hacking group successfully breached Microsoft, NVIDIA, Samsung, and Okta by targeting employees with social engineering and SIM swapping. In many cases, they bypassed MFA by either convincing carriers to transfer the victim's phone number, or by using real-time phishing proxies to relay authenticator app codes. Their success highlighted the importance of <em>phishing-resistant MFA</em> (FIDO2) and the need for Zero Trust to check device health and behavioral signals, not just authentication codes.
+        </div>
+
+        <div class="video-container">
+          <iframe src="https://www.youtube.com/embed/txPZa3wLIOE"
+            title="How Zero Trust and Identity Management Work Together"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen loading="lazy"></iframe>
+        </div>
+        <p class="video-caption">🎬 Identity verification and Zero Trust: how they connect in practice.</p>
+
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="goToScreen('screen-m2')">← Back</button>
+          <button class="btn-primary" onclick="goToScreen('screen-m4')">Module 4: Micro-Segmentation →</button>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           MODULE 4 — MICRO-SEGMENTATION
+           ========================================== -->
+      <section id="screen-m4" class="module-screen" aria-labelledby="m4-title">
+        <p class="module-subtitle">Module 4 of 6</p>
+        <h2 id="m4-title" class="module-title">// Micro-Segmentation &amp; Least Privilege</h2>
+
+        <p class="content-p">
+          You've verified the user's identity and confirmed their device is healthy. Now what? In a traditional network, the answer is: let them in and give them broad access to the internal network. In Zero Trust, the answer is: grant them access to <em>only the specific resource they need</em>, for the duration they need it, and nothing more. This principle is called <span class="highlight">least-privilege access</span>, and the primary technical mechanism for enforcing it at the network level is <span class="highlight">micro-segmentation</span>.
+        </p>
+
+        <h3 class="section-heading">What Is Micro-Segmentation?</h3>
+
+        <p class="content-p">
+          Traditional network security divides the network into large zones — often just "inside" and "outside," or maybe a DMZ for web-facing servers. Everything inside a zone can freely communicate with everything else inside that zone. Micro-segmentation takes this concept and shrinks the zones down to the level of individual workloads, applications, or even individual processes. Instead of one big "internal network" where everything trusts everything, you get hundreds of tiny isolated segments, each with its own access rules.
+        </p>
+
+        <p class="content-p">
+          Imagine a hospital's network as a city. Traditional segmentation is like having a perimeter wall around the city — once you're inside, you can walk anywhere. Micro-segmentation is like every building, every floor, and every room having its own locked door and requiring credentials to enter. A thief who breaks into the pharmacy can't automatically access the patient records server on the sixth floor of the same building.
+        </p>
+
+        <div class="callout danger">
+          <div class="callout-title">🚨 The NotPetya Lesson</div>
+          In 2017, the NotPetya ransomware devastated shipping giant Maersk — causing an estimated $300 million in damage — largely because the company's internal network allowed unrestricted lateral movement. Once a single machine was infected, the malware spread to virtually every Windows machine in the company. Micro-segmentation would have contained the blast radius dramatically.
+        </div>
+
+        <h3 class="section-heading">How Micro-Segmentation Is Implemented</h3>
+
+        <div class="scenario-tabs" role="tablist" aria-label="Micro-segmentation techniques">
+          <button class="scenario-tab active" role="tab" aria-selected="true" aria-controls="seg-panel-1" onclick="switchTab(this,'seg-panels')" id="seg-tab-1">Host-Based Firewalls</button>
+          <button class="scenario-tab" role="tab" aria-selected="false" aria-controls="seg-panel-2" onclick="switchTab(this,'seg-panels')" id="seg-tab-2">SDN &amp; Overlay Networks</button>
+          <button class="scenario-tab" role="tab" aria-selected="false" aria-controls="seg-panel-3" onclick="switchTab(this,'seg-panels')" id="seg-tab-3">Service Meshes</button>
+        </div>
+
+        <div id="seg-panels">
+          <div class="scenario-panel active" id="seg-panel-1" role="tabpanel" aria-labelledby="seg-tab-1">
+            <p class="content-p">
+              The most straightforward approach: deploy a firewall or agent on each server or workload that enforces rules about what traffic is allowed in and out. Tools like <em>Windows Defender Firewall</em>, <em>iptables</em> on Linux, or dedicated agents from vendors like Illumio or Guardicore sit on each host and enforce policy. The advantage is that this approach works with any underlying network — you don't need special hardware. The disadvantage is that it requires managing policies across potentially thousands of individual hosts.
+            </p>
+          </div>
+          <div class="scenario-panel" id="seg-panel-2" role="tabpanel" aria-labelledby="seg-tab-2">
+            <p class="content-p">
+              <span class="highlight">Software-Defined Networking (SDN)</span> allows network behavior to be controlled programmatically through software. In a data center or cloud environment, SDN controllers can dynamically create isolated network overlays — virtual networks that sit on top of the physical infrastructure. Traffic between segments is controlled and inspected centrally. Cloud platforms like AWS (using Security Groups and VPC peering rules) and Azure (using Network Security Groups) implement this model natively. You define traffic rules in code, and the platform enforces them automatically.
+            </p>
+          </div>
+          <div class="scenario-panel" id="seg-panel-3" role="tabpanel" aria-labelledby="seg-tab-3">
+            <p class="content-p">
+              In modern cloud-native environments built on containers and microservices, a <span class="highlight">service mesh</span> (like <em>Istio</em> or <em>Linkerd</em>) handles inter-service communication. Each microservice gets a sidecar proxy that enforces mutual TLS (mTLS) authentication — every service must cryptographically prove its identity to every other service before communication is allowed. Policy engines within the mesh define which services are allowed to talk to which, with fine-grained rules. This is Zero Trust applied at the application/workload level in a Kubernetes environment.
+            </p>
+          </div>
+        </div>
+
+        <h3 class="section-heading">Least Privilege Access</h3>
+
+        <p class="content-p">
+          <span class="highlight">Least-privilege access</span> means that users, processes, and systems should only have the minimum permissions necessary to perform their current task — nothing more, nothing less. This principle applies at multiple levels: a database user account should only be able to read the tables it needs (not modify or delete them); an employee should only have access to the business systems relevant to their job; a container process should only run with the privileges required for that specific workload.
+        </p>
+
+        <p class="content-p">
+          A related concept is <span class="tooltip-wrap"><span class="key-term">Just-in-Time (JIT) access</span><span class="tooltip-box">JIT access means privileged access is granted only when needed, for a specific time window, and then automatically revoked. This reduces the risk of standing privileged accounts being compromised.</span></span>. Instead of giving administrators permanent administrative accounts (which become high-value targets), JIT access grants elevated privileges only when requested and for a limited time window — say, 30 minutes to perform a specific maintenance task — and then revokes them automatically. Microsoft's Azure Active Directory Privileged Identity Management (PIM) and similar tools implement this model.
+        </p>
+
+        <div class="card-grid cols-2">
+          <div class="info-card">
+            <div class="info-card-icon">🗂️</div>
+            <div class="info-card-title">Role-Based Access Control (RBAC)</div>
+            <div class="info-card-body">Permissions are assigned to roles (e.g., "developer," "admin," "read-only analyst"), and users are assigned to roles. Users inherit the permissions of their role. Easy to manage at scale, but can lead to "role explosion" if too many roles are created.</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-icon">📋</div>
+            <div class="info-card-title">Attribute-Based Access Control (ABAC)</div>
+            <div class="info-card-body">Access decisions are based on attributes — user attributes (department, clearance level), resource attributes (data classification), and context attributes (time of day, device health). More flexible and powerful than RBAC, especially in complex Zero Trust environments.</div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="goToScreen('screen-m3')">← Back</button>
+          <button class="btn-primary" onclick="goToScreen('screen-m5')">Module 5: Policy Engine &amp; SASE →</button>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           MODULE 5 — POLICY ENGINE & SASE
+           ========================================== -->
+      <section id="screen-m5" class="module-screen" aria-labelledby="m5-title">
+        <p class="module-subtitle">Module 5 of 6</p>
+        <h2 id="m5-title" class="module-title">// Policy Engine, Continuous Monitoring &amp; SASE</h2>
+
+        <p class="content-p">
+          Everything we've covered so far — identity verification, device health checks, micro-segmentation, least privilege — needs a central brain that decides whether to allow or deny each access request. In Zero Trust architecture, this brain is called the <span class="highlight">Policy Engine</span> (PE) and <span class="highlight">Policy Administrator</span> (PA). And delivering all these capabilities to distributed users and cloud environments is increasingly done through a modern architecture called <span class="highlight">SASE (Secure Access Service Edge)</span>.
+        </p>
+
+        <h3 class="section-heading">The Policy Engine: Zero Trust's Decision Maker</h3>
+
+        <p class="content-p">
+          According to NIST SP 800-207 (the U.S. government's Zero Trust reference framework), every access request flows through the following logic:
+        </p>
+
+        <div class="card-grid cols-3">
+          <div class="info-card">
+            <div class="info-card-icon">🔍</div>
+            <div class="info-card-title">Policy Engine (PE)</div>
+            <div class="info-card-body">The component that evaluates access requests against policy rules. It consumes signals from identity providers, device health systems, threat intelligence, and behavioral analytics to make an allow/deny decision.</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-icon">⚙️</div>
+            <div class="info-card-title">Policy Administrator (PA)</div>
+            <div class="info-card-body">Executes the Policy Engine's decision. If access is allowed, the PA generates credentials and communicates the decision to the Policy Enforcement Point. If denied, it sends a termination signal.</div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-icon">🚧</div>
+            <div class="info-card-title">Policy Enforcement Point (PEP)</div>
+            <div class="info-card-body">The gateway or proxy that actually allows or blocks the traffic. It sits between the subject (user/device) and the resource (application/data). All access flows through the PEP.</div>
+          </div>
+        </div>
+
+        <p class="content-p mt-md">
+          The Policy Engine doesn't just check rules statically. It continuously evaluates <span class="highlight">contextual signals</span>: Is the user's device compliant at this moment? Has the user's location changed suspiciously? Has the IP address been flagged in threat intelligence feeds? Are there any anomalous behavioral patterns? This constant evaluation is what makes Zero Trust <em>dynamic</em> rather than a one-time check-box.
+        </p>
+
+        <h3 class="section-heading">🔬 Interactive: Policy Simulator</h3>
+        <p class="content-p">Use the controls below to see how a Zero Trust Policy Engine might respond to different access scenarios:</p>
+
+        <div class="policy-sim" aria-label="Policy simulator">
+          <div class="policy-row">
+            <label class="policy-label" for="sim-user">User Type</label>
+            <select class="policy-select" id="sim-user" onchange="runSim()">
+              <option value="employee">Employee (active directory)</option>
+              <option value="contractor">External Contractor</option>
+              <option value="unknown">Unknown / Unauthenticated</option>
+            </select>
+          </div>
+          <div class="policy-row">
+            <label class="policy-label" for="sim-device">Device Health</label>
+            <select class="policy-select" id="sim-device" onchange="runSim()">
+              <option value="compliant">Compliant (MDM-enrolled, patched)</option>
+              <option value="personal">Personal/Unmanaged Device</option>
+              <option value="compromised">Flagged as Compromised</option>
+            </select>
+          </div>
+          <div class="policy-row">
+            <label class="policy-label" for="sim-mfa">Authentication</label>
+            <select class="policy-select" id="sim-mfa" onchange="runSim()">
+              <option value="fido2">FIDO2 Hardware Key</option>
+              <option value="totp">TOTP Authenticator App</option>
+              <option value="password">Password Only (No MFA)</option>
+            </select>
+          </div>
+          <div class="policy-row">
+            <label class="policy-label" for="sim-resource">Resource</label>
+            <select class="policy-select" id="sim-resource" onchange="runSim()">
+              <option value="public">Public Intranet Page</option>
+              <option value="sensitive">Sensitive Customer Database</option>
+              <option value="critical">Critical Infrastructure Admin Console</option>
+            </select>
+          </div>
+
+          <div class="policy-result" id="sim-result" role="status" aria-live="polite">
+            Evaluating...
+          </div>
+        </div>
+
+        <h3 class="section-heading">Continuous Monitoring &amp; Logging</h3>
+
+        <p class="content-p">
+          Zero Trust requires that you can't just grant access and forget about it. All access must be <span class="highlight">continuously monitored</span> and logged. This generates an enormous amount of data — every login, every API call, every file download — which is fed into a <span class="tooltip-wrap"><span class="key-term">SIEM (Security Information and Event Management)</span><span class="tooltip-box">A SIEM platform aggregates logs from across the environment, correlates events to identify patterns indicative of attacks, and generates alerts. Examples: Microsoft Sentinel, Splunk, IBM QRadar.</span></span> system and increasingly into <span class="tooltip-wrap"><span class="key-term">UEBA (User and Entity Behavior Analytics)</span><span class="tooltip-box">UEBA tools use machine learning to build baselines of normal user and device behavior, then alert on deviations that may indicate compromise or insider threat.</span></span> platforms that use AI to detect anomalies. The goal is to shrink the time from intrusion to detection — the infamous "dwell time" that averaged over 200 days in traditional environments.
+        </p>
+
+        <h3 class="section-heading">SASE: Delivering Zero Trust at the Edge</h3>
+
+        <p class="content-p">
+          As workforces went remote and applications moved to the cloud, a new challenge emerged: how do you deliver consistent Zero Trust security to users who are everywhere, accessing applications that are also everywhere? The answer from Gartner (who coined the term in 2019) is <span class="highlight">SASE — Secure Access Service Edge</span>. SASE converges networking and security into a single cloud-delivered service, delivered close to where users are (at the "edge").
+        </p>
+
+        <div class="card-grid cols-2">
+          <div class="info-card">
+            <div class="info-card-icon">🔐</div>
+            <div class="info-card-title">Security Components of SASE</div>
+            <div class="info-card-body">
+              <strong>CASB</strong> (Cloud Access Security Broker) — controls SaaS app access<br>
+              <strong>SWG</strong> (Secure Web Gateway) — filters web traffic<br>
+              <strong>ZTNA</strong> (Zero Trust Network Access) — replaces VPN<br>
+              <strong>FWaaS</strong> (Firewall as a Service) — cloud-based next-gen firewall<br>
+              <strong>DLP</strong> — enforces data loss prevention policies
+            </div>
+          </div>
+          <div class="info-card">
+            <div class="info-card-icon">🌐</div>
+            <div class="info-card-title">Networking Components of SASE</div>
+            <div class="info-card-body">
+              <strong>SD-WAN</strong> (Software-Defined WAN) — intelligent traffic routing<br>
+              <strong>CDN/Edge PoPs</strong> — deliver security inspection close to users<br>
+              <strong>QoS / Optimization</strong> — prioritize critical traffic<br>
+              <strong>Cloud-native delivery</strong> — scale up/down on demand
+            </div>
+          </div>
+        </div>
+
+        <p class="content-p mt-md">
+          A key component of SASE is <span class="highlight">ZTNA (Zero Trust Network Access)</span>, which replaces traditional VPNs. With a VPN, users connect to a corporate network endpoint and then have broad access to internal resources. ZTNA instead creates a secure, application-specific tunnel — a user can only access the specific application they're authorized for, with no visibility into or access to the rest of the network. Vendors like Zscaler, Palo Alto Networks (Prisma Access), and Cloudflare Access implement ZTNA as part of their SASE offerings.
+        </p>
+
+        <div class="video-container">
+          <iframe src="https://www.youtube.com/embed/TVl9jmMJ_Dw"
+            title="SASE and Zero Trust Network Access Explained"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen loading="lazy"></iframe>
+        </div>
+        <p class="video-caption">🎬 SASE and ZTNA: next-generation network security explained. (~10 min)</p>
+
+        <div class="callout">
+          <div class="callout-title">💡 SASE in Practice: A Day in the Life</div>
+          Priya is a contractor working from a café in Austin. She opens her laptop and tries to access a financial reporting app. The SASE platform's ZTNA checks her identity (she authenticates with her FIDO2 key), verifies her device health (her managed laptop passes compliance checks), evaluates her risk score (low — normal location, normal time), and applies data policies (she can view reports but not download them as CSV). Access is granted — to that specific app only. Priya never connects to the corporate "network." The whole process is invisible to her.
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="goToScreen('screen-m4')">← Back</button>
+          <button class="btn-primary" onclick="goToScreen('screen-quiz')">Module 6: Knowledge Check →</button>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           MODULE 6 — KNOWLEDGE CHECK QUIZ
+           ========================================== -->
+      <section id="screen-quiz" class="module-screen" aria-labelledby="quiz-title">
+        <p class="module-subtitle">Module 6 of 6</p>
+        <h2 id="quiz-title" class="module-title">// Knowledge Check</h2>
+        <p class="content-p">
+          Ten questions covering everything in this module. Questions are randomized each time. Select your answer, then click "Check Answer" to get immediate feedback. When you've answered all ten, click "See Results" to view your score.
+        </p>
+
+        <div id="quiz-container">
+          <div class="quiz-header">
+            <span class="quiz-counter" id="quiz-counter" aria-live="polite">Question 1 of 10</span>
+            <span class="quiz-counter" id="quiz-score-live" aria-live="polite">Score: 0</span>
+          </div>
+
+          <div class="quiz-question-text" id="quiz-question" aria-live="polite" aria-atomic="true">
+            Loading question…
+          </div>
+
+          <div class="quiz-options" id="quiz-options" role="group" aria-labelledby="quiz-question">
+            <!-- Populated by JS -->
+          </div>
+
+          <div class="quiz-feedback" id="quiz-feedback" role="alert" aria-live="assertive"></div>
+
+          <div class="btn-row" id="quiz-btn-row">
+            <button class="btn-primary" id="btn-check" onclick="checkAnswer()">Check Answer</button>
+            <button class="btn-secondary" id="btn-next" style="display:none;" onclick="nextQuestion()">Next Question →</button>
+            <button class="btn-primary" id="btn-finish" style="display:none;" onclick="finishQuiz()">See Results →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           RESULTS SCREEN
+           ========================================== -->
+      <section id="screen-results" class="module-screen" aria-labelledby="results-title">
+        <div id="results-screen">
+          <div class="results-score-ring" id="results-ring" aria-hidden="true">
+            <span class="results-score-number" id="results-pct">0%</span>
+          </div>
+
+          <h2 id="results-title" class="results-title" id="results-heading"></h2>
+          <p class="results-message" id="results-message"></p>
+
+          <div class="results-stats">
+            <div class="results-stat">
+              <div class="results-stat-value" id="stat-correct">0</div>
+              <div class="results-stat-label">Correct</div>
+            </div>
+            <div class="results-stat">
+              <div class="results-stat-value" id="stat-total">10</div>
+              <div class="results-stat-label">Total</div>
+            </div>
+            <div class="results-stat">
+              <div class="results-stat-value" id="stat-pct">0%</div>
+              <div class="results-stat-label">Score</div>
+            </div>
+          </div>
+
+          <div class="btn-row" style="justify-content: center;">
+            <button class="btn-primary" onclick="resetAll()">🔄 Try Again</button>
+            <button class="btn-secondary" onclick="goToScreen('screen-m1')">📖 Review Content</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav id="mobile-nav" aria-label="Quick module navigation">
+  <button class="mobile-nav-btn active" onclick="goToScreen('screen-hero')">
+    <span class="mobile-nav-icon">🏠</span>
+    <span>Home</span>
+  </button>
+  <button class="mobile-nav-btn" onclick="goToScreen('screen-m1')">
+    <span class="mobile-nav-icon">📖</span>
+    <span>Modules</span>
+  </button>
+  <button class="mobile-nav-btn" onclick="goToScreen('screen-m3')">
+    <span class="mobile-nav-icon">🔐</span>
+    <span>Identity</span>
+  </button>
+  <button class="mobile-nav-btn" onclick="goToScreen('screen-quiz')">
+    <span class="mobile-nav-icon">✍️</span>
+    <span>Quiz</span>
+  </button>
+  <button class="mobile-nav-btn" onclick="goToScreen('screen-results')">
+    <span class="mobile-nav-icon">🏆</span>
+    <span>Results</span>
+  </button>
+</nav>
+
+<script>
+/* ============================================================
+   ZERO TRUST INTERACTIVE LEARNING MODULE
+   JavaScript — all logic below
+   ============================================================ */
+
+/* ============================================================
+   CONSTANTS & STATE
+   ============================================================ */
+
+// Module order for progress tracking
+const MODULE_ORDER = [
+  'screen-hero',
+  'screen-m1',
+  'screen-m2',
+  'screen-m3',
+  'screen-m4',
+  'screen-m5',
+  'screen-quiz',
+  'screen-results'
+];
+
+// Track which modules have been visited (completed)
+const visitedModules = new Set(['screen-hero']);
+let currentScreen = 'screen-hero';
+
+// Quiz state
+let quizQuestions   = [];
+let currentQIndex   = 0;
+let quizScore       = 0;
+let selectedOption  = null;
+let answered        = false;
+
+// Font size state (clamped 12–24px in 2px steps)
+let baseFontSize = 16;
+
+/* ============================================================
+   QUIZ QUESTION BANK (10 questions, shuffled each session)
+   ============================================================ */
+const QUESTION_BANK = [
+  {
+    q: "What is the core principle that defines Zero Trust security?",
+    options: [
+      { text: "Trust users who are inside the corporate network perimeter, verify those outside.", correct: false },
+      { text: "Never trust, always verify — regardless of network location.", correct: true },
+      { text: "Trust all traffic that has passed through the VPN gateway.", correct: false },
+      { text: "Verify users once at login, then trust the session for its duration.", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! Zero Trust's foundational mantra is 'Never Trust, Always Verify.' Network location — being inside or outside the firewall — is irrelevant. Every access request must be authenticated and authorized.",
+      incorrect: "Not quite. Zero Trust explicitly rejects the idea that being inside the network makes you trustworthy. The correct answer is 'Never trust, always verify — regardless of network location.'"
+    }
+  },
+  {
+    q: "Which of the following is the STRONGEST and most phishing-resistant form of multi-factor authentication?",
+    options: [
+      { text: "SMS one-time passwords sent to the user's phone number.", correct: false },
+      { text: "A time-based code from a TOTP authenticator app (e.g., Google Authenticator).", correct: false },
+      { text: "FIDO2 hardware security keys or passkeys using the WebAuthn standard.", correct: true },
+      { text: "Push notification approval via a mobile authenticator app.", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! FIDO2/WebAuthn is the gold standard. The authentication is cryptographically bound to the specific website's domain, so phishing sites cannot intercept or relay the response. It's immune to SIM swapping, SS7 attacks, and real-time phishing proxies.",
+      incorrect: "Incorrect. While all listed options are better than passwords alone, FIDO2 hardware keys and passkeys (WebAuthn) are the strongest because authentication is domain-bound — a phishing site cannot intercept the response."
+    }
+  },
+  {
+    q: "Which federal government executive order and NIST publication formalized Zero Trust as a requirement for U.S. federal agencies?",
+    options: [
+      { text: "NIST SP 800-53 and the Homeland Security Act of 2002.", correct: false },
+      { text: "Executive Order 14028 and NIST SP 800-207.", correct: true },
+      { text: "FISMA 2014 and NIST SP 800-171.", correct: false },
+      { text: "Executive Order 13800 and NIST SP 800-63.", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! President Biden's Executive Order 14028 (2021) mandated Zero Trust for federal agencies, and NIST SP 800-207 is the reference architecture document that defines how to implement it.",
+      incorrect: "Incorrect. The correct answer is Executive Order 14028 (Biden's 2021 Cybersecurity EO) and NIST SP 800-207, which is the formal Zero Trust Architecture standard."
+    }
+  },
+  {
+    q: "What does 'micro-segmentation' accomplish in a Zero Trust network?",
+    options: [
+      { text: "It compresses network packets to improve bandwidth efficiency.", correct: false },
+      { text: "It divides the network into small isolated zones to prevent lateral movement after a breach.", correct: true },
+      { text: "It monitors micro-second timing of network packets to detect intrusions.", correct: false },
+      { text: "It segments user accounts into micro-roles for fine-grained RBAC.", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! Micro-segmentation divides the network into tiny isolated zones, each with its own access controls. This limits how far an attacker can move after breaching one system — dramatically reducing the blast radius of any intrusion.",
+      incorrect: "Incorrect. Micro-segmentation refers to dividing the network into small, isolated zones. If an attacker breaches one segment, they cannot freely move to other segments — a critical defense against lateral movement."
+    }
+  },
+  {
+    q: "In NIST SP 800-207's Zero Trust architecture, what is the role of the Policy Enforcement Point (PEP)?",
+    options: [
+      { text: "It evaluates access requests against defined policy rules and makes the allow/deny decision.", correct: false },
+      { text: "It stores and manages user identity credentials and roles.", correct: false },
+      { text: "It sits between the subject and the resource, enforcing the decision made by the Policy Engine.", correct: true },
+      { text: "It generates compliance reports for auditors and regulators.", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! The PEP is the enforcer — the gateway or proxy that actually allows or blocks traffic based on the decision made by the Policy Engine. It does not make decisions itself; it executes them.",
+      incorrect: "Incorrect. The Policy Engine (PE) makes the allow/deny decision; the Policy Administrator (PA) communicates it; the Policy Enforcement Point (PEP) enforces it by actually allowing or blocking the connection at the gateway."
+    }
+  },
+  {
+    q: "Which attack technique specifically targets MFA by sending repeated push notifications to a user's phone until they accidentally approve?",
+    options: [
+      { text: "SIM Swapping", correct: false },
+      { text: "SS7 Protocol Attack", correct: false },
+      { text: "MFA Fatigue / Push Bombing", correct: true },
+      { text: "Credential Stuffing", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! MFA fatigue (push bombing) floods the victim with push notification approval requests. The attacker hopes the user will eventually approve one out of frustration or mistake. Modern defenses include number matching, which requires the user to type a code shown on screen into the app.",
+      incorrect: "Incorrect. The attack described is 'MFA Fatigue' or 'Push Bombing.' Lapsus$ used this technique successfully against several major organizations. The defense is number matching in push-based MFA."
+    }
+  },
+  {
+    q: "What is SASE, and what problem does it primarily solve?",
+    options: [
+      { text: "Security Assertion and Signing Environment — it manages digital certificates for TLS.", correct: false },
+      { text: "Secure Access Service Edge — it converges networking and security into a cloud-delivered service for distributed users and cloud applications.", correct: true },
+      { text: "Software-Defined Application Security Engine — it secures APIs between microservices.", correct: false },
+      { text: "Segmented Access Security Enterprise — it replaces traditional firewalls in data centers.", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! SASE (coined by Gartner in 2019) converges SD-WAN networking capabilities with security services like ZTNA, CASB, SWG, and FWaaS into a single cloud-delivered platform. It solves the problem of delivering consistent Zero Trust security to users and applications that are everywhere.",
+      incorrect: "Incorrect. SASE stands for Secure Access Service Edge. It combines networking (SD-WAN) and security (ZTNA, CASB, SWG, FWaaS) into one cloud-delivered service, addressing the challenge of securing a distributed workforce accessing cloud applications."
+    }
+  },
+  {
+    q: "Just-in-Time (JIT) access is a key least-privilege concept. Which statement best describes it?",
+    options: [
+      { text: "Users are always assigned the maximum permissions for their role to avoid access requests delaying work.", correct: false },
+      { text: "Privileged access is granted only when requested, for a specific task and limited time window, then automatically revoked.", correct: true },
+      { text: "Access decisions are made just in time — within milliseconds — by a real-time AI system.", correct: false },
+      { text: "Users must submit access requests three business days in advance to allow security review.", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! JIT access means no standing privileged accounts. When an admin needs elevated access (e.g., to patch a server), they request it for a specific purpose and time window. Once complete, the elevated privileges are automatically revoked, dramatically reducing the attack surface.",
+      incorrect: "Incorrect. JIT access means privileged access is temporary — granted on request, for a specific task, for a limited time, then automatically revoked. Tools like Azure AD Privileged Identity Management (PIM) implement this."
+    }
+  },
+  {
+    q: "Which of the following correctly distinguishes RBAC from ABAC?",
+    options: [
+      { text: "RBAC allows access based on user attributes and context; ABAC is based on predefined roles.", correct: false },
+      { text: "RBAC and ABAC are different names for the same access control model.", correct: false },
+      { text: "RBAC grants access based on assigned roles (e.g., 'admin,' 'developer'); ABAC uses dynamic attributes (e.g., user department, data classification, time of day).", correct: true },
+      { text: "RBAC is used only in cloud environments; ABAC is used only in on-premises systems.", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! Role-Based Access Control assigns permissions to roles, then assigns users to roles. Attribute-Based Access Control evaluates dynamic attributes — who the user is, what resource they want, what conditions exist — making it more flexible and powerful for complex Zero Trust policies.",
+      incorrect: "Incorrect. RBAC grants access based on predefined roles (e.g., 'read-only analyst'), while ABAC evaluates multiple dynamic attributes at access time — user attributes, resource classification, context like time and location — making it more flexible for Zero Trust environments."
+    }
+  },
+  {
+    q: "Google's BeyondCorp initiative is significant in Zero Trust history primarily because it:",
+    options: [
+      { text: "Was the first commercial product sold as a 'Zero Trust' solution.", correct: false },
+      { text: "Demonstrated that large-scale Zero Trust could be implemented in a real organization, enabling employees to work without a VPN from any device.", correct: true },
+      { text: "Introduced the concept of multi-factor authentication to enterprise security.", correct: false },
+      { text: "Was the first government mandate requiring Zero Trust for federal agencies.", correct: false }
+    ],
+    feedback: {
+      correct: "Correct! BeyondCorp (launched ~2011 after the Operation Aurora attack) was groundbreaking because Google actually implemented Zero Trust at scale. Employees could securely access corporate applications from any network, without a VPN, using identity and device verification — proving the model was practical for large enterprises.",
+      incorrect: "Incorrect. BeyondCorp is significant because Google implemented Zero Trust in the real world, at scale, after being targeted in the Operation Aurora cyberattack. It showed the industry that Zero Trust was practical, not just theoretical."
+    }
+  }
+];
+
+/* ============================================================
+   Fisher-Yates shuffle — randomizes array in place
+   Returns a new shuffled copy.
+   ============================================================ */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ============================================================
+   SCREEN NAVIGATION
+   Controls which module screen is visible,
+   updates progress bar, and marks sidebar items.
+   ============================================================ */
+function goToScreen(screenId) {
+  // Hide all screens
+  document.querySelectorAll('.module-screen').forEach(s => {
+    s.classList.remove('active');
+  });
+
+  // Show the target screen
+  const target = document.getElementById(screenId);
+  if (target) {
+    target.classList.add('active');
+    currentScreen = screenId;
+    visitedModules.add(screenId);
+    updateProgress();
+    updateSidebarNav(screenId);
+    updateMobileNav(screenId);
+    // Scroll to top of content area
+    document.getElementById('content-panel').scrollTop = 0;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Initialize quiz when navigating to it
+  if (screenId === 'screen-quiz') {
+    initQuiz();
+  }
+}
+
+/* ============================================================
+   PROGRESS BAR
+   Calculates percentage of modules visited.
+   ============================================================ */
+function updateProgress() {
+  const total   = MODULE_ORDER.length;
+  const visited = MODULE_ORDER.filter(id => visitedModules.has(id)).length;
+  const pct     = Math.round((visited / total) * 100);
+  const moduleIndex = MODULE_ORDER.indexOf(currentScreen);
+
+  const fill  = document.getElementById('progress-bar-fill');
+  const label = document.getElementById('progress-label');
+  const modInd = document.getElementById('module-indicator');
+
+  fill.style.width = pct + '%';
+  fill.setAttribute('aria-valuenow', pct);
+  label.textContent = pct + '% Complete';
+  modInd.textContent = 'Module ' + (moduleIndex) + ' / ' + (MODULE_ORDER.length - 2);
+}
+
+/* ============================================================
+   SIDEBAR NAV HIGHLIGHTS
+   ============================================================ */
+function updateSidebarNav(activeScreenId) {
+  document.querySelectorAll('.nav-module-item').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.getAttribute('data-target') === activeScreenId) {
+      btn.classList.add('active');
+    }
+    // Mark completed
+    const checkId = 'nav-check-' + btn.getAttribute('data-target').replace('screen-', '');
+    const check = document.getElementById(checkId);
+    if (check && visitedModules.has(btn.getAttribute('data-target'))) {
+      check.textContent = '✅';
+      btn.classList.add('completed');
+    }
+  });
+}
+
+/* ============================================================
+   MOBILE NAV HIGHLIGHTS
+   ============================================================ */
+function updateMobileNav(activeScreenId) {
+  document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+}
+
+/* ============================================================
+   ACCORDION TOGGLE
+   Opens/closes accordion panels.
+   ============================================================ */
+function toggleAccordion(trigger) {
+  const expanded = trigger.getAttribute('aria-expanded') === 'true';
+  const bodyId   = trigger.getAttribute('aria-controls');
+  const body     = document.getElementById(bodyId);
+
+  // Close all in same accordion
+  const parent = trigger.closest('.accordion');
+  parent.querySelectorAll('.accordion-trigger').forEach(t => {
+    t.setAttribute('aria-expanded', 'false');
+    const bid = t.getAttribute('aria-controls');
+    const b   = document.getElementById(bid);
+    if (b) b.classList.remove('open');
+  });
+
+  // Toggle this one
+  if (!expanded) {
+    trigger.setAttribute('aria-expanded', 'true');
+    if (body) body.classList.add('open');
+  }
+}
+
+/* ============================================================
+   SCENARIO TABS (tabbed content panels)
+   ============================================================ */
+function switchTab(clickedTab, panelsContainerId) {
+  // Get all tabs in the same tab group (parent element)
+  const tabGroup = clickedTab.parentElement;
+  const panelsEl = document.getElementById(panelsContainerId);
+
+  tabGroup.querySelectorAll('.scenario-tab').forEach(t => {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected', 'false');
+  });
+
+  panelsEl.querySelectorAll('.scenario-panel').forEach(p => {
+    p.classList.remove('active');
+  });
+
+  clickedTab.classList.add('active');
+  clickedTab.setAttribute('aria-selected', 'true');
+
+  const targetPanelId = clickedTab.getAttribute('aria-controls');
+  const targetPanel = document.getElementById(targetPanelId);
+  if (targetPanel) targetPanel.classList.add('active');
+}
+
+/* ============================================================
+   POLICY SIMULATOR
+   Evaluates access request based on dropdown selections.
+   ============================================================ */
+function runSim() {
+  const user     = document.getElementById('sim-user').value;
+  const device   = document.getElementById('sim-device').value;
+  const mfa      = document.getElementById('sim-mfa').value;
+  const resource = document.getElementById('sim-resource').value;
+  const result   = document.getElementById('sim-result');
+
+  // Decision logic
+  let decision = 'allow';
+  let reason   = '';
+
+  // Unknown user always denied
+  if (user === 'unknown') {
+    decision = 'deny';
+    reason = '🚫 ACCESS DENIED — Unauthenticated user. No identity verification possible.';
+  }
+  // Compromised device always denied
+  else if (device === 'compromised') {
+    decision = 'deny';
+    reason = '🚫 ACCESS DENIED — Device flagged as compromised. Zero Trust requires device health before granting access.';
+  }
+  // No MFA + sensitive/critical always denied
+  else if (mfa === 'password' && (resource === 'sensitive' || resource === 'critical')) {
+    decision = 'deny';
+    reason = '🚫 ACCESS DENIED — Password-only authentication is insufficient for sensitive or critical resources. MFA required.';
+  }
+  // Critical resource needs FIDO2 or employee + TOTP
+  else if (resource === 'critical') {
+    if (mfa === 'fido2' && user === 'employee' && device === 'compliant') {
+      decision = 'allow';
+      reason = '✅ ACCESS GRANTED — Employee with phishing-resistant FIDO2 auth on compliant device. Highest trust level. Proceeding to critical resource with full audit logging.';
+    } else if (mfa === 'fido2') {
+      decision = 'mfa';
+      reason = '⚠️ CONDITIONAL ACCESS — FIDO2 verified, but additional step-up verification required for critical infrastructure. Requesting manager approval token.';
+    } else {
+      decision = 'deny';
+      reason = '🚫 ACCESS DENIED — Critical infrastructure requires phishing-resistant FIDO2 authentication. TOTP is not sufficient for this resource.';
+    }
+  }
+  // Contractor on personal device to sensitive resource — step up
+  else if (user === 'contractor' && device === 'personal' && resource === 'sensitive') {
+    decision = 'mfa';
+    reason = '⚠️ CONDITIONAL ACCESS — Contractor on unmanaged device requesting sensitive data. Access limited to read-only view; download blocked. Step-up MFA required.';
+  }
+  // Password only — limited access
+  else if (mfa === 'password') {
+    decision = 'mfa';
+    reason = '⚠️ STEP-UP REQUIRED — Password-only login detected. MFA required to proceed. Redirecting to MFA enrollment.';
+  }
+  // Personal device — restrict access
+  else if (device === 'personal') {
+    decision = 'mfa';
+    reason = '⚠️ CONDITIONAL ACCESS — Unmanaged personal device detected. Access limited to approved SaaS apps only. Full resource access requires a managed, MDM-enrolled device.';
+  }
+  // Default — allow
+  else {
+    decision = 'allow';
+    reason = '✅ ACCESS GRANTED — Identity verified, device compliant, MFA satisfied, risk score acceptable. Session logged and monitored continuously.';
+  }
+
+  result.className = 'policy-result ' + decision;
+  result.textContent = reason;
+}
+
+/* ============================================================
+   QUIZ: INITIALIZATION
+   Shuffles questions and options, renders first question.
+   ============================================================ */
+function initQuiz() {
+  // Reset state
+  quizQuestions  = shuffle(QUESTION_BANK).slice(0, 10);
+  // Shuffle answer options within each question
+  quizQuestions  = quizQuestions.map(q => ({
+    ...q,
+    options: shuffle(q.options)
+  }));
+  currentQIndex  = 0;
+  quizScore      = 0;
+  selectedOption = null;
+  answered       = false;
+
+  renderQuestion();
+}
+
+/* ============================================================
+   QUIZ: RENDER QUESTION
+   Displays the current question and its options.
+   ============================================================ */
+function renderQuestion() {
+  const q = quizQuestions[currentQIndex];
+
+  document.getElementById('quiz-counter').textContent =
+    'Question ' + (currentQIndex + 1) + ' of ' + quizQuestions.length;
+  document.getElementById('quiz-score-live').textContent =
+    'Score: ' + quizScore;
+  document.getElementById('quiz-question').textContent = q.q;
+
+  // Clear feedback
+  const feedback = document.getElementById('quiz-feedback');
+  feedback.textContent = '';
+  feedback.className = 'quiz-feedback';
+
+  // Render options
+  const optionsEl = document.getElementById('quiz-options');
+  optionsEl.innerHTML = '';
+  const letters = ['A', 'B', 'C', 'D'];
+
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-option';
+    btn.innerHTML = `<span class="option-letter">${letters[i]}</span><span>${opt.text}</span>`;
+    btn.setAttribute('aria-label', 'Option ' + letters[i] + ': ' + opt.text);
+    btn.dataset.index = i;
+    btn.addEventListener('click', () => selectOption(btn, i));
+    optionsEl.appendChild(btn);
+  });
+
+  // Reset buttons
+  document.getElementById('btn-check').style.display = 'inline-flex';
+  document.getElementById('btn-next').style.display = 'none';
+  document.getElementById('btn-finish').style.display = 'none';
+  document.getElementById('btn-check').disabled = true;
+
+  selectedOption = null;
+  answered = false;
+}
+
+/* ============================================================
+   QUIZ: SELECT AN OPTION
+   Highlights the selected option.
+   ============================================================ */
+function selectOption(btn, index) {
+  if (answered) return;
+
+  // Deselect all
+  document.querySelectorAll('.quiz-option').forEach(b => {
+    b.style.borderColor = '';
+    b.style.background = '';
+  });
+
+  // Highlight selected
+  btn.style.borderColor = 'var(--color-accent)';
+  btn.style.background = 'rgba(0,200,255,0.08)';
+
+  selectedOption = index;
+  document.getElementById('btn-check').disabled = false;
+}
+
+/* ============================================================
+   QUIZ: CHECK ANSWER
+   Validates selection, shows feedback, marks correct/incorrect.
+   ============================================================ */
+function checkAnswer() {
+  if (selectedOption === null || answered) return;
+  answered = true;
+
+  const q    = quizQuestions[currentQIndex];
+  const opts = document.querySelectorAll('.quiz-option');
+  const selected = opts[selectedOption];
+  const isCorrect = q.options[selectedOption].correct;
+
+  // Mark all options
+  opts.forEach((btn, i) => {
+    btn.disabled = true;
+    btn.style.borderColor = '';
+    btn.style.background = '';
+    if (q.options[i].correct) {
+      btn.classList.add('correct');
+    } else if (i === selectedOption && !isCorrect) {
+      btn.classList.add('incorrect');
+    } else {
+      btn.classList.add('revealed');
+    }
+  });
+
+  // Show feedback
+  const feedback = document.getElementById('quiz-feedback');
+  feedback.textContent = isCorrect ? q.feedback.correct : q.feedback.incorrect;
+  feedback.className = 'quiz-feedback show ' + (isCorrect ? 'correct' : 'incorrect');
+
+  if (isCorrect) {
+    quizScore++;
+    document.getElementById('quiz-score-live').textContent = 'Score: ' + quizScore;
+  }
+
+  // Show next or finish
+  document.getElementById('btn-check').style.display = 'none';
+  if (currentQIndex < quizQuestions.length - 1) {
+    document.getElementById('btn-next').style.display = 'inline-flex';
+  } else {
+    document.getElementById('btn-finish').style.display = 'inline-flex';
+  }
+}
+
+/* ============================================================
+   QUIZ: NEXT QUESTION
+   ============================================================ */
+function nextQuestion() {
+  currentQIndex++;
+  renderQuestion();
+}
+
+/* ============================================================
+   QUIZ: FINISH — show results screen
+   ============================================================ */
+function finishQuiz() {
+  const total = quizQuestions.length;
+  const pct   = Math.round((quizScore / total) * 100);
+
+  // Populate results screen
+  document.getElementById('results-pct').textContent = pct + '%';
+  document.getElementById('stat-correct').textContent = quizScore;
+  document.getElementById('stat-total').textContent   = total;
+  document.getElementById('stat-pct').textContent     = pct + '%';
+
+  // Set conic gradient for ring
+  document.getElementById('results-ring').style.setProperty('--score-pct', pct + '%');
+
+  let title, message;
+  if (pct >= 90) {
+    title = '🏆 Zero Trust Expert!';
+    message = "Outstanding work! You've demonstrated mastery of Zero Trust concepts — from identity and MFA to micro-segmentation, the policy engine, and SASE. You're ready to go deeper into implementation.";
+  } else if (pct >= 70) {
+    title = '✅ Solid Understanding';
+    message = "Great job! You have a solid grasp of Zero Trust fundamentals. Review the modules for any questions you missed, and you'll be well-prepared for advanced study.";
+  } else if (pct >= 50) {
+    title = '📖 Keep Reviewing';
+    message = "Good start! Some concepts need another look. Head back through the content modules, paying special attention to the Policy Engine, MFA types, and micro-segmentation.";
+  } else {
+    title = '🔁 Try Again';
+    message = "Zero Trust is a complex topic — keep at it! We recommend going back through all five content modules before retaking the quiz. You'll get there!";
+  }
+
+  document.getElementById('results-title').textContent = title;
+  document.getElementById('results-message').textContent = message;
+
+  goToScreen('screen-results');
+}
+
+/* ============================================================
+   RESET ALL — restart the entire course
+   ============================================================ */
+function resetAll() {
+  visitedModules.clear();
+  visitedModules.add('screen-hero');
+  quizScore = 0;
+  currentQIndex = 0;
+  goToScreen('screen-hero');
+}
+
+/* ============================================================
+   FONT SIZE CONTROLS
+   Adjusts --base-font-size CSS variable in 2px steps.
+   ============================================================ */
+function updateFontSize(delta) {
+  baseFontSize = Math.max(12, Math.min(24, baseFontSize + delta));
+  document.documentElement.style.setProperty('--base-font-size', baseFontSize + 'px');
+  document.getElementById('font-size-display').textContent = baseFontSize + 'px';
+}
+
+document.getElementById('btn-font-down').addEventListener('click', () => updateFontSize(-2));
+document.getElementById('btn-font-up').addEventListener('click', () => updateFontSize(2));
+
+/* ============================================================
+   REDUCED MOTION TOGGLE
+   Adds/removes .motion-reduced class on <body>.
+   ============================================================ */
+document.getElementById('btn-reduce-motion').addEventListener('click', function() {
+  const pressed = this.getAttribute('aria-pressed') === 'true';
+  this.setAttribute('aria-pressed', String(!pressed));
+  document.body.classList.toggle('motion-reduced', !pressed);
+});
+
+/* ============================================================
+   INITIALIZE ON LOAD
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  // Start at hero screen
+  goToScreen('screen-hero');
+  // Run the sim once to show an initial result
+  runSim();
+  // Initialize quiz questions in background (so first visit is instant)
+  initQuiz();
+});
+</script>
+</body>
+</html>
