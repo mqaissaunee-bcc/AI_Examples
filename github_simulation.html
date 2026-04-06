@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub for Educators — Interactive Walkthrough</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Fraunces:ital,wght@0,300;0,600;1,300&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gh-bg: #0d1117;
+    --gh-surface: #161b22;
+    --gh-border: #30363d;
+    --gh-text: #c9d1d9;
+    --gh-muted: #8b949e;
+    --gh-green: #2ea043;
+    --gh-green-hover: #3fb950;
+    --gh-blue: #58a6ff;
+    --gh-input-bg: #010409;
+    --gh-input-border: #30363d;
+    --gh-btn-bg: #21262d;
+    --gh-btn-border: #30363d;
+    --sidebar-w: 260px;
+    --callout-bg: #1c2a1c;
+    --callout-border: #2ea043;
+    --callout-accent: #3fb950;
+    --tip-bg: #0d2137;
+    --tip-border: #58a6ff;
+    --shell-bg: #f6f8fa;
+    --shell-text: #24292f;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #0a0e17;
+    color: var(--gh-text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP CHROME ── */
+  .sim-header {
+    background: #0d1117;
+    border-bottom: 1px solid #21262d;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .sim-badge {
+    background: linear-gradient(135deg, #2ea043, #1a7f37);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .sim-title {
+    font-family: 'Fraunces', serif;
+    font-size: 15px;
+    font-weight: 300;
+    color: #c9d1d9;
+    flex: 1;
+  }
+  .sim-title span { color: #2ea043; font-weight: 600; }
+  .progress-bar-outer {
+    flex: 1;
+    max-width: 220px;
+    height: 4px;
+    background: #21262d;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar-inner {
+    height: 100%;
+    background: linear-gradient(90deg, #2ea043, #3fb950);
+    border-radius: 2px;
+    transition: width .5s cubic-bezier(.4,0,.2,1);
+  }
+  .step-counter {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--gh-muted);
+  }
+
+  /* ── LAYOUT ── */
+  .app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: #0d1117;
+    border-right: 1px solid #21262d;
+    padding: 20px 0;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .sidebar-section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    color: var(--gh-muted);
+    text-transform: uppercase;
+    padding: 0 16px 8px;
+    margin-top: 16px;
+  }
+  .sidebar-section-label:first-child { margin-top: 0; }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all .2s;
+    font-size: 13px;
+    color: var(--gh-muted);
+    position: relative;
+  }
+  .sidebar-item:hover { background: #161b22; color: var(--gh-text); }
+  .sidebar-item.active {
+    border-left-color: #2ea043;
+    background: #161b22;
+    color: #c9d1d9;
+  }
+  .sidebar-item.completed { color: #3fb950; }
+  .sidebar-item.completed .step-dot { background: #2ea043; border-color: #2ea043; }
+  .sidebar-item.active .step-dot { border-color: #2ea043; background: #2ea043; }
+  .step-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #30363d;
+    background: transparent;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    transition: all .3s;
+  }
+  .step-dot.check::after { content: '✓'; color: #fff; }
+  .sidebar-step-name { line-height: 1.3; }
+
+  /* ── MAIN CONTENT ── */
+  .main-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px 60px;
+    gap: 24px;
+  }
+
+  /* ── STEP HEADER ── */
+  .step-header {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .step-icon-wrap {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #1a7f37, #2ea043);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 20px;
+  }
+  .step-meta { flex: 1; }
+  .step-phase {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: #2ea043;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .step-title-main {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: #e6edf3;
+    line-height: 1.2;
+  }
+  .step-subtitle {
+    font-size: 13px;
+    color: var(--gh-muted);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  /* ── CALLOUT BOX ── */
+  .callout {
+    width: 100%;
+    max-width: 760px;
+    background: var(--callout-bg);
+    border: 1px solid var(--callout-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    position: relative;
+  }
+  .callout-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .callout-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--callout-accent);
+  }
+  .callout-brief {
+    font-size: 13px;
+    color: #adbdad;
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+  .expand-btn {
+    background: none;
+    border: 1px solid #2ea04340;
+    color: #2ea043;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .2s;
+    flex-shrink: 0;
+  }
+  .expand-btn:hover { background: #2ea04320; }
+  .callout-detail {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #2ea04330;
+  }
+  .callout-detail.open { display: block; }
+  .callout-detail p {
+    font-size: 13px;
+    color: #c9d1d9;
+    line-height: 1.7;
+    margin-bottom: 10px;
+  }
+  .callout-detail p:last-child { margin-bottom: 0; }
+  .callout-detail ul {
+    font-size: 13px;
+    color: #c9d1d9;
+    line-height: 1.7;
+    margin: 0 0 10px 18px;
+  }
+  .tip-box {
+    background: var(--tip-bg);
+    border: 1px solid var(--tip-border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #90bfe8;
+    line-height: 1.6;
+    margin-top: 10px;
+  }
+  .tip-box strong { color: #58a6ff; }
+
+  /* ── GITHUB SIMULATION PANELS ── */
+  .gh-window {
+    width: 100%;
+    max-width: 760px;
+    background: var(--gh-bg);
+    border: 1px solid var(--gh-border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  }
+  .gh-topbar {
+    background: #161b22;
+    border-bottom: 1px solid var(--gh-border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .gh-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .gh-dot.r { background: #ff5f57; }
+  .gh-dot.y { background: #febc2e; }
+  .gh-dot.g { background: #28c840; }
+  .gh-url-bar {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #8b949e;
+    margin-left: 8px;
+  }
+  .gh-logo-svg {
+    color: #e6edf3;
+    width: 22px;
+    height: 22px;
+    margin-left: auto;
+  }
+  .gh-body { padding: 0; }
+
+  /* GH NAV */
+  .gh-nav {
+    background: #161b22;
+    border-bottom: 1px solid #21262d;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .gh-nav-logo {
+    font-size: 18px;
+    color: #e6edf3;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    flex-shrink: 0;
+  }
+  .gh-nav-item {
+    font-size: 13px;
+    color: #c9d1d9;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: default;
+  }
+  .gh-nav-spacer { flex: 1; }
+  .gh-nav-btn {
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    background: #21262d;
+    color: #c9d1d9;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .gh-nav-btn.primary {
+    background: #238636;
+    border-color: #2ea043;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* SIGNUP FORM */
+  .gh-signup-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 24px;
+    background: #0d1117;
+  }
+  .gh-signup-logo { font-size: 36px; margin-bottom: 16px; color: #e6edf3; }
+  .gh-signup-title {
+    font-size: 22px;
+    font-weight: 300;
+    color: #c9d1d9;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .gh-form { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 14px; }
+  .gh-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #c9d1d9;
+    margin-bottom: 5px;
+  }
+  .gh-field input, .gh-field select {
+    width: 100%;
+    background: var(--gh-input-bg);
+    border: 1px solid var(--gh-input-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #c9d1d9;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+  }
+  .gh-field input:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88,166,255,.15); }
+  .gh-field .field-hint { font-size: 11px; color: var(--gh-muted); margin-top: 4px; }
+  .gh-field .field-valid { color: #3fb950; font-size: 11px; margin-top: 4px; }
+  .gh-btn-primary {
+    background: #238636;
+    border: 1px solid #2ea043;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    text-align: center;
+    transition: background .2s;
+    width: 100%;
+    margin-top: 4px;
+  }
+  .gh-btn-primary:hover { background: #2ea043; }
+  .gh-terms {
+    font-size: 11px;
+    color: var(--gh-muted);
+    text-align: center;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+  .gh-terms a { color: #58a6ff; text-decoration: none; }
+  .gh-divider { border: none; border-top: 1px solid #21262d; margin: 8px 0; }
+
+  /* VERIFY EMAIL SCREEN */
+  .gh-verify-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px;
+    text-align: center;
+  }
+  .gh-verify-icon {
+    width: 80px;
+    height: 80px;
+    background: #161b22;
+    border: 2px solid #30363d;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    margin-bottom: 20px;
+  }
+  .gh-verify-title { font-size: 20px; font-weight: 600; color: #e6edf3; margin-bottom: 10px; }
+  .gh-verify-sub { font-size: 14px; color: var(--gh-muted); line-height: 1.6; max-width: 360px; }
+  .gh-verify-email-display {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: #58a6ff;
+    margin: 16px 0;
+  }
+  .gh-code-entry {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin: 20px 0;
+  }
+  .gh-code-digit {
+    width: 44px;
+    height: 52px;
+    background: #0d1117;
+    border: 2px solid #30363d;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 22px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #e6edf3;
+    font-weight: 600;
+  }
+  .gh-code-digit.filled { border-color: #2ea043; color: #3fb950; }
+
+  /* DASHBOARD */
+  .gh-dashboard {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 0;
+    min-height: 400px;
+  }
+  .gh-sidebar-panel {
+    background: #0d1117;
+    border-right: 1px solid #21262d;
+    padding: 20px 16px;
+  }
+  .gh-avatar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .gh-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2ea043, #1a7f37);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+  }
+  .gh-username { font-size: 14px; font-weight: 600; color: #e6edf3; }
+  .gh-fullname { font-size: 12px; color: var(--gh-muted); }
+  .gh-side-section { margin-bottom: 16px; }
+  .gh-side-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: var(--gh-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .gh-side-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 6px;
+    font-size: 13px;
+    color: #c9d1d9;
+    border-radius: 6px;
+    cursor: default;
+  }
+  .gh-side-item:hover { background: #161b22; }
+  .gh-side-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gh-muted); flex-shrink: 0; }
+  .gh-feed {
+    background: #0d1117;
+    padding: 20px;
+  }
+  .gh-feed-section { margin-bottom: 20px; }
+  .gh-feed-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #e6edf3;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .gh-repo-card {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .gh-repo-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #58a6ff;
+    margin-bottom: 4px;
+  }
+  .gh-repo-desc { font-size: 12px; color: var(--gh-muted); margin-bottom: 8px; }
+  .gh-repo-meta { display: flex; gap: 14px; font-size: 11px; color: var(--gh-muted); }
+  .gh-repo-lang::before {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #f1e05a;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .gh-activity-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #21262d;
+    font-size: 12px;
+    color: var(--gh-muted);
+    align-items: flex-start;
+  }
+  .gh-activity-item:last-child { border-bottom: none; }
+  .gh-activity-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .gh-activity-text { line-height: 1.5; }
+  .gh-activity-text a { color: #58a6ff; }
+
+  /* PROFILE EDIT */
+  .gh-profile-edit {
+    display: grid;
+    grid-template-columns: 1fr 260px;
+    gap: 0;
+    align-items: start;
+  }
+  .gh-profile-form { padding: 20px 24px; }
+  .gh-profile-preview {
+    background: #161b22;
+    border-left: 1px solid #21262d;
+    padding: 20px;
+    min-height: 300px;
+  }
+  .gh-profile-avatar-big {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2ea043, #1a7f37);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 12px;
+  }
+  .gh-profile-form .gh-field { margin-bottom: 14px; }
+  .gh-profile-preview .preview-name { font-size: 16px; font-weight: 600; color: #e6edf3; }
+  .gh-profile-preview .preview-username { font-size: 13px; color: var(--gh-muted); margin-bottom: 10px; }
+  .gh-profile-preview .preview-bio { font-size: 13px; color: #c9d1d9; margin-bottom: 10px; line-height: 1.5; }
+  .gh-profile-preview .preview-item { font-size: 12px; color: var(--gh-muted); margin-bottom: 5px; display: flex; align-items: center; gap: 6px; }
+  .gh-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e6edf3;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #21262d;
+  }
+
+  /* REPO CREATE */
+  .gh-repo-create { padding: 24px; }
+  .gh-repo-create .gh-breadcrumb {
+    font-size: 13px;
+    color: var(--gh-muted);
+    margin-bottom: 20px;
+  }
+  .gh-repo-create .gh-breadcrumb a { color: #58a6ff; }
+  .gh-radio-group { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .gh-radio-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 12px 14px;
+    cursor: pointer;
+  }
+  .gh-radio-option.selected { border-color: #2ea043; background: #1c2a1c; }
+  .gh-radio-option input[type="radio"] { margin-top: 2px; accent-color: #2ea043; }
+  .gh-radio-label { font-size: 13px; font-weight: 600; color: #c9d1d9; }
+  .gh-radio-desc { font-size: 12px; color: var(--gh-muted); margin-top: 2px; line-height: 1.4; }
+  .gh-checkbox-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .gh-checkbox-row input { accent-color: #2ea043; margin-top: 2px; flex-shrink: 0; }
+  .gh-checkbox-label { font-size: 13px; color: #c9d1d9; }
+  .gh-checkbox-sub { font-size: 12px; color: var(--gh-muted); margin-top: 2px; }
+
+  /* PAGES SETUP */
+  .gh-pages-wrap { padding: 24px; }
+  .gh-tab-row {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #21262d;
+    margin-bottom: 20px;
+  }
+  .gh-tab {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--gh-muted);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    margin-bottom: -1px;
+  }
+  .gh-tab.active { color: #e6edf3; border-bottom-color: #f0883e; }
+  .gh-pages-setting {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .gh-pages-label { font-size: 14px; font-weight: 600; color: #e6edf3; margin-bottom: 4px; }
+  .gh-pages-sub { font-size: 12px; color: var(--gh-muted); margin-bottom: 12px; }
+  .gh-select-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .gh-select {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #c9d1d9;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .gh-save-btn {
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    font-size: 13px;
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .gh-save-btn:hover { background: #30363d; }
+  .gh-pages-success {
+    background: #1c2a1c;
+    border: 1px solid #2ea043;
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .gh-pages-success-icon { font-size: 18px; flex-shrink: 0; }
+  .gh-pages-success-text { font-size: 13px; color: #adbdad; line-height: 1.5; }
+  .gh-pages-success-url { font-family: 'JetBrains Mono', monospace; color: #58a6ff; font-size: 13px; }
+
+  /* CONTENT EDITOR */
+  .gh-editor-wrap {
+    padding: 0;
+    background: #0d1117;
+  }
+  .gh-editor-topbar {
+    background: #161b22;
+    border-bottom: 1px solid #21262d;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .gh-editor-tabs { display: flex; gap: 4px; }
+  .gh-editor-tab {
+    padding: 5px 14px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    background: transparent;
+    color: var(--gh-muted);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .gh-editor-tab.active { background: #21262d; color: #c9d1d9; border-color: #30363d; }
+  .gh-editor-spacer { flex: 1; }
+  .gh-commit-btn {
+    background: #238636;
+    border: 1px solid #2ea043;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .gh-code-area {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #c9d1d9;
+    background: #0d1117;
+    padding: 16px;
+    line-height: 1.7;
+    min-height: 140px;
+    border-bottom: 1px solid #21262d;
+    white-space: pre-wrap;
+  }
+  .gh-code-area .hl-h1 { color: #79c0ff; font-weight: 700; }
+  .gh-code-area .hl-bold { color: #ffa657; font-weight: 700; }
+  .gh-code-area .hl-list { color: #3fb950; }
+  .gh-commit-form {
+    padding: 14px 16px;
+    background: #161b22;
+    border-top: 1px solid #21262d;
+  }
+  .gh-commit-form label { font-size: 12px; color: var(--gh-muted); margin-bottom: 6px; display: block; }
+  .gh-commit-input {
+    width: 100%;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    color: #c9d1d9;
+    font-family: 'DM Sans', sans-serif;
+    margin-bottom: 10px;
+  }
+  .gh-commit-actions { display: flex; gap: 8px; }
+
+  /* ANNOTATION OVERLAY */
+  .annotation {
+    position: absolute;
+    background: #1c2a3a;
+    border: 1px solid #58a6ff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #90bfe8;
+    max-width: 180px;
+    line-height: 1.5;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .annotation::before {
+    content: '👆';
+    display: block;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  /* NAVIGATION BUTTONS */
+  .nav-buttons {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 8px;
+  }
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all .2s;
+    border: none;
+  }
+  .nav-btn.prev {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+  }
+  .nav-btn.prev:hover { background: #30363d; }
+  .nav-btn.next {
+    background: #238636;
+    color: #fff;
+    margin-left: auto;
+  }
+  .nav-btn.next:hover { background: #2ea043; }
+  .nav-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .nav-step-label { font-size: 11px; color: var(--gh-muted); font-weight: 400; display: block; }
+
+  /* COMPLETED STATE */
+  .completed-banner {
+    width: 100%;
+    max-width: 760px;
+    background: linear-gradient(135deg, #1c2a1c, #0d1a0d);
+    border: 1px solid #2ea043;
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+  }
+  .completed-banner .big-check { font-size: 48px; margin-bottom: 12px; }
+  .completed-banner h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: #e6edf3;
+    margin-bottom: 8px;
+  }
+  .completed-banner p { font-size: 14px; color: #adbdad; line-height: 1.6; max-width: 440px; margin: 0 auto 20px; }
+  .restart-btn {
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: background .2s;
+  }
+  .restart-btn:hover { background: #30363d; }
+
+  /* HIGHLIGHT PULSE */
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(46,160,67,.4); }
+    50% { box-shadow: 0 0 0 6px rgba(46,160,67,0); }
+  }
+  .highlight { animation: pulse-border 2s ease-in-out infinite; border-color: #2ea043 !important; }
+
+  /* STEP FADE */
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .step-fade { animation: fadeSlide .35s ease forwards; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #0d1117; }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+  @media (max-width: 640px) {
+    :root { --sidebar-w: 0px; }
+    .sidebar { display: none; }
+    .gh-dashboard { grid-template-columns: 1fr; }
+    .gh-profile-edit { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP CHROME -->
+<header class="sim-header">
+  <span class="sim-badge">SIMULATION</span>
+  <span class="sim-title">GitHub for Educators — <span>Interactive Walkthrough</span></span>
+  <div class="progress-bar-outer">
+    <div class="progress-bar-inner" id="progressBar" style="width: 0%"></div>
+  </div>
+  <span class="step-counter" id="stepCounter">Step 1 of 8</span>
+</header>
+
+<div class="app-body">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-section-label">Getting Started</div>
+    <div class="sidebar-item" data-step="0" onclick="goToStep(0)">
+      <div class="step-dot" id="dot-0">1</div>
+      <span class="sidebar-step-name">Create Your Account</span>
+    </div>
+    <div class="sidebar-item" data-step="1" onclick="goToStep(1)">
+      <div class="step-dot" id="dot-1">2</div>
+      <span class="sidebar-step-name">Verify Your Email</span>
+    </div>
+    <div class="sidebar-section-label">Setup</div>
+    <div class="sidebar-item" data-step="2" onclick="goToStep(2)">
+      <div class="step-dot" id="dot-2">3</div>
+      <span class="sidebar-step-name">Post-Signup Steps</span>
+    </div>
+    <div class="sidebar-item" data-step="3" onclick="goToStep(3)">
+      <div class="step-dot" id="dot-3">4</div>
+      <span class="sidebar-step-name">Set Up Your Profile</span>
+    </div>
+    <div class="sidebar-section-label">Working with GitHub</div>
+    <div class="sidebar-item" data-step="4" onclick="goToStep(4)">
+      <div class="step-dot" id="dot-4">5</div>
+      <span class="sidebar-step-name">Create First Repository</span>
+    </div>
+    <div class="sidebar-item" data-step="5" onclick="goToStep(5)">
+      <div class="step-dot" id="dot-5">6</div>
+      <span class="sidebar-step-name">Navigate the Dashboard</span>
+    </div>
+    <div class="sidebar-item" data-step="6" onclick="goToStep(6)">
+      <div class="step-dot" id="dot-6">7</div>
+      <span class="sidebar-step-name">Update Content &amp; Create a Page</span>
+    </div>
+    <div class="sidebar-item" data-step="7" onclick="goToStep(7)">
+      <div class="step-dot" id="dot-7">8</div>
+      <span class="sidebar-step-name">Make Your Page Public</span>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main-content" id="mainContent"></main>
+
+</div>
+
+<script>
+const PERSONA = {
+  name: 'Professor Alex Rivera',
+  initials: 'AR',
+  username: 'alexrivera-edu',
+  email: 'a.rivera+github@westridgecollege.edu',
+  bio: 'Faculty in Communication Studies. I share course materials, syllabi, and student resources here.',
+  org: 'Westridge Community College',
+  url: 'westridgecollege.edu',
+  repoName: 'comm101-resources',
+  repoDesc: 'Course materials and resources for COMM 101 — Introduction to Communication'
+};
+
+const STEPS = [
+  {
+    phase: 'Step 1 — Account Creation',
+    icon: '🔐',
+    title: 'Create Your GitHub Account',
+    subtitle: 'Start at github.com and click "Sign up" to begin the registration process.',
+    url: 'github.com/signup',
+    callout: {
+      brief: 'Your GitHub account is your permanent professional identity on the platform. Choose a username that reflects your role — you\'ll share this URL with students.',
+      detail: `<p>GitHub accounts are free and permanent. Think of your username as a professional handle — it becomes part of every URL you share (e.g., <strong>github.com/alexrivera-edu</strong>).</p>
+      <p>Good username patterns for faculty:</p>
+      <ul>
+        <li>firstname-lastname (alexrivera)</li>
+        <li>firstname-role (alexrivera-edu)</li>
+        <li>initials-institution (arwcc)</li>
+      </ul>
+      <p>Avoid: numbers, underscores, or anything that looks like a student pseudonym. You want this to be findable and shareable.</p>
+      <div class="tip-box"><strong>💡 Email tip:</strong> Use your institutional email if you want GitHub's Education benefits (free Pro plan). You can add personal email as a backup later.</div>`
+    },
+    render: renderSignup
+  },
+  {
+    phase: 'Step 2 — Verification',
+    icon: '📧',
+    title: 'Verify Your Email Address',
+    subtitle: 'GitHub sends a 6-digit code to your email. Check your inbox and enter it to activate your account.',
+    url: 'github.com/sessions/email-verification',
+    callout: {
+      brief: 'Email verification protects your account and is required before you can create repositories or share anything publicly.',
+      detail: `<p>GitHub sends a one-time 6-digit code — not a traditional link — which is more phishing-resistant. The code expires in 15 minutes, so have your email open in another tab.</p>
+      <p>Common issues faculty run into:</p>
+      <ul>
+        <li><strong>Spam folder</strong> — institutional email filters sometimes block GitHub. Check junk/spam.</li>
+        <li><strong>Delayed delivery</strong> — some campus mail servers are slow. Wait 2–3 minutes before requesting a new code.</li>
+        <li><strong>Wrong inbox</strong> — if you used a plus alias (name+github@), it still arrives at your base address.</li>
+      </ul>
+      <div class="tip-box"><strong>💡 Show students:</strong> This step is a great moment to discuss multi-factor verification and why platforms require it — connects to information security topics.</div>`
+    },
+    render: renderVerify
+  },
+  {
+    phase: 'Step 3 — Post-Signup',
+    icon: '🚀',
+    title: 'Post-Signup Onboarding',
+    subtitle: 'GitHub walks you through a quick setup wizard to personalize your experience and discover features.',
+    url: 'github.com/onboarding',
+    callout: {
+      brief: 'The onboarding wizard helps GitHub recommend relevant features. Faculty should indicate they\'re educators — this unlocks free access to GitHub Education.',
+      detail: `<p>GitHub's onboarding asks three things:</p>
+      <ul>
+        <li><strong>How many people are in your team?</strong> — Choose "Just me" or your department size. This doesn't lock anything.</li>
+        <li><strong>What are you planning to use GitHub for?</strong> — Select "Education" and "Sharing course materials" if available.</li>
+        <li><strong>What is your level of experience?</strong> — Be honest; GitHub adjusts the interface hints accordingly.</li>
+      </ul>
+      <p>After the wizard, you'll see a prompt about GitHub Education — <strong>definitely apply</strong>. It gives you a free Pro account with unlimited private repositories and access to GitHub Copilot for Students.</p>
+      <div class="tip-box"><strong>💡 GitHub Education:</strong> Apply at education.github.com with your institutional email. Approval usually takes 1–3 business days.</div>`
+    },
+    render: renderOnboarding
+  },
+  {
+    phase: 'Step 4 — Profile',
+    icon: '👤',
+    title: 'Set Up Your Profile',
+    subtitle: 'Add your name, bio, and institutional affiliation. Your profile is the face of your GitHub presence.',
+    url: 'github.com/settings/profile',
+    callout: {
+      brief: 'A complete profile builds credibility with students and colleagues. Include your role and institution — your profile URL is shareable on syllabi.',
+      detail: `<p>Key profile fields for faculty:</p>
+      <ul>
+        <li><strong>Name:</strong> Your real full name (not username). This appears prominently on your profile page.</li>
+        <li><strong>Bio:</strong> One or two sentences — your discipline, role, and what you share on GitHub.</li>
+        <li><strong>Company/Organization:</strong> Your institution's name.</li>
+        <li><strong>Location:</strong> Optional, but helps students at multi-campus schools know which campus.</li>
+        <li><strong>Website:</strong> Link to your faculty page, Canvas, or portfolio.</li>
+      </ul>
+      <p>Your profile page (github.com/yourusername) is shareable without requiring students to have their own accounts.</p>
+      <div class="tip-box"><strong>💡 Profile README:</strong> You can create a special repository with your username that adds a custom card to your profile — great for listing your courses and office hours.</div>`
+    },
+    render: renderProfile
+  },
+  {
+    phase: 'Step 5 — First Repository',
+    icon: '📁',
+    title: 'Create Your First Repository',
+    subtitle: 'A repository (repo) is a folder on GitHub. Create one for a course to hold syllabus, slides, and resources.',
+    url: 'github.com/new',
+    callout: {
+      brief: 'Think of a repository as a shared course folder that tracks every version of every file automatically. Students can always access the latest version.',
+      detail: `<p>Key decisions when creating a repo:</p>
+      <ul>
+        <li><strong>Repository name:</strong> Use lowercase with hyphens (no spaces). Convention: course-code-term (e.g., comm101-fall2025).</li>
+        <li><strong>Public vs. Private:</strong> Public repos are visible to anyone with the link — great for sharing syllabi. Private repos require students to have GitHub accounts and be invited.</li>
+        <li><strong>Initialize with README:</strong> Always check this. It creates an index file students will see first when they visit your repo.</li>
+        <li><strong>Add .gitignore:</strong> Optional for faculty use, but useful if you upload from a Mac (hides .DS_Store files).</li>
+      </ul>
+      <div class="tip-box"><strong>💡 Naming conventions:</strong> Consistent naming across semesters makes your profile look professional and makes it easy to copy repos each term.</div>`
+    },
+    render: renderNewRepo
+  },
+  {
+    phase: 'Step 6 — Dashboard',
+    icon: '🗂️',
+    title: 'Navigate the Dashboard',
+    subtitle: 'The GitHub dashboard is your home base — it shows your repositories, activity, and quick access to everything you\'ve created.',
+    url: 'github.com',
+    callout: {
+      brief: 'The dashboard is where you\'ll start every GitHub session. Your repositories appear in the left sidebar, and your recent activity fills the feed on the right.',
+      detail: `<p>Key areas of the dashboard:</p>
+      <ul>
+        <li><strong>Left sidebar — Your repos:</strong> Quick access to your most recently visited repositories.</li>
+        <li><strong>Feed (center/right):</strong> Activity from people and organizations you follow.</li>
+        <li><strong>Top navigation:</strong> The + icon creates new repos, issues, or gists. Your avatar opens account settings.</li>
+        <li><strong>Explore tab:</strong> Discover popular repositories and topics — great for finding open educational resources.</li>
+      </ul>
+      <p>Tip for workshops: bookmark github.com — it always lands on your dashboard when you're signed in. Share the direct repo URL with students instead, since they'll see your repo directly without needing an account.</p>
+      <div class="tip-box"><strong>💡 For students:</strong> They don't need a GitHub account to view public repositories or download files. Only require accounts if you want them to submit via GitHub.</div>`
+    },
+    render: renderDashboard
+  },
+  {
+    phase: 'Step 7 — Content',
+    icon: '✏️',
+    title: 'Update Content & Edit Files',
+    subtitle: 'Edit your README or upload files directly in the browser — no coding tools required.',
+    url: 'github.com/alexrivera-edu/comm101-resources',
+    callout: {
+      brief: 'GitHub\'s in-browser editor lets you update course materials without installing any software. Every save is automatically version-controlled.',
+      detail: `<p>Ways to add content without coding:</p>
+      <ul>
+        <li><strong>Edit README:</strong> Click the pencil icon on any file to open the in-browser editor. Use Markdown (simple formatting symbols) to add headings, lists, and links.</li>
+        <li><strong>Upload files:</strong> Drag and drop PDFs, images, or documents directly into a repository folder.</li>
+        <li><strong>Create new files:</strong> Click "Add file" → "Create new file." Name it with .md extension for formatted text.</li>
+      </ul>
+      <p>Every change you save is called a "commit" — essentially a snapshot with a message explaining what you changed. This creates a full history of your materials.</p>
+      <div class="tip-box"><strong>💡 Markdown basics:</strong> # Heading, **bold**, *italic*, - list item. GitHub renders these automatically. Students see formatted text, not symbols.</div>`
+    },
+    render: renderEditor
+  },
+  {
+    phase: 'Step 8 — GitHub Pages',
+    icon: '🌐',
+    title: 'Make Your Page Public with GitHub Pages',
+    subtitle: 'Turn your repository into a live website — accessible to anyone without a GitHub account.',
+    url: 'github.com/alexrivera-edu/comm101-resources/settings/pages',
+    callout: {
+      brief: 'GitHub Pages converts your README and files into a real website with a permanent URL. It\'s free, instant, and requires zero web hosting knowledge.',
+      detail: `<p>GitHub Pages is one of GitHub's most powerful free features for educators:</p>
+      <ul>
+        <li><strong>Free hosting:</strong> No domain or hosting costs. Your site is at username.github.io/repo-name.</li>
+        <li><strong>Automatic updates:</strong> Every time you edit files and commit, the website updates automatically — usually within 1–2 minutes.</li>
+        <li><strong>No login required to view:</strong> Share the URL in your syllabus, Canvas, or email. Students click and see your content.</li>
+        <li><strong>Supports HTML files:</strong> If you're building interactive learning tools (like the ones in this workshop suite), host them here for free.</li>
+      </ul>
+      <p>After enabling Pages, GitHub provides a direct URL. It takes 1–3 minutes to go live the first time.</p>
+      <div class="tip-box"><strong>💡 Course hub idea:</strong> Create one repo per course as a GitHub Pages site. Link it from Canvas as an external URL. Students always see the most current version.</div>`
+    },
+    render: renderPages
+  }
+];
+
+let currentStep = 0;
+const totalSteps = STEPS.length;
+
+function goToStep(n) {
+  if (n < 0 || n >= totalSteps) return;
+  currentStep = n;
+  render();
+}
+
+function render() {
+  const step = STEPS[currentStep];
+  const pct = ((currentStep) / (totalSteps)) * 100;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('stepCounter').textContent = `Step ${currentStep + 1} of ${totalSteps}`;
+
+  // Sidebar highlight
+  document.querySelectorAll('.sidebar-item').forEach((el, i) => {
+    el.classList.toggle('active', i === currentStep);
+    el.classList.toggle('completed', i < currentStep);
+    const dot = document.getElementById('dot-' + i);
+    if (i < currentStep) { dot.classList.add('check'); dot.textContent = ''; }
+    else if (i === currentStep) { dot.classList.remove('check'); dot.textContent = i + 1; }
+    else { dot.classList.remove('check'); dot.textContent = i + 1; }
+  });
+
+  const main = document.getElementById('mainContent');
+  main.innerHTML = '';
+
+  // Step header
+  const header = document.createElement('div');
+  header.className = 'step-header step-fade';
+  header.innerHTML = `
+    <div class="step-icon-wrap">${step.icon}</div>
+    <div class="step-meta">
+      <div class="step-phase">${step.phase}</div>
+      <div class="step-title-main">${step.title}</div>
+      <div class="step-subtitle">${step.subtitle}</div>
+    </div>`;
+  main.appendChild(header);
+
+  // Callout
+  const callout = document.createElement('div');
+  callout.className = 'callout step-fade';
+  callout.innerHTML = `
+    <div class="callout-header">
+      <div class="callout-label">🎓 Why this matters</div>
+      <button class="expand-btn" onclick="this.closest('.callout').querySelector('.callout-detail').classList.toggle('open'); this.textContent = this.closest('.callout').querySelector('.callout-detail').classList.contains('open') ? '▲ Less' : '▾ More detail'">▾ More detail</button>
+    </div>
+    <div class="callout-brief">${step.callout.brief}</div>
+    <div class="callout-detail">${step.callout.detail}</div>`;
+  main.appendChild(callout);
+
+  // GitHub simulation window
+  const win = document.createElement('div');
+  win.className = 'gh-window step-fade';
+  win.innerHTML = `
+    <div class="gh-topbar">
+      <div class="gh-dot r"></div><div class="gh-dot y"></div><div class="gh-dot g"></div>
+      <div class="gh-url-bar">🔒 ${step.url}</div>
+      <svg class="gh-logo-svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    </div>
+    <div class="gh-body" id="ghBody"></div>`;
+  main.appendChild(win);
+
+  step.render(win.querySelector('#ghBody'));
+
+  // Nav buttons
+  if (currentStep < totalSteps - 1) {
+    const nav = document.createElement('div');
+    nav.className = 'nav-buttons step-fade';
+    nav.innerHTML = `
+      ${currentStep > 0 ? `<button class="nav-btn prev" onclick="goToStep(${currentStep - 1})">← <span><span class="nav-step-label">Previous</span>${STEPS[currentStep - 1].title}</span></button>` : '<div></div>'}
+      <button class="nav-btn next" onclick="goToStep(${currentStep + 1})">
+        <span><span class="nav-step-label">Next step</span>${STEPS[currentStep + 1].title}</span> →
+      </button>`;
+    main.appendChild(nav);
+  } else {
+    // Final step — show complete + restart
+    const nav = document.createElement('div');
+    nav.className = 'nav-buttons step-fade';
+    nav.innerHTML = `<button class="nav-btn prev" onclick="goToStep(${currentStep - 1})">← <span><span class="nav-step-label">Previous</span>${STEPS[currentStep - 1].title}</span></button><div></div>`;
+    main.appendChild(nav);
+
+    const done = document.createElement('div');
+    done.className = 'completed-banner step-fade';
+    done.innerHTML = `
+      <div class="big-check">🎉</div>
+      <h2>Walkthrough Complete!</h2>
+      <p>You've covered account creation, profile setup, creating a repository, navigating the dashboard, editing content, and publishing with GitHub Pages. You're ready to walk faculty through the real thing.</p>
+      <button class="restart-btn" onclick="goToStep(0)">↩ Start Over</button>`;
+    main.appendChild(done);
+  }
+
+  main.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ── STEP RENDERERS ── */
+
+function renderSignup(body) {
+  body.innerHTML = `
+    <div class="gh-signup-wrap">
+      <div class="gh-signup-logo">
+        <svg width="36" height="36" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </div>
+      <div class="gh-signup-title">Create your account</div>
+      <div class="gh-form">
+        <div class="gh-field">
+          <label>Email address <span style="color:#f85149">*</span></label>
+          <input type="email" value="${PERSONA.email}" readonly>
+          <div class="field-valid">✓ Looks good!</div>
+        </div>
+        <div class="gh-field">
+          <label>Create a password <span style="color:#f85149">*</span></label>
+          <input type="password" value="SecurePass123!" readonly>
+          <div class="field-hint">Must be at least 15 characters OR 8+ with a number and lowercase letter.</div>
+        </div>
+        <div class="gh-field">
+          <label>Enter a username <span style="color:#f85149">*</span></label>
+          <input type="text" value="${PERSONA.username}" readonly>
+          <div class="field-valid">✓ alexrivera-edu is available.</div>
+        </div>
+        <div class="gh-field">
+          <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;cursor:pointer;">
+            <input type="checkbox" style="margin-top:3px;accent-color:#2ea043;">
+            <span style="font-size:12px;color:#8b949e;">I'd like to receive product updates via email. You can unsubscribe at any time.</span>
+          </label>
+        </div>
+        <div class="gh-btn-primary highlight">Continue →</div>
+        <div class="gh-terms">By creating an account, you agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</div>
+      </div>
+    </div>`;
+}
+
+function renderVerify(body) {
+  body.innerHTML = `
+    <div class="gh-verify-wrap">
+      <div class="gh-verify-icon">📬</div>
+      <div class="gh-verify-title">Please verify your email address</div>
+      <div class="gh-verify-sub">We sent a launch code to your email address. Enter the 6-digit verification code sent to:</div>
+      <div class="gh-verify-email-display">${PERSONA.email}</div>
+      <div class="gh-verify-sub" style="font-size:12px;margin-bottom:0;">Enter the code from the email:</div>
+      <div class="gh-code-entry">
+        <input class="gh-code-digit filled" maxlength="1" value="4" readonly>
+        <input class="gh-code-digit filled" maxlength="1" value="7" readonly>
+        <input class="gh-code-digit filled" maxlength="1" value="2" readonly>
+        <input class="gh-code-digit filled" maxlength="1" value="9" readonly>
+        <input class="gh-code-digit filled" maxlength="1" value="1" readonly>
+        <input class="gh-code-digit filled highlight" maxlength="1" value="6" readonly>
+      </div>
+      <div style="font-size:12px;color:#8b949e;margin-top:8px;">Didn't receive the email? <a href="#" style="color:#58a6ff;">Resend it</a> or <a href="#" style="color:#58a6ff;">change your email address</a>.</div>
+    </div>`;
+}
+
+function renderOnboarding(body) {
+  body.innerHTML = `
+    <div style="padding:24px;background:#0d1117;">
+      <div style="max-width:480px;margin:0 auto;">
+        <div style="font-size:12px;color:#8b949e;text-align:center;margin-bottom:6px;">Step 1 of 3</div>
+        <div style="height:3px;background:#21262d;border-radius:2px;margin-bottom:24px;overflow:hidden;">
+          <div style="height:100%;width:33%;background:#2ea043;border-radius:2px;"></div>
+        </div>
+        <div style="font-size:20px;font-weight:600;color:#e6edf3;margin-bottom:6px;">Welcome to GitHub! 🎉</div>
+        <div style="font-size:14px;color:#8b949e;margin-bottom:24px;">Let's help you get started. How many people will be working with you?</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+          <label style="display:flex;align-items:center;gap:12px;background:#161b22;border:1px solid #2ea043;border-radius:8px;padding:14px;cursor:pointer;">
+            <input type="radio" name="team" checked style="accent-color:#2ea043;">
+            <div>
+              <div style="font-size:14px;font-weight:600;color:#c9d1d9;">Just me</div>
+              <div style="font-size:12px;color:#8b949e;">Personal or individual projects</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;cursor:pointer;">
+            <input type="radio" name="team" style="accent-color:#2ea043;">
+            <div>
+              <div style="font-size:14px;font-weight:600;color:#c9d1d9;">2–5 people</div>
+              <div style="font-size:12px;color:#8b949e;">Small team or class project</div>
+            </div>
+          </label>
+        </div>
+        <div style="background:#1c2437;border:1px solid #58a6ff;border-radius:8px;padding:14px;display:flex;gap:12px;align-items:flex-start;margin-bottom:20px;">
+          <span style="font-size:18px;">🎓</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#90bfe8;margin-bottom:4px;">Are you a student or teacher?</div>
+            <div style="font-size:12px;color:#8b949e;line-height:1.5;">Apply for free GitHub Education benefits — including a free Pro account and access to developer tools used in industry.</div>
+            <a href="#" style="font-size:12px;color:#58a6ff;display:inline-block;margin-top:6px;">Apply for GitHub Education →</a>
+          </div>
+        </div>
+        <button class="gh-btn-primary highlight">Continue →</button>
+      </div>
+    </div>`;
+}
+
+function renderProfile(body) {
+  body.innerHTML = `
+    <div class="gh-profile-edit">
+      <div class="gh-profile-form">
+        <div class="gh-section-title">Public profile</div>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+          <div class="gh-profile-avatar-big">${PERSONA.initials}</div>
+          <div>
+            <div style="font-size:13px;color:#c9d1d9;margin-bottom:6px;">Profile picture</div>
+            <button style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">Upload a photo</button>
+          </div>
+        </div>
+        <div class="gh-field">
+          <label>Name</label>
+          <input type="text" value="${PERSONA.name}" readonly>
+          <div class="field-hint">Your name may appear around GitHub where you contribute or are mentioned. You can remove it at any time.</div>
+        </div>
+        <div class="gh-field">
+          <label>Bio</label>
+          <textarea style="width:100%;background:#010409;border:1px solid #30363d;border-radius:6px;padding:8px 12px;font-size:13px;color:#c9d1d9;font-family:'DM Sans',sans-serif;resize:vertical;min-height:72px;" readonly>${PERSONA.bio}</textarea>
+          <div class="field-hint">Tell us a little about yourself</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div class="gh-field">
+            <label>Company</label>
+            <input type="text" value="${PERSONA.org}" readonly>
+          </div>
+          <div class="gh-field">
+            <label>Website</label>
+            <input type="text" value="${PERSONA.url}" readonly>
+          </div>
+        </div>
+        <div class="gh-field">
+          <label>Location</label>
+          <input type="text" value="New Jersey, USA" readonly>
+        </div>
+        <button class="gh-btn-primary highlight" style="max-width:180px;">Update profile</button>
+      </div>
+      <div class="gh-profile-preview">
+        <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;margin-bottom:14px;">Preview</div>
+        <div class="gh-profile-avatar-big">${PERSONA.initials}</div>
+        <div class="preview-name">${PERSONA.name}</div>
+        <div class="preview-username">${PERSONA.username}</div>
+        <div class="preview-bio">${PERSONA.bio}</div>
+        <div class="preview-item">🏢 ${PERSONA.org}</div>
+        <div class="preview-item">🌐 ${PERSONA.url}</div>
+        <div class="preview-item">📍 New Jersey, USA</div>
+      </div>
+    </div>`;
+}
+
+function renderNewRepo(body) {
+  body.innerHTML = `
+    <div class="gh-repo-create">
+      <div class="gh-breadcrumb"><a href="#">alexrivera-edu</a> / New repository</div>
+      <div class="gh-section-title">Create a new repository</div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:16px;">
+        <div class="gh-field" style="margin-bottom:0">
+          <label>Repository name <span style="color:#f85149">*</span></label>
+          <input type="text" value="${PERSONA.repoName}" readonly>
+          <div class="field-valid">✓ comm101-resources is available.</div>
+        </div>
+      </div>
+      <div class="gh-field">
+        <label>Description <span style="color:#8b949e;font-weight:400;">(optional)</span></label>
+        <input type="text" value="${PERSONA.repoDesc}" readonly>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:600;color:#c9d1d9;margin-bottom:10px;">Visibility</div>
+        <div class="gh-radio-group">
+          <div class="gh-radio-option selected">
+            <input type="radio" name="vis" checked readonly>
+            <div>
+              <div class="gh-radio-label">🌐 Public</div>
+              <div class="gh-radio-desc">Anyone on the internet can see this repository. You choose who can commit.</div>
+            </div>
+          </div>
+          <div class="gh-radio-option">
+            <input type="radio" name="vis" readonly>
+            <div>
+              <div class="gh-radio-label">🔒 Private</div>
+              <div class="gh-radio-desc">You choose who can see and commit to this repository.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-bottom:20px;">
+        <div style="font-size:13px;font-weight:600;color:#c9d1d9;margin-bottom:10px;">Initialize this repository with:</div>
+        <div class="gh-checkbox-row">
+          <input type="checkbox" checked readonly>
+          <div>
+            <div class="gh-checkbox-label">Add a README file</div>
+            <div class="gh-checkbox-sub">This is where you can write a long description for your project. Learn more about READMEs.</div>
+          </div>
+        </div>
+      </div>
+      <button class="gh-btn-primary highlight" style="max-width:220px;">Create repository</button>
+    </div>`;
+}
+
+function renderDashboard(body) {
+  body.innerHTML = `
+    <div class="gh-nav">
+      <div class="gh-nav-logo">
+        <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </div>
+      <div class="gh-nav-item">Pull requests</div>
+      <div class="gh-nav-item">Issues</div>
+      <div class="gh-nav-item">Marketplace</div>
+      <div class="gh-nav-item">Explore</div>
+      <div class="gh-nav-spacer"></div>
+      <div class="gh-nav-item" style="font-size:18px;cursor:pointer;" title="Create new">⊕</div>
+      <div class="gh-avatar" style="width:28px;height:28px;font-size:12px;cursor:pointer;">${PERSONA.initials}</div>
+    </div>
+    <div class="gh-dashboard">
+      <div class="gh-sidebar-panel">
+        <div class="gh-avatar-row">
+          <div class="gh-avatar">${PERSONA.initials}</div>
+          <div>
+            <div class="gh-username">${PERSONA.username}</div>
+            <div class="gh-fullname">${PERSONA.name}</div>
+          </div>
+        </div>
+        <div class="gh-side-section">
+          <div class="gh-side-label">Repositories</div>
+          <div class="gh-side-item highlight" style="border-radius:6px;">
+            <div class="gh-side-dot" style="background:#2ea043;"></div>
+            ${PERSONA.username} / ${PERSONA.repoName}
+          </div>
+          <div class="gh-side-item">
+            <div class="gh-side-dot"></div>
+            ${PERSONA.username}.github.io
+          </div>
+        </div>
+        <div class="gh-side-section">
+          <div class="gh-side-label">Recent Activity</div>
+          <div class="gh-side-item"><span style="font-size:12px;">📝</span> Created ${PERSONA.repoName}</div>
+          <div class="gh-side-item"><span style="font-size:12px;">📤</span> Committed README.md</div>
+        </div>
+        <button style="width:100%;background:#238636;border:1px solid #2ea043;color:#fff;font-size:12px;font-weight:600;padding:7px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:8px;">+ New repository</button>
+      </div>
+      <div class="gh-feed">
+        <div class="gh-feed-section">
+          <div class="gh-feed-title">📁 Your repositories</div>
+          <div class="gh-repo-card">
+            <div class="gh-repo-name">${PERSONA.username} / ${PERSONA.repoName}</div>
+            <div class="gh-repo-desc">${PERSONA.repoDesc}</div>
+            <div class="gh-repo-meta">
+              <span class="gh-repo-lang">Markdown</span>
+              <span>Updated just now</span>
+              <span>⭐ 0</span>
+            </div>
+          </div>
+        </div>
+        <div class="gh-feed-section">
+          <div class="gh-feed-title">📰 Recent activity</div>
+          <div class="gh-activity-item">
+            <div class="gh-activity-icon">📝</div>
+            <div class="gh-activity-text"><a>${PERSONA.username}</a> created repository <a>${PERSONA.repoName}</a> — just now</div>
+          </div>
+          <div class="gh-activity-item">
+            <div class="gh-activity-icon">✨</div>
+            <div class="gh-activity-text"><a>${PERSONA.username}</a> joined GitHub — today</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderEditor(body) {
+  body.innerHTML = `
+    <div class="gh-editor-wrap">
+      <div style="background:#161b22;border-bottom:1px solid #21262d;padding:10px 16px;font-size:13px;color:#8b949e;">
+        <a style="color:#58a6ff;">${PERSONA.username}</a> / <a style="color:#58a6ff;">${PERSONA.repoName}</a> / <span>README.md</span>
+        <span style="float:right;font-size:11px;background:#1c2a1c;border:1px solid #2ea043;border-radius:4px;padding:2px 8px;color:#3fb950;">✓ 1 commit</span>
+      </div>
+      <div class="gh-editor-topbar">
+        <div class="gh-editor-tabs">
+          <button class="gh-editor-tab active">Edit</button>
+          <button class="gh-editor-tab">Preview</button>
+        </div>
+        <div style="font-size:11px;color:#8b949e;margin-left:8px;">README.md</div>
+        <div class="gh-editor-spacer"></div>
+        <span style="font-size:11px;color:#8b949e;margin-right:8px;">Markdown</span>
+      </div>
+      <div class="gh-code-area">
+<span class="hl-h1"># COMM 101 — Introduction to Communication</span>
+<span class="hl-bold">**Westridge Community College | Prof. Alex Rivera**</span>
+
+Welcome to the course resource repository. All materials are updated here throughout the semester.
+
+<span class="hl-h1">## 📚 Course Materials</span>
+<span class="hl-list">- Syllabus (PDF) — see /syllabus folder
+- Week 1: Introduction slides
+- Week 2: Verbal Communication
+- Week 3: Nonverbal Communication</span>
+
+<span class="hl-h1">## 🔗 Quick Links</span>
+<span class="hl-list">- [Canvas Course](#)
+- [Office Hours Scheduler](#)
+- [Library Resources](#)</span>
+
+<span class="hl-bold">**Questions?** Email a.rivera@westridgecollege.edu</span>
+      </div>
+      <div class="gh-commit-form">
+        <label>Commit message</label>
+        <input class="gh-commit-input" type="text" value="Add course materials and quick links to README" readonly>
+        <div class="gh-commit-actions">
+          <button class="gh-commit-btn highlight">Commit changes</button>
+          <button style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderPages(body) {
+  body.innerHTML = `
+    <div class="gh-pages-wrap">
+      <div style="font-size:13px;color:#8b949e;margin-bottom:16px;">
+        <a style="color:#58a6ff;">${PERSONA.username}</a> / <a style="color:#58a6ff;">${PERSONA.repoName}</a> / Settings / Pages
+      </div>
+      <div class="gh-tab-row">
+        <div class="gh-tab">General</div>
+        <div class="gh-tab">Access</div>
+        <div class="gh-tab">Branches</div>
+        <div class="gh-tab active">Pages</div>
+        <div class="gh-tab">Security</div>
+      </div>
+      <div style="font-size:18px;font-weight:600;color:#e6edf3;margin-bottom:4px;">GitHub Pages</div>
+      <div style="font-size:13px;color:#8b949e;margin-bottom:20px;line-height:1.5;">GitHub Pages is designed to host your personal, organization, or project pages from a GitHub repository.</div>
+      <div class="gh-pages-setting">
+        <div class="gh-pages-label">Build and deployment</div>
+        <div class="gh-pages-sub">Configure your site's source to start publishing.</div>
+        <div style="font-size:13px;color:#c9d1d9;margin-bottom:8px;font-weight:500;">Source</div>
+        <div class="gh-select-row">
+          <select class="gh-select">
+            <option selected>Deploy from a branch</option>
+            <option>GitHub Actions</option>
+          </select>
+        </div>
+        <div style="margin-top:14px;font-size:13px;color:#c9d1d9;font-weight:500;margin-bottom:8px;">Branch</div>
+        <div class="gh-select-row">
+          <select class="gh-select">
+            <option selected>main</option>
+          </select>
+          <select class="gh-select">
+            <option selected>/ (root)</option>
+            <option>/docs</option>
+          </select>
+          <button class="gh-save-btn highlight">Save</button>
+        </div>
+      </div>
+      <div class="gh-pages-success">
+        <div class="gh-pages-success-icon">✅</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#3fb950;margin-bottom:4px;">Your site is live!</div>
+          <div class="gh-pages-success-text">Your site is published at:</div>
+          <div class="gh-pages-success-url">https://${PERSONA.username}.github.io/${PERSONA.repoName}/</div>
+          <div class="gh-pages-success-text" style="margin-top:6px;">Changes you commit will appear on the site within 1–2 minutes.</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;background:#161b22;border:1px solid #21262d;border-radius:8px;padding:14px;">
+        <div style="font-size:13px;font-weight:600;color:#e6edf3;margin-bottom:8px;">📋 Share this URL with students</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#58a6ff;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:8px 12px;margin-bottom:8px;">https://${PERSONA.username}.github.io/${PERSONA.repoName}/</div>
+        <div style="font-size:12px;color:#8b949e;">Post this in your Canvas course, syllabus, or email signature. No GitHub account needed to view.</div>
+      </div>
+    </div>`;
+}
+
+// Init
+render();
+</script>
+</body>
+</html>
