@@ -285,6 +285,54 @@ input[type=range]{flex:1;accent-color:var(--teal);}
 /* Variation panels */
 .variation-panel{margin-top:14px;padding:14px 16px;background:#f7f9f7;border:2px solid var(--teal-light);border-radius:var(--radius);animation:vpFadeIn .2s ease;}
 @keyframes vpFadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* Step 3 sticky footer bar */
+.p3-sticky-footer{
+  position:sticky; bottom:0; left:0; right:0; z-index:500;
+  background:linear-gradient(135deg,var(--navy-dark),var(--teal));
+  color:var(--white); padding:12px 24px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  flex-wrap:wrap;
+  box-shadow:0 -3px 16px rgba(0,0,0,.25);
+  border-top:3px solid var(--gold);
+  border-radius:0 0 var(--radius) var(--radius);
+  margin:24px -32px -32px -32px;  /* bleed to panel edges */
+}
+.p3-footer-info{display:flex;align-items:center;gap:10px;font-size:.88rem;line-height:1.4;}
+.p3-footer-count{background:var(--gold);color:var(--navy-dark);font-weight:700;padding:3px 12px;border-radius:12px;font-size:.9rem;white-space:nowrap;}
+.p3-footer-text{color:rgba(255,255,255,.9);}
+.p3-footer-text strong{color:var(--gold-light);}
+.p3-footer-btn{
+  background:var(--gold); color:var(--navy-dark);
+  border:none; border-radius:var(--radius);
+  padding:10px 22px; font-family:var(--font-body);
+  font-weight:700; font-size:.9rem; cursor:pointer;
+  white-space:nowrap; transition:var(--transition);
+  display:flex; align-items:center; gap:6px;
+}
+.p3-footer-btn:hover{background:var(--gold-light);transform:translateY(-1px);}
+.p3-footer-btn:focus-visible{outline:3px solid var(--white);outline-offset:2px;}
+
+/* Floating Action Button */
+.p3-fab{
+  position:fixed; bottom:28px; right:28px; z-index:1500;
+  background:var(--gold); color:var(--navy-dark);
+  border:none; border-radius:50px;
+  padding:14px 22px; font-family:var(--font-body);
+  font-weight:700; font-size:.92rem; cursor:pointer;
+  box-shadow:0 6px 24px rgba(0,0,0,.3);
+  display:none; align-items:center; gap:8px;
+  transition:transform .2s ease, box-shadow .2s ease;
+  white-space:nowrap;
+}
+.p3-fab.visible{display:flex;}
+.p3-fab:hover{transform:translateY(-3px);box-shadow:0 10px 32px rgba(0,0,0,.35);}
+.p3-fab:focus-visible{outline:3px solid var(--navy);outline-offset:3px;}
+.p3-fab-count{
+  background:var(--navy-dark); color:var(--white);
+  border-radius:12px; padding:2px 9px;
+  font-size:.8rem; font-weight:700;
+}
 .variation-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
 .variation-title{font-weight:700;font-size:.87rem;color:var(--navy);}
 .variation-reset{background:none;border:1px solid var(--light-gray);border-radius:4px;padding:3px 10px;font-size:.75rem;cursor:pointer;color:var(--mid-gray);font-family:var(--font-body);transition:.2s;}
@@ -640,9 +688,33 @@ input[type=range]{flex:1;accent-color:var(--teal);}
       <p>No questions yet. Generate from your materials or add manually.</p>
     </div>
 
+    <!-- Export format picker — synced to Panel 4 -->
+    <div class="export-format-row" role="group" aria-label="Export format selection">
+      <label class="field-label" for="exportFormatP3" style="margin-bottom:6px;">Export Format</label>
+      <select id="exportFormatP3" aria-label="Choose export format">
+        <option value="qti12">Canvas QTI 1.2 ZIP — single bank (recommended)</option>
+        <option value="qti12-diff">Canvas QTI 1.2 ZIP — split by difficulty (up to 3 banks)</option>
+        <option value="qti12-topic">Canvas QTI 1.2 ZIP — split by domain/topic</option>
+        <option value="json">JSON (archive / backup)</option>
+        <option value="csv">CSV (spreadsheet review)</option>
+        <option value="studyguide">📄 Student Study Guide (printable HTML — no answers)</option>
+      </select>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-gold" id="btnToExport">📦 Proceed to Export →</button>
       <button class="btn btn-secondary" id="btnBack3">← Back to Config</button>
+    </div>
+
+    <!-- Sticky footer bar (Option A) -->
+    <div class="p3-sticky-footer" id="p3StickyFooter" role="complementary" aria-label="Export navigation">
+      <div class="p3-footer-info">
+        <span class="p3-footer-count" id="p3FooterCount" aria-live="polite">0 questions</span>
+        <span class="p3-footer-text"><strong>Step 4</strong> is where you choose your export format and download your Canvas QTI file.</span>
+      </div>
+      <button class="p3-footer-btn" id="p3FooterExportBtn" aria-label="Proceed to Step 4 Export">
+        📦 Step 4: Export &amp; Download →
+      </button>
     </div>
   </section>
 
@@ -696,6 +768,12 @@ input[type=range]{flex:1;accent-color:var(--teal);}
     </div>
     <div class="status-box" id="exportStatus" style="margin-top:16px;" role="status" aria-live="polite">Export ready.</div>
   </section>
+<!-- Floating Action Button — Step 3 only (Option C) -->
+<button class="p3-fab" id="p3Fab" aria-label="Proceed to Step 4: Export and Download">
+  📦 Export &amp; Download
+  <span class="p3-fab-count" id="p3FabCount">0</span>
+</button>
+
 </main>
 
 <!-- Edit Modal -->
@@ -910,7 +988,7 @@ function checkRestore(){
       state.questions=saved.questions.map(q=>({...q,difficulty:normalizeDiff(q.difficulty)}));
       state.config=saved.config||{};
       $('restoreBanner').classList.remove('show');
-      renderQuestions(); updateStats(); goToPanel(3);
+      renderQuestions(); updateStats(); goToPanel(3); updateP3Nav();
       toast('✅ Restored '+state.questions.length+' questions.','success');
     };
     $('btnDiscardRestore').onclick=()=>{
@@ -1294,7 +1372,7 @@ async function startGeneration(config){
     addLog('✓ '+newQs.length+' new questions. Total: '+state.questions.length,'ok');
     saveSession();
     await new Promise(r=>setTimeout(r,600));
-    state.generating=false; renderQuestions(); updateStats(); goToPanel(3);
+    state.generating=false; renderQuestions(); updateStats(); goToPanel(3); updateP3Nav();
     toast('✅ Generated '+newQs.length+' questions!','success');
   }catch(err){
     state.generating=false;
@@ -1397,7 +1475,7 @@ function renderQuestions(){
       if(from===to) return;
       const moved=state.questions.splice(from,1)[0];
       state.questions.splice(to,0,moved);
-      saveSession(); renderQuestions(); updateStats();
+      saveSession(); renderQuestions(); updateStats(); updateP3Nav();
     });
     list.appendChild(li);
   });
@@ -1408,12 +1486,12 @@ function moveQ(idx,dir){
   const t=idx+dir;
   if(t<0||t>=state.questions.length) return;
   [state.questions[idx],state.questions[t]]=[state.questions[t],state.questions[idx]];
-  saveSession(); renderQuestions(); updateStats();
+  saveSession(); renderQuestions(); updateStats(); updateP3Nav();
 }
 
 function delQ(idx){
   if(!confirm('Delete this question?')) return;
-  state.questions.splice(idx,1); saveSession(); renderQuestions(); updateStats();
+  state.questions.splice(idx,1); saveSession(); renderQuestions(); updateStats(); updateP3Nav();
   toast('Question deleted.','');
 }
 
@@ -1504,7 +1582,7 @@ $('modalSave').addEventListener('click',()=>{
   document.querySelectorAll('.choice-input').forEach(inp=>{
     const ch=q.choices.find(c=>c.letter===inp.dataset.letter); if(ch) ch.text=inp.value.trim();
   });
-  closeModal(); saveSession(); renderQuestions(); updateStats(); toast('Saved.','success');
+  closeModal(); saveSession(); renderQuestions(); updateStats(); updateP3Nav(); toast('Saved.','success');
 });
 
 $('btnAddQ').addEventListener('click',()=>{
@@ -1512,13 +1590,13 @@ $('btnAddQ').addEventListener('click',()=>{
     domain:'',stem:'Enter question stem…',
     choices:[{letter:'A',text:'Choice A'},{letter:'B',text:'Choice B'},{letter:'C',text:'Choice C'},{letter:'D',text:'Choice D'}],
     correct:'A',rationale:'Enter rationale…'});
-  saveSession(); renderQuestions(); updateStats(); editQ(state.questions.length-1);
+  saveSession(); renderQuestions(); updateStats(); updateP3Nav(); editQ(state.questions.length-1);
 });
 
 $('btnClearAll').addEventListener('click',()=>{
   if(!state.questions.length) return;
   if(!confirm('Clear all '+state.questions.length+' questions?')) return;
-  state.questions=[]; clearSession(); renderQuestions(); updateStats(); toast('Cleared.','');
+  state.questions=[]; clearSession(); renderQuestions(); updateStats(); updateP3Nav(); toast('Cleared.','');
 });
 
 // #8 PRINT
@@ -1530,10 +1608,38 @@ $('btnPrint').addEventListener('click',()=>window.print());
 $('btnToExport').addEventListener('click',()=>{
   if(!state.questions.length){ toast('No questions to export.','error'); return; }
   $('exportBankName').value=state.config.bankName||'Generated Question Bank';
-  updateStats(); goToPanel(4);
+  // Sync format picker from P3 to P4
+  if($('exportFormatP3').value) $('exportFormat').value=$('exportFormatP3').value;
+  updateStats(); goToPanel(4); updateP3Nav();
 });
-$('btnBack3').addEventListener('click',()=>goToPanel(1));
-$('btnBack4').addEventListener('click',()=>goToPanel(3));
+$('btnBack3').addEventListener('click',()=>{ goToPanel(1); updateP3Nav(); });
+$('btnBack4').addEventListener('click',()=>{ goToPanel(3); updateP3Nav(); });
+
+// ---- Sticky footer + FAB (Step 3 navigation aids) ----
+function updateP3Nav(){
+  const n = state.questions.length;
+  const onP3 = document.getElementById('panel3').classList.contains('active');
+  const countTxt = n === 1 ? '1 question' : `${n} questions`;
+  $('p3FooterCount').textContent = countTxt;
+  $('p3FabCount').textContent = n;
+  // FAB only visible on panel 3 with at least 1 question
+  $('p3Fab').classList.toggle('visible', onP3 && n > 0);
+}
+
+function goToExportFromP3(){
+  if(!state.questions.length){ toast('No questions to export.','error'); return; }
+  $('exportBankName').value=state.config.bankName||'Generated Question Bank';
+  if($('exportFormatP3').value) $('exportFormat').value=$('exportFormatP3').value;
+  updateStats(); goToPanel(4); updateP3Nav();
+}
+$('p3FooterExportBtn').addEventListener('click', goToExportFromP3);
+$('p3Fab').addEventListener('click', goToExportFromP3);
+
+// Sync exportFormatP3 → exportFormat live
+$('exportFormatP3').addEventListener('change',()=>{
+  $('exportFormat').value=$('exportFormatP3').value;
+  updateStats();
+});
 $('btnNewBank').addEventListener('click',()=>{
   if(!confirm('Clear all questions and start fresh?')) return;
   state.questions=[]; state.files={pptx:[],docs:[]};
@@ -1866,7 +1972,7 @@ function restoreSnap(i){
   const snaps = loadSnaps();
   if(!snaps[i]) return;
   state.questions = JSON.parse(JSON.stringify(snaps[i].questions)).map(q=>({...q,difficulty:normalizeDiff(q.difficulty)}));
-  saveSession(); renderQuestions(); updateStats(); closeSnapModal();
+  saveSession(); renderQuestions(); updateStats(); updateP3Nav(); closeSnapModal();
   toast('✅ Restored "'+snaps[i].name+'" — '+state.questions.length+' questions.','success');
 }
 
@@ -1948,7 +2054,7 @@ $('btnDoMerge').addEventListener('click',()=>{
   const toAdd = skipDups ? mergeCandidate.filter(q=>!q._dup) : mergeCandidate;
   const cleaned = toAdd.map(q=>{ const c={...q,difficulty:normalizeDiff(q.difficulty)}; delete c._dup; return c; });
   state.questions = [...state.questions, ...cleaned];
-  saveSession(); renderQuestions(); updateStats(); closeMergeModal();
+  saveSession(); renderQuestions(); updateStats(); updateP3Nav(); closeMergeModal();
   toast(`✅ Merged ${cleaned.length} questions. Total: ${state.questions.length}.`,'success');
 });
 
@@ -2077,10 +2183,10 @@ $('btnRebalance').addEventListener('click', async()=>{
     setProgress(100,'Rebalance complete!');
     addLog('Rebalance done. Total: '+state.questions.length,'ok');
     saveSession(); await new Promise(r=>setTimeout(r,600));
-    renderQuestions(); updateStats(); goToPanel(3);
+    renderQuestions(); updateStats(); goToPanel(3); updateP3Nav();
     toast('✅ Added '+newQs.length+' questions to rebalance.','success');
   }catch(err){
-    addLog('Error: '+err.message,'err'); goToPanel(3);
+    addLog('Error: '+err.message,'err'); goToPanel(3); updateP3Nav();
     toast('Rebalance failed: '+err.message,'error');
   }
 });
