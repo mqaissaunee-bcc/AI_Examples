@@ -344,7 +344,7 @@ input[type=range]{flex:1;accent-color:var(--teal);}
           <input type="file" id="pptxInput" accept=".pptx,.ppt" multiple aria-label="Upload PowerPoint files">
           <span class="upload-icon">📊</span>
           <div class="upload-label">Drop .pptx files here</div>
-          <div class="upload-hint" id="pptxHint">Slide text extracted via JSZip · multiple files accepted</div>
+          <div class="upload-hint" id="pptxHint">Slide text extracted via JSZip · files up to 25MB · multiple files accepted</div>
         </div>
         <ul class="upload-files-list" id="pptxList" aria-label="Uploaded PowerPoint files" aria-live="polite"></ul>
       </div>
@@ -376,11 +376,11 @@ input[type=range]{flex:1;accent-color:var(--teal);}
 
     <div class="form-row-grid">
       <div class="form-row">
-        <!-- #9: slider capped at 30; >15 uses two API calls -->
+        <!-- Questions are auto-chunked into batches of 20 per API call -->
         <label class="field-label" for="numQuestions">Number of Questions</label>
-        <span class="field-hint" id="numQHint">Max 30 per generation. 16–30 uses two API calls automatically.</span>
+        <span class="field-hint" id="numQHint">No hard cap — questions are generated in batches of 20 automatically. Banks over 60 may take a minute or two.</span>
         <div class="range-row">
-          <input type="range" id="numQuestions" min="5" max="30" value="20" aria-valuemin="5" aria-valuemax="30" aria-valuenow="20" aria-describedby="numQHint">
+          <input type="range" id="numQuestions" min="5" max="100" value="20" aria-valuemin="5" aria-valuemax="100" aria-valuenow="20" aria-describedby="numQHint">
           <span class="range-val" id="numQVal" aria-live="polite">20</span>
         </div>
         <!-- #10: live cost estimate -->
@@ -440,7 +440,7 @@ input[type=range]{flex:1;accent-color:var(--teal);}
   <!-- ===== PANEL 2 ===== -->
   <section class="panel" id="panel2" aria-labelledby="p2title" aria-live="polite">
     <h2 class="panel-title" id="p2title">⚡ Generating Question Bank</h2>
-    <p class="panel-desc">Extracting text from files then generating questions. Banks of 16–30 questions use two sequential API calls for reliability.</p>
+    <p class="panel-desc">Extracting text from files then generating questions. Large banks are split into batches of 20 questions per API call automatically — no manual splitting needed.</p>
     <div class="progress-wrap" role="region" aria-label="Generation progress">
       <div class="progress-label"><span id="progressLabel">Initializing…</span><span id="progressPct">0%</span></div>
       <div class="progress-bar-outer" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="progressBar" aria-labelledby="progressLabel">
@@ -475,7 +475,7 @@ input[type=range]{flex:1;accent-color:var(--teal);}
     <div class="gen-more-row" id="genMoreRow" role="region" aria-label="Generate additional questions">
       <div>
         <label class="field-label" for="genMoreCount">Additional questions to generate</label>
-        <input type="number" id="genMoreCount" value="10" min="1" max="30" aria-label="Number of additional questions">
+        <input type="number" id="genMoreCount" value="10" min="1" max="100" aria-label="Number of additional questions">
       </div>
       <button class="btn btn-primary" id="btnGenMoreGo">⚡ Generate</button>
       <button class="btn btn-secondary" id="btnGenMoreCancel">Cancel</button>
@@ -570,8 +570,8 @@ const state = {
   questions: [], config: {},
   editingIdx: null, generating: false, abortController: null
 };
-const MAX_FILE_MB = 5;
-const CHUNK_SIZE  = 15;   // questions per API call (#9)
+const MAX_FILE_MB = 25;
+const CHUNK_SIZE  = 20;   // questions per API call — Claude Sonnet handles 20 reliably
 const LS_KEY = 'qti_session_v2';
 
 // ================================================================
@@ -728,7 +728,7 @@ async function extractAll(files, logFn){
   for(const f of files){
     logFn('Extracting '+f.name+'…');
     const raw=await extractFile(f);
-    const clean=raw.replace(/\s{3,}/g,' ').trim().substring(0,10000);
+    const clean=raw.replace(/\s{3,}/g,' ').trim().substring(0,25000);
     logFn('  → '+Math.round(clean.length/100)/10+'KB extracted','ok');
     if(clean.length>50) chunks.push('=== '+f.name+' ===\n'+clean);
   }
@@ -749,7 +749,7 @@ function renderFileList(type){
     li.innerHTML=`<span class="ft-${cls}"></span>
       <span class="fname" title="${f.name}">${f.name}</span>
       <span style="color:var(--mid-gray);font-size:.74rem">${(f.size/1024).toFixed(0)}KB</span>
-      ${over?'<span class="file-size-warn" title="Large files are truncated to 10KB of text">⚠ Large</span>':''}
+      ${over?'<span class="file-size-warn" title="Very large files — text is capped at 25KB per file">⚠ Large</span>':''}
       <button class="file-remove" aria-label="Remove ${f.name}" data-type="${type}" data-idx="${i}">✕</button>`;
     el.appendChild(li);
   });
@@ -832,7 +832,7 @@ Requirements:
 - Focus on application, analysis, problem-solving
 
 Source Material:
-${content.substring(0,12000)||'[No files — generate questions based on course title and topic focus above]'}
+${content.substring(0,30000)||'[No files — generate questions based on course title and topic focus above]'}
 
 Return ONLY a valid JSON array. No markdown, no preamble. Each object:
 {"id":"q1","type":"scenario|multiple_choice|true_false|analysis","bloom":"Apply","difficulty":"easy|medium|hard","domain":"topic","stem":"question","choices":[{"letter":"A","text":"..."},{"letter":"B","text":"..."},{"letter":"C","text":"..."},{"letter":"D","text":"..."}],"correct":"A","rationale":"explanation"}
