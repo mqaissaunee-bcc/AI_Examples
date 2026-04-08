@@ -283,7 +283,7 @@ tr:last-child td{border-bottom:none;}
         <div class="form-row">
           <label class="field-label" for="numQuestions">Number of Questions</label>
           <div class="range-row">
-            <input type="range" id="numQuestions" min="5" max="50" value="15" aria-valuemin="5" aria-valuemax="50" aria-valuenow="15">
+            <input type="range" id="numQuestions" min="5" max="100" value="15" aria-valuemin="5" aria-valuemax="100" aria-valuenow="15">
             <span class="range-val" id="numQVal" aria-live="polite">15</span>
           </div>
           <div id="qWarn" style="margin-top:6px;font-size:.8rem;line-height:1.5;" aria-live="polite"></div>
@@ -913,7 +913,7 @@ async function extractOneFile(item){
     else if(['docx','doc'].includes(ext)) text=await extractDocx(item.file);
     else if(ext==='pdf') text=await extractPdf(item.file);
     else text=await extractTxt(item.file);
-    item.text=text.replace(/\s{3,}/g,' ').trim().substring(0,10000);
+    item.text=text.replace(/\s{3,}/g,' ').trim().substring(0,25000);
     item.status='ok';
   }catch(e){
     item.text=''; item.status='err'; item.error=e.message;
@@ -982,14 +982,14 @@ const LLM_LABELS = {
 };
 
 // Per-LLM thresholds: [safeMax, warnMax]
-// Below safeMax → green. safeMax–warnMax → yellow. warnMax–35 → orange. 36+ → red.
+// Below safeMax → green. safeMax–warnMax → yellow. warnMax–50 → orange. 51+ → red.
 const LLM_THRESHOLDS = {
-  claude:    [25, 35],
-  chatgpto1: [25, 35],
-  chatgpt4o: [20, 30],
-  gemini:    [15, 25],
-  copilot:   [15, 22],
-  generic:   [15, 22],
+  claude:    [30, 50],
+  chatgpto1: [30, 50],
+  chatgpt4o: [25, 40],
+  gemini:    [20, 35],
+  copilot:   [15, 25],
+  generic:   [15, 25],
 };
 
 function updateQWarn(){
@@ -1011,7 +1011,7 @@ function updateQWarn(){
     } else {
       msg = `⚠ Approaching limits for some free-tier LLMs (Gemini, Copilot). ${name} handles this well.`;
     }
-  } else if(n <= 35){
+  } else if(n <= 50){
     color = '#8B3A00';
     if(llm === 'claude' || llm === 'chatgpto1'){
       msg = `⚠ Large bank — ${name} Pro/paid recommended. Free tier may truncate. Gemini and Copilot will likely cut off early.`;
@@ -1023,9 +1023,9 @@ function updateQWarn(){
   } else {
     color = '#8B0000';
     if(llm === 'claude' || llm === 'chatgpto1'){
-      msg = `⛔ ${n} questions requires a paid plan. Consider two separate generations of ${Math.ceil(n/2)} questions each for free-tier users. Gemini and Copilot will fail at this count.`;
+      msg = `⛔ ${n} questions requires a paid plan. Claude will handle this via multiple API calls if you use the API-key version. For this prompt tool, consider splitting into batches of ${Math.ceil(n/2)}.`;
     } else {
-      msg = `⛔ ${n} questions will exceed free-tier output limits on ${name}, Gemini, and Copilot. Use Claude Pro or ChatGPT Plus, or split into two smaller generations.`;
+      msg = `⛔ ${n} questions will exceed output limits on ${name}, Gemini, and Copilot. Use Claude Pro or ChatGPT Plus, or split into two separate prompts of ${Math.ceil(n/2)} questions each.`;
     }
   }
 
@@ -1072,7 +1072,7 @@ function buildPrompt(){
   };
 
   const contentSection = combinedContent
-    ? `\n== COURSE CONTENT (ground your questions in this material) ==\n${combinedContent.substring(0,14000)}\n== END COURSE CONTENT ==\n`
+    ? `\n== COURSE CONTENT (ground your questions in this material) ==\n${combinedContent.substring(0,40000)}\n== END COURSE CONTENT ==\n`
     : '';
   const topicsSection = topicFocus ? `\nTopic focus areas: ${topicFocus}\n` : '';
   const extraSection  = extra ? `\nAdditional instructions: ${extra}\n` : '';
