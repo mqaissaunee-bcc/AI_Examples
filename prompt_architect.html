@@ -3728,7 +3728,6 @@ function toggleSuperSnippet(ss, btn) {
         }
         // Handle multimedia chip side effects
         if (chipId === 'multimedia') hideVideoGate();
-        if (chipId === 'dhh') syncDhhCaptionsChip(false);
       }
     });
   } else {
@@ -3749,7 +3748,6 @@ function toggleSuperSnippet(ss, btn) {
       }
       // Handle multimedia chip side effects
       if (chipId === 'multimedia') showVideoGate();
-      if (chipId === 'dhh') syncDhhCaptionsChip(true);
     });
   }
 
@@ -3842,7 +3840,6 @@ function toggleSnippet(snip, chipEl, countId) {
   if (isActive) {
     doDeactivateSnippet(snip, chipEl, countId);
     if (snip.id === 'fileupload') hideFileUploadGate();
-    if (snip.id === 'dhh') syncDhhCaptionsChip(false);
   } else {
     state.activeSnippets.add(snip.id);
     chipEl.classList.add('active');
@@ -3850,7 +3847,6 @@ function toggleSnippet(snip, chipEl, countId) {
     chipEl.querySelector('.chip-check').textContent = '✓ ';
     if (snip.id === 'multimedia') showVideoGate();
     if (snip.id === 'fileupload') showFileUploadGate();
-    if (snip.id === 'dhh') syncDhhCaptionsChip(true);
   }
   updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS, RESIST_SNIPPETS, REF_SNIPPETS].flat());
   syncSuperChipVisuals();
@@ -3864,42 +3860,6 @@ function doDeactivateSnippet(snip, chipEl, countId) {
   chipEl.querySelector('.chip-check').textContent = '';
   updateCountBadge(countId, [TECH_SNIPPETS, PED_SNIPPETS, OUT_SNIPPETS, ACC_SNIPPETS, RESIST_SNIPPETS, REF_SNIPPETS].flat());
   syncSuperChipVisuals();
-  updatePrompt();
-}
-
-function syncDhhCaptionsChip(dhhOn) {
-  // Find the captions quality chip in the video gate panel
-  const captionsChip = document.querySelector('.video-pref-chip[data-pref="quality"][data-val="captions"]');
-  if (!captionsChip) return;
-  if (dhhOn) {
-    // Force on and visually lock
-    captionsChip.classList.add('active');
-    captionsChip.setAttribute('aria-pressed', 'true');
-    captionsChip.dataset.dhhLocked = 'true';
-    captionsChip.style.cssText = 'outline:2px solid #4a6fd4;outline-offset:1px;cursor:not-allowed;opacity:0.85;';
-    captionsChip.title = 'Locked — required when Deaf & Hard of Hearing chip is active';
-    // Prevent clicks while DHH is on
-    captionsChip._dhhBlocker = (e) => e.stopImmediatePropagation();
-    captionsChip.addEventListener('click', captionsChip._dhhBlocker, true);
-    // Nudge Text Density down if currently Rich (3) or Textbook-Dense (4)
-    // Plain language and visual chunking are incompatible with dense prose
-    const densitySlider = document.getElementById('density');
-    if (densitySlider && parseInt(densitySlider.value) > 2) {
-      densitySlider.value = 1; // Concise
-      if (typeof updateDensityDisplay === 'function') updateDensityDisplay(1);
-    }
-  } else {
-    // Unlock — restore to unselected state (faculty can re-select manually)
-    captionsChip.classList.remove('active');
-    captionsChip.setAttribute('aria-pressed', 'false');
-    captionsChip.dataset.dhhLocked = '';
-    captionsChip.style.cssText = '';
-    captionsChip.title = '';
-    if (captionsChip._dhhBlocker) {
-      captionsChip.removeEventListener('click', captionsChip._dhhBlocker, true);
-      captionsChip._dhhBlocker = null;
-    }
-  }
   updatePrompt();
 }
 
@@ -4685,9 +4645,7 @@ function flashBtn(id, label, cls) {
       highview:    'Prefer videos from channels with a large, established subscriber base — a signal of trusted, high-quality content.',
       recent:      'Prefer videos published within the last 3 years to ensure currency and relevance.',
       educational: 'Prefer videos from educational institutions, university channels, professional organizations, or recognized subject-matter experts rather than informal personal channels.',
-      captions:    state.activeSnippets.has('dhh')
-        ? 'CAPTIONS REQUIRED (DHH mode): Only embed videos that have accurate, human-edited closed captions or subtitles. Auto-generated captions are not acceptable. Verify caption quality before use. Flag any video where caption accuracy cannot be confirmed.'
-        : 'Prefer videos that have closed captions or subtitles available. Accurate captions are the most reliable accessibility solution for students who have difficulty following audio — including those affected by speaker accent, hearing differences, or noisy environments.',
+      captions:    'Prefer videos that have closed captions or subtitles available. Accurate captions are the most reliable accessibility solution for students who have difficulty following audio — including those affected by speaker accent, hearing differences, or noisy environments.',
       nosponsored: 'Avoid videos that are heavily sponsored, promotional, or primarily advertising-driven.',
       ussource:    'Prefer videos produced by US or Canadian educational sources — such as universities, public broadcasters (PBS, NPR), or established organizations like Khan Academy or Crash Course. This increases the likelihood of a familiar North American English accent and production style suited to academic use.',
     };
