@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCORM Studio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* ── DESIGN TOKENS ─────────────────────────────────────────────────────── */
+:root {
+  --bg:        #f5f4f0;
+  --bg2:       #ffffff;
+  --bg3:       #eeecea;
+  --surface:   #ffffff;
+  --surface2:  #f9f8f5;
+  --border:    #dbd8d2;
+  --border2:   #c4bfb8;
+  --text:      #1a1917;
+  --text2:     #4a4743;
+  --text3:     #8a8480;
+  --amber:     #c47c00;
+  --amber2:    #a36500;
+  --amber-dim: rgba(196,124,0,0.10);
+  --amber-glow:rgba(196,124,0,0.20);
+  --green:     #157a4a;
+  --green-dim: rgba(21,122,74,0.10);
+  --red:       #cc2d2d;
+  --red-dim:   rgba(204,45,45,0.10);
+  --yellow:    #9a6f00;
+  --yellow-dim:rgba(154,111,0,0.10);
+  --blue:      #1d5fa8;
+  --mono:      'Courier New', 'Lucida Console', monospace;
+  --sans:      'Georgia', 'Times New Roman', serif;
+  --ui:        -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --radius:    8px;
+  --radius-sm: 5px;
+  --shadow:    0 4px 24px rgba(0,0,0,0.10);
+}
+
+/* ── RESET ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: var(--ui);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  background-image:
+    radial-gradient(ellipse 80% 40% at 20% 0%, rgba(196,124,0,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 30% at 80% 100%, rgba(29,95,168,0.04) 0%, transparent 60%);
+}
+
+/* ── HEADER ────────────────────────────────────────────────────────────── */
+header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo-mark {
+  width: 34px; height: 34px;
+  background: var(--amber);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #000;
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-family: var(--mono);
+  font-size: 1rem;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+
+.logo-text span { color: var(--amber); }
+
+.header-meta {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text3);
+  letter-spacing: 0.06em;
+}
+
+/* ── LAYOUT ────────────────────────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 1.5rem;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 1.5rem 2rem 3rem;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .app { grid-template-columns: 1fr; }
+}
+
+/* ── PANELS ────────────────────────────────────────────────────────────── */
+.panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.panel-header {
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.panel-header h2 {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: normal;
+  color: var(--text2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panel-header .ph-icon { font-size: 0.9rem; opacity: 0.7; }
+
+.panel-body { padding: 1.1rem; }
+
+/* ── PASTE ZONE ────────────────────────────────────────────────────────── */
+.paste-zone {
+  position: relative;
+  min-height: 280px;
+}
+
+#htmlInput {
+  width: 100%;
+  min-height: 280px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text);
+  resize: vertical;
+  outline: none;
+  line-height: 1.6;
+  transition: border-color 0.2s;
+}
+
+#htmlInput:focus { border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-dim); }
+#htmlInput::placeholder { color: var(--text3); }
+
+.paste-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.char-count {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text3);
+  margin-left: auto;
+}
+
+/* ── PRE-FLIGHT ────────────────────────────────────────────────────────── */
+.preflight {
+  margin-top: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.preflight-header {
+  background: var(--bg3);
+  padding: 0.55rem 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text2);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.preflight-score {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: bold;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-family: var(--mono);
+}
+
+.score-great  { background: var(--green-dim);  color: var(--green); }
+.score-ok     { background: var(--yellow-dim); color: var(--yellow); }
+.score-warn   { background: var(--red-dim);    color: var(--red); }
+.score-empty  { background: var(--bg3);        color: var(--text3); }
+
+.preflight-list {
+  padding: 0.6rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pf-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pf-item:last-child { border-bottom: none; }
+
+.pf-icon { font-size: 0.85rem; flex-shrink: 0; margin-top: 0.05rem; }
+.pf-label { color: var(--text2); flex: 1; }
+.pf-label strong { color: var(--text); }
+.pf-status {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: bold;
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.st-pass  { background: var(--green-dim);  color: var(--green); }
+.st-warn  { background: var(--yellow-dim); color: var(--yellow); }
+.st-fail  { background: var(--red-dim);    color: var(--red); }
+.st-info  { background: var(--amber-dim);  color: var(--amber); }
+.st-skip  { background: var(--bg3);        color: var(--text3); }
+
+/* ── CONFIG PANEL ──────────────────────────────────────────────────────── */
+.config-section {
+  margin-bottom: 1.1rem;
+}
+
+.config-section:last-child { margin-bottom: 0; }
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--amber);
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Segmented control */
+.seg-control {
+  display: flex;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 0.55rem;
+}
+
+.seg-btn {
+  flex: 1;
+  padding: 0.5rem 0.4rem;
+  background: var(--bg3);
+  border: none;
+  color: var(--text2);
+  font-size: 0.76rem;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.seg-btn:not(:last-child) { border-right: 1px solid var(--border2); }
+
+.seg-btn.active {
+  background: var(--amber);
+  color: #000;
+  font-weight: bold;
+}
+
+.seg-btn:hover:not(.active) {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+/* Field */
+.field { margin-bottom: 0.7rem; }
+
+.field label {
+  display: block;
+  font-size: 0.71rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text2);
+  margin-bottom: 0.3rem;
+  font-family: var(--mono);
+}
+
+.field label .req { color: var(--amber); margin-left: 2px; }
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.83rem;
+  color: var(--text);
+  font-family: var(--ui);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  appearance: none;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px var(--amber-dim);
+}
+
+.field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23546080' d='M5 7L0 2h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  padding-right: 1.8rem;
+  cursor: pointer;
+}
+
+.field-hint {
+  font-size: 0.71rem;
+  color: var(--text3);
+  margin-top: 0.25rem;
+  line-height: 1.4;
+  font-family: var(--ui);
+}
+
+/* Advanced toggle */
+.adv-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text3);
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--mono);
+  margin: 0.6rem 0 0;
+  padding: 0;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.adv-toggle:hover { color: var(--amber); }
+.adv-arrow { transition: transform 0.2s; font-size: 0.65rem; }
+.adv-toggle.open .adv-arrow { transform: rotate(90deg); }
+
+.adv-fields {
+  display: none;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+}
+
+.adv-fields.visible { display: block; }
+
+/* Row layout */
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+/* ── LMS PROFILE CARDS ─────────────────────────────────────────────────── */
+.lms-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+}
+
+.lms-card {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--bg3);
+  text-align: left;
+  width: 100%;
+}
+
+.lms-card:hover { border-color: var(--border2); background: var(--surface); }
+
+.lms-card.active {
+  border-color: var(--amber);
+  background: var(--amber-dim);
+}
+
+.lms-card-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--mono);
+  display: block;
+  margin-bottom: 0.1rem;
+}
+
+.lms-card-desc {
+  font-size: 0.68rem;
+  color: var(--text3);
+  line-height: 1.3;
+}
+
+.lms-card.active .lms-card-name { color: var(--amber); }
+.lms-card.active .lms-card-desc { color: var(--text2); }
+
+/* ── DOWNLOAD BUTTON ───────────────────────────────────────────────────── */
+.download-zone {
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--border);
+}
+
+.btn-download {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  background: var(--amber);
+  border: none;
+  border-radius: var(--radius);
+  color: #000;
+  font-size: 1rem;
+  font-weight: 800;
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  transition: all 0.2s;
+  box-shadow: 0 3px 14px var(--amber-glow);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-download::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.btn-download:hover {
+  background: #fbbf24;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px var(--amber-glow);
+}
+
+.btn-download:active { transform: translateY(0); }
+
+.btn-download:disabled {
+  background: var(--bg3);
+  color: var(--text3);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-download.success {
+  background: var(--green);
+  box-shadow: 0 4px 20px rgba(16,185,129,0.3);
+}
+
+.dl-sub {
+  font-size: 0.72rem;
+  color: var(--text3);
+  text-align: center;
+  margin-top: 0.5rem;
+  font-family: var(--mono);
+  letter-spacing: 0.03em;
+}
+
+/* ── UTILITY BUTTONS ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border2);
+  background: var(--bg3);
+  color: var(--text2);
+  font-size: 0.76rem;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.btn:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+
+.btn-primary {
+  background: var(--amber-dim);
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.btn-ghost { background: transparent; }
+
+/* ── SCORM CLOUD LINK ──────────────────────────────────────────────────── */
+.scorm-cloud-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.76rem;
+  color: var(--text2);
+  font-family: var(--mono);
+}
+
+.scorm-cloud-row a {
+  color: var(--blue);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.scorm-cloud-row a:hover { text-decoration: underline; }
+
+/* ── MANIFEST PREVIEW ──────────────────────────────────────────────────── */
+.manifest-preview {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text2);
+  line-height: 1.7;
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre;
+  margin-top: 0.6rem;
+  display: none;
+}
+
+.manifest-preview.visible { display: block; }
+
+.xml-tag    { color: #1d5fa8; }
+.xml-attr   { color: #a36500; }
+.xml-val    { color: #157a4a; }
+.xml-comment{ color: var(--text3); font-style: italic; }
+
+/* ── INJECT NOTICE ─────────────────────────────────────────────────────── */
+.inject-notice {
+  display: none;
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  background: #fffbeb;
+  border: 1px solid #d97706;
+  border-radius: var(--radius-sm);
+  font-size: 0.77rem;
+  color: #78350f;
+  line-height: 1.5;
+  font-family: var(--ui);
+}
+
+.inject-notice.visible { display: block; }
+
+/* ── SCROLLBAR ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── FOOTER ────────────────────────────────────────────────────────────── */
+footer {
+  text-align: center;
+  padding: 1.5rem;
+  font-size: 0.72rem;
+  color: var(--text3);
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  letter-spacing: 0.03em;
+}
+
+footer a { color: var(--amber); text-decoration: none; }
+
+/* ── ANIMATIONS ────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.panel { animation: fadeIn 0.3s ease both; }
+.panel:nth-child(2) { animation-delay: 0.08s; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(0,0,0,0.15);
+  border-top-color: #1a1917;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── ACCESSIBILITY ─────────────────────────────────────────────────────── */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sr-only { position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark" aria-hidden="true">S12</div>
+    <span class="logo-text">SCORM <span>Studio</span></span>
+  </div>
+  <div class="header-meta">SCORM 1.2 · SCORM 2004 · Canvas · D2L Brightspace</div>
+</header>
+
+<main class="app" role="main">
+
+  <!-- ═══ LEFT: HTML INPUT + PREFLIGHT ═══ -->
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ph-icon" aria-hidden="true">📄</span>
+        <h2>HTML Source</h2>
+      </div>
+      <div class="panel-body">
+        <p style="font-size:0.78rem;color:var(--text2);margin-bottom:0.65rem;line-height:1.5;">Paste the complete HTML file generated by your LLM. The packager will wrap it in a SCORM-compliant ZIP ready to upload to Canvas or D2L Brightspace.</p>
+
+        <div class="paste-zone">
+          <textarea id="htmlInput"
+            placeholder="<!DOCTYPE html>&#10;<html lang=&quot;en&quot;>&#10;  <!-- Paste your complete HTML file here -->&#10;</html>"
+            spellcheck="false"
+            aria-label="HTML source code to package"
+          ></textarea>
+        </div>
+
+        <div class="paste-actions">
+          <button class="btn btn-primary" id="pasteBtn" type="button">📋 Paste from clipboard</button>
+          <button class="btn" id="clearBtn" type="button">✕ Clear</button>
+          <button class="btn" id="sampleBtn" type="button">⚡ Load sample</button>
+          <span class="char-count" id="charCount" aria-live="polite">0 chars</span>
+        </div>
+
+        <!-- Pre-flight checklist -->
+        <div class="preflight" id="preflightPanel">
+          <div class="preflight-header">
+            <span aria-hidden="true">🔍</span>
+            Pre-flight checklist
+            <span class="preflight-score score-empty" id="preflightScore">—</span>
+          </div>
+          <div class="preflight-list" id="preflightList">
+            <div class="pf-item">
+              <span class="pf-icon">○</span>
+              <span class="pf-label">Paste your HTML above to run the pre-flight check</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inject notice -->
+        <div class="inject-notice" id="injectNotice">
+          ℹ️ <strong>No SCORM API in this HTML — this is often expected.</strong> When you paste HTML generated without the SCORM chips, it has no LMS wiring yet. SCORM Studio will <strong>automatically inject a minimal SCORM 1.2 scaffold</strong> (cross-origin-safe findAPI, LMSInitialize, LMSSetValue, LMSFinish) into the ZIP so the package communicates with the LMS on upload. The ❌ in the pre-flight only appears in a plain browser tab — once uploaded to Canvas or D2L Brightspace, the LMS provides the SCORM API that findAPI() connects to, and the error disappears. <strong>Important:</strong> the auto-injected scaffold reports completion only — no numeric score. For gradebook scoring, go back to Prompt Architect and activate the SCORM 1.2 Wrapper + Score → SCORM Bridge chips before regenerating.
+        </div>
+
+        <!-- Manifest preview toggle -->
+        <button class="adv-toggle" id="manifestToggle" type="button" style="margin-top:0.85rem;">
+          <span class="adv-arrow">▶</span>
+          Preview generated manifest XML
+        </button>
+        <div class="manifest-preview" id="manifestPreview" role="region" aria-label="Generated manifest XML preview"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RIGHT: CONFIG + DOWNLOAD ═══ -->
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ph-icon" aria-hidden="true">⚙️</span>
+        <h2>Package Configuration</h2>
+      </div>
+      <div class="panel-body">
+
+        <!-- SCORM Version -->
+        <div class="config-section">
+          <div class="section-label">📦 SCORM Version</div>
+          <div class="seg-control" role="group" aria-label="SCORM version">
+            <button class="seg-btn active" data-ver="1.2" type="button">SCORM 1.2</button>
+            <button class="seg-btn" data-ver="2004-4" type="button">2004 4th Ed.</button>
+          </div>
+          <p class="field-hint" id="versionHint">SCORM 1.2 — maximum compatibility. suspend_data limited to 4,096 chars.</p>
+        </div>
+
+        <!-- LMS Profile -->
+        <div class="config-section">
+          <div class="section-label">🎯 LMS Profile</div>
+          <div class="lms-grid" role="group" aria-label="LMS profile">
+            <button class="lms-card active" data-lms="canvas" type="button">
+              <span class="lms-card-name">Canvas</span>
+              <span class="lms-card-desc">Instructure Canvas — lenient manifest validation</span>
+            </button>
+            <button class="lms-card" data-lms="d2l" type="button">
+              <span class="lms-card-name">D2L Brightspace</span>
+              <span class="lms-card-desc">Strict validation, requires score.raw for gradebook</span>
+            </button>
+            <button class="lms-card" data-lms="moodle" type="button">
+              <span class="lms-card-name">Moodle</span>
+              <span class="lms-card-desc">Standard SCORM, completion-based grading</span>
+            </button>
+            <button class="lms-card" data-lms="generic" type="button">
+              <span class="lms-card-name">Generic</span>
+              <span class="lms-card-desc">Spec-compliant, no LMS-specific tuning</span>
+            </button>
+          </div>
+          <p class="field-hint" id="lmsHint">Canvas: adds mastery score element, completion threshold 100%.</p>
+        </div>
+
+        <!-- Core Fields -->
+        <div class="config-section">
+          <div class="section-label">📝 Manifest Fields</div>
+
+          <div class="field">
+            <label for="pkgTitle">Course Title <span class="req">*</span></label>
+            <input type="text" id="pkgTitle" value="Interactive Learning Activity" placeholder="e.g., Week 3: Network Security" />
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="masteryScore">Mastery Score %</label>
+              <input type="number" id="masteryScore" value="70" min="0" max="100" />
+              <p class="field-hint">Pass threshold</p>
+            </div>
+            <div class="field">
+              <label for="pkgFilename">ZIP Filename</label>
+              <input type="text" id="pkgFilename" value="scorm_package" placeholder="scorm_package" />
+            </div>
+          </div>
+
+          <!-- Advanced fields -->
+          <button class="adv-toggle" id="advToggle" type="button">
+            <span class="adv-arrow">▶</span>
+            Advanced manifest fields
+          </button>
+
+          <div class="adv-fields" id="advFields">
+            <div class="field">
+              <label for="pkgIdentifier">Package Identifier</label>
+              <input type="text" id="pkgIdentifier" value="" placeholder="Auto-generated if blank" />
+              <p class="field-hint">Must be unique in your LMS</p>
+            </div>
+            <div class="field">
+              <label for="pkgDescription">Description</label>
+              <input type="text" id="pkgDescription" placeholder="Optional course description" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="pkgVersion">Version</label>
+                <input type="text" id="pkgVersion" value="1.0" />
+              </div>
+              <div class="field">
+                <label for="pkgLang">Language</label>
+                <input type="text" id="pkgLang" value="en-US" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="completionThreshold">Completion Threshold</label>
+              <select id="completionThreshold">
+                <option value="1.0">100% (viewed entire activity)</option>
+                <option value="0.8">80%</option>
+                <option value="0.7" selected>70% (default)</option>
+                <option value="0.5">50%</option>
+                <option value="0.0">0% (any launch)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Download -->
+        <div class="download-zone">
+          <button class="btn-download" id="downloadBtn" type="button" disabled>
+            <span id="dlIcon">⬇</span>
+            <span id="dlLabel">DOWNLOAD SCORM ZIP</span>
+          </button>
+          <p class="dl-sub" id="dlSub">Paste HTML above to enable packaging</p>
+
+          <div class="scorm-cloud-row" aria-label="SCORM Cloud testing tip">
+            <span>🧪</span>
+            <span>Test your package at <a href="https://cloud.scorm.com" target="_blank" rel="noopener">cloud.scorm.com</a> before uploading to your LMS</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  SCORM Studio &nbsp;·&nbsp; Generates SCORM 1.2 and SCORM 2004 4th Edition packages &nbsp;·&nbsp;
+  <a href="https://cloud.scorm.com" target="_blank" rel="noopener">Test at SCORM Cloud</a> &nbsp;·&nbsp;
+  <a href="https://docs.d2l.com/en/content/integrate/new-content/scorm" target="_blank" rel="noopener">D2L SCORM docs</a>
+</footer>
+
+<script>
+'use strict';
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+const state = {
+  scormVersion: '1.2',
+  lmsProfile: 'canvas',
+  htmlContent: '',
+  preflightResults: [],
+};
+
+// ── LMS PROFILE HINTS ──────────────────────────────────────────────────────
+const LMS_HINTS = {
+  canvas:  'Canvas: lenient manifest, mastery score added, completion threshold 100%.',
+  d2l:     'D2L Brightspace: strict validation — requires cmi.core.score.raw for gradebook. mastery score and completion threshold required.',
+  moodle:  'Moodle: standard SCORM compliance, completion-based. Both status and score supported.',
+  generic: 'Generic: full spec compliance with no LMS-specific tuning.',
+};
+
+const VERSION_HINTS = {
+  '1.2':    'SCORM 1.2 — maximum LMS compatibility. suspend_data limited to 4,096 chars.',
+  '2004-4': 'SCORM 2004 4th Edition — richer sequencing, 64,000 char suspend_data. D2L recommended.',
+};
+
+// ── PRE-FLIGHT CHECKS ──────────────────────────────────────────────────────
+function runPreflight(html) {
+  if (!html || html.trim().length < 50) return [];
+
+  const checks = [];
+
+  // 1. HTML structure
+  const hasDoctype = /<!DOCTYPE\s+html/i.test(html);
+  const hasHtmlTag = /<html[\s>]/i.test(html);
+  const hasBody    = /<body[\s>]/i.test(html);
+  checks.push({
+    icon: hasDoctype && hasHtmlTag && hasBody ? '✅' : '⚠️',
+    label: '<strong>HTML structure</strong> — DOCTYPE, html, body tags',
+    status: hasDoctype && hasHtmlTag && hasBody ? 'pass' : 'warn',
+    statusText: hasDoctype && hasHtmlTag && hasBody ? 'Valid' : 'Incomplete',
+  });
+
+  // 2. SCORM API
+  const hasLMSInit     = /LMSInitialize\s*\(/i.test(html);
+  const hasFindAPI     = /findAPI\s*\(/i.test(html);
+  const hasLMSSetValue = /LMSSetValue\s*\(/i.test(html);
+  const hasScormJS     = hasLMSInit && hasFindAPI;
+  const hasBothFields  = hasLMSSetValue && /cmi\.core\.score\.raw/i.test(html);
+
+  checks.push({
+    icon: hasScormJS ? '✅' : '❌',
+    label: hasScormJS
+      ? '<strong>SCORM API</strong> — LMSInitialize + findAPI detected'
+      : '<strong>SCORM API</strong> — not detected. <em>This is normal</em> if you did not use the SCORM chips in Prompt Architect. SCORM Studio will auto-inject a minimal scaffold. The ❌ only appears in a plain browser — once uploaded to Canvas or D2L, the LMS provides the API and everything connects correctly.',
+    status: hasScormJS ? 'pass' : 'fail',
+    statusText: hasScormJS ? 'Detected' : 'Expected — see note',
+  });
+
+  // 3. Cross-origin safe findAPI (try/catch pattern)
+  const hasSafeFindAPI = /findAPI[\s\S]{0,300}try\s*\{[\s\S]{0,100}catch/i.test(html);
+  checks.push({
+    icon: hasSafeFindAPI ? '✅' : (hasScormJS ? '⚠️' : '—'),
+    label: '<strong>Cross-origin safe</strong> — findAPI uses try/catch for iframe preview',
+    status: hasSafeFindAPI ? 'pass' : (hasScormJS ? 'warn' : 'skip'),
+    statusText: hasSafeFindAPI ? 'Safe' : (hasScormJS ? 'Unsafe' : 'N/A'),
+  });
+
+  // 4. Score reporting
+  const hasScoreRaw = /cmi\.core\.score\.raw/i.test(html) || /cmi\.score\.raw/i.test(html);
+  checks.push({
+    icon: hasScoreRaw ? '✅' : '⚠️',
+    label: '<strong>Score reporting</strong> — cmi.core.score.raw found (required for D2L gradebook)',
+    status: hasScoreRaw ? 'pass' : 'warn',
+    statusText: hasScoreRaw ? 'Found' : 'Missing',
+  });
+
+  // 5. External CDN links
+  const cdnMatches = html.match(/https?:\/\/[^\s"'<>]+\.(js|css)/gi) || [];
+  const hasCDN = cdnMatches.length > 0;
+  checks.push({
+    icon: hasCDN ? '⚠️' : '✅',
+    label: `<strong>External dependencies</strong> — ${hasCDN ? cdnMatches.length + ' external link(s) found (offline will break)' : 'none detected'}`,
+    status: hasCDN ? 'warn' : 'pass',
+    statusText: hasCDN ? `${cdnMatches.length} found` : 'Clean',
+  });
+
+  // 6. Single file check (no src= pointing to relative files)
+  const relSrcMatches = (html.match(/\bsrc=["'][^"'http][^"']+["']/gi) || [])
+    .filter(m => !/data:/.test(m));
+  const hasRelSrc = relSrcMatches.length > 0;
+  checks.push({
+    icon: hasRelSrc ? '⚠️' : '✅',
+    label: `<strong>Self-contained</strong> — ${hasRelSrc ? relSrcMatches.length + ' relative src reference(s) found' : 'no external file references'}`,
+    status: hasRelSrc ? 'warn' : 'pass',
+    statusText: hasRelSrc ? `${relSrcMatches.length} refs` : 'Self-contained',
+  });
+
+  // 7. File size estimate
+  const bytes  = new Blob([html]).size;
+  const kb     = (bytes / 1024).toFixed(1);
+  const tooBig = bytes > 5 * 1024 * 1024;
+  checks.push({
+    icon: tooBig ? '⚠️' : '✅',
+    label: `<strong>File size</strong> — ${kb} KB ${tooBig ? '(over 5MB — some LMSes may reject)' : '(within normal range)'}`,
+    status: tooBig ? 'warn' : 'pass',
+    statusText: `${kb} KB`,
+  });
+
+  // 8. Accessibility — lang attribute
+  const hasLang = /html[^>]+lang\s*=/i.test(html);
+  checks.push({
+    icon: hasLang ? '✅' : '⚠️',
+    label: '<strong>Accessibility</strong> — lang attribute on &lt;html&gt;',
+    status: hasLang ? 'pass' : 'warn',
+    statusText: hasLang ? 'Present' : 'Missing',
+  });
+
+  return checks;
+}
+
+function renderPreflight(checks) {
+  const list  = document.getElementById('preflightList');
+  const score = document.getElementById('preflightScore');
+
+  if (!checks.length) {
+    list.innerHTML = '<div class="pf-item"><span class="pf-icon">○</span><span class="pf-label">Paste your HTML above to run the pre-flight check</span></div>';
+    score.textContent = '—';
+    score.className = 'preflight-score score-empty';
+    return;
+  }
+
+  const passes = checks.filter(c => c.status === 'pass').length;
+  const total  = checks.filter(c => c.status !== 'skip').length;
+  const pct    = Math.round((passes / total) * 100);
+
+  score.textContent = `${passes}/${total}`;
+  if (pct === 100) { score.className = 'preflight-score score-great'; }
+  else if (pct >= 70) { score.className = 'preflight-score score-ok'; }
+  else { score.className = 'preflight-score score-warn'; }
+
+  const statusMap = { pass: 'st-pass', warn: 'st-warn', fail: 'st-fail', info: 'st-info', skip: 'st-skip' };
+
+  list.innerHTML = checks.map(c => `
+    <div class="pf-item">
+      <span class="pf-icon">${c.icon}</span>
+      <span class="pf-label">${c.label}</span>
+      <span class="pf-status ${statusMap[c.status] || 'st-skip'}">${c.statusText}</span>
+    </div>`).join('');
+
+  // Show inject notice if SCORM API is missing
+  const noScorm = checks.find(c => c.label.includes('SCORM API') && c.status === 'fail');
+  document.getElementById('injectNotice').classList.toggle('visible', !!noScorm);
+}
+
+// ── MANIFEST GENERATION ────────────────────────────────────────────────────
+function makeIdentifier() {
+  const custom = document.getElementById('pkgIdentifier').value.trim();
+  if (custom) return custom;
+  return 'pkg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+function generateManifest12() {
+  const title       = escXML(document.getElementById('pkgTitle').value.trim() || 'Interactive Learning Activity');
+  const mastery     = parseInt(document.getElementById('masteryScore').value) || 70;
+  const threshold   = parseFloat(document.getElementById('completionThreshold').value) || 0.7;
+  const desc        = escXML(document.getElementById('pkgDescription').value.trim());
+  const ver         = escXML(document.getElementById('pkgVersion').value.trim() || '1.0');
+  const lang        = escXML(document.getElementById('pkgLang').value.trim() || 'en-US');
+  const identifier  = makeIdentifier();
+  const lms         = state.lmsProfile;
+
+  // D2L wants explicit mastery score and timeLimitAction
+  const d2lExtras = lms === 'd2l'
+    ? `\n    <adlcp:timeLimitAction>continue,no message</adlcp:timeLimitAction>`
+    : '';
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="${identifier}"
+  version="${ver}"
+  xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2
+    imscp_rootv1p1p2.xsd
+    http://www.imsglobal.org/xsd/imsmd_rootv1p2p1
+    imsmd_rootv1p2p1.xsd
+    http://www.adlnet.org/xsd/adlcp_rootv1p2
+    adlcp_rootv1p2.xsd">
+
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>1.2</schemaversion>
+  </metadata>
+
+  <organizations default="org_1">
+    <organization identifier="org_1">
+      <title>${title}</title>
+      <item identifier="item_1" identifierref="res_1" isvisible="true">
+        <title>${title}</title>
+        <adlcp:prerequisites type="aicc_script"></adlcp:prerequisites>
+        <adlcp:maxtimeallowed></adlcp:maxtimeallowed>${d2lExtras}
+        <adlcp:datafromlms></adlcp:datafromlms>
+        <adlcp:masteryscore>${mastery}</adlcp:masteryscore>
+      </item>
+    </organization>
+  </organizations>
+
+  <resources>
+    <resource identifier="res_1"
+      type="webcontent"
+      adlcp:scormtype="sco"
+      href="index.html">
+      <file href="index.html"/>
+    </resource>
+  </resources>
+
+</manifest>`;
+}
+
+function generateManifest2004() {
+  const title      = escXML(document.getElementById('pkgTitle').value.trim() || 'Interactive Learning Activity');
+  const mastery    = parseInt(document.getElementById('masteryScore').value) || 70;
+  const threshold  = parseFloat(document.getElementById('completionThreshold').value) || 0.7;
+  const desc       = escXML(document.getElementById('pkgDescription').value.trim());
+  const ver        = escXML(document.getElementById('pkgVersion').value.trim() || '1.0');
+  const lang       = escXML(document.getElementById('pkgLang').value.trim() || 'en-US');
+  const identifier = makeIdentifier();
+  const masteryNorm = (mastery / 100).toFixed(2);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="${identifier}"
+  version="${ver}"
+  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
+  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3p2"
+  xmlns:adlseq="http://www.adlnet.org/xsd/adlseq_v1p3p2"
+  xmlns:adlnav="http://www.adlnet.org/xsd/adlnav_v1p3p2"
+  xmlns:imsss="http://www.imsglobal.org/xsd/imsss"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.imsglobal.org/xsd/imscp_v1p1
+    https://www.imsglobal.org/xsd/imscp_v1p1.xsd
+    http://www.adlnet.org/xsd/adlcp_v1p3p2
+    https://www.adlnet.org/xsd/adlcp_v1p3p2.xsd
+    http://www.imsglobal.org/xsd/imsss
+    https://www.imsglobal.org/xsd/imsss_v1p0.xsd">
+
+  <metadata>
+    <schema>ADL SCORM</schema>
+    <schemaversion>2004 4th Edition</schemaversion>
+  </metadata>
+
+  <organizations default="org_1">
+    <organization identifier="org_1">
+      <title>${title}</title>
+      <item identifier="item_1" identifierref="res_1">
+        <title>${title}</title>
+        <imsss:sequencing>
+          <imsss:objectives>
+            <imsss:primaryObjective objectiveID="primary_obj" satisfiedByMeasure="true">
+              <imsss:minNormalizedMeasure>${masteryNorm}</imsss:minNormalizedMeasure>
+            </imsss:primaryObjective>
+          </imsss:objectives>
+          <imsss:deliveryControls completionSetByContent="true" objectiveSetByContent="true"/>
+        </imsss:sequencing>
+      </item>
+    </organization>
+  </organizations>
+
+  <resources>
+    <resource identifier="res_1"
+      type="webcontent"
+      adlcp:scormType="sco"
+      href="index.html">
+      <file href="index.html"/>
+    </resource>
+  </resources>
+
+</manifest>`;
+}
+
+function generateManifest() {
+  return state.scormVersion === '1.2' ? generateManifest12() : generateManifest2004();
+}
+
+// ── MANIFEST PREVIEW ───────────────────────────────────────────────────────
+function syntaxHighlight(xml) {
+  return xml
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/(&lt;\/?[a-zA-Z:][a-zA-Z0-9:_-]*)/g, '<span class="xml-tag">$1</span>')
+    .replace(/(&gt;)/g, '<span class="xml-tag">$1</span>')
+    .replace(/([a-zA-Z:_-]+=)("([^"]*)")/g, '<span class="xml-attr">$1</span><span class="xml-val">"$3"</span>')
+    .replace(/(&lt;!--.*?--&gt;)/g, '<span class="xml-comment">$1</span>');
+}
+
+function updateManifestPreview() {
+  const el = document.getElementById('manifestPreview');
+  if (!el.classList.contains('visible')) return;
+  el.innerHTML = syntaxHighlight(generateManifest());
+}
+
+// ── MINIMAL SCORM SCAFFOLD (injected if missing) ───────────────────────────
+const SCORM_SCAFFOLD_12 = `
+<script>
+/* ── SCORM 1.2 Minimal Scaffold (auto-injected by SCORM Packager) ── */
+(function() {
+  var _API = null;
+  function findAPI(win) {
+    var attempts = 0;
+    while (attempts < 7) {
+      attempts++;
+      try {
+        if (win.API != null) return win.API;
+        if (win.parent == null || win.parent === win) break;
+        win = win.parent;
+      } catch(e) { break; }
+    }
+    return null;
+  }
+  function getAPI() {
+    var api = findAPI(window);
+    if (!api) { try { if (window.opener) api = findAPI(window.opener); } catch(e) {} }
+    return api;
+  }
+  function lmsCall(fn, args) {
+    var api = getAPI();
+    if (!api) return '';
+    try { return api[fn].apply(api, args || []); } catch(e) { return ''; }
+  }
+  window.LMSInitialize  = function(s) { return lmsCall('LMSInitialize', [s || '']); };
+  window.LMSSetValue    = function(k,v){ return lmsCall('LMSSetValue', [k, v]); };
+  window.LMSGetValue    = function(k)  { return lmsCall('LMSGetValue', [k]); };
+  window.LMSCommit      = function(s)  { return lmsCall('LMSCommit', [s || '']); };
+  window.LMSFinish      = function(s)  { return lmsCall('LMSFinish', [s || '']); };
+  window.addEventListener('load', function() { LMSInitialize(''); });
+  window.addEventListener('beforeunload', function() {
+    LMSSetValue('cmi.core.lesson_status', 'completed');
+    LMSCommit('');
+    LMSFinish('');
+  });
+})();
+<\/script>`;
+
+// ── ZIP CREATION ───────────────────────────────────────────────────────────
+async function buildAndDownload() {
+  const html = state.htmlContent;
+  if (!html) return;
+
+  const btn   = document.getElementById('downloadBtn');
+  const label = document.getElementById('dlLabel');
+  const icon  = document.getElementById('dlIcon');
+  const sub   = document.getElementById('dlSub');
+
+  btn.disabled = true;
+  icon.innerHTML = '<span class="spinner"></span>';
+  label.textContent = 'BUILDING PACKAGE…';
+
+  try {
+    const zip = new JSZip();
+    const manifest = generateManifest();
+
+    // Decide whether to inject scaffold
+    const hasScorm = /LMSInitialize\s*\(/i.test(html) && /findAPI\s*\(/i.test(html);
+    let finalHtml = html;
+    if (!hasScorm) {
+      // Inject before </body>
+      if (/<\/body>/i.test(finalHtml)) {
+        finalHtml = finalHtml.replace(/<\/body>/i, SCORM_SCAFFOLD_12 + '\n</body>');
+      } else {
+        finalHtml = finalHtml + SCORM_SCAFFOLD_12;
+      }
+    }
+
+    zip.file('imsmanifest.xml', manifest);
+    zip.file('index.html', finalHtml);
+
+    // Add schema XSD stubs expected by strict LMSes
+    if (state.scormVersion === '1.2') {
+      zip.file('imscp_rootv1p1p2.xsd', '<!-- SCORM 1.2 schema stub -->');
+      zip.file('imsmd_rootv1p2p1.xsd', '<!-- SCORM 1.2 metadata schema stub -->');
+      zip.file('adlcp_rootv1p2.xsd',   '<!-- SCORM 1.2 ADL schema stub -->');
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+
+    const rawName = document.getElementById('pkgFilename').value.trim() || 'scorm_package';
+    const filename = rawName.replace(/[^a-zA-Z0-9_-]/g, '_') + '.zip';
+
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // Success state
+    btn.classList.add('success');
+    icon.textContent = '✅';
+    label.textContent = `${filename} DOWNLOADED`;
+    sub.textContent = `${(blob.size / 1024).toFixed(1)} KB · ${state.scormVersion === '1.2' ? 'SCORM 1.2' : 'SCORM 2004 4th Ed.'} · ${state.lmsProfile.toUpperCase()}`;
+
+    setTimeout(() => {
+      btn.classList.remove('success');
+      btn.disabled = false;
+      icon.textContent = '⬇';
+      label.textContent = 'DOWNLOAD SCORM ZIP';
+    }, 4000);
+
+  } catch(err) {
+    console.error('Packaging error:', err);
+    btn.disabled = false;
+    icon.textContent = '⬇';
+    label.textContent = 'DOWNLOAD SCORM ZIP';
+    sub.textContent = '❌ Error: ' + err.message;
+    setTimeout(() => { sub.textContent = ''; updateDownloadState(); }, 4000);
+  }
+}
+
+// ── DOWNLOAD BUTTON STATE ──────────────────────────────────────────────────
+function updateDownloadState() {
+  const btn = document.getElementById('downloadBtn');
+  const sub = document.getElementById('dlSub');
+  const hasHtml = state.htmlContent.trim().length > 50;
+
+  btn.disabled = !hasHtml;
+  if (!hasHtml) {
+    sub.textContent = 'Paste HTML above to enable packaging';
+  } else {
+    const lmsLabel = { canvas:'Canvas', d2l:'D2L Brightspace', moodle:'Moodle', generic:'Generic' }[state.lmsProfile] || '';
+    const verLabel = state.scormVersion === '1.2' ? 'SCORM 1.2' : 'SCORM 2004 4th Ed.';
+    sub.textContent = `${verLabel} · ${lmsLabel} profile · ready to package`;
+  }
+}
+
+// ── CHAR COUNT ─────────────────────────────────────────────────────────────
+function updateCharCount(html) {
+  const el = document.getElementById('charCount');
+  if (!html) { el.textContent = '0 chars'; return; }
+  const kb = (new Blob([html]).size / 1024).toFixed(1);
+  el.textContent = `${html.length.toLocaleString()} chars · ${kb} KB`;
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function escXML(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+
+function autoTitle(html) {
+  const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (m && m[1].trim()) {
+    const el = document.getElementById('pkgTitle');
+    if (el.value === 'Interactive Learning Activity' || !el.value.trim()) {
+      el.value = m[1].trim().slice(0, 120);
+    }
+  }
+}
+
+function autoFilename() {
+  const title = document.getElementById('pkgTitle').value.trim();
+  const fnEl  = document.getElementById('pkgFilename');
+  if (title && (fnEl.value === 'scorm_package' || !fnEl.value.trim())) {
+    fnEl.value = title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'scorm_package';
+  }
+}
+
+// ── SAMPLE HTML ───────────────────────────────────────────────────────────
+const SAMPLE_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Security Basics — Sample Activity</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; background: #f8fafc; color: #1e293b; }
+  h1 { color: #0f172a; }
+  .question { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.2rem; margin: 1rem 0; }
+  button { background: #0ea5e9; color: white; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-top: 0.5rem; }
+  button:hover { background: #0284c7; }
+  .result { margin-top: 0.6rem; font-weight: bold; }
+  .correct { color: #16a34a; } .incorrect { color: #dc2626; }
+  #score-display { background: #0f172a; color: #fff; border-radius: 8px; padding: 0.75rem 1.2rem; display: inline-block; margin-bottom: 1rem; font-family: monospace; }
+</style>
+</head>
+<body>
+<h1>Network Security Basics</h1>
+<div id="score-display">Score: <span id="score">0</span> / <span id="total">3</span></div>
+
+<div class="question">
+  <p><strong>1.</strong> Which protocol encrypts web traffic?</p>
+  <button onclick="answer(this, true)">HTTPS</button>
+  <button onclick="answer(this, false)">HTTP</button>
+  <button onclick="answer(this, false)">FTP</button>
+  <div class="result" id="r1"></div>
+</div>
+
+<div class="question">
+  <p><strong>2.</strong> What does a firewall primarily do?</p>
+  <button onclick="answer(this, false)">Encrypts data</button>
+  <button onclick="answer(this, true)">Filters network traffic</button>
+  <button onclick="answer(this, false)">Backs up files</button>
+  <div class="result" id="r2"></div>
+</div>
+
+<div class="question">
+  <p><strong>3.</strong> What is phishing?</p>
+  <button onclick="answer(this, false)">A network scan</button>
+  <button onclick="answer(this, false)">A VPN protocol</button>
+  <button onclick="answer(this, true)">A social engineering attack using deceptive emails</button>
+  <div class="result" id="r3"></div>
+</div>
+
+<script>
+var correct = 0; var answered = 0; var total = 3;
+var PASSING_THRESHOLD = 0.70;
+
+function findAPI(win) {
+  var attempts = 0;
+  while (attempts < 7) {
+    attempts++;
+    try {
+      if (win.API != null) return win.API;
+      if (win.parent == null || win.parent === win) break;
+      win = win.parent;
+    } catch(e) { break; }
+  }
+  return null;
+}
+function getAPI() {
+  var api = findAPI(window);
+  if (!api) { try { if (window.opener) api = findAPI(window.opener); } catch(e) {} }
+  return api;
+}
+function lms(fn, a, b) {
+  var api = getAPI(); if (!api) return '';
+  try { return api[fn](a, b); } catch(e) { return ''; }
+}
+
+window.addEventListener('load', function() { lms('LMSInitialize', ''); });
+
+function answer(btn, isCorrect) {
+  var parent = btn.closest('.question');
+  if (parent.dataset.answered) return;
+  parent.dataset.answered = '1';
+  Array.from(parent.querySelectorAll('button')).forEach(function(b) { b.disabled = true; });
+  answered++;
+  var resultEls = parent.querySelectorAll('.result');
+  var resultEl = resultEls[0];
+  if (isCorrect) {
+    correct++;
+    resultEl.textContent = '✓ Correct!';
+    resultEl.className = 'result correct';
+  } else {
+    resultEl.textContent = '✗ Incorrect.';
+    resultEl.className = 'result incorrect';
+  }
+  document.getElementById('score').textContent = correct;
+  if (answered === total) finish();
+}
+
+function finish() {
+  var rawScore = Math.round((correct / total) * 100);
+  var passed   = correct / total >= PASSING_THRESHOLD;
+  lms('LMSSetValue', 'cmi.core.score.raw', String(rawScore));
+  lms('LMSSetValue', 'cmi.core.score.min', '0');
+  lms('LMSSetValue', 'cmi.core.score.max', '100');
+  lms('LMSSetValue', 'cmi.core.lesson_status', passed ? 'passed' : 'failed');
+  lms('LMSCommit', '');
+  lms('LMSFinish', '');
+}
+
+window.addEventListener('beforeunload', function() {
+  if (answered < total) {
+    lms('LMSSetValue', 'cmi.core.lesson_status', 'incomplete');
+    lms('LMSCommit', '');
+    lms('LMSFinish', '');
+  }
+});
+<\/script>
+</body>
+</html>`;
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+
+  const htmlInput = document.getElementById('htmlInput');
+
+  // HTML input events
+  htmlInput.addEventListener('input', () => {
+    state.htmlContent = htmlInput.value;
+    updateCharCount(state.htmlContent);
+    const checks = runPreflight(state.htmlContent);
+    state.preflightResults = checks;
+    renderPreflight(checks);
+    updateDownloadState();
+    updateManifestPreview();
+    if (state.htmlContent.length > 100) autoTitle(state.htmlContent);
+  });
+
+  // Paste button
+  document.getElementById('pasteBtn').addEventListener('click', async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      htmlInput.value = text;
+      htmlInput.dispatchEvent(new Event('input'));
+    } catch(e) {
+      htmlInput.focus();
+      alert('Paste manually with Ctrl+V / Cmd+V — clipboard access was blocked.');
+    }
+  });
+
+  // Clear button
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    htmlInput.value = '';
+    htmlInput.dispatchEvent(new Event('input'));
+    document.getElementById('pkgTitle').value = 'Interactive Learning Activity';
+    document.getElementById('pkgFilename').value = 'scorm_package';
+  });
+
+  // Sample button
+  document.getElementById('sampleBtn').addEventListener('click', () => {
+    htmlInput.value = SAMPLE_HTML;
+    htmlInput.dispatchEvent(new Event('input'));
+  });
+
+  // SCORM version buttons
+  document.querySelectorAll('.seg-btn[data-ver]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.seg-btn[data-ver]').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
+      state.scormVersion = btn.dataset.ver;
+      document.getElementById('versionHint').textContent = VERSION_HINTS[state.scormVersion];
+      updateManifestPreview();
+      updateDownloadState();
+    });
+  });
+
+  // LMS profile cards
+  document.querySelectorAll('.lms-card[data-lms]').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.lms-card').forEach(c => {
+        c.classList.remove('active');
+        c.setAttribute('aria-pressed', 'false');
+      });
+      card.classList.add('active');
+      card.setAttribute('aria-pressed', 'true');
+      state.lmsProfile = card.dataset.lms;
+      document.getElementById('lmsHint').textContent = LMS_HINTS[state.lmsProfile];
+      updateManifestPreview();
+      updateDownloadState();
+    });
+  });
+
+  // Manifest fields → live preview update
+  ['pkgTitle','masteryScore','pkgFilename','pkgIdentifier','pkgDescription','pkgVersion','pkgLang','completionThreshold'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        updateManifestPreview();
+        updateDownloadState();
+      });
+    }
+  });
+
+  // Auto-filename from title
+  document.getElementById('pkgTitle').addEventListener('blur', autoFilename);
+
+  // Advanced toggle
+  const advToggle = document.getElementById('advToggle');
+  const advFields = document.getElementById('advFields');
+  advToggle.addEventListener('click', () => {
+    const open = advFields.classList.toggle('visible');
+    advToggle.classList.toggle('open', open);
+  });
+
+  // Manifest preview toggle
+  const manifestToggle = document.getElementById('manifestToggle');
+  const manifestPreview = document.getElementById('manifestPreview');
+  manifestToggle.addEventListener('click', () => {
+    const open = manifestPreview.classList.toggle('visible');
+    manifestToggle.classList.toggle('open', open);
+    if (open) updateManifestPreview();
+  });
+
+  // Download button
+  document.getElementById('downloadBtn').addEventListener('click', buildAndDownload);
+
+  // Initial state
+  updateDownloadState();
+  renderPreflight([]);
+});
+</script>
+</body>
+</html>
