@@ -1800,26 +1800,75 @@ async function loadJSZip(){ await loadJSZipLib(); }
 
 function buildQTIXML(questions, bankName, pts){
   const ident=bankName.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40)||'QB';
+  const PG_OPEN_ENDED=new Set(['fill_in_the_blank','short_answer','command_response','essay']);
+
+  function pgCanvasQType(t){
+    if(t==='fill_in_the_blank'||t==='short_answer'||t==='command_response') return 'short_answer_question';
+    if(t==='essay') return 'essay_question';
+    return 'multiple_choice_question';
+  }
+
   const items=questions.map((q,i)=>{
     const qid='item_'+(i+1)+'_'+ident;
-    const choices=(q.choices||[]).map(c=>`          <response_label ident="${c.letter}">
+    const qtype=(q.type||'multiple_choice').toLowerCase();
+    const isOpenEnded=PG_OPEN_ENDED.has(qtype);
+    const canvasQType=pgCanvasQType(qtype);
+    const modelAnswer=escX(q.correct||'');
+    const isFITB=(qtype==='fill_in_the_blank');
+    const isEssay=(qtype==='essay');
+
+    let presentation, resprocessing;
+
+    if(isOpenEnded){
+      presentation=`<presentation>
+        <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
+        <response_str ident="response1" rcardinality="Single">
+          <render_fib rows="${isFITB?1:5}" columns="${isFITB?40:60}"/>
+        </response_str>
+      </presentation>`;
+
+      if(isFITB){
+        resprocessing=`<resprocessing>
+        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
+        <respcondition continue="No">
+          <conditionvar><varequal respident="response1" case="No">${modelAnswer}</varequal></conditionvar>
+          <setvar action="Set" varname="SCORE">${pts}</setvar>
+          <displayfeedback feedbacktype="Response" linkrefid="fb_correct"/>
+        </respcondition>
+        <respcondition continue="Yes">
+          <conditionvar><other/></conditionvar>
+          <displayfeedback feedbacktype="Response" linkrefid="fb_incorrect"/>
+        </respcondition>
+      </resprocessing>
+      <itemfeedback ident="fb_correct"><flow_mat><material>
+        <mattext texttype="text/plain">Correct! ${modelAnswer}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
+      </material></flow_mat></itemfeedback>
+      <itemfeedback ident="fb_incorrect"><flow_mat><material>
+        <mattext texttype="text/plain">Incorrect. Correct answer: ${modelAnswer}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
+      </material></flow_mat></itemfeedback>`;
+      } else {
+        resprocessing=`<resprocessing>
+        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
+        <respcondition continue="Yes">
+          <conditionvar><other/></conditionvar>
+          <displayfeedback feedbacktype="Response" linkrefid="fb"/>
+        </respcondition>
+      </resprocessing>
+      <itemfeedback ident="fb"><flow_mat><material>
+        <mattext texttype="text/plain">${isEssay?'Rubric / model answer':'Model answer'}: ${modelAnswer}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
+      </material></flow_mat></itemfeedback>`;
+      }
+    } else {
+      const choices=(q.choices||[]).map(c=>`          <response_label ident="${c.letter}">
             <material><mattext texttype="text/plain">${escX(c.text)}</mattext></material>
           </response_label>`).join('\n');
-    return `    <item ident="${qid}" title="${escX(q.stem.substring(0,80))}">
-      <itemmetadata><qtimetadata>
-        <qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>multiple_choice_question</fieldentry></qtimetadatafield>
-        <qtimetadatafield><fieldlabel>points_possible</fieldlabel><fieldentry>${pts}</fieldentry></qtimetadatafield>
-        <qtimetadatafield><fieldlabel>bloom_level</fieldlabel><fieldentry>${escX(q.bloom)}</fieldentry></qtimetadatafield>
-        <qtimetadatafield><fieldlabel>difficulty</fieldlabel><fieldentry>${escX(q.difficulty)}</fieldentry></qtimetadatafield>
-        ${q.objective?`<qtimetadatafield><fieldlabel>learning_objective</fieldlabel><fieldentry>${escX(q.objective)}</fieldentry></qtimetadatafield>`:''}
-      </qtimetadata></itemmetadata>
-      <presentation>
+      presentation=`<presentation>
         <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
         <response_lid ident="response1" rcardinality="Single"><render_choice>
 ${choices}
         </render_choice></response_lid>
-      </presentation>
-      <resprocessing>
+      </presentation>`;
+      resprocessing=`<resprocessing>
         <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
         <respcondition continue="No">
           <conditionvar><varequal respident="response1">${escX(q.correct)}</varequal></conditionvar>
@@ -1829,7 +1878,19 @@ ${choices}
       </resprocessing>
       <itemfeedback ident="fb"><flow_mat><material>
         <mattext texttype="text/plain">${escX(q.rationale||'Correct!')}</mattext>
-      </material></flow_mat></itemfeedback>
+      </material></flow_mat></itemfeedback>`;
+    }
+
+    return `    <item ident="${qid}" title="${escX(q.stem.substring(0,80))}">
+      <itemmetadata><qtimetadata>
+        <qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>${canvasQType}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>points_possible</fieldlabel><fieldentry>${pts}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>bloom_level</fieldlabel><fieldentry>${escX(q.bloom)}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>difficulty</fieldlabel><fieldentry>${escX(q.difficulty)}</fieldentry></qtimetadatafield>
+        ${q.objective?`<qtimetadatafield><fieldlabel>learning_objective</fieldlabel><fieldentry>${escX(q.objective)}</fieldentry></qtimetadatafield>`:''}
+      </qtimetadata></itemmetadata>
+      ${presentation}
+      ${resprocessing}
     </item>`;
   }).join('\n\n');
 
