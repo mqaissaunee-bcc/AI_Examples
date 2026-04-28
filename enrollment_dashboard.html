@@ -359,6 +359,18 @@
   .kpi .delta.down { color: var(--down); }
   .kpi .delta.flat { color: var(--flat); }
   .kpi .sub { font-style: italic; color: var(--ink-soft); font-size: 12px; margin-top: 6px; }
+  .kpi .bench {
+    font-style: normal;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-left: 4px;
+  }
+  .bench.up { color: var(--up); }
+  .bench.down { color: var(--down); }
+  .bench.flat { color: var(--flat); font-weight: 400; font-style: italic; }
 
   /* Filter bar */
   .filter-bar {
@@ -768,6 +780,7 @@
     PRESETS: 'enroll-presets',
     SNAPSHOTS: 'enroll-snapshots',
     INSTITUTE_INDEX: 'enroll-inst-idx',
+    BENCHMARKS: 'enroll-benchmarks',
   };
 
   const state = {
@@ -787,6 +800,7 @@
     activeDisciplineFilter: new Set(), // sub-filter within selected
     sortKey: 'Section',
     sortDir: 1,
+    showBenchmarks: true,
   };
 
   /* =========================================================================
@@ -861,6 +875,9 @@
       const ii = localStorage.getItem(STORAGE.INSTITUTE_INDEX);
       if (ii) state.instituteIndex = JSON.parse(ii);
 
+      const bm = localStorage.getItem(STORAGE.BENCHMARKS);
+      if (bm !== null) state.showBenchmarks = bm === 'true';
+
       // Set current snapshot to most recent
       if (state.snapshots.length > 0) {
         state.snapshots.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -878,6 +895,7 @@
       localStorage.setItem(STORAGE.PRESETS, JSON.stringify(state.presets));
       localStorage.setItem(STORAGE.SNAPSHOTS, JSON.stringify(state.snapshots));
       localStorage.setItem(STORAGE.INSTITUTE_INDEX, JSON.stringify(state.instituteIndex));
+      localStorage.setItem(STORAGE.BENCHMARKS, String(state.showBenchmarks));
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
       toast('⚠ Unable to save. Browser storage may be full. Consider exporting and clearing old snapshots.', 8000);
@@ -1064,6 +1082,37 @@
     });
   }
 
+  // College-wide stats for a snapshot — every fall section, all disciplines.
+  // Returns { sections, enrolled, capacity, fill, sch }.
+  function collegeWideStats(snap) {
+    if (!snap) return { sections: 0, enrolled: 0, capacity: 0, fill: 0, sch: 0 };
+    const rows = snap.rows;
+    const enrolled = sum(rows, 'Enrolled Students');
+    const capacity = sum(rows, 'Capacity');
+    return {
+      sections: rows.length,
+      enrolled,
+      capacity,
+      fill: capacity > 0 ? (enrolled / capacity * 100) : 0,
+      sch: sum(rows, 'Total Student Credit Hours'),
+    };
+  }
+
+  // True if comparison to college-wide is meaningful — i.e., user is looking
+  // at a real subset, not (effectively) the whole college.
+  function comparisonMeaningful() {
+    if (!state.showBenchmarks) return false;
+    const snap = currentSnapshot();
+    if (!snap) return false;
+    const totalDisciplines = state.allDisciplines.length;
+    if (totalDisciplines === 0) return false;
+    // Selected fewer than all disciplines OR has location/sub-filter narrowing
+    if (state.selectedDisciplines.size < totalDisciplines) return true;
+    if (state.activeDisciplineFilter.size > 0) return true;
+    if (state.activeLocations.size > 0) return true;
+    return false;
+  }
+
   /* =========================================================================
    * RENDER ROOT
    * ========================================================================= */
@@ -1219,6 +1268,14 @@
     const emptyCount = cur.filter(r => r['Enrolled Students'] === 0).length;
     const waitlistTotal = sum(cur, 'Wait List');
 
+    // College-wide benchmark for fill comparison
+    const showBench = comparisonMeaningful();
+    const cw = showBench ? collegeWideStats(currentSnapshot()) : null;
+    const fillVsCollege = cw ? (fillNow - cw.fill) : null;
+    const fillSubtext = cw
+      ? `${(capacityNow - enrolledNow).toLocaleString()} seats remaining · College: ${cw.fill.toFixed(1)}% ${benchDelta(fillVsCollege, 'pp', 1)}`
+      : `${(capacityNow - enrolledNow).toLocaleString()} seats remaining`;
+
     return `
       <div class="kpi-strip">
         <div class="kpi">
@@ -1234,7 +1291,7 @@
         <div class="kpi">
           <div class="label">Overall Fill</div>
           <div class="value">${fillNow.toFixed(1)}% ${dFill}</div>
-          <div class="sub">${(capacityNow - enrolledNow).toLocaleString()} seats remaining</div>
+          <div class="sub">${fillSubtext}</div>
         </div>
         <div class="kpi">
           <div class="label">Student Credit Hrs</div>
@@ -1243,6 +1300,17 @@
         </div>
       </div>
     `;
+  }
+
+  // Inline benchmark delta, used in KPI subtexts and panel rows.
+  // Distinct from time-delta: shows "+X.Xpp ahead" / "-X.Xpp behind".
+  function benchDelta(n, unit, decimals) {
+    if (n === null || n === undefined || isNaN(n)) return '';
+    if (Math.abs(n) < 0.05) return `<span class="bench flat">at college avg</span>`;
+    const sign = n > 0 ? '+' : '';
+    const cls = n > 0 ? 'up' : 'down';
+    const v = decimals ? n.toFixed(decimals) : n.toLocaleString();
+    return `<span class="bench ${cls}">${sign}${v}${unit || ''}</span>`;
   }
 
   function renderDelta(n, unit, decimals) {
@@ -1289,6 +1357,12 @@
             `).join('')}
           </div>
         ` : ''}
+        <div class="filter-group">
+          <span class="lbl">Compare</span>
+          <button class="chip ${state.showBenchmarks ? 'active' : ''}" id="benchToggle" type="button" title="Compare against college-wide fall enrollment">
+            ⊕ vs. College
+          </button>
+        </div>
         <button class="reset" id="resetFilters">Reset filters</button>
       </div>
     `;
@@ -1338,6 +1412,13 @@
         dSCH = miniDelta(sch - schPrev);
       }
 
+      // College-wide benchmark row
+      const showBench = state.showBenchmarks;
+      const cw = showBench ? collegeWideStats(snap) : null;
+      const benchRow = cw
+        ? `<div class="stat-row"><span class="k">vs. College</span><span class="v" style="font-size:11px;color:var(--ink-mute)">${cw.fill.toFixed(1)}%</span><span class="d">${miniDelta(fill - cw.fill, 'pp', 1)}</span></div>`
+        : '';
+
       // Sparkline of total enrollment for this discipline across snapshots
       const enrSeries = state.snapshots.map(s =>
         sum(s.rows.filter(r => r._prefix === p && inFilter(r)), 'Enrolled Students')
@@ -1351,6 +1432,7 @@
           <div class="panel-sub">${sections} section${sections !== 1 ? 's' : ''}${prevRows ? ` · was ${prevRows.length}` : ''}</div>
           <div class="stat-row"><span class="k">Enrolled / Cap</span><span class="v">${enrolled} / ${capacity}</span><span class="d">${dEnr}</span></div>
           <div class="stat-row"><span class="k">Fill Rate</span><span class="v">${fill.toFixed(1)}%</span><span class="d">${dFill}</span></div>
+          ${benchRow}
           <div class="stat-row"><span class="k">Credit Hours</span><span class="v">${sch}</span><span class="d">${dSCH}</span></div>
           <div class="stat-row"><span class="k">At Capacity</span><span class="v">${fullCount}</span><span class="d"></span></div>
           <div class="stat-row"><span class="k">Empty</span><span class="v">${emptyCount}</span><span class="d"></span></div>
@@ -1628,6 +1710,19 @@
       return { code: p, color: colorFor(p), enr, fill };
     });
 
+    // College-wide reference series (rendered as dashed line on charts when toggle is on)
+    const cwSeries = state.showBenchmarks ? {
+      code: 'College',
+      color: 'var(--flat)',
+      dashed: true,
+      enr: state.snapshots.map(s => sum(s.rows, 'Enrolled Students')),
+      fill: state.snapshots.map(s => {
+        const cap = sum(s.rows, 'Capacity');
+        const en = sum(s.rows, 'Enrolled Students');
+        return cap > 0 ? (en / cap * 100) : 0;
+      }),
+    } : null;
+
     const dates = state.snapshots.map(s => fmtDateShort(s.date));
 
     // Movers — biggest enrollment changes between first and last snapshot
@@ -1664,8 +1759,8 @@
 
     return `
       <div class="section-title">Enrollment Over Time <span class="meta">${state.snapshots.length} snapshots · ${fmtDate(firstSnap.date)} → ${fmtDate(lastSnap.date)}</span></div>
-      ${renderMultiSeriesChart(series, dates, 'enr', 'Enrolled Students')}
-      ${renderMultiSeriesChart(series, dates, 'fill', 'Fill Rate (%)')}
+      ${renderMultiSeriesChart(series, dates, 'enr', 'Enrolled Students', null)}
+      ${renderMultiSeriesChart(series, dates, 'fill', 'Fill Rate (%)', cwSeries)}
 
       <div class="section-title">Movers</div>
       <div class="grid-auto">
@@ -1676,13 +1771,14 @@
     `;
   }
 
-  function renderMultiSeriesChart(series, dates, key, title) {
+  function renderMultiSeriesChart(series, dates, key, title, refSeries) {
     const W = 1100, H = 280, padL = 60, padR = 20, padT = 30, padB = 50;
     const innerW = W - padL - padR;
     const innerH = H - padT - padB;
     if (series.length === 0 || dates.length === 0) return '';
 
-    const allVals = series.flatMap(s => s[key]);
+    const allSeries = refSeries ? [...series, refSeries] : series;
+    const allVals = allSeries.flatMap(s => s[key]);
     const max = Math.max(...allVals, key === 'fill' ? 100 : 1);
     const min = 0;
     const xStep = dates.length > 1 ? innerW / (dates.length - 1) : 0;
@@ -1698,14 +1794,18 @@
       yTicks.push({ v, y: yCoord(v) });
     }
 
-    const lines = series.map(s => {
+    const renderLine = (s) => {
       const path = s[key].map((v, i) => `${i === 0 ? 'M' : 'L'}${xCoord(i)},${yCoord(v)}`).join(' ');
-      const dots = s[key].map((v, i) => `<circle cx="${xCoord(i)}" cy="${yCoord(v)}" r="3" fill="${s.color}"/>`).join('');
+      const dots = s[key].map((v, i) => `<circle cx="${xCoord(i)}" cy="${yCoord(v)}" r="${s.dashed ? 2 : 3}" fill="${s.color}" opacity="${s.dashed ? 0.6 : 1}"/>`).join('');
+      const dash = s.dashed ? 'stroke-dasharray="5,4"' : '';
+      const opacity = s.dashed ? '0.6' : '1';
       return `
-        <path d="${path}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <path d="${path}" fill="none" stroke="${s.color}" stroke-width="${s.dashed ? 1.5 : 2}" ${dash} stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>
         ${dots}
       `;
-    }).join('');
+    };
+
+    const lines = series.map(renderLine).join('') + (refSeries ? renderLine(refSeries) : '');
 
     const xLabels = dates.map((d, i) =>
       `<text x="${xCoord(i)}" y="${H - padB + 18}" text-anchor="middle" font-size="11" fill="var(--ink-mute)" font-family="Helvetica Neue, sans-serif">${escapeHtml(d)}</text>`
@@ -1716,9 +1816,13 @@
        <text x="${padL - 8}" y="${t.y + 3}" text-anchor="end" font-size="10" fill="var(--ink-mute)" font-family="Helvetica Neue, sans-serif">${key === 'fill' ? t.v.toFixed(0) + '%' : t.v.toFixed(0)}</text>`
     ).join('');
 
-    const legend = series.map(s =>
+    const legendItems = series.map(s =>
       `<span><span class="sw" style="background:${s.color}"></span>${escapeHtml(s.code)}</span>`
-    ).join('');
+    );
+    if (refSeries) {
+      legendItems.push(`<span><span class="sw" style="background:${refSeries.color};opacity:0.6;background-image:repeating-linear-gradient(90deg, ${refSeries.color} 0 4px, transparent 4px 7px)"></span>${escapeHtml(refSeries.code)} <em style="color:var(--ink-mute)">(reference)</em></span>`);
+    }
+    const legend = legendItems.join('');
 
     return `
       <div class="trend-chart-wrap">
@@ -2018,6 +2122,13 @@
     if (reset) reset.addEventListener('click', () => {
       state.activeDisciplineFilter.clear();
       state.activeLocations.clear();
+      render();
+    });
+
+    const benchT = el('benchToggle');
+    if (benchT) benchT.addEventListener('click', () => {
+      state.showBenchmarks = !state.showBenchmarks;
+      saveStorage();
       render();
     });
 
