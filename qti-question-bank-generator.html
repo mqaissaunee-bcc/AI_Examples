@@ -695,6 +695,9 @@ input[type=range]{flex:1;accent-color:var(--teal);}
         <option value="qti12">Canvas QTI 1.2 ZIP — single bank (recommended)</option>
         <option value="qti12-diff">Canvas QTI 1.2 ZIP — split by difficulty (up to 3 banks)</option>
         <option value="qti12-topic">Canvas QTI 1.2 ZIP — split by domain/topic</option>
+        <option value="gift">🎓 Moodle GIFT — single category</option>
+        <option value="gift-diff">🎓 Moodle GIFT — split by difficulty</option>
+        <option value="gift-topic">🎓 Moodle GIFT — split by topic/domain</option>
         <option value="json">JSON (archive / backup)</option>
         <option value="csv">CSV (spreadsheet review)</option>
         <option value="studyguide">📄 Student Study Guide (printable HTML — no answers)</option>
@@ -746,6 +749,9 @@ input[type=range]{flex:1;accent-color:var(--teal);}
         <option value="qti12">Canvas QTI 1.2 ZIP — single bank (recommended)</option>
         <option value="qti12-diff">Canvas QTI 1.2 ZIP — split by difficulty (up to 3 banks)</option>
         <option value="qti12-topic">Canvas QTI 1.2 ZIP — split by domain/topic (one bank per topic)</option>
+        <option value="gift">🎓 Moodle GIFT — single category</option>
+        <option value="gift-diff">🎓 Moodle GIFT — split by difficulty</option>
+        <option value="gift-topic">🎓 Moodle GIFT — split by topic/domain</option>
         <option value="json">JSON (archive / custom LMS)</option>
         <option value="csv">CSV (spreadsheet review)</option>
         <option value="studyguide">📄 Student Study Guide (printable HTML — no answers)</option>
@@ -1658,18 +1664,67 @@ function buildQTIXML(questions, bankName, pts){
   const items=questions.map((q,i)=>{
     const qid='item_'+(i+1)+'_'+ident;
     const isOpenEnded=OPEN_ENDED_TYPES.has(q.type);
-    const canvasQType=isOpenEnded?'essay_question':'multiple_choice_question';
+
+    // Canvas QTI question_type mapping per type:
+    //   fill_in_the_blank  → short_answer_question  (auto-graded, exact match)
+    //   short_answer       → short_answer_question  (manually graded, model answer in feedback)
+    //   command_response   → short_answer_question  (manually graded)
+    //   essay              → essay_question         (manually graded, rubric in feedback)
+    //   all others         → multiple_choice_question
+    function canvasQTypeFor(t){
+      if(t==='fill_in_the_blank'||t==='short_answer'||t==='command_response') return 'short_answer_question';
+      if(t==='essay') return 'essay_question';
+      return 'multiple_choice_question';
+    }
+    const canvasQType=canvasQTypeFor(q.type);
 
     let presentation, resprocessing;
     if(isOpenEnded){
-      // Canvas essay/short-answer/FITB/command: render_fib or essay response area
       const modelAnswer=escXml(q.correct||'');
+      const isFITB=(q.type==='fill_in_the_blank');
+      const isEssay=(q.type==='essay');
+
       presentation=`<presentation>
         <material><mattext texttype="text/html">${escXml(q.stem)}</mattext></material>
-        ${q.type==='fill_in_the_blank'?`<response_str ident="response1" rcardinality="Single"><render_fib rows="1" columns="40"/></response_str>`
-          :`<response_str ident="response1" rcardinality="Single"><render_fib rows="5" columns="60"/></response_str>`}
+        <response_str ident="response1" rcardinality="Single">
+          <render_fib rows="${isFITB?1:5}" columns="${isFITB?40:60}"/>
+        </response_str>
       </presentation>`;
-      resprocessing=`<resprocessing>
+
+      if(isFITB){
+        // fill_in_the_blank: auto-graded exact match (case-insensitive)
+        resprocessing=`<resprocessing>
+        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
+        <respcondition continue="No">
+          <conditionvar><varequal respident="response1" case="No">${modelAnswer}</varequal></conditionvar>
+          <setvar action="Set" varname="SCORE">${pts}</setvar>
+          <displayfeedback feedbacktype="Response" linkrefid="fb_correct"/>
+        </respcondition>
+        <respcondition continue="Yes">
+          <conditionvar><other/></conditionvar>
+          <displayfeedback feedbacktype="Response" linkrefid="fb_incorrect"/>
+        </respcondition>
+      </resprocessing>
+      <itemfeedback ident="fb_correct"><flow_mat><material>
+        <mattext texttype="text/plain">Correct! ${modelAnswer}${q.rationale?'\n\n'+escXml(q.rationale):''}</mattext>
+      </material></flow_mat></itemfeedback>
+      <itemfeedback ident="fb_incorrect"><flow_mat><material>
+        <mattext texttype="text/plain">Incorrect. Correct answer: ${modelAnswer}${q.rationale?'\n\n'+escXml(q.rationale):''}</mattext>
+      </material></flow_mat></itemfeedback>`;
+      }else if(isEssay){
+        resprocessing=`<resprocessing>
+        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
+        <respcondition continue="Yes">
+          <conditionvar><other/></conditionvar>
+          <displayfeedback feedbacktype="Response" linkrefid="fb"/>
+        </respcondition>
+      </resprocessing>
+      <itemfeedback ident="fb"><flow_mat><material>
+        <mattext texttype="text/plain">Rubric / model answer: ${modelAnswer}${q.rationale?'\n\n'+escXml(q.rationale):''}</mattext>
+      </material></flow_mat></itemfeedback>`;
+      }else{
+        // short_answer / command_response — manual grading, model answer in feedback
+        resprocessing=`<resprocessing>
         <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
         <respcondition continue="Yes">
           <conditionvar><other/></conditionvar>
@@ -1679,6 +1734,7 @@ function buildQTIXML(questions, bankName, pts){
       <itemfeedback ident="fb"><flow_mat><material>
         <mattext texttype="text/plain">Model answer: ${modelAnswer}${q.rationale?'\n\nGrading note: '+escXml(q.rationale):''}</mattext>
       </material></flow_mat></itemfeedback>`;
+      }
     } else {
       const choices=(q.choices||[]).map(c=>`          <response_label ident="${c.letter}">
             <material><mattext texttype="text/plain">${escXml(c.text)}</mattext></material>
@@ -1834,6 +1890,86 @@ function generateStudyGuide(questions, bankName, courseTitle){
 </html>`;
 }
 
+// ================================================================
+// MOODLE GIFT FORMAT BUILDER
+// Skips: analysis, command_response (no clean Moodle equivalent)
+// Passes through: match (silently skips if no pairs[] present)
+// Wrong-answer penalty: 0 (no negative marking)
+// ================================================================
+function escGIFT(s) {
+  return String(s || '').replace(/([~=#{}:\\])/g, '\\$1');
+}
+
+function buildGIFT(questions, categoryName) {
+  const SKIP_TYPES = new Set(['command_response', 'analysis']);
+  const lines = [];
+  lines.push('// Moodle GIFT export — generated ' + new Date().toISOString());
+  lines.push('');
+  lines.push('$CATEGORY: $course$/top/' + escGIFT(categoryName));
+  lines.push('');
+  let exported = 0, skipped = 0;
+
+  questions.forEach(function(q, idx) {
+    var qtype = (q.type || 'multiple_choice').toLowerCase();
+    if (SKIP_TYPES.has(qtype)) { skipped++; return; }
+
+    var title = escGIFT((q.stem || 'Q' + (idx+1)).slice(0, 80).replace(/\n/g, ' '));
+    var stem  = escGIFT(q.stem || '');
+    var fb    = q.rationale ? '\n####' + escGIFT(q.rationale) : '';
+    var meta  = '// Q' + (idx+1) + ' | ' + (q.bloom||'') + ' | ' + (q.difficulty||'');
+
+    if (qtype === 'true_false') {
+      var ans = (q.correct||'A').trim().toUpperCase().charAt(0) === 'A' ? 'TRUE' : 'FALSE';
+      lines.push(meta);
+      lines.push('::' + title + '::' + stem + '{' + ans + fb + '}');
+      lines.push(''); exported++; return;
+    }
+    if (qtype === 'essay') {
+      var model = q.correct ? '\n####Model answer: ' + escGIFT(q.correct) : '';
+      lines.push(meta);
+      lines.push('::' + title + '::' + stem + '{' + model + '}');
+      lines.push(''); exported++; return;
+    }
+    if (qtype === 'short_answer' || qtype === 'fill_in_the_blank') {
+      var dStem = (qtype === 'fill_in_the_blank') ? stem.replace(/___+/g, '____') : stem;
+      var ans2  = escGIFT(q.correct || (q.choices && q.choices[0] && q.choices[0].text) || '');
+      var alt   = (q.choices && q.choices[0] && q.choices[0].text &&
+                   q.choices[0].text.trim() !== (q.correct||'').trim())
+                  ? '\n    =%100%' + escGIFT(q.choices[0].text) : '';
+      lines.push(meta);
+      lines.push('::' + title + '::' + dStem + '{=' + ans2 + alt + fb + '}');
+      lines.push(''); exported++; return;
+    }
+    if (qtype === 'match' || qtype === 'matching') {
+      var pairs = q.pairs || [];
+      if (!pairs.length) { skipped++; return; }
+      var pl = pairs.map(function(p){ return '    =' + escGIFT(p.term||'') + ' -> ' + escGIFT(p.definition||''); }).join('\n');
+      lines.push(meta);
+      lines.push('::' + title + '::' + stem + '{\n' + pl + '\n}');
+      lines.push(''); exported++; return;
+    }
+    // Multichoice fallthrough
+    var choices = q.choices || [];
+    if (!choices.length) { skipped++; return; }
+    var ci = 'ABCD'.indexOf((q.correct||'A').trim().toUpperCase().charAt(0));
+    if (ci < 0) ci = 0;
+    var cl = choices.map(function(c, i2){
+      return '    ' + (i2===ci ? '=' : '~%0%') + escGIFT(c.text||'');
+    }).join('\n');
+    lines.push(meta);
+    lines.push('::' + title + '::' + stem + '{\n' + cl + fb + '\n}');
+    lines.push(''); exported++;
+  });
+
+  lines.push('// Exported: ' + exported + ' | Skipped: ' + skipped + ' (analysis/command_response)');
+  return { text: lines.join('\n'), exported: exported, skipped: skipped };
+}
+
+function buildGIFTBlob(questions, categoryName) {
+  var r = buildGIFT(questions, categoryName);
+  return { blob: new Blob([r.text], {type:'text/plain;charset=utf-8'}), exported:r.exported, skipped:r.skipped };
+}
+
 function dlBlob(blob, fname){
   const u=URL.createObjectURL(blob), a=document.createElement('a');
   a.href=u; a.download=fname; a.click(); setTimeout(()=>URL.revokeObjectURL(u),5000);
@@ -1892,6 +2028,43 @@ $('btnDownload').addEventListener('click', async()=>{
       status.className='status-box success'; status.textContent=`✓ Student study guide exported — ${qs.length} questions, no answers. Open in browser and print to PDF.`;
       toast('Study guide downloaded!','success');
 
+    // ── Moodle GIFT — single category ─────────────────────────────────────
+    }else if(fmt==='gift'){
+      var gr=buildGIFTBlob(qs,bankName);
+      dlBlob(gr.blob, bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_Moodle.gift.txt');
+      status.className='status-box success';
+      status.textContent='✓ Moodle GIFT exported — '+gr.exported+' questions'+(gr.skipped?' ('+gr.skipped+' skipped)':'')+'.';
+      toast('Moodle GIFT downloaded!','success');
+
+    // ── Moodle GIFT — split by difficulty ──────────────────────────────────
+    }else if(fmt==='gift-diff'){
+      var dg={easy:[],medium:[],hard:[]};
+      qs.forEach(function(q){(dg[q.difficulty]||dg.medium).push(q);});
+      var dp=Object.entries(dg).filter(function(e){return e[1].length;});
+      var dc='',de=0,ds=0;
+      dp.forEach(function(e){
+        var r=buildGIFT(e[1], bankName+' \u2014 '+e[0].charAt(0).toUpperCase()+e[0].slice(1));
+        dc+=r.text+'\n\n'; de+=r.exported; ds+=r.skipped;
+      });
+      dlBlob(new Blob([dc],{type:'text/plain;charset=utf-8'}), bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_by-difficulty_Moodle.gift.txt');
+      status.className='status-box success';
+      status.textContent='✓ Moodle GIFT by difficulty — '+de+' questions across '+dp.length+' categories'+(ds?' ('+ds+' skipped)':'')+'.';
+      toast('Moodle GIFT (by difficulty) downloaded!','success');
+
+    // ── Moodle GIFT — split by topic ───────────────────────────────────────
+    }else if(fmt==='gift-topic'){
+      var tg={};
+      qs.forEach(function(q){var d=q.domain||'General';if(!tg[d])tg[d]=[];tg[d].push(q);});
+      var tc='',te=0,ts=0;
+      Object.entries(tg).forEach(function(e){
+        var r=buildGIFT(e[1], bankName+' \u2014 '+e[0]);
+        tc+=r.text+'\n\n'; te+=r.exported; ts+=r.skipped;
+      });
+      dlBlob(new Blob([tc],{type:'text/plain;charset=utf-8'}), bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_by-topic_Moodle.gift.txt');
+      status.className='status-box success';
+      status.textContent='✓ Moodle GIFT by topic — '+te+' questions across '+Object.keys(tg).length+' categories'+(ts?' ('+ts+' skipped)':'')+'.';
+      toast('Moodle GIFT (by topic) downloaded!','success');
+
     }else{
       const blob=await makeZip([{name:bankName,questions:qs}],pts);
       const fname=bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_QTI.zip';
@@ -1903,7 +2076,9 @@ $('btnDownload').addEventListener('click', async()=>{
     status.className='status-box error'; status.textContent='Export error: '+err.message;
     toast('Export failed: '+err.message,'error');
   }
-  $('btnDownload').disabled=false; $('btnDownload').innerHTML='⬇ Download Question Bank';
+  var _fmt=$('exportFormat').value;
+  $('btnDownload').disabled=false;
+  $('btnDownload').innerHTML=_fmt.startsWith('gift')?'⬇ Download Moodle GIFT':'⬇ Download Question Bank';
 });
 
 // ================================================================
