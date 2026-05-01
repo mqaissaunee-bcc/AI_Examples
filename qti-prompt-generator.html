@@ -475,7 +475,7 @@ tr:last-child td{border-bottom:none;}
 
       <div class="form-row">
         <label class="field-label" for="contentPaste">Or Paste Course Content <span style="font-weight:400;color:var(--mid-gray)">(optional — notes, outlines, key terms)</span></label>
-        <span class="field-hint">Extracted file text appears here automatically. You can also type or paste directly. Both sources are combined in the prompt.</span>
+        <span class="field-hint">Extracted file text appears here automatically. You can also type or paste directly. Both sources are combined in the prompt. <span id="urlDetectHint" style="display:none;color:var(--teal);font-weight:600;">🔗 URL detected — LLMs with web access (Claude, GPT-4o, Gemini) will fetch this page when generating.</span></span>
         <textarea id="contentPaste" rows="5" placeholder="Paste your lecture notes, chapter summaries, key terms, or any course content here…&#10;&#10;Example:&#10;Chapter 4: Cryptography Basics&#10;• Symmetric encryption uses the same key for encryption and decryption (AES, DES, 3DES)&#10;• Asymmetric encryption uses a key pair — public key encrypts, private key decrypts (RSA, ECC)&#10;• Hashing produces a fixed-length digest; used for integrity (SHA-256, MD5)&#10;• PKI manages digital certificates through a Certificate Authority (CA)…"></textarea>
       </div>
 
@@ -690,6 +690,9 @@ tr:last-child td{border-bottom:none;}
             <option value="qti12">Canvas QTI 1.2 ZIP — single bank (recommended)</option>
             <option value="qti12-diff">Canvas QTI 1.2 ZIP — split by difficulty (up to 3 banks)</option>
             <option value="qti12-topic">Canvas QTI 1.2 ZIP — split by domain/topic</option>
+            <option value="gift">🎓 Moodle GIFT — single category</option>
+            <option value="gift-diff">🎓 Moodle GIFT — split by difficulty</option>
+            <option value="gift-topic">🎓 Moodle GIFT — split by topic/domain</option>
             <option value="json">JSON (archive / backup)</option>
             <option value="csv">CSV (spreadsheet review)</option>
             <option value="studyguide">📄 Student Study Guide (printable HTML — no answers)</option>
@@ -1356,9 +1359,24 @@ function buildPrompt(){
     'challenge':   'Hard 80%, Medium 20%',
   };
 
+  // Detect URLs in the raw paste content (before combining with file text)
+  const _rawPaste=($('contentPaste')||{value:''}).value.trim();
+  const _urls=(_rawPaste.match(/https?:\/\/[^\s"'<>]+/gi)||[]);
+  const _isUrlOnly=_rawPaste.length>0&&_rawPaste.split('\n').filter(l=>l.trim()).every(l=>/^https?:\/\//i.test(l.trim()));
+  let _urlInstruction='';
+  if(_urls.length>0&&_isUrlOnly&&!combinedContent.replace(_rawPaste,'').trim()){
+    // Pure URL paste with no file uploads — instruct LLM to fetch
+    _urlInstruction='\nURL SOURCE CONTENT \u2014 FETCH AND READ BEFORE GENERATING QUESTIONS:\n'+_urls.map(u=>'  - '+u).join('\n')+'\nIMPORTANT: Retrieve and read the full content at each URL above. Base the questions primarily on that content. If a URL is inaccessible, fall back to the course title and topic focus.\n';
+  }else if(_urls.length>0){
+    // URLs mixed with other content or files
+    _urlInstruction='\nNOTE: The content includes '+(_urls.length===1?'a URL ('+_urls[0]+')':_urls.length+' URLs')+'. If you have web access, fetch and read '+((_urls.length===1)?'it':'them')+' to supplement the provided content.\n';
+  }
+
   const contentSection = combinedContent
-    ? `\nNOTE: The following course material was extracted from uploaded files and is provided inline. Do not ask for file attachments — all source content is already included below. Use it as the sole basis for generating questions.\n== COURSE CONTENT ==\n${combinedContent.substring(0,40000)}\n== END COURSE CONTENT ==\n`
-    : `\nNo source material was provided. Generate questions based solely on the course title, question bank name, and topic focus listed above.\n`;
+    ? `\nNOTE: The following course material was extracted from uploaded files and is provided inline. Do not ask for file attachments \u2014 all source content is already included below. Use it as the sole basis for generating questions.\n${_urlInstruction}== COURSE CONTENT ==\n${combinedContent.substring(0,40000)}\n== END COURSE CONTENT ==\n`
+    : _urlInstruction
+      ? _urlInstruction
+      : `\nNo source material was provided. Generate questions based solely on the course title, question bank name, and topic focus listed above.\n`;
   const topicsSection = topicFocus ? `\nTopic focus areas: ${topicFocus}\n` : '';
   const extraSection  = extra ? `\nAdditional instructions: ${extra}\n` : '';
 
@@ -1748,6 +1766,17 @@ function closeEditModal(){
 $('eqModalClose').addEventListener('click', closeEditModal);
 $('eqModalCancel').addEventListener('click', closeEditModal);
 $('eqModal').addEventListener('click', e=>{ if(e.target===$('eqModal')) closeEditModal(); });
+
+// ── URL detection in content paste box ────────────────────────────────────
+(function initUrlDetect(){
+  var ta=$('contentPaste'), hint=$('urlDetectHint');
+  if(!ta||!hint) return;
+  var URL_RE=/https?:\/\/[^\s"'<>]+/i;
+  function check(){ hint.style.display=URL_RE.test(ta.value)?'inline':'none'; }
+  ta.addEventListener('input',check);
+  ta.addEventListener('paste',function(){setTimeout(check,50);});
+  check();
+})();
 document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){
     if($('eqModal').classList.contains('open')) closeEditModal();
@@ -1800,33 +1829,28 @@ async function loadJSZip(){ await loadJSZipLib(); }
 
 function buildQTIXML(questions, bankName, pts){
   const ident=bankName.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40)||'QB';
-  const PG_OPEN_ENDED=new Set(['fill_in_the_blank','short_answer','command_response','essay']);
-
-  function pgCanvasQType(t){
+  const PG_OPEN=new Set(['fill_in_the_blank','short_answer','command_response','essay']);
+  function pgQType(t){
     if(t==='fill_in_the_blank'||t==='short_answer'||t==='command_response') return 'short_answer_question';
     if(t==='essay') return 'essay_question';
     return 'multiple_choice_question';
   }
-
   const items=questions.map((q,i)=>{
     const qid='item_'+(i+1)+'_'+ident;
     const qtype=(q.type||'multiple_choice').toLowerCase();
-    const isOpenEnded=PG_OPEN_ENDED.has(qtype);
-    const canvasQType=pgCanvasQType(qtype);
-    const modelAnswer=escX(q.correct||'');
+    const isOE=PG_OPEN.has(qtype);
+    const cqt=pgQType(qtype);
     const isFITB=(qtype==='fill_in_the_blank');
     const isEssay=(qtype==='essay');
-
-    let presentation, resprocessing;
-
-    if(isOpenEnded){
+    const modelAnswer=escX(q.correct||'');
+    let presentation,resprocessing;
+    if(isOE){
       presentation=`<presentation>
         <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
         <response_str ident="response1" rcardinality="Single">
           <render_fib rows="${isFITB?1:5}" columns="${isFITB?40:60}"/>
         </response_str>
       </presentation>`;
-
       if(isFITB){
         resprocessing=`<resprocessing>
         <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
@@ -1846,7 +1870,7 @@ function buildQTIXML(questions, bankName, pts){
       <itemfeedback ident="fb_incorrect"><flow_mat><material>
         <mattext texttype="text/plain">Incorrect. Correct answer: ${modelAnswer}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
       </material></flow_mat></itemfeedback>`;
-      } else {
+      }else{
         resprocessing=`<resprocessing>
         <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
         <respcondition continue="Yes">
@@ -1858,7 +1882,7 @@ function buildQTIXML(questions, bankName, pts){
         <mattext texttype="text/plain">${isEssay?'Rubric / model answer':'Model answer'}: ${modelAnswer}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
       </material></flow_mat></itemfeedback>`;
       }
-    } else {
+    }else{
       const choices=(q.choices||[]).map(c=>`          <response_label ident="${c.letter}">
             <material><mattext texttype="text/plain">${escX(c.text)}</mattext></material>
           </response_label>`).join('\n');
@@ -1880,10 +1904,9 @@ ${choices}
         <mattext texttype="text/plain">${escX(q.rationale||'Correct!')}</mattext>
       </material></flow_mat></itemfeedback>`;
     }
-
     return `    <item ident="${qid}" title="${escX(q.stem.substring(0,80))}">
       <itemmetadata><qtimetadata>
-        <qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>${canvasQType}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>${cqt}</fieldentry></qtimetadatafield>
         <qtimetadatafield><fieldlabel>points_possible</fieldlabel><fieldentry>${pts}</fieldentry></qtimetadatafield>
         <qtimetadatafield><fieldlabel>bloom_level</fieldlabel><fieldentry>${escX(q.bloom)}</fieldentry></qtimetadatafield>
         <qtimetadatafield><fieldlabel>difficulty</fieldlabel><fieldentry>${escX(q.difficulty)}</fieldentry></qtimetadatafield>
@@ -2011,6 +2034,62 @@ function generateStudyGuide(questions, bankName, courseTitle){
 </html>`;
 }
 
+// ================================================================
+// MOODLE GIFT FORMAT BUILDER
+// Skips: analysis, command_response
+// Match: silently skipped if no pairs[] present
+// Wrong-answer penalty: 0
+// ================================================================
+function escGIFT(s){
+  return String(s||'').replace(/([~=#{}:\\])/g,'\\$1');
+}
+function buildGIFT(questions,categoryName){
+  const SKIP=new Set(['command_response','analysis']);
+  const lines=[];
+  lines.push('// Moodle GIFT export \u2014 generated '+new Date().toISOString());
+  lines.push('');
+  lines.push('$CATEGORY: $course$/top/'+escGIFT(categoryName));
+  lines.push('');
+  let exported=0,skipped=0;
+  questions.forEach(function(q,idx){
+    var t=(q.type||'multiple_choice').toLowerCase();
+    if(SKIP.has(t)){skipped++;return;}
+    var title=escGIFT((q.stem||'Q'+(idx+1)).slice(0,80).replace(/\n/g,' '));
+    var stem=escGIFT(q.stem||'');
+    var fb=q.rationale?'\n####'+escGIFT(q.rationale):'';
+    var meta='// Q'+(idx+1)+' | '+(q.bloom||'')+' | '+(q.difficulty||'');
+    if(t==='true_false'){
+      var ans=(q.correct||'A').trim().toUpperCase().charAt(0)==='A'?'TRUE':'FALSE';
+      lines.push(meta);lines.push('::'+title+'::'+stem+'{'+ans+fb+'}');lines.push('');exported++;return;
+    }
+    if(t==='essay'){
+      var m=q.correct?'\n####Model answer: '+escGIFT(q.correct):'';
+      lines.push(meta);lines.push('::'+title+'::'+stem+'{'+m+'}');lines.push('');exported++;return;
+    }
+    if(t==='short_answer'||t==='fill_in_the_blank'){
+      var ds=(t==='fill_in_the_blank')?stem.replace(/___+/g,'____'):stem;
+      var a2=escGIFT(q.correct||(q.choices&&q.choices[0]&&q.choices[0].text)||'');
+      var alt=(q.choices&&q.choices[0]&&q.choices[0].text&&q.choices[0].text.trim()!==(q.correct||'').trim())?'\n    =%100%'+escGIFT(q.choices[0].text):'';
+      lines.push(meta);lines.push('::'+title+'::'+ds+'{='+a2+alt+fb+'}');lines.push('');exported++;return;
+    }
+    if(t==='match'||t==='matching'){
+      var pairs=q.pairs||[];if(!pairs.length){skipped++;return;}
+      var pl=pairs.map(function(p){return '    ='+escGIFT(p.term||'')+' -> '+escGIFT(p.definition||'');}).join('\n');
+      lines.push(meta);lines.push('::'+title+'::'+stem+'{\n'+pl+'\n}');lines.push('');exported++;return;
+    }
+    var choices=q.choices||[];if(!choices.length){skipped++;return;}
+    var ci='ABCD'.indexOf((q.correct||'A').trim().toUpperCase().charAt(0));if(ci<0)ci=0;
+    var cl=choices.map(function(c,i2){return '    '+(i2===ci?'=':'~%0%')+escGIFT(c.text||'');}).join('\n');
+    lines.push(meta);lines.push('::'+title+'::'+stem+'{\n'+cl+fb+'\n}');lines.push('');exported++;
+  });
+  lines.push('// Exported: '+exported+' | Skipped: '+skipped);
+  return {text:lines.join('\n'),exported:exported,skipped:skipped};
+}
+function buildGIFTBlob(questions,categoryName){
+  var r=buildGIFT(questions,categoryName);
+  return{blob:new Blob([r.text],{type:'text/plain;charset=utf-8'}),exported:r.exported,skipped:r.skipped};
+}
+
 function dlBlob(blob,fname){
   const u=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=u;a.download=fname;a.click();setTimeout(()=>URL.revokeObjectURL(u),5000);
@@ -2054,6 +2133,26 @@ $('btnExport').addEventListener('click', async()=>{
       const html=generateStudyGuide(qs,bankName,courseTitle);
       dlBlob(new Blob([html],{type:'text/html'}),bankName.replace(/\s+/g,'_')+'_StudyGuide.html');
       toast('Study guide downloaded!','success');
+
+    }else if(fmt==='gift'){
+      var gr=buildGIFTBlob(qs,bankName);
+      dlBlob(gr.blob,bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_Moodle.gift.txt');
+      toast('\u2713 Moodle GIFT \u2014 '+gr.exported+' questions'+(gr.skipped?' ('+gr.skipped+' skipped)':'')+'.','success');
+    }else if(fmt==='gift-diff'){
+      var dg={easy:[],medium:[],hard:[]};
+      qs.forEach(function(q){(dg[q.difficulty]||dg.medium).push(q);});
+      var dp=Object.entries(dg).filter(function(e){return e[1].length;});
+      var dc='',de=0,ds=0;
+      dp.forEach(function(e){var r=buildGIFT(e[1],bankName+' \u2014 '+e[0].charAt(0).toUpperCase()+e[0].slice(1));dc+=r.text+'\n\n';de+=r.exported;ds+=r.skipped;});
+      dlBlob(new Blob([dc],{type:'text/plain;charset=utf-8'}),bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_by-difficulty_Moodle.gift.txt');
+      toast('\u2713 Moodle GIFT (by difficulty) \u2014 '+de+' questions across '+dp.length+' categories'+(ds?' ('+ds+' skipped)':'')+'.','success');
+    }else if(fmt==='gift-topic'){
+      var tg={};
+      qs.forEach(function(q){var d=q.domain||'General';if(!tg[d])tg[d]=[];tg[d].push(q);});
+      var tc='',te=0,ts=0;
+      Object.entries(tg).forEach(function(e){var r=buildGIFT(e[1],bankName+' \u2014 '+e[0]);tc+=r.text+'\n\n';te+=r.exported;ts+=r.skipped;});
+      dlBlob(new Blob([tc],{type:'text/plain;charset=utf-8'}),bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_by-topic_Moodle.gift.txt');
+      toast('\u2713 Moodle GIFT (by topic) \u2014 '+te+' questions across '+Object.keys(tg).length+' categories'+(ts?' ('+ts+' skipped)':'')+'.','success');
     }else{
       const blob=await makeZip([{name:bankName,questions:qs}],pts);
       dlBlob(blob,bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_QTI.zip');
@@ -2061,8 +2160,9 @@ $('btnExport').addEventListener('click', async()=>{
     }
   }catch(err){ toast('Export failed: '+err.message,'error'); }
 
+  var _pgFmt=$('expFormat').value;
   $('btnExport').disabled=false;
-  $('btnExport').innerHTML='⬇ Download Canvas QTI';
+  $('btnExport').innerHTML=_pgFmt.startsWith('gift')?'⬇ Download Moodle GIFT':'⬇ Download Canvas QTI';
 });
 
 // HOW IT WORKS MODAL
