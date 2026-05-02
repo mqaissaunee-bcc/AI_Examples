@@ -9,6 +9,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <!-- JSZip for export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ── Design: Scientific / Instrument-grade aesthetic ─────────────────────
@@ -796,18 +797,344 @@ input[type=range] {
   vertical-align: middle;
 }
 
-/* ── KaTeX overrides ─────────────────────────────────────────────────── */
+
+/* ── Light / dark theme ──────────────────────────────────── */
+body.light {
+  --navy:      #f0f4ff;
+  --slate:     #e4eaf5;
+  --slate-mid: #d8e0f0;
+  --border:    #b8c8e0;
+  --card-bg:   #ffffff;
+  --input-bg:  #f8faff;
+  --white:     #1a2744;
+  --gray-light:#4a5a7a;
+  --gray-mid:  #8a9bbf;
+  --cyan:      #006888;
+  --cyan-dim:  #005070;
+  --amber:     #8a5000;
+  --amber-dim: #6a3800;
+  --green:     #006840;
+  --red:       #900000;
+  background:  #f0f4ff;
+  color:       #1a2744;
+}
+body.light .site-header { background: #1a2744; border-bottom-color: #00c8e0; }
+body.light .tab-nav      { background: #e4eaf5; border-bottom-color: #b8c8e0; }
+body.light .tab-btn      { color: #4a5a7a; }
+body.light .tab-btn.active { color: #006888; border-bottom-color: #006888; }
+body.light .warn-banner  { background: rgba(180,100,0,.08); color: #6a4000; }
+body.light .section-card { background: #ffffff; border-color: #b8c8e0; }
+body.light .section-card::before { background: linear-gradient(90deg,#006888,transparent); }
+body.light .section-card h3 { color: #006888; }
+body.light input, body.light select, body.light textarea { background: #ffffff; border-color: #b8c8e0; color: #1a2744; }
+body.light .check-item   { background: #f0f4ff; border-color: #b8c8e0; color: #4a5a7a; }
+body.light .check-item.checked { border-color: #006888; color: #006888; background: rgba(0,104,136,.07); }
+body.light .q-card       { background: #ffffff; border-color: #b8c8e0; }
+body.light .q-card:hover { border-color: #006888; }
+body.light .q-num        { background: rgba(0,104,136,.08); border-color: #006888; color: #006888; }
+body.light .choice-item  { background: #f8faff; border-color: #b8c8e0; }
+body.light .choice-item.correct { border-color: #006840; background: rgba(0,104,64,.05); }
+body.light .solution-box { background: rgba(140,90,0,.04); border-color: rgba(140,90,0,.2); color: #5a3800; }
+body.light .sol-head     { color: #6a4000; }
+body.light .solution-toggle { color: #6a4000; border-color: rgba(106,56,0,.35); }
+body.light .rationale-box { background: rgba(0,104,136,.04); border-left-color: #006888; }
+body.light .gen-status   { background: #ffffff; border-color: #b8c8e0; }
+body.light .gen-log      { color: #4a5a7a; }
+body.light .concept-link { color: #006888; border-color: rgba(0,104,136,.35); }
+body.light .concept-link:hover { background: rgba(0,104,136,.07); }
+body.light .verify-badge.needs { background: rgba(140,80,0,.1); color: #6a4000; border-color: rgba(140,80,0,.35); }
+body.light .verify-badge.done  { background: rgba(0,100,60,.1); color: #005030; border-color: rgba(0,100,60,.3); }
+body.light .export-verify-bar  { background: rgba(140,80,0,.06); border-color: rgba(140,80,0,.2); color: #6a4000; }
+body.light .export-verify-bar.all-verified { background: rgba(0,100,60,.06); color: #004020; border-color: rgba(0,100,60,.2); }
+body.light .stat-chip    { border-color: #b8c8e0; color: #4a5a7a; }
+body.light #toast        { background: #ffffff; border-color: #b8c8e0; color: #1a2744; }
+body.light .modal-box    { background: #f0f4ff; border-color: #b8c8e0; }
+body.light .modal-head   { border-bottom-color: #b8c8e0; }
+body.light .modal-head h3{ color: #006888; }
+body.light .modal-foot   { border-top-color: #b8c8e0; }
+body.light .llm-card     { background: #f8faff; border-color: #b8c8e0; }
+body.light .llm-card.selected { background: rgba(0,104,136,.06); border-color: #006888; }
+body.light .verification-widget { background: rgba(0,80,110,.06); border-color: rgba(0,80,110,.2); }
+body.light .vw-pass      { background: rgba(0,100,60,.08); border-color: rgba(0,100,60,.25); }
+body.light .vw-fail      { background: rgba(160,0,0,.06); border-color: rgba(160,0,0,.2); }
+body.light .vw-skip      { background: rgba(140,80,0,.06); border-color: rgba(140,80,0,.2); }
+
+/* ── Theme toggle button ─────────────────────────────────── */
+.theme-toggle {
+  background: none;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  color: rgba(255,255,255,.75);
+  cursor: pointer;
+  transition: all .2s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 12px;
+}
+.theme-toggle:hover { border-color: rgba(255,255,255,.6); color: #fff; }
+body.light .theme-toggle { border-color: rgba(255,255,255,.4); color: rgba(255,255,255,.85); }
+
+
+/* ── Computation verification widget ────────────────────── */
+.verification-widget {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: rgba(0,80,110,.08);
+  border: 1px solid rgba(0,200,224,.2);
+  font-size: .82rem;
+}
+.vw-label {
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  color: var(--gray-light);
+}
+.vw-expr {
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  color: var(--cyan);
+  background: rgba(0,200,224,.06);
+  border-radius: 3px;
+  padding: 3px 8px;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+.vw-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .83rem;
+  font-weight: 600;
+}
+.vw-pass {
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  background: rgba(0,200,122,.1);
+  border: 1px solid rgba(0,200,122,.3);
+  color: var(--green);
+}
+.vw-fail {
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  background: rgba(224,85,85,.1);
+  border: 1px solid rgba(224,85,85,.3);
+  color: var(--red);
+}
+.vw-skip {
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  background: rgba(245,166,35,.08);
+  border: 1px solid rgba(245,166,35,.25);
+  color: var(--amber);
+  font-size: .78rem;
+}
+.vw-wa-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--amber);
+  border: 1px solid rgba(245,166,35,.35);
+  border-radius: 4px;
+  padding: 3px 9px;
+  text-decoration: none;
+  transition: all .15s;
+  margin-top: 6px;
+  display: inline-flex;
+}
+.vw-wa-link:hover { border-color: var(--amber); background: rgba(245,166,35,.1); }
+
+
+/* ── Worked solution — more prominent ───────────────────── */
+.solution-box {
+  display: none;
+  background: rgba(245,166,35,.06);
+  border: 2px solid rgba(245,166,35,.3);
+  border-radius: 6px;
+  padding: 16px 18px;
+  margin-top: 10px;
+  font-size: .9rem;
+  line-height: 1.9;
+  color: var(--white);
+}
+.solution-box.open { display: block; }
+.sol-head {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(245,166,35,.2);
+}
+.solution-toggle {
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: rgba(245,166,35,.08);
+  border: 1.5px solid rgba(245,166,35,.4);
+  border-radius: 4px;
+  padding: 6px 14px;
+  cursor: pointer;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all .15s;
+  width: 100%;
+  justify-content: center;
+}
+.solution-toggle:hover {
+  background: rgba(245,166,35,.15);
+  border-color: var(--amber);
+}
+
+
+/* ── Print ───────────────────────────────────────────────── */
+.btn-print {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--gray-light);
+}
+.btn-print:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+@media print {
+  .site-header, .tab-nav, .warn-banner, .progress-bar-wrap,
+  .btn-row, .q-actions, .solution-toggle, .concept-link,
+  .verification-widget, .export-verify-bar, .theme-toggle { display: none !important; }
+  .q-card-body { display: block !important; }
+  .solution-box { display: block !important; border: 1px solid #ccc !important; }
+  body { background: white !important; color: black !important; }
+  .q-card { border: 1px solid #ccc !important; margin-bottom: 16px !important; page-break-inside: avoid; }
+}
+
+/* ── KaTeX overrides ─────────────────────────────────────── */
 .katex { color: var(--white); font-size: 1em; }
 .katex-display { margin: 8px 0; overflow-x: auto; }
+
+/* ── LLM jump links ──────────────────────────────────────── */
+.llm-jump-section {
+  margin-top: 20px;
+  padding: 16px 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.llm-jump-label {
+  font-family: var(--font-mono);
+  font-size: .67rem;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--gray-light);
+  margin-bottom: 10px;
+}
+.llm-jump-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.llm-jump-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 20px;
+  border: 1.5px solid var(--llm-color, var(--border));
+  color: var(--llm-color, var(--gray-light));
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-decoration: none;
+  transition: all .15s;
+}
+.llm-jump-btn:hover {
+  background: color-mix(in srgb, var(--llm-color) 12%, transparent);
+  text-decoration: none;
+}
+.llm-jump-icon { font-size: .8rem; }
+body.light .llm-jump-section { background: #ffffff; }
+
+/* ── Font size control ───────────────────────────────────── */
+.font-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+.font-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 4px;
+  color: rgba(255,255,255,.75);
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: all .15s;
+}
+.font-btn:hover { border-color: rgba(255,255,255,.6); color: #fff; }
+.font-size-label {
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  color: rgba(255,255,255,.5);
+  min-width: 28px;
+  text-align: center;
+}
+/* Font size steps applied to body */
+body.fs-large  { font-size: 17px; }
+body.fs-larger { font-size: 19px; }
+
+/* ── Header contrast improvements ────────────────────────── */
+/* Dark mode: header stays dark navy — improve text contrast */
+.site-header .logo,
+.site-header .tagline,
+.header-badge,
+.beta-tag {
+  /* already on dark bg — ensure visibility */
+}
+/* Light mode: header stays dark so badges remain legible */
+body.light .site-header {
+  background: #1a2744 !important;
+  border-bottom-color: #00c8e0;
+}
+body.light .site-header .tagline { color: rgba(255,255,255,.65); }
+body.light .site-header .logo    { color: #00c8e0; }
+
 </style>
 </head>
-<body>
+<body class="light">
 
 <!-- ── Header ─────────────────────────────────────────────────────────── -->
 <header class="site-header" role="banner">
   <div class="logo">STEM <span>QTI</span> Prompt Generator</div>
   <div class="tagline">Physics · Engineering · Mathematics · Chemistry</div>
-  <span class="header-badge">No API Key Required</span><span class="beta-tag">β Beta</span>
+  <span class="header-badge">No API Key Required</span><span class="beta-tag">β Beta</span> <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode" onclick="toggleTheme()">☀ Light</button>
 </header>
 
 <!-- ── Warning banner ─────────────────────────────────────────────────── -->
@@ -820,7 +1147,7 @@ input[type=range] {
 <nav class="tab-nav" role="tablist" aria-label="Main sections">
   <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-build" id="tbtn-build" onclick="switchTab('build')">⚙ 1. Configure</button>
   <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-prompt" id="tbtn-prompt" onclick="switchTab('prompt')">📋 2. Generated Prompt</button>
-  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-review" id="tbtn-review" onclick="switchTab('review')">🔬 3. Review &amp; Export</button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-review" id="tbtn-review" onclick="switchTab('review')">🔬 3. Review &amp; Export <span id='reviewTabCount' style='font-size:.65rem;opacity:.7;'></span></button>
   <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-guide" id="tbtn-guide" onclick="switchTab('guide')">📖 LLM Guide</button>
 </nav>
 
@@ -1049,6 +1376,34 @@ Tip: LLMs with web access (Claude, GPT-4o, Gemini) will fetch URLs automatically
     <button class="btn btn-ghost" id="btnClearForm">↺ Clear Form</button>
   </div>
 
+  <!-- ── LLM Jump Links ─────────────────────────────────────────── -->
+  <div class="llm-jump-section" role="navigation" aria-label="Open LLM in new tab">
+    <div class="llm-jump-label">Open your LLM — paste the prompt above directly:</div>
+    <div class="llm-jump-row">
+      <a class="llm-jump-btn" href="https://claude.ai" target="_blank" rel="noopener noreferrer"
+         style="--llm-color:#c97b3a;">
+        <span class="llm-jump-icon">◆</span> Claude
+      </a>
+      <a class="llm-jump-btn" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer"
+         style="--llm-color:#10a37f;">
+        <span class="llm-jump-icon">⬡</span> ChatGPT
+      </a>
+      <a class="llm-jump-btn" href="https://gemini.google.com" target="_blank" rel="noopener noreferrer"
+         style="--llm-color:#4285f4;">
+        <span class="llm-jump-icon">✦</span> Gemini
+      </a>
+      <a class="llm-jump-btn" href="https://copilot.microsoft.com" target="_blank" rel="noopener noreferrer"
+         style="--llm-color:#0078d4;">
+        <span class="llm-jump-icon">⬡</span> Copilot
+      </a>
+      <a class="llm-jump-btn" href="https://www.perplexity.ai" target="_blank" rel="noopener noreferrer"
+         style="--llm-color:#20b2aa;">
+        <span class="llm-jump-icon">◎</span> Perplexity
+      </a>
+    </div>
+  </div>
+
+
 </div>
 </div>
 
@@ -1113,6 +1468,7 @@ Tip: LLMs with web access (Claude, GPT-4o, Gemini) will fetch URLs automatically
     "difficulty": "medium",
     "tolerance_pct": 5,
     "units": "m/s²",
+    "verification_expression": "15.0 * sqrt(2 * 45.0 / 9.81)",
     "rationale": "..."
   }
 ]'></textarea>
@@ -1301,6 +1657,57 @@ function toast(msg, type=''){
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>t.className='',3000);
 }
+
+
+// ── Theme toggle ──────────────────────────────────────────
+
+// ── Font size control ─────────────────────────────────────
+var FONT_STEPS = ['', 'fs-large', 'fs-larger'];
+var FONT_LABELS = ['100%', '113%', '127%'];
+var _fontIdx = 0;
+function changeFontSize(dir){
+  document.body.classList.remove(FONT_STEPS[_fontIdx]);
+  _fontIdx = Math.max(0, Math.min(FONT_STEPS.length-1, _fontIdx + dir));
+  if(FONT_STEPS[_fontIdx]) document.body.classList.add(FONT_STEPS[_fontIdx]);
+  var lbl = $('fontSizeLabel'); if(lbl) lbl.textContent = FONT_LABELS[_fontIdx];
+  try{ localStorage.setItem('stem_font', _fontIdx); }catch(e){}
+}
+(function initFont(){
+  try{
+    var saved = parseInt(localStorage.getItem('stem_font')||'0');
+    if(saved > 0 && saved < FONT_STEPS.length){
+      _fontIdx = saved;
+      if(FONT_STEPS[saved]) document.body.classList.add(FONT_STEPS[saved]);
+      document.addEventListener('DOMContentLoaded', function(){
+        var lbl=$('fontSizeLabel'); if(lbl) lbl.textContent=FONT_LABELS[saved];
+      });
+    }
+  }catch(e){}
+})();
+
+function toggleTheme(){
+  var isLight = document.body.classList.toggle('light');
+  var btn = $('themeToggle');
+  if(btn) btn.textContent = isLight ? '🌙 Dark' : '☀ Light';
+  try{ localStorage.setItem('stem_theme', isLight ? 'light' : 'dark'); }catch(e){}
+}
+(function initTheme(){
+  try{
+    var saved = localStorage.getItem('stem_theme');
+    // Default is light; only switch to dark if explicitly saved
+    if(saved === 'dark'){
+      document.body.classList.remove('light');
+      document.addEventListener('DOMContentLoaded', function(){
+        var b = $('themeToggle'); if(b) b.textContent = '☀ Light';
+      });
+    } else {
+      // Ensure light class and correct button label on load
+      document.addEventListener('DOMContentLoaded', function(){
+        var b = $('themeToggle'); if(b) b.textContent = '🌙 Dark';
+      });
+    }
+  }catch(e){}
+})();
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 function switchTab(name){
@@ -1507,7 +1914,11 @@ Respond ONLY with a valid JSON array. No preamble, no explanation, no markdown f
 
 For free_response: choices = [], correct = model answer text, distractor_logic = {}.
 For symbolic/conceptual: tolerance_pct = null, units = null.
-CRITICAL: Every numerical_mc answer must be verified against its worked_solution before you finalize it.`;
+CRITICAL: Every numerical_mc answer must be verified against its worked_solution before you finalize it.
+VERIFICATION EXPRESSION REQUIRED: For every numerical_mc question, populate the "verification_expression" field
+with a self-contained arithmetic expression that evaluates to the correct answer — no variable names, only numbers
+and functions. Examples: "9.81 * sin(30*pi/180) * 5" or "1/(1/10 + 1/20)" or "sqrt(2 * 45.0 / 9.81) * 15.0".
+This expression will be evaluated by a browser math engine to check your answer automatically.`;
 }
 
 // ── Generate button ────────────────────────────────────────────────────────
@@ -1525,7 +1936,7 @@ $('btnGenerate').addEventListener('click',()=>{
   else if(tokens<24000){ pill.className='token-pill warn'; $('tokenMsg').textContent='Large prompt — use Claude or GPT-4o for best results.'; }
   else { pill.className='token-pill over'; $('tokenMsg').textContent='Very large — consider reducing question count or content.'; }
   switchTab('prompt');
-  toast('Prompt generated!','success');
+  toast('✓ Prompt ready — copy it, paste into your LLM, then bring the JSON to Tab 3.','success');
 });
 
 $('btnCopy').addEventListener('click',()=>{
@@ -1567,6 +1978,7 @@ $('btnValidate').addEventListener('click',()=>{
       difficulty: (q.difficulty||'medium').toLowerCase(),
       tolerance_pct: q.tolerance_pct!=null ? Number(q.tolerance_pct) : Number($('defaultTolerance').value||5),
       units: q.units||null,
+      verification_expression: q.verification_expression||q.verificationExpression||'',
       rationale: q.rationale||'',
     }));
     parsedQuestions = arr;
@@ -1628,6 +2040,129 @@ function renderReview(){
 // ── Verification helpers ──────────────────────────────────────────
 // The worked solution pane is the primary verification tool.
 function getQuestions(){ return parsedQuestions; }
+
+
+// ═══════════════════════════════════════════════════════════
+// COMPUTATION VERIFICATION — Option C
+// 1. Run math.js on verification_expression (fast, in-browser)
+// 2. If math.js can't evaluate it, fall back to Wolfram Alpha link
+// 3. Always show concept search below
+// ═══════════════════════════════════════════════════════════
+function cleanExprForMathJS(expr){
+  if(!expr) return null;
+  var s = String(expr);
+  // Strip LaTeX delimiters preserving content
+  s = s.replace(/\$\$([^$]+)\$\$/g, function(_,m){return m;});
+  s = s.replace(/\$([^$]+)\$/g,    function(_,m){return m;});
+  // Convert LaTeX math to mathjs syntax
+  s = s.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)');
+  s = s.replace(/\\sqrt\{([^}]+)\}/g,'sqrt($1)');
+  s = s.replace(/\\sqrt\b/g,'sqrt');
+  s = s.replace(/\\sin\b/g,'sin').replace(/\\cos\b/g,'cos').replace(/\\tan\b/g,'tan');
+  s = s.replace(/\\ln\b/g,'log').replace(/\\log\b/g,'log10');
+  s = s.replace(/\\pi\b/g,'pi').replace(/\\theta\b/g,'theta');
+  s = s.replace(/\\times\b/g,'*').replace(/\\cdot\b/g,'*').replace(/\\div\b/g,'/');
+  // Unit words → strip (mathjs handles units separately, keep numbers)
+  s = s.replace(/\b(m\/s\^2|m\/s²|m\/s|kg|N|J|W|Pa|Hz|rad|deg|ohm|Ohm|Ω)\b/g,'');
+  s = s.replace(/\\text\{([^}]*)\}/g,'');
+  s = s.replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1');
+  s = s.replace(/\\[a-zA-Z]+/g,'');
+  s = s.replace(/[{}]/g,'');
+  // Degree symbol to degrees()
+  s = s.replace(/(\d+\.?\d*)\s*°/g, function(_,n){ return '('+n+'*pi/180)'; });
+  s = s.replace(/(\d+\.?\d*)\s*degrees?/gi, function(_,n){ return '('+n+'*pi/180)'; });
+  s = s.replace(/\s{2,}/g,' ').trim();
+  return s || null;
+}
+
+function tryEvaluate(expr){
+  // Returns {ok:true, result:number} or {ok:false, reason:string}
+  if(!expr) return {ok:false, reason:'no expression'};
+  var clean = cleanExprForMathJS(expr);
+  if(!clean) return {ok:false, reason:'empty after cleaning'};
+  if(typeof math === 'undefined') return {ok:false, reason:'math.js not loaded'};
+  try {
+    var result = math.evaluate(clean);
+    if(typeof result !== 'number' || !isFinite(result))
+      return {ok:false, reason:'non-numeric result'};
+    return {ok:true, result:result, expr:clean};
+  } catch(e) {
+    return {ok:false, reason:e.message||'parse error', expr:clean};
+  }
+}
+
+function getCorrectValue(q){
+  // Extract numeric value from the correct choice text
+  var correctChoice = (q.choices||[]).find(function(c){ return c.letter===q.correct; });
+  if(!correctChoice) return null;
+  var text = correctChoice.text
+    .replace(/\$\$([^$]+)\$\$/g,function(_,m){return m;})
+    .replace(/\$([^$]+)\$/g,function(_,m){return m;})
+    .replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1')
+    .replace(/\\[a-zA-Z]+/g,'');
+  var match = text.match(/([-+]?[\d.]+(?:[eE][+-]?\d+)?)/);
+  return match ? parseFloat(match[1]) : null;
+}
+
+function buildVerificationWidget(q){
+  var qtype = (q.type||'');
+  // Only for numerical_mc and symbolic — others don't need computation check
+  if(qtype !== 'numerical_mc' && qtype !== 'symbolic') return buildConceptLink(q);
+
+  var expr = (q.verification_expression||'').trim();
+  var correctVal = getCorrectValue(q);
+  var tol = (q.tolerance_pct||5)/100;
+  var html = '<div class="verification-widget">';
+  html += '<div class="vw-label">⚙ Computation Check</div>';
+
+  if(expr){
+    html += '<div class="vw-expr">' + escH(expr) + '</div>';
+    var evalResult = tryEvaluate(expr);
+    if(evalResult.ok){
+      var computed = Math.round(evalResult.result * 1e6)/1e6;
+      if(correctVal !== null){
+        // Use absolute margin to correctly handle negative answers
+        var _margin = Math.abs(correctVal) * tol;
+        // Near-zero fallback: if answer is very small, use absolute tolerance of 0.01
+        if(_margin < 0.01) _margin = 0.01;
+        var lo = correctVal - _margin, hi = correctVal + _margin;
+        var pass = computed >= lo && computed <= hi;
+        if(pass){
+          html += '<div class="vw-pass">✅ Computed: <strong>' + computed + '</strong>'
+               +  ' — matches correct answer (' + correctVal + ') within ±' + (tol*100) + '%</div>';
+        } else {
+          html += '<div class="vw-fail">⚠ Computed: <strong>' + computed + '</strong>'
+               +  ' — does NOT match correct answer (' + correctVal + ') within ±' + (tol*100) + '%'
+               +  '<br><small>Check the worked solution and correct answer carefully.</small></div>';
+        }
+      } else {
+        html += '<div class="vw-pass">✅ Computed: <strong>' + computed + '</strong>'
+             +  ' (verify this matches the correct answer)</div>';
+      }
+    } else {
+      // math.js failed — fall back to Wolfram Alpha
+      var waExpr = expr.replace(/(\d+\.?\d*)\s*°/g,'$1 degrees')
+                       .replace(/°/g,' degrees').replace(/\*/g,'*');
+      var waUrl = 'https://www.wolframalpha.com/input?i='
+               + encodeURIComponent(waExpr.substring(0,200));
+      html += '<div class="vw-skip">⚡ Expression too complex for browser evaluation'
+           +  (evalResult.expr ? ' (<code>'+escH(evalResult.expr.substring(0,60))+'</code>)' : '')
+           +  '</div>';
+      html += '<a class="vw-wa-link" href="' + waUrl + '" target="_blank" rel="noopener"'
+           +  ' title="Verify: ' + escH(expr).replace(/"/g,"'").substring(0,80) + '">'
+           +  '🔎 Verify on Wolfram Alpha</a>';
+    }
+  } else {
+    // No verification_expression provided
+    html += '<div class="vw-skip">No <code>verification_expression</code> in this question.'
+         +  ' Re-generate with an updated prompt to get computation checking.</div>';
+  }
+
+  // Always show concept search
+  html += '<div style="margin-top:8px;">' + buildConceptLink(q) + '</div>';
+  html += '</div>';
+  return html;
+}
 
 function buildConceptLink(q){
   if(!q.stem) return '';
@@ -1723,7 +2258,7 @@ function buildQCard(q,i){
          ${q.units?`<span style="color:var(--gray-mid);font-family:var(--font-mono);font-size:.78rem;">Units: ${escH(q.units)}</span>`:''}
        </div>` : '';
 
-  const conceptLink = buildConceptLink(q);
+  const conceptLink = buildVerificationWidget(q);
 
   div.innerHTML = `
     <div class="q-card-head" onclick="toggleCard(${i})" role="button" aria-expanded="false" aria-controls="qbody-${i}" tabindex="0">
@@ -1738,6 +2273,7 @@ function buildQCard(q,i){
         </div>
         <div class="q-stem">${escH(q.stem)}</div>
       </div>
+      <button class="verify-badge needs" id="vbadge-${i}" onclick="event.stopPropagation();toggleVerified(${i})" aria-label="Mark question ${i+1} as verified" title="Click after reviewing the worked solution">⚠ Needs Verification</button>
       <div class="q-actions" onclick="event.stopPropagation()">
         <button class="q-act-btn" onclick="editQ(${i})" aria-label="Edit question ${i+1}">✎</button>
         <button class="q-act-btn del" onclick="deleteQ(${i})" aria-label="Delete question ${i+1}">✕</button>
