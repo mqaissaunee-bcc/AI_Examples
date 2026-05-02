@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>STEM QTI Question Bank Generator [Beta]</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
+:root{
+  --navy:#0a1628;--slate:#1a2744;--slate-mid:#243354;--border:#2e3f5c;
+  --cyan:#00c8e0;--cyan-dim:#007a8a;--amber:#f5a623;--amber-dim:#8a5a00;
+  --green:#00c87a;--red:#e05555;--white:#f0f4ff;
+  --gray-light:#8a9bbf;--gray-mid:#4a5a7a;
+  --card-bg:#111e35;--input-bg:#0d1a2e;
+  --radius:6px;--font-mono:'IBM Plex Mono',monospace;--font-body:'IBM Plex Sans',sans-serif;
+  --focus-ring:0 0 0 3px rgba(0,200,224,.35);--shadow:0 4px 24px rgba(0,0,0,.4);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font-body);background:var(--navy);color:var(--white);min-height:100vh;font-size:15px;line-height:1.6;}
+
+/* Header */
+.site-header{background:var(--slate);border-bottom:2px solid var(--amber);padding:0 24px;position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:16px;height:56px;}
+.site-header .logo{font-family:var(--font-mono);font-size:.78rem;font-weight:600;color:var(--amber);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
+.site-header .logo span{color:var(--cyan);}
+.site-header .tagline{font-size:.72rem;color:var(--gray-light);border-left:1px solid var(--border);padding-left:16px;}
+.header-badge{margin-left:auto;font-family:var(--font-mono);font-size:.65rem;font-weight:600;background:rgba(245,166,35,.12);color:var(--amber);border:1px solid var(--amber-dim);border-radius:4px;padding:3px 9px;letter-spacing:.06em;}
+
+/* Warning */
+.warn-banner{background:rgba(245,166,35,.08);border-top:3px solid var(--amber);border-bottom:1px solid rgba(245,166,35,.2);padding:10px 24px;display:flex;align-items:flex-start;gap:12px;font-size:.82rem;color:#c8a060;line-height:1.5;}
+.warn-banner .wi{font-size:1.1rem;flex-shrink:0;margin-top:1px;}
+
+/* Progress bar */
+.progress-bar-wrap{background:var(--slate);border-bottom:1px solid var(--border);padding:8px 24px;display:flex;align-items:center;gap:16px;}
+.progress-bar-track{flex:1;height:4px;background:var(--slate-mid);border-radius:2px;overflow:hidden;}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--amber));border-radius:2px;transition:width .4s ease;width:0%;}
+.progress-label{font-family:var(--font-mono);font-size:.65rem;color:var(--gray-light);letter-spacing:.05em;white-space:nowrap;}
+
+/* Tabs */
+.tab-nav{background:var(--slate);border-bottom:1px solid var(--border);display:flex;padding:0 24px;gap:2px;overflow-x:auto;}
+.tab-btn{font-family:var(--font-mono);font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:none;border:none;color:var(--gray-light);padding:14px 18px 12px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s;}
+.tab-btn:hover{color:var(--white);}
+.tab-btn.active{color:var(--amber);border-bottom-color:var(--amber);}
+.tab-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* Layout */
+.main-wrap{max-width:1000px;margin:0 auto;padding:28px 24px 60px;}
+.panel-head{margin-bottom:24px;}
+.panel-head h2{font-family:var(--font-mono);font-size:1rem;font-weight:600;color:var(--amber);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;}
+.panel-head p{font-size:.85rem;color:var(--gray-light);line-height:1.6;}
+
+/* Forms */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.form-grid.full{grid-template-columns:1fr;}
+@media(max-width:640px){.form-grid{grid-template-columns:1fr;}}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field-label{font-family:var(--font-mono);font-size:.68rem;font-weight:600;color:var(--gray-light);letter-spacing:.08em;text-transform:uppercase;}
+.field-hint{font-size:.75rem;color:var(--gray-mid);line-height:1.5;}
+input[type=text],input[type=number],input[type=password],select,textarea{background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--white);font-family:var(--font-body);font-size:.87rem;padding:9px 12px;width:100%;transition:border-color .15s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--cyan);box-shadow:var(--focus-ring);}
+select option{background:var(--slate);}
+textarea{resize:vertical;}
+
+/* Cards */
+.section-card{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:22px 24px;margin-bottom:20px;position:relative;}
+.section-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--amber),transparent);border-radius:8px 8px 0 0;}
+.section-card h3{font-family:var(--font-mono);font-size:.72rem;font-weight:600;color:var(--amber);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+
+/* Checkbox grid */
+.check-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.check-item{display:flex;align-items:center;gap:7px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:.82rem;color:var(--gray-light);transition:border-color .15s,color .15s;user-select:none;}
+.check-item:hover{border-color:var(--cyan-dim);color:var(--white);}
+.check-item.checked{border-color:var(--cyan);color:var(--cyan);background:rgba(0,200,224,.07);}
+.check-item input[type=checkbox]{accent-color:var(--cyan);width:14px;height:14px;}
+
+/* Slider */
+.slider-wrap{display:flex;align-items:center;gap:14px;}
+input[type=range]{flex:1;accent-color:var(--amber);height:4px;cursor:pointer;}
+.slider-val{font-family:var(--font-mono);font-size:.9rem;font-weight:600;color:var(--amber);min-width:40px;text-align:right;}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:var(--radius);font-family:var(--font-mono);font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;}
+.btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-primary{background:var(--amber);color:var(--navy);}
+.btn-primary:hover:not(:disabled){background:#ffc040;}
+.btn-cyan{background:var(--cyan);color:var(--navy);}
+.btn-cyan:hover:not(:disabled){background:#00e0fa;}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--gray-light);}
+.btn-ghost:hover:not(:disabled){border-color:var(--cyan);color:var(--cyan);}
+.btn-danger{background:transparent;border:1px solid var(--red);color:var(--red);}
+.btn-danger:hover:not(:disabled){background:rgba(224,85,85,.1);}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;}
+
+/* API key panel */
+.api-panel{background:rgba(245,166,35,.05);border:1px solid rgba(245,166,35,.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:20px;}
+.api-panel p{font-size:.82rem;color:var(--gray-light);margin-bottom:10px;}
+.api-input-row{display:flex;gap:10px;align-items:center;}
+.api-input-row input{flex:1;font-family:var(--font-mono);font-size:.82rem;}
+.api-status{font-family:var(--font-mono);font-size:.68rem;margin-top:8px;padding:4px 10px;border-radius:4px;display:inline-block;}
+.api-status.ok{background:rgba(0,200,122,.1);color:var(--green);border:1px solid rgba(0,200,122,.25);}
+.api-status.bad{background:rgba(224,85,85,.1);color:var(--red);border:1px solid rgba(224,85,85,.25);}
+
+/* Generation status */
+.gen-status{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-top:16px;display:none;}
+.gen-status.show{display:block;}
+.gen-log{font-family:var(--font-mono);font-size:.73rem;color:var(--gray-light);line-height:1.8;max-height:140px;overflow-y:auto;}
+.gen-log .log-ok{color:var(--green);}
+.gen-log .log-err{color:var(--red);}
+.gen-log .log-info{color:var(--cyan);}
+
+/* Stats row */
+.stats-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
+.stat-chip{font-family:var(--font-mono);font-size:.7rem;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--gray-light);}
+
+/* Question cards */
+.q-card{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .2s;}
+.q-card:hover{border-color:var(--amber-dim);}
+.q-card-head{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;cursor:pointer;}
+.q-num{font-family:var(--font-mono);font-size:.68rem;font-weight:600;color:var(--amber);background:rgba(245,166,35,.1);border:1px solid var(--amber-dim);border-radius:4px;padding:2px 7px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
+.q-badges{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px;}
+.q-badge{font-family:var(--font-mono);font-size:.6rem;font-weight:600;padding:1px 7px;border-radius:3px;letter-spacing:.04em;text-transform:uppercase;}
+.badge-type{background:rgba(0,200,224,.12);color:var(--cyan);border:1px solid rgba(0,200,224,.25);}
+.badge-diff{background:rgba(245,166,35,.12);color:var(--amber);border:1px solid rgba(245,166,35,.25);}
+.badge-bloom{background:rgba(0,200,122,.1);color:var(--green);border:1px solid rgba(0,200,122,.2);}
+.badge-stem{background:rgba(160,120,255,.12);color:#b090ff;border:1px solid rgba(160,120,255,.25);}
+.q-stem{font-size:.88rem;color:var(--white);line-height:1.6;flex:1;}
+.q-actions{display:flex;gap:6px;align-items:flex-start;flex-shrink:0;}
+.q-act-btn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--gray-light);font-size:.8rem;padding:4px 8px;cursor:pointer;font-family:var(--font-mono);transition:all .15s;}
+.q-act-btn:hover{border-color:var(--amber);color:var(--amber);}
+.q-act-btn.del:hover{border-color:var(--red);color:var(--red);}
+.q-card-body{display:none;padding:0 16px 14px;}
+.q-card-body.open{display:block;}
+.choices-list{list-style:none;margin:10px 0;display:flex;flex-direction:column;gap:5px;}
+.choice-item{display:flex;align-items:flex-start;gap:10px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;padding:8px 12px;font-size:.84rem;}
+.choice-item.correct{border-color:var(--green);background:rgba(0,200,122,.05);}
+.choice-letter{font-family:var(--font-mono);font-size:.7rem;font-weight:700;color:var(--gray-light);min-width:20px;margin-top:1px;}
+.choice-item.correct .choice-letter{color:var(--green);}
+.choice-error{font-family:var(--font-mono);font-size:.68rem;color:var(--gray-mid);font-style:italic;margin-top:2px;}
+.solution-toggle{font-family:var(--font-mono);font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);background:none;border:1px solid var(--amber-dim);border-radius:4px;padding:4px 10px;cursor:pointer;margin-top:8px;transition:all .15s;}
+.solution-toggle:hover{border-color:var(--amber);background:rgba(245,166,35,.08);}
+.solution-box{display:none;background:rgba(245,166,35,.05);border:1px solid rgba(245,166,35,.2);border-radius:4px;padding:12px 14px;margin-top:8px;font-size:.83rem;line-height:1.8;color:#c8a860;}
+.solution-box.open{display:block;}
+.sol-head{font-family:var(--font-mono);font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);margin-bottom:8px;}
+.rationale-box{background:rgba(0,200,224,.04);border-left:3px solid var(--cyan-dim);padding:8px 12px;margin-top:8px;font-size:.82rem;color:var(--gray-light);line-height:1.6;border-radius:0 4px 4px 0;}
+.tolerance-row{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:.82rem;color:var(--gray-light);}
+.tolerance-row input[type=number]{width:75px;padding:5px 8px;font-family:var(--font-mono);font-size:.82rem;}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:var(--slate);border:1px solid var(--border);border-radius:10px;width:100%;max-width:700px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.modal-head h3{font-family:var(--font-mono);font-size:.8rem;font-weight:600;color:var(--amber);letter-spacing:.07em;text-transform:uppercase;}
+.modal-close{background:none;border:none;color:var(--gray-light);font-size:1.2rem;cursor:pointer;}
+.modal-close:hover{color:var(--white);}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:14px;}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;}
+
+/* Status */
+.status-msg{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-radius:var(--radius);font-size:.84rem;margin-top:14px;}
+.status-msg.ok{background:rgba(0,200,122,.08);border:1px solid rgba(0,200,122,.25);color:#80e0b0;}
+.status-msg.err{background:rgba(224,85,85,.08);border:1px solid rgba(224,85,85,.25);color:#e09090;}
+.status-msg.warn{background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.25);color:#c8a060;}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--slate);border:1px solid var(--border);border-radius:var(--radius);padding:10px 18px;font-family:var(--font-mono);font-size:.75rem;color:var(--white);box-shadow:var(--shadow);transform:translateY(80px);opacity:0;transition:all .25s;z-index:999;max-width:340px;}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.ok{border-color:var(--green);color:var(--green);}
+#toast.err{border-color:var(--red);color:var(--red);}
+
+/* KaTeX */
+.katex{color:var(--white);font-size:1em;}
+.katex-display{margin:8px 0;overflow-x:auto;}
+</style>
+</head>
+<body>
+
+<header class="site-header" role="banner">
+  <div class="logo">STEM <span>QTI</span> Generator <span style="color:var(--amber)">⚡ API</span></div>
+  <div class="tagline">Physics · Engineering · Mathematics · Chemistry</div>
+  <span class="header-badge">Requires API Key</span><span class="beta-tag">β Beta</span>
+</header>
+
+<div class="warn-banner" role="alert">
+  <span class="wi">⚠</span>
+  <div><strong>Calculation accuracy notice:</strong> AI-generated STEM questions require human verification before use in assessments. Check all numerical answers, worked solutions, and formula representations by expanding the <strong>Worked Solution</strong> on each card and checking every step.</div>
+</div>
+
+<div class="progress-bar-wrap" aria-label="Workflow progress">
+  <div class="progress-bar-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Generation progress">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+  <span class="progress-label" id="progressLabel">Configure → Generate → Review → Export</span>
+</div>
+
+<nav class="tab-nav" role="tablist" aria-label="Main sections">
+  <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-config" id="tbtn-config" onclick="switchTab('config')">⚙ 1. Configure</button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-review" id="tbtn-review" onclick="switchTab('review')">🔬 2. Review &amp; Edit</button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-export" id="tbtn-export" onclick="switchTab('export')">⬇ 3. Export</button>
+</nav>
+
+<!-- ══════════════════ TAB 1 — CONFIGURE ══════════════════ -->
+<div class="tab-panel active" id="tab-config" role="tabpanel" aria-labelledby="tbtn-config">
+<div class="main-wrap">
+  <div class="panel-head">
+    <h2>Configure &amp; Generate</h2>
+    <p>Enter your Anthropic API key, configure question parameters, then generate your STEM question bank. All calculations are performed by Claude and flagged for your verification.</p>
+  </div>
+
+  <!-- API Key -->
+  <div class="api-panel" role="region" aria-label="API key configuration">
+    <p>Enter your Anthropic API key. It is used only in your browser and never stored on any server.</p>
+    <div class="api-input-row">
+      <input type="password" id="apiKey" placeholder="sk-ant-api03-…" aria-label="Anthropic API key" autocomplete="off">
+      <button class="btn btn-ghost" id="btnSaveKey" type="button">Save</button>
+      <button class="btn btn-danger" id="btnClearKey" type="button">Clear</button>
+    </div>
+    <div id="apiStatus"></div>
+  </div>
+
+  <!-- Course Info -->
+  <div class="section-card">
+    <h3>📚 Course Information</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="courseTitle">Course Title</label>
+        <input type="text" id="courseTitle" placeholder="e.g. Engineering Statics, Calculus II">
+      </div>
+      <div class="field">
+        <label class="field-label" for="bankName">Question Bank Name</label>
+        <input type="text" id="bankName" placeholder="e.g. Unit 3 — Equilibrium">
+      </div>
+      <div class="field">
+        <label class="field-label" for="subject">Subject Area</label>
+        <select id="subject">
+          <optgroup label="Physics">
+            <option value="physics-mechanics">Physics — Mechanics (Kinematics, Newton's Laws, Energy)</option>
+            <option value="physics-em">Physics — Electricity &amp; Magnetism</option>
+            <option value="physics-thermo">Physics — Thermodynamics &amp; Statistical Mechanics</option>
+            <option value="physics-waves">Physics — Waves, Optics &amp; Modern Physics</option>
+          </optgroup>
+          <optgroup label="Engineering">
+            <option value="eng-statics">Engineering — Statics</option>
+            <option value="eng-dynamics">Engineering — Dynamics</option>
+            <option value="eng-circuits">Engineering — Electric Circuits</option>
+            <option value="eng-thermo">Engineering — Thermodynamics</option>
+            <option value="eng-fluids">Engineering — Fluid Mechanics</option>
+            <option value="eng-materials">Engineering — Mechanics of Materials</option>
+          </optgroup>
+          <optgroup label="Mathematics">
+            <option value="math-calc1">Mathematics — Calculus I</option>
+            <option value="math-calc2">Mathematics — Calculus II</option>
+            <option value="math-calc3">Mathematics — Calculus III (Multivariable)</option>
+            <option value="math-diffeq">Mathematics — Differential Equations</option>
+            <option value="math-linalg">Mathematics — Linear Algebra</option>
+            <option value="math-stats">Mathematics — Statistics &amp; Probability</option>
+            <option value="math-algebra">Mathematics — College Algebra &amp; Precalculus</option>
+          </optgroup>
+          <optgroup label="Chemistry">
+            <option value="chem-gen1">Chemistry — General Chemistry I</option>
+            <option value="chem-gen2">Chemistry — General Chemistry II</option>
+            <option value="chem-organic">Chemistry — Organic Chemistry</option>
+            <option value="chem-pchem">Chemistry — Physical Chemistry</option>
+            <option value="chem-analytical">Chemistry — Analytical Chemistry</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label" for="level">Course Level</label>
+        <select id="level">
+          <option value="intro">Introductory / Survey (100–200 level)</option>
+          <option value="intermediate" selected>Intermediate (200–300 level)</option>
+          <option value="upper">Upper Division (300–400 level)</option>
+          <option value="graduate">Graduate</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid full" style="margin-top:14px;">
+      <div class="field">
+        <label class="field-label" for="topicFocus">Specific Topics / Concepts (optional)</label>
+        <input type="text" id="topicFocus" placeholder="e.g. rotational dynamics, moment of inertia, angular momentum">
+      </div>
+    </div>
+  </div>
+
+  <!-- Question Parameters -->
+  <div class="section-card">
+    <h3>🎛 Question Parameters</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="numQ">Number of Questions</label>
+        <div class="slider-wrap">
+          <input type="range" id="numQ" min="3" max="30" value="10" oninput="$('numQVal').textContent=this.value">
+          <span class="slider-val" id="numQVal">10</span>
+        </div>
+        <span class="field-hint">Generated in batches of 5. Larger banks cost more API tokens.</span>
+      </div>
+      <div class="field">
+        <label class="field-label" for="diffSelect">Difficulty Mix</label>
+        <select id="diffSelect">
+          <option value="balanced">Balanced — Easy 20% / Medium 60% / Hard 20%</option>
+          <option value="introductory">Introductory — Easy 50% / Medium 50%</option>
+          <option value="exam">Exam-Ready — Medium 40% / Hard 60%</option>
+          <option value="challenge">Challenge — Medium 20% / Hard 80%</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div class="field-label" style="margin-bottom:10px;">Question Types</div>
+      <div class="check-grid">
+        <label class="check-item checked"><input type="checkbox" name="qtype" value="numerical_mc" checked> 🔢 Numerical MC</label>
+        <label class="check-item checked"><input type="checkbox" name="qtype" value="symbolic" checked> 🔣 Symbolic / Formula</label>
+        <label class="check-item checked"><input type="checkbox" name="qtype" value="conceptual" checked> 💡 Conceptual</label>
+        <label class="check-item"><input type="checkbox" name="qtype" value="free_response"> ✏ Free Response</label>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div class="field-label" style="margin-bottom:10px;">Bloom's Taxonomy Levels</div>
+      <div class="check-grid">
+        <label class="check-item"><input type="checkbox" name="bloom" value="Remember"> Remember</label>
+        <label class="check-item checked"><input type="checkbox" name="bloom" value="Understand" checked> Understand</label>
+        <label class="check-item checked"><input type="checkbox" name="bloom" value="Apply" checked> Apply</label>
+        <label class="check-item checked"><input type="checkbox" name="bloom" value="Analyze" checked> Analyze</label>
+        <label class="check-item"><input type="checkbox" name="bloom" value="Evaluate"> Evaluate</label>
+        <label class="check-item"><input type="checkbox" name="bloom" value="Create"> Create</label>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div class="field-label" style="margin-bottom:10px;">STEM Cognitive Level</div>
+      <div class="check-grid">
+        <label class="check-item checked"><input type="checkbox" name="stemLevel" value="Single-step" checked> Single-step</label>
+        <label class="check-item checked"><input type="checkbox" name="stemLevel" value="Multi-step" checked> Multi-step</label>
+        <label class="check-item"><input type="checkbox" name="stemLevel" value="Multi-concept"> Multi-concept</label>
+        <label class="check-item"><input type="checkbox" name="stemLevel" value="Proof-based"> Proof-based</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Numerical Settings -->
+  <div class="section-card">
+    <h3>🔢 Numerical &amp; Notation Settings</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="sigFigs">Significant Figures</label>
+        <select id="sigFigs">
+          <option value="2">2 significant figures</option>
+          <option value="3" selected>3 significant figures</option>
+          <option value="4">4 significant figures</option>
+          <option value="any">Any (problem-appropriate)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label" for="defaultTolerance">Default Tolerance (±%)</label>
+        <input type="number" id="defaultTolerance" value="5" min="0.1" max="50" step="0.5">
+        <span class="field-hint">Overridable per question in the review panel.</span>
+      </div>
+      <div class="field">
+        <label class="field-label" for="unitSystem">Unit System</label>
+        <select id="unitSystem">
+          <option value="SI">SI — meters, kilograms, seconds</option>
+          <option value="US">US Customary — feet, pounds, seconds</option>
+          <option value="both">Both — specify per problem</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid full" style="margin-top:14px;">
+      <div class="field">
+        <label class="field-label" for="extraContext">Additional Instructions (optional)</label>
+        <textarea id="extraContext" rows="2" placeholder="e.g. Include free body diagrams described in text, use real-world engineering contexts…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Source content -->
+  <div class="section-card">
+    <h3>📄 Source Content (optional)</h3>
+    <div class="field">
+      <label class="field-label" for="contentPaste">Paste Lecture Notes, Textbook Excerpts, or a URL</label>
+      <textarea id="contentPaste" rows="4" placeholder="Paste lecture notes, worked examples, textbook content, or a URL…"></textarea>
+      <span class="field-hint">Helps Claude generate questions aligned to your specific curriculum. <span id="urlHint" style="display:none;color:var(--cyan);font-weight:600;">🔗 URL detected — Claude will fetch and read it.</span></span>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btnGenerate">⚡ Generate Questions</button>
+    <button class="btn btn-ghost" id="btnClearForm">↺ Clear</button>
+  </div>
+
+  <div class="gen-status" id="genStatus">
+    <div class="gen-log" id="genLog" aria-live="polite" aria-label="Generation log"></div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════ TAB 2 — REVIEW ══════════════════ -->
+<div class="tab-panel" id="tab-review" role="tabpanel" aria-labelledby="tbtn-review">
+<div class="main-wrap">
+  <div class="panel-head">
+    <h2>Review &amp; Edit</h2>
+    <p>Verify every question before exporting. Numerical MC questions open automatically with their worked solution visible. Read through every step, check the arithmetic and units, then click the <strong>⚠ Needs Verification</strong> badge on each card when satisfied. The export section shows how many questions you've verified.</p>
+  </div>
+
+  <div class="stats-row" id="reviewStats" aria-live="polite"></div>
+  <div id="qList" role="list" aria-label="Question list"></div>
+
+  <div id="noQMsg" style="text-align:center;padding:60px 20px;color:var(--gray-mid);">
+    <div style="font-size:2.5rem;margin-bottom:12px;">⚡</div>
+    <div style="font-family:var(--font-mono);font-size:.8rem;">Generate questions in Step 1 first.</div>
+  </div>
+
+  <div class="btn-row" id="reviewBtnRow" style="display:none;">
+    <button class="btn btn-cyan" onclick="switchTab('export')">Proceed to Export →</button>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════ TAB 3 — EXPORT ══════════════════ -->
+<div class="tab-panel" id="tab-export" role="tabpanel" aria-labelledby="tbtn-export">
+<div class="main-wrap">
+  <div class="panel-head">
+    <h2>Export</h2>
+    <p>Export your verified question bank. Numerical MC questions use Canvas <code>calculated_question</code> type with your per-question tolerance settings.</p>
+  </div>
+
+  <div class="section-card">
+    <h3>⬇ Export Options</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="expFormat">Format</label>
+        <select id="expFormat">
+          <option value="qti-mixed">Canvas QTI — auto per type (recommended)</option>
+          <option value="qti-diff">Canvas QTI — split by difficulty</option>
+          <option value="gift">🎓 Moodle GIFT — single category</option>
+          <option value="gift-diff">🎓 Moodle GIFT — split by difficulty</option>
+          <option value="json">JSON (backup / import)</option>
+          <option value="csv">CSV (spreadsheet review)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label" for="ptsPerQ">Points per Question</label>
+        <input type="number" id="ptsPerQ" value="1" min="0.5" max="100" step="0.5">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnExport">⬇ Download</button>
+    </div>
+    <div id="exportMsg" style="margin-top:14px;font-size:.84rem;display:none;"></div>
+  </div>
+
+  <div class="section-card">
+    <h3>📸 Snapshots</h3>
+    <p style="font-size:.84rem;color:var(--gray-light);margin-bottom:12px;">Save the current question set. Useful before making major edits.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <input type="text" id="snapName" placeholder="Snapshot name…" style="flex:1;max-width:300px;">
+      <button class="btn btn-ghost" id="btnSnapSave">💾 Save Snapshot</button>
+    </div>
+    <ul id="snapList" style="margin-top:12px;list-style:none;display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;" aria-label="Saved snapshots"></ul>
+  </div>
+</div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-overlay" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="editModalTitle">Edit Question</h3>
+      <button class="modal-close" id="editClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label class="field-label" for="editStem">Stem (LaTeX OK)</label><textarea id="editStem" rows="4"></textarea></div>
+      <div class="field"><label class="field-label" for="editSolution">Worked Solution</label><textarea id="editSolution" rows="5"></textarea></div>
+      <div class="field"><label class="field-label" for="editCorrect">Correct Answer Letter</label><input type="text" id="editCorrect" maxlength="1" style="width:80px;"></div>
+      <div class="field"><label class="field-label" for="editRationale">Rationale</label><textarea id="editRationale" rows="3"></textarea></div>
+      <div class="field"><label class="field-label" for="editTolerance">Tolerance (%)</label><input type="number" id="editTolerance" value="5" min="0" max="50" step="0.5" style="width:100px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="editCancel">Cancel</button>
+      <button class="btn btn-primary" id="editSave">✓ Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escX(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let toastTimer;
+function toast(msg,type=''){
+  const t=$('toast');
+  t.textContent=msg; t.className='show '+(type==='success'?'ok':type==='error'?'err':'');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.className='',3500);
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>{b.classList.remove('active');b.setAttribute('aria-selected','false');});
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  $('tbtn-'+name).classList.add('active'); $('tbtn-'+name).setAttribute('aria-selected','true');
+  $('tab-'+name).classList.add('active');
+}
+
+// Checkbox styling
+document.querySelectorAll('.check-item input[type=checkbox]').forEach(cb=>{
+  cb.addEventListener('change',()=>cb.closest('.check-item').classList.toggle('checked',cb.checked));
+});
+
+// URL detection
+(function(){
+  const ta=$('contentPaste'),hint=$('urlHint');
+  if(!ta||!hint) return;
+  const RE=/https?:\/\/[^\s"'<>]+/i;
+  function chk(){hint.style.display=RE.test(ta.value)?'inline':'none';}
+  ta.addEventListener('input',chk); ta.addEventListener('paste',()=>setTimeout(chk,50));
+})();
+
+// API key management
+const KEY_STORE='stem_qti_api_key_v1';
+(function(){
+  const saved=sessionStorage.getItem(KEY_STORE);
+  if(saved){$('apiKey').value=saved; setApiStatus('ok');}
+})();
+function setApiStatus(state){
+  const el=$('apiStatus'); if(!el) return;
+  if(state==='ok'){el.className='api-status ok'; el.textContent='✓ API key loaded';}
+  else if(state==='cleared'){el.className='api-status bad'; el.textContent='Key cleared from session';}
+  else{el.innerHTML=''; }
+}
+$('btnSaveKey').addEventListener('click',()=>{
+  const k=$('apiKey').value.trim();
+  if(!k.startsWith('sk-')){toast('Key should start with sk-','error'); return;}
+  sessionStorage.setItem(KEY_STORE,k); setApiStatus('ok'); toast('API key saved for this session.','success');
+});
+$('btnClearKey').addEventListener('click',()=>{
+  sessionStorage.removeItem(KEY_STORE); $('apiKey').value=''; setApiStatus('cleared');
+});
+
+// State
+const state = {
+  questions: [],
+  config: {},
+};
+
+function saveSession(){
+  try{ localStorage.setItem('stem_qti_session_v1', JSON.stringify(state)); }catch(e){}
+}
+(function restore(){
+  try{
+    const s=JSON.parse(localStorage.getItem('stem_qti_session_v1')||'null');
+    if(!s||!Array.isArray(s.questions)||!s.questions.length) return;
+    state.questions=s.questions; state.config=s.config||{};
+    renderReview(); $('noQMsg').style.display='none'; $('reviewBtnRow').style.display='flex';
+  }catch(e){}
+})();
+
+// Subject names
+const SUBJECT_NAMES={
+  'physics-mechanics':'Physics — Mechanics','physics-em':'Physics — E&M','physics-thermo':'Physics — Thermodynamics','physics-waves':'Physics — Waves & Optics',
+  'eng-statics':'Engineering Statics','eng-dynamics':'Engineering Dynamics','eng-circuits':'Electric Circuits','eng-thermo':'Engineering Thermodynamics','eng-fluids':'Fluid Mechanics','eng-materials':'Mechanics of Materials',
+  'math-calc1':'Calculus I','math-calc2':'Calculus II','math-calc3':'Calculus III','math-diffeq':'Differential Equations','math-linalg':'Linear Algebra','math-stats':'Statistics & Probability','math-algebra':'College Algebra',
+  'chem-gen1':'Gen Chemistry I','chem-gen2':'Gen Chemistry II','chem-organic':'Organic Chemistry','chem-pchem':'Physical Chemistry','chem-analytical':'Analytical Chemistry',
+};
+const DIFF_MAPS={'balanced':'Easy 20%, Medium 60%, Hard 20%','introductory':'Easy 50%, Medium 50%','exam':'Medium 40%, Hard 60%','challenge':'Medium 20%, Hard 80%'};
+
+// Prompt builder (internal — for API call)
+function buildSystemPrompt(){
+  return 'You are an expert STEM educator and question designer. You produce well-formed, numerically accurate multiple-choice and free-response questions for undergraduate STEM courses. You always verify your arithmetic and dimensional analysis before finalizing answers. You always respond with a valid JSON array and nothing else — no preamble, no markdown fences, no explanation.';
+}
+
+function buildUserPrompt(config){
+  const {courseTitle,bankName,subject,level,topicFocus,numQ,diff,diffMap,qtypes,blooms,stemLevels,sigFigs,tolerance,unitSystem,extraContext,contentSection}=config;
+  const subjectName=SUBJECT_NAMES[subject]||subject;
+
+  const qtypeInstructions=[];
+  if(qtypes.includes('numerical_mc')) qtypeInstructions.push('- "numerical_mc": Quantitative problem. 4 choices (A–D). Each wrong choice must correspond to a specific named student error. All arithmetic must be verified. tolerance_pct: default '+tolerance+'.');
+  if(qtypes.includes('symbolic')) qtypeInstructions.push('- "symbolic": Formula identification or algebraic manipulation. 4 choices. No floating-point arithmetic required.');
+  if(qtypes.includes('conceptual')) qtypeInstructions.push('- "conceptual": Qualitative understanding. No calculation. Tests physical intuition or principle identification. 4 choices.');
+  if(qtypes.includes('free_response')) qtypeInstructions.push('- "free_response": Open-ended show-your-work problem. choices=[]. correct=complete model answer. worked_solution=full step-by-step solution.');
+
+  return `Generate a STEM question bank for: ${courseTitle}
+Bank name: ${bankName}
+Subject: ${subjectName}
+Level: ${level}
+Difficulty: ${diffMap}
+${topicFocus?'Topics: '+topicFocus+'\n':''}${extraContext?'Instructions: '+extraContext+'\n':''}
+NOTATION: Use LaTeX with $...$ for inline and $$...$$ for display math. Every variable, formula, and unit must be in math mode.
+CRITICAL — NO VALUE DUPLICATION: Never write a numerical value twice. Do NOT write "15.0 kg$15.0\ \text{kg}$" or any pattern where a value appears in plain text AND again in LaTeX. Write each given value exactly once, inside $...$ only.
+
+NUMERICAL PRECISION:
+- ${sigFigs==='any'?'Use appropriate significant figures':'Use '+sigFigs+' significant figures'}
+- Unit system: ${unitSystem==='SI'?'SI':unitSystem==='US'?'US Customary':'As specified per problem'}
+- Include dimensional analysis in every worked_solution
+
+QUESTION TYPES:
+${qtypeInstructions.join('\n')}
+
+DISTRACTOR ENGINEERING (numerical_mc only):
+Each wrong choice must be derived from a specific realistic error. Document each in distractor_logic.
+
+BLOOM'S: ${blooms.join(', ')}
+STEM COGNITIVE LEVELS: ${stemLevels.join(', ')}
+ANSWER POSITION: Distribute correct answers evenly across A, B, C, D.
+${contentSection}
+Produce exactly ${numQ} questions as a JSON array:
+[{"id":"q1","type":"numerical_mc|symbolic|conceptual|free_response","subject":"${subject}","stem":"$LaTeX$ stem","choices":[{"letter":"A","text":"..."},{"letter":"B","text":"..."},{"letter":"C","text":"..."},{"letter":"D","text":"..."}],"correct":"B","worked_solution":"Step 1: ...","distractor_logic":{"A":"error type","C":"error type","D":"error type"},"bloom":"Apply","stem_level":"Single-step","difficulty":"medium","tolerance_pct":${tolerance},"units":"m/s","rationale":"..."}]`;
+}
+
+// Progress helpers
+function setProgress(pct,label){
+  $('progressFill').style.width=pct+'%';
+  $('progressFill').closest('[role=progressbar]').setAttribute('aria-valuenow',pct);
+  $('progressLabel').textContent=label||'';
+}
+function logLine(msg,cls=''){
+  const log=$('genLog');
+  const div=document.createElement('div');
+  div.className=cls; div.textContent=msg;
+  log.appendChild(div); log.scrollTop=log.scrollHeight;
+}
+
+// Generate
+$('btnGenerate').addEventListener('click', async()=>{
+  const apiKey=($('apiKey').value.trim()||sessionStorage.getItem(KEY_STORE)||'');
+  if(!apiKey.startsWith('sk-')){ toast('Enter a valid Anthropic API key first.','error'); return; }
+
+  const qtypes=[...document.querySelectorAll('input[name=qtype]:checked')].map(c=>c.value);
+  const blooms=[...document.querySelectorAll('input[name=bloom]:checked')].map(c=>c.value);
+  const stemLevels=[...document.querySelectorAll('input[name=stemLevel]:checked')].map(c=>c.value);
+  if(!qtypes.length||!blooms.length||!stemLevels.length){toast('Select at least one question type, Bloom\'s level, and STEM level.','error');return;}
+
+  const numQ=parseInt($('numQ').value)||10;
+  const diff=$('diffSelect').value;
+  const diffMap=DIFF_MAPS[diff]||DIFF_MAPS.balanced;
+  const subject=$('subject').value;
+  const rawContent=$('contentPaste').value.trim();
+  const urls=(rawContent.match(/https?:\/\/[^\s"'<>]+/gi)||[]);
+  const isUrlOnly=rawContent.length>0&&rawContent.split('\n').filter(l=>l.trim()).every(l=>/^https?:\/\//i.test(l.trim()));
+  let contentSection='';
+  if(!rawContent) contentSection='';
+  else if(urls.length&&isUrlOnly) contentSection='\nSOURCE CONTENT — FETCH AND READ BEFORE GENERATING:\n'+urls.map(u=>'  - '+u).join('\n')+'\n';
+  else contentSection='\nSOURCE CONTENT:\n'+rawContent.substring(0,6000)+'\n';
+
+  const config={
+    courseTitle:$('courseTitle').value.trim()||'STEM Course',
+    bankName:$('bankName').value.trim()||'Question Bank',
+    subject,level:$('level').value,
+    topicFocus:$('topicFocus').value.trim(),
+    numQ,diff,diffMap,qtypes,blooms,stemLevels,
+    sigFigs:$('sigFigs').value,
+    tolerance:$('defaultTolerance').value||'5',
+    unitSystem:$('unitSystem').value,
+    extraContext:$('extraContext').value.trim(),
+    contentSection,
+  };
+  state.config=config;
+
+  $('genStatus').classList.add('show');
+  $('genLog').innerHTML='';
+  $('btnGenerate').disabled=true;
+  state.questions=[];
+  setProgress(5,'Connecting to Claude API…');
+  logLine('⚡ Starting generation: '+numQ+' questions','log-info');
+  logLine('Subject: '+(SUBJECT_NAMES[subject]||subject),'log-info');
+
+  // Generate in batches of 5
+  const BATCH=5;
+  const batches=Math.ceil(numQ/BATCH);
+  let allQs=[];
+
+  for(let b=0;b<batches;b++){
+    const bSize=Math.min(BATCH,numQ-b*BATCH);
+    const bConfig={...config,numQ:bSize};
+    logLine(`Batch ${b+1}/${batches}: requesting ${bSize} questions…`);
+    setProgress(10+Math.round((b/batches)*80),`Batch ${b+1} of ${batches}…`);
+    try{
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-20250514',
+          max_tokens:4096,
+          system:buildSystemPrompt(),
+          messages:[{role:'user',content:buildUserPrompt(bConfig)}],
+        })
+      });
+      if(!resp.ok){ const e=await resp.json(); throw new Error(e.error?.message||resp.statusText); }
+      const data=await resp.json();
+      const raw=data.content[0]?.text||'';
+      const cleaned=raw.replace(/^```(?:json)?\n?/,'').replace(/\n?```$/,'').trim();
+      let arr=JSON.parse(cleaned);
+      if(!Array.isArray(arr)) arr=arr.questions||arr.data||Object.values(arr);
+      arr=arr.map((q,i)=>({
+        id:q.id||'q'+(allQs.length+i+1),
+        type:(q.type||'numerical_mc').toLowerCase(),
+        subject:q.subject||subject,
+        stem:q.stem||'',
+        choices:q.choices||[],
+        correct:(q.correct||'A').toUpperCase().trim(),
+        worked_solution:q.worked_solution||q.workedSolution||'',
+        distractor_logic:q.distractor_logic||{},
+        bloom:q.bloom||'Apply',
+        stem_level:q.stem_level||q.stemLevel||'Single-step',
+        difficulty:(q.difficulty||'medium').toLowerCase(),
+        tolerance_pct:q.tolerance_pct!=null?Number(q.tolerance_pct):Number(config.tolerance||5),
+        units:q.units||null,
+        rationale:q.rationale||'',
+      }));
+      allQs=allQs.concat(arr);
+      logLine(`✓ Batch ${b+1}: ${arr.length} questions received`,'log-ok');
+    }catch(e){
+      logLine(`✗ Batch ${b+1} error: ${e.message}`,'log-err');
+      toast('Batch '+(b+1)+' failed: '+e.message,'error');
+    }
+    if(b<batches-1) await new Promise(r=>setTimeout(r,600));
+  }
+
+  state.questions=allQs;
+  saveSession();
+  setProgress(100,'Generation complete!');
+  logLine('✓ Done! '+allQs.length+' questions generated. Switching to Review tab…','log-ok');
+  toast('✅ '+allQs.length+' questions generated!','success');
+
+  renderReview();
+  $('noQMsg').style.display='none';
+  $('reviewBtnRow').style.display='flex';
+  $('btnGenerate').disabled=false;
+  setTimeout(()=>switchTab('review'),600);
+});
+
+$('btnClearForm').addEventListener('click',()=>{
+  ['courseTitle','bankName','topicFocus','extraContext','contentPaste'].forEach(id=>$(id).value='');
+  $('urlHint').style.display='none';
+  $('genStatus').classList.remove('show');
+  $('genLog').innerHTML='';
+  setProgress(0,'');
+});
+
+// Render review
+let editingIdx=-1;
+
+function renderReview(){
+  const list=$('qList');
+  list.innerHTML='';
+  if(!state.questions.length){ $('reviewStats').innerHTML=''; return; }
+  const byType=t=>state.questions.filter(q=>q.type===t).length;
+  const stats=[
+    'Total: '+state.questions.length,
+    'Numerical MC: '+byType('numerical_mc'),
+    'Symbolic: '+byType('symbolic'),
+    'Conceptual: '+byType('conceptual'),
+    'Free Response: '+byType('free_response'),
+  ].filter(s=>!s.endsWith(': 0'));
+  $('reviewStats').innerHTML=stats.map(s=>`<span class="stat-chip">${escH(s)}</span>`).join('');
+  state.questions.forEach((q,i)=>list.appendChild(buildQCard(q,i)));
+  verifiedSet={}; updateVerifyBar();
+  setTimeout(()=>{
+    if(window.renderMathInElement) renderMathInElement(list,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});
+  },150);
+}
+
+
+
+
+// ── Verification helpers ──────────────────────────────────────────
+// The worked solution pane is the primary verification tool.
+function getQuestions(){ return state.questions; }
+
+function buildConceptLink(q){
+  if(!q.stem) return '';
+  // Build a targeted search query from the stem
+  var stemClean = (q.stem||'')
+    .replace(/\$\$([^$]+)\$\$/g, function(_,m){return m;})
+    .replace(/\$([^$]+)\$/g,    function(_,m){return m;})
+    .replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1').replace(/\\[a-zA-Z]+/g,'')
+    .replace(/[^a-zA-Z0-9\s]/g,' ').replace(/\s{2,}/g,' ').trim();
+  var keywords = stemClean.split(/\s+/).filter(function(w){return w.length>3;}).slice(0,5).join(' ');
+  if(!keywords) return '';
+  var url = 'https://www.google.com/search?q='
+    + encodeURIComponent(keywords
+      + ' site:khanacademy.org OR site:hyperphysics.phy-astr.gsu.edu OR site:physicsclassroom.com');
+  return '<a class="concept-link" href="' + url + '" target="_blank" rel="noopener">'
+       + '\uD83D\uDD0D Find Teaching Resources</a>';
+}
+
+
+// ── Per-question verification state ──────────────────────────────
+var verifiedSet = {};   // qid → true
+
+function toggleVerified(idx){
+  var q = getQuestions()[idx];
+  if(!q) return;
+  var qid = q.id || ('q'+idx);
+  verifiedSet[qid] = !verifiedSet[qid];
+  var card = document.getElementById('qcard-'+idx);
+  var badge = document.getElementById('vbadge-'+idx);
+  var solBox = document.getElementById('solbox-'+idx);
+  var solTog = document.getElementById('soltog-'+idx);
+  if(verifiedSet[qid]){
+    if(card){ card.classList.add('verified'); card.classList.remove('needs-verify'); }
+    if(badge){ badge.className='verify-badge done'; badge.textContent='\u2713 Verified'; }
+  } else {
+    if(card){ card.classList.remove('verified'); card.classList.add('needs-verify'); }
+    if(badge){ badge.className='verify-badge needs'; badge.textContent='\u26A0 Needs Verification'; }
+    // Re-expand worked solution when un-verifying
+    if(solBox && !solBox.classList.contains('open')){
+      solBox.classList.add('open');
+      if(solTog){ solTog.textContent='\u25BC Hide Worked Solution'; solTog.setAttribute('aria-expanded','true'); }
+      if(window.renderMathInElement) renderMathInElement(solBox,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});
+    }
+  }
+  updateVerifyBar();
+}
+
+function updateVerifyBar(){
+  var qs = getQuestions();
+  var total = qs.length;
+  var done  = qs.filter(function(q,i){ return verifiedSet[q.id||('q'+i)]; }).length;
+  var bar   = document.getElementById('verifyBar');
+  var pill  = document.getElementById('verifyPill');
+  var msg   = document.getElementById('verifyMsg');
+  if(!bar) return;
+  if(done === total && total > 0){
+    bar.className='export-verify-bar all-verified';
+    if(pill){ pill.className='verify-count-pill full'; pill.textContent=done+'/'+total+' verified'; }
+    if(msg) msg.textContent='\u2713 All questions verified \u2014 ready to export.';
+  } else {
+    bar.className='export-verify-bar';
+    if(pill){ pill.className='verify-count-pill'; pill.textContent=done+'/'+total+' verified'; }
+    if(msg) msg.textContent='Please verify each question\'s calculation before exporting.';
+  }
+}
+
+function buildQCard(q,i){
+  const div=document.createElement('div');
+  div.className='q-card needs-verify'; div.id='qcard-'+i; div.setAttribute('role','listitem');
+  const typeLabel={'numerical_mc':'Numerical MC','symbolic':'Symbolic','conceptual':'Conceptual','free_response':'Free Response'}[q.type]||q.type;
+  const choicesHtml=(q.choices||[]).map(c=>{
+    const ok=c.letter===q.correct;
+    const dErr=(q.distractor_logic||{})[c.letter];
+    return `<li class="choice-item ${ok?'correct':''}">
+      <span class="choice-letter">${escH(c.letter)}</span>
+      <div><div>${escH(c.text)}</div>${!ok&&dErr?`<div class="choice-error">⚠ ${escH(dErr)}</div>`:''}</div>
+    </li>`;
+  }).join('');
+  const toleranceRow=(q.type==='numerical_mc')
+    ?`<div class="tolerance-row"><span>Tolerance:</span><input type="number" value="${q.tolerance_pct||5}" min="0.1" max="50" step="0.5" aria-label="Tolerance" onchange="state.questions[${i}].tolerance_pct=parseFloat(this.value);saveSession();" style="width:75px;"><span>%</span>${q.units?`<span style="color:var(--gray-mid);font-family:var(--font-mono);font-size:.78rem;">Units: ${escH(q.units)}</span>`:''}</div>`:'' ;
+  const conceptLink = buildConceptLink(q);
+  div.innerHTML=`
+    <div class="q-card-head" onclick="toggleCard(${i})" role="button" aria-expanded="false" aria-controls="qbody-${i}" tabindex="0">
+      <span class="q-num">#${i+1}</span>
+      <div style="flex:1;">
+        <div class="q-badges">
+          <span class="q-badge badge-type">${escH(typeLabel)}</span>
+          <span class="q-badge badge-diff">${escH(q.difficulty)}</span>
+          <span class="q-badge badge-bloom">${escH(q.bloom)}</span>
+          <span class="q-badge badge-stem">${escH(q.stem_level)}</span>
+        </div>
+        <div class="q-stem">${escH(q.stem)}</div>
+      </div>
+      <div class="q-actions" onclick="event.stopPropagation()">
+        <button class="q-act-btn" onclick="editQ(${i})" aria-label="Edit">✎</button>
+        <button class="q-act-btn del" onclick="deleteQ(${i})" aria-label="Delete">✕</button>
+      </div>
+    </div>
+    <div class="q-card-body" id="qbody-${i}">
+      <ul class="choices-list">${choicesHtml}</ul>
+      ${toleranceRow}
+      ${conceptLink}
+      <button class="solution-toggle" onclick="toggleSolution(${i})" id="soltog-${i}" aria-expanded="false">▶ Show Worked Solution</button>
+      <div class="solution-box" id="solbox-${i}">
+        <div class="sol-head">Worked Solution</div>
+        <div>${escH(q.worked_solution||'No worked solution provided.')}</div>
+      </div>
+      ${q.rationale?`<div class="rationale-box">${escH(q.rationale)}</div>`:''}
+    </div>`;
+  // Auto-expand card body for numerical_mc (needs calculation verification)
+  if(q.type==='numerical_mc'){
+    var autoBody=document.getElementById('qbody-'+i);
+    var autoHead=autoBody?autoBody.previousElementSibling:null;
+    var autoSol=document.getElementById('solbox-'+i);
+    var autoTog=document.getElementById('soltog-'+i);
+    if(autoBody){ autoBody.classList.add('open'); if(autoHead) autoHead.setAttribute('aria-expanded','true'); }
+    if(autoSol){ autoSol.classList.add('open'); }
+    if(autoTog){ autoTog.textContent='▼ Hide Worked Solution'; autoTog.setAttribute('aria-expanded','true'); }
+  }
+
+  div.querySelector('.q-card-head').addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleCard(i);}
+  });
+  return div;
+}
+
+function toggleCard(i){
+  const body=$('qbody-'+i),head=body.previousElementSibling;
+  const open=body.classList.toggle('open');
+  head.setAttribute('aria-expanded',open);
+  if(open&&window.renderMathInElement) setTimeout(()=>renderMathInElement(body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false}),50);
+}
+function toggleSolution(i){
+  const box=$('solbox-'+i),tog=$('soltog-'+i);
+  const open=box.classList.toggle('open');
+  tog.textContent=open?'▼ Hide Worked Solution':'▶ Show Worked Solution';
+  tog.setAttribute('aria-expanded',open);
+  if(open&&window.renderMathInElement) setTimeout(()=>renderMathInElement(box,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false}),50);
+}
+function deleteQ(i){
+  if(!confirm('Delete question '+(i+1)+'?')) return;
+  state.questions.splice(i,1); saveSession(); renderReview();
+  toast('Question deleted.','');
+}
+function editQ(i){
+  editingIdx=i; const q=state.questions[i];
+  $('editStem').value=q.stem||''; $('editSolution').value=q.worked_solution||'';
+  $('editCorrect').value=q.correct||'A'; $('editRationale').value=q.rationale||'';
+  $('editTolerance').value=q.tolerance_pct||5;
+  $('editModal').classList.add('open'); $('editStem').focus();
+}
+$('editSave').addEventListener('click',()=>{
+  if(editingIdx<0) return;
+  const q=state.questions[editingIdx];
+  q.stem=$('editStem').value.trim()||q.stem;
+  q.worked_solution=$('editSolution').value.trim();
+  q.correct=$('editCorrect').value.trim().toUpperCase()||q.correct;
+  q.rationale=$('editRationale').value.trim();
+  q.tolerance_pct=parseFloat($('editTolerance').value)||5;
+  saveSession(); $('editModal').classList.remove('open'); renderReview();
+  toast('Saved.','success');
+});
+$('editClose').addEventListener('click',()=>$('editModal').classList.remove('open'));
+$('editCancel').addEventListener('click',()=>$('editModal').classList.remove('open'));
+$('editModal').addEventListener('click',e=>{if(e.target===$('editModal'))$('editModal').classList.remove('open');});
+
+// ── GIFT ──────────────────────────────────────────────────────────────────
+function escGIFT(s){return String(s||'').replace(/([~=#{}:\\])/g,'\\$1');}
+function buildGIFT(questions,catName){
+  const SKIP=new Set(['free_response']);
+  const lines=['// Moodle GIFT — STEM Bank','// Generated: '+new Date().toISOString(),'','$CATEGORY: $course$/top/'+escGIFT(catName),''];
+  let exported=0,skipped=0;
+  questions.forEach((q,idx)=>{
+    if(SKIP.has(q.type)){skipped++;return;}
+    const title=escGIFT((q.stem||'Q'+(idx+1)).slice(0,80).replace(/\n/g,' ').replace(/\$[^$]+\$/g,''));
+    const stem=escGIFT(q.stem.replace(/\$[^$]+\$/g,'[formula]').replace(/\$\$[^$]+\$\$/g,'[equation]'));
+    const fb=q.rationale?'\n####'+escGIFT(q.rationale):'';
+    const meta='// Q'+(idx+1)+' | '+q.bloom+' | '+q.difficulty;
+    const ci='ABCD'.indexOf((q.correct||'A').toUpperCase().charAt(0));
+    const cl=(q.choices||[]).map((c,i2)=>'    '+(i2===ci?'=':'~%0%')+escGIFT(c.text.replace(/\$[^$]+\$/g,'').trim())).join('\n');
+    lines.push(meta); lines.push('::'+title+'::'+stem+'{\n'+cl+fb+'\n}'); lines.push(''); exported++;
+  });
+  lines.push('// Exported: '+exported+' | Skipped: '+skipped);
+  return{text:lines.join('\n'),exported,skipped};
+}
+
+// ── QTI ──────────────────────────────────────────────────────────────────
+function buildQTIXML(questions,bankName,pts){
+  const ident=bankName.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40)||'STEM_QB';
+  const items=questions.map((q,i)=>{
+    const qid='item_'+(i+1)+'_'+ident;
+    const isFR=q.type==='free_response',isNum=q.type==='numerical_mc';
+    const cqt=isNum?'calculated_question':isFR?'essay_question':'multiple_choice_question';
+    const correctLetter=(q.correct||'A').toUpperCase().charAt(0);
+    const correctIdx='ABCD'.indexOf(correctLetter);
+    let presentation,resprocessing;
+    if(isFR){
+      presentation=`<presentation><material><mattext texttype="text/html">${escX(q.stem)}</mattext></material><response_str ident="response1" rcardinality="Single"><render_fib rows="10" columns="80"/></response_str></presentation>`;
+      resprocessing=`<resprocessing><outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes><respcondition continue="Yes"><conditionvar><other/></conditionvar></respcondition></resprocessing><itemfeedback ident="fb"><flow_mat><material><mattext texttype="text/plain">Model answer: ${escX(q.worked_solution||q.correct||'')}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext></material></flow_mat></itemfeedback>`;
+    } else if(isNum){
+      const correctChoice=(q.choices||[])[correctIdx>=0?correctIdx:0];
+      const correctVal=correctChoice?correctChoice.text.replace(/[^0-9.\-+eE]/g,''):'0';
+      const tol=q.tolerance_pct||5;
+      const low=parseFloat(correctVal)*(1-tol/100),high=parseFloat(correctVal)*(1+tol/100);
+      presentation=`<presentation><material><mattext texttype="text/html">${escX(q.stem)}</mattext></material><response_str ident="response1" rcardinality="Single"><render_fib rows="1" columns="20"/></response_str></presentation>`;
+      resprocessing=`<resprocessing><outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes><respcondition continue="No"><conditionvar><vargte respident="response1">${escX(String(low))}</vargte><varlte respident="response1">${escX(String(high))}</varlte></conditionvar><setvar action="Set" varname="SCORE">${pts}</setvar><displayfeedback feedbacktype="Response" linkrefid="fb_correct"/></respcondition><respcondition continue="Yes"><conditionvar><other/></conditionvar><displayfeedback feedbacktype="Response" linkrefid="fb_incorrect"/></respcondition></resprocessing><itemfeedback ident="fb_correct"><flow_mat><material><mattext texttype="text/plain">Correct!${q.worked_solution?'\n\n'+escX(q.worked_solution):''}</mattext></material></flow_mat></itemfeedback><itemfeedback ident="fb_incorrect"><flow_mat><material><mattext texttype="text/plain">Incorrect. Correct answer: ${escX(correctVal)}${q.units?' '+escX(q.units):''}${q.worked_solution?'\n\nWorked solution:\n'+escX(q.worked_solution):''}</mattext></material></flow_mat></itemfeedback>`;
+    } else {
+      const choices=(q.choices||[]).map(c=>`          <response_label ident="${c.letter}"><material><mattext texttype="text/html">${escX(c.text)}</mattext></material></response_label>`).join('\n');
+      presentation=`<presentation><material><mattext texttype="text/html">${escX(q.stem)}</mattext></material><response_lid ident="response1" rcardinality="Single"><render_choice>\n${choices}\n        </render_choice></response_lid></presentation>`;
+      resprocessing=`<resprocessing><outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes><respcondition continue="No"><conditionvar><varequal respident="response1">${escX(correctLetter)}</varequal></conditionvar><setvar action="Set" varname="SCORE">${pts}</setvar><displayfeedback feedbacktype="Response" linkrefid="fb"/></respcondition></resprocessing><itemfeedback ident="fb"><flow_mat><material><mattext texttype="text/plain">${escX(q.rationale||'Correct!')}${q.worked_solution?'\n\nWorked solution:\n'+escX(q.worked_solution):''}</mattext></material></flow_mat></itemfeedback>`;
+    }
+    return `    <item ident="${qid}" title="${escX(q.stem.substring(0,80))}">
+      <itemmetadata><qtimetadata>
+        <qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>${cqt}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>points_possible</fieldlabel><fieldentry>${pts}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>bloom_level</fieldlabel><fieldentry>${escX(q.bloom)}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>stem_level</fieldlabel><fieldentry>${escX(q.stem_level)}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>difficulty</fieldlabel><fieldentry>${escX(q.difficulty)}</fieldentry></qtimetadatafield>
+        ${q.units?`<qtimetadatafield><fieldlabel>units</fieldlabel><fieldentry>${escX(q.units)}</fieldentry></qtimetadatafield>`:''}
+      </qtimetadata></itemmetadata>
+      ${presentation}
+      ${resprocessing}
+    </item>`;
+  }).join('\n\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<questestinterop xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsglobal.org/xsd/ims_qtiasiv1p2 http://www.imsglobal.org/xsd/ims_qtiasiv1p2p1.xsd">
+  <objectbank ident="${ident}">
+    <qtimetadata><qtimetadatafield><fieldlabel>bank_title</fieldlabel><fieldentry>${escX(bankName)}</fieldentry></qtimetadatafield></qtimetadata>
+${items}
+  </objectbank>
+</questestinterop>`;
+}
+
+function buildManifest(entries){
+  const r=entries.map(e=>`    <resource identifier="res_${e.ident}" type="imsqti_xmlv1p2"><file href="${e.file}"/></resource>`).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<manifest identifier="man_${Date.now()}" xmlns="http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1">\n  <metadata><schema>IMS Content</schema><schemaversion>1.1.3</schemaversion></metadata>\n  <organizations/>\n  <resources>\n${r}\n  </resources>\n</manifest>`;
+}
+
+async function makeZip(banks,pts){
+  const zip=new JSZip(),entries=[];
+  for(const b of banks){
+    const ident=b.name.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
+    const fname=ident+'.xml';
+    zip.file(fname,buildQTIXML(b.questions,b.name,pts));
+    entries.push({ident,file:fname});
+  }
+  zip.file('imsmanifest.xml',buildManifest(entries));
+  return zip.generateAsync({type:'blob'});
+}
+
+function buildCSV(questions){
+  const hdr='ID,Type,Subject,Difficulty,Bloom,STEM Level,Stem,Correct,Units,Tolerance%,Rationale\n';
+  return hdr+questions.map(q=>[q.id,q.type,q.subject||'',q.difficulty,q.bloom,q.stem_level,'"'+q.stem.replace(/"/g,'""').replace(/\n/g,' ')+'"',q.correct,q.units||'',q.tolerance_pct||'','"'+(q.rationale||'').replace(/"/g,'""')+'"'].join(',')).join('\n');
+}
+
+function dlBlob(blob,fname){
+  const u=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=u; a.download=fname; a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),2000);
+}
+
+// Export
+$('btnExport').addEventListener('click',async()=>{
+  if(!state.questions.length){toast('No questions to export.','error');return;}
+  const fmt=$('expFormat').value,pts=parseFloat($('ptsPerQ').value)||1;
+  const bankName=(state.config.bankName||'STEM_Bank').replace(/\s+/g,'_');
+  const msg=$('exportMsg');
+  msg.style.display='none'; $('btnExport').disabled=true; $('btnExport').textContent='Exporting…';
+  try{
+    if(fmt==='json'){
+      dlBlob(new Blob([JSON.stringify(state.questions,null,2)],{type:'application/json'}),bankName+'_STEM.json');
+      msg.style.display='block'; msg.className='status-msg ok'; msg.textContent='✓ JSON — '+state.questions.length+' questions.';
+      toast('JSON downloaded!','success');
+    } else if(fmt==='csv'){
+      dlBlob(new Blob([buildCSV(state.questions)],{type:'text/csv'}),bankName+'_STEM.csv');
+      msg.style.display='block'; msg.className='status-msg ok'; msg.textContent='✓ CSV — '+state.questions.length+' questions.';
+      toast('CSV downloaded!','success');
+    } else if(fmt==='gift'){
+      const {text,exported,skipped}=buildGIFT(state.questions,state.config.bankName||'STEM Bank');
+      dlBlob(new Blob([text],{type:'text/plain;charset=utf-8'}),bankName+'_Moodle.gift.txt');
+      msg.style.display='block'; msg.className='status-msg ok'; msg.textContent='✓ Moodle GIFT — '+exported+' questions'+(skipped?' ('+skipped+' skipped)':'')+'.';
+      toast('Moodle GIFT downloaded!','success');
+    } else if(fmt==='gift-diff'){
+      const grps={easy:[],medium:[],hard:[]};
+      state.questions.forEach(q=>(grps[q.difficulty]||grps.medium).push(q));
+      let combined='',exp=0,sk=0;
+      Object.entries(grps).filter(([,v])=>v.length).forEach(([d,v])=>{
+        const r=buildGIFT(v,(state.config.bankName||'STEM Bank')+' — '+d.charAt(0).toUpperCase()+d.slice(1));
+        combined+=r.text+'\n\n'; exp+=r.exported; sk+=r.skipped;
+      });
+      dlBlob(new Blob([combined],{type:'text/plain;charset=utf-8'}),bankName+'_by-difficulty_Moodle.gift.txt');
+      msg.style.display='block'; msg.className='status-msg ok'; msg.textContent='✓ Moodle GIFT by difficulty — '+exp+' questions.';
+      toast('Moodle GIFT downloaded!','success');
+    } else if(fmt==='qti-diff'){
+      const grps={easy:[],medium:[],hard:[]};
+      state.questions.forEach(q=>(grps[q.difficulty]||grps.medium).push(q));
+      const banks=Object.entries(grps).filter(([,v])=>v.length).map(([d,v])=>({name:(state.config.bankName||'STEM Bank')+' — '+d.charAt(0).toUpperCase()+d.slice(1),questions:v}));
+      const blob=await makeZip(banks,pts);
+      dlBlob(blob,bankName+'_by-difficulty_QTI.zip');
+      msg.style.display='block'; msg.className='status-msg ok'; msg.textContent='✓ QTI by difficulty — '+state.questions.length+' questions.';
+      toast('QTI ZIP downloaded!','success');
+    } else {
+      const blob=await makeZip([{name:state.config.bankName||'STEM Bank',questions:state.questions}],pts);
+      const numCalc=state.questions.filter(q=>q.type==='numerical_mc').length;
+      dlBlob(blob,bankName+'_STEM_QTI.zip');
+      msg.style.display='block'; msg.className='status-msg ok'; msg.textContent='✓ Canvas QTI — '+state.questions.length+' questions ('+numCalc+' as calculated_question).';
+      toast('QTI ZIP downloaded!','success');
+    }
+  }catch(e){
+    msg.style.display='block'; msg.className='status-msg err'; msg.textContent='Export error: '+e.message;
+    toast('Export failed.','error');
+  }
+  $('btnExport').disabled=false; $('btnExport').textContent='⬇ Download';
+});
+
+// Snapshots
+const SNAP_KEY='stem_qti_snaps_v1';
+function loadSnaps(){try{return JSON.parse(localStorage.getItem(SNAP_KEY)||'[]');}catch(e){return[];}}
+function saveSnaps(s){try{localStorage.setItem(SNAP_KEY,JSON.stringify(s));}catch(e){}}
+function renderSnaps(){
+  const snaps=loadSnaps(),ul=$('snapList');
+  ul.innerHTML='';
+  if(!snaps.length){ul.innerHTML='<li style="color:var(--gray-mid);font-size:.82rem;padding:8px 0;">No snapshots saved.</li>';return;}
+  snaps.forEach((s,i)=>{
+    const li=document.createElement('li');
+    li.style.cssText='display:flex;align-items:center;gap:8px;background:var(--card-bg);border:1px solid var(--border);border-radius:4px;padding:8px 12px;font-size:.82rem;';
+    li.innerHTML=`<div style="flex:1;"><div style="font-weight:700;">${escH(s.name)}</div><div style="color:var(--gray-mid);font-size:.72rem;">${s.count} q · ${new Date(s.ts).toLocaleString()}</div></div><button class="btn btn-ghost" style="padding:4px 10px;font-size:.68rem;" onclick="restoreSnap(${i})">↩ Restore</button><button class="btn btn-danger" style="padding:4px 10px;font-size:.68rem;" onclick="deleteSnap(${i})">✕</button>`;
+    ul.appendChild(li);
+  });
+}
+function restoreSnap(i){
+  const snaps=loadSnaps(),s=snaps[i];
+  if(!s||!confirm('Restore "'+s.name+'"? Current questions will be replaced.')) return;
+  state.questions=s.questions; saveSession(); renderReview();
+  $('noQMsg').style.display='none'; $('reviewBtnRow').style.display='flex';
+  toast('Restored "'+s.name+'"','success');
+}
+function deleteSnap(i){
+  const snaps=loadSnaps();
+  if(!confirm('Delete snapshot "'+snaps[i]?.name+'"?')) return;
+  snaps.splice(i,1); saveSnaps(snaps); renderSnaps();
+}
+$('btnSnapSave').addEventListener('click',()=>{
+  if(!state.questions.length){toast('No questions to snapshot.','error');return;}
+  const snaps=loadSnaps();
+  if(snaps.length>=10){toast('Max 10 snapshots.','error');return;}
+  const name=$('snapName').value.trim()||'Snapshot '+new Date().toLocaleTimeString();
+  snaps.push({name,count:state.questions.length,questions:state.questions,ts:Date.now()});
+  saveSnaps(snaps); renderSnaps(); $('snapName').value='';
+  toast('Snapshot saved: '+name,'success');
+});
+renderSnaps();
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') $('editModal').classList.remove('open');
+});
+</script>
+</body>
+</html>
