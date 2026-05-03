@@ -1,0 +1,84 @@
+name: Regenerate enrollment manifest
+
+# When this Action runs:
+#   - Whenever someone pushes a commit that touches the data/ folder
+#   - Skips runs triggered by the Action's own commits (prevents loops)
+on:
+  push:
+    paths:
+      - 'data/**'
+      - 'generate_manifest.py'
+      - '.github/workflows/regenerate-manifest.yml'
+
+# Need write permission to commit the regenerated manifest back to the repo
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+
+    # Skip if the most recent commit was made by this Action — prevents
+    # the Action from triggering itself in an infinite loop
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Find data folders to regenerate
+        id: find-folders
+        run: |
+          # Find every data/<TERM>/ folder that contains .xlsx files
+          # so future semesters work automatically without changing this file
+          folders=$(find data -mindepth 1 -maxdepth 1 -type d 2>/dev/null || true)
+          if [ -z "$folders" ]; then
+            echo "No data folders found. Nothing to regenerate."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "Folders to process:"
+          echo "$folders"
+          # Save folder list for next step (newline-separated)
+          {
+            echo "folders<<EOF"
+            echo "$folders"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate manifests
+        if: steps.find-folders.outputs.found == 'true'
+        run: |
+          set -e
+          while IFS= read -r folder; do
+            [ -z "$folder" ] && continue
+            echo ""
+            echo "=== Regenerating manifest for $folder ==="
+            python3 generate_manifest.py --data-dir "$folder"
+          done <<< "${{ steps.find-folders.outputs.folders }}"
+
+      - name: Commit and push if manifest changed
+        if: steps.find-folders.outputs.found == 'true'
+        run: |
+          # Configure git as the GitHub Actions bot
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Stage any manifest changes
+          git add data/*/manifest.json 2>/dev/null || true
+
+          # Only commit if there's actually something staged
+          if git diff --cached --quiet; then
+            echo "Manifest is already up to date. Nothing to commit."
+            exit 0
+          fi
+
+          git commit -m "Auto-regenerate enrollment manifest [skip ci]"
+          git push
+          echo "Pushed updated manifest."
