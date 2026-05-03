@@ -211,6 +211,28 @@
   }
   .welcome .upload-btn:hover { opacity: 0.85; }
 
+  .loader-bar {
+    width: 240px;
+    height: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    margin: 24px auto 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .loader-fill {
+    position: absolute;
+    top: 0; left: -40%;
+    width: 40%;
+    height: 100%;
+    background: var(--rule-strong);
+    animation: loaderSlide 1.4s ease-in-out infinite;
+  }
+  @keyframes loaderSlide {
+    0% { left: -40%; }
+    100% { left: 100%; }
+  }
+
   /* Discipline picker modal */
   .modal-overlay {
     position: fixed; inset: 0;
@@ -739,9 +761,8 @@
     </div>
     <h1>The Enrollment Ledger</h1>
     <div class="controls">
-      <label class="btn primary" for="fileInput">↑ Upload Report</label>
-      <input type="file" id="fileInput" accept=".xlsx,.xls">
       <button class="btn" id="disciplineBtn" type="button" style="display:none">≡ Disciplines</button>
+      <button class="btn" id="refreshBtn" type="button" title="Reload latest data from GitHub">↻ Refresh</button>
       <button class="btn" id="themeBtn" type="button">◐ Theme</button>
       <button class="btn ghost" id="printBtn" type="button">⎙ Print</button>
     </div>
@@ -769,6 +790,18 @@
 <script>
 (function () {
   'use strict';
+
+  /* =========================================================================
+   * CONFIGURATION
+   * =========================================================================
+   * The dashboard loads enrollment reports from a GitHub-hosted data folder.
+   * To track a different semester, change DATA_PATH and update the manifest.
+   * To work locally with files instead, leave as-is and serve the directory
+   * with a static server (python3 -m http.server, etc.) — fetch() respects
+   * relative paths.
+   */
+  const DATA_PATH = 'data/26FA/';
+  const MANIFEST_FILE = 'manifest.json';
 
   /* =========================================================================
    * STATE & STORAGE
@@ -801,6 +834,12 @@
     sortKey: 'Section',
     sortDir: 1,
     showBenchmarks: true,
+
+    // Loading state for GitHub-hosted data
+    loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
+    loadError: null,
+    loadedAt: null,         // when manifest was fetched
+    manifestUpdatedAt: null,// "updated" field from manifest if present
   };
 
   /* =========================================================================
@@ -869,21 +908,14 @@
       const p = localStorage.getItem(STORAGE.PRESETS);
       if (p) state.presets = JSON.parse(p);
 
-      const s = localStorage.getItem(STORAGE.SNAPSHOTS);
-      if (s) state.snapshots = JSON.parse(s);
+      // Snapshots now come from GitHub via loadFromManifest(); we do not
+      // restore them from localStorage anymore.
 
       const ii = localStorage.getItem(STORAGE.INSTITUTE_INDEX);
       if (ii) state.instituteIndex = JSON.parse(ii);
 
       const bm = localStorage.getItem(STORAGE.BENCHMARKS);
       if (bm !== null) state.showBenchmarks = bm === 'true';
-
-      // Set current snapshot to most recent
-      if (state.snapshots.length > 0) {
-        state.snapshots.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-        state.currentSnapshotId = state.snapshots[state.snapshots.length - 1].id;
-        recomputeAllDisciplines();
-      }
     } catch (err) {
       console.error('Storage load error:', err);
     }
@@ -893,12 +925,10 @@
     try {
       localStorage.setItem(STORAGE.DISCIPLINES, JSON.stringify([...state.selectedDisciplines]));
       localStorage.setItem(STORAGE.PRESETS, JSON.stringify(state.presets));
-      localStorage.setItem(STORAGE.SNAPSHOTS, JSON.stringify(state.snapshots));
       localStorage.setItem(STORAGE.INSTITUTE_INDEX, JSON.stringify(state.instituteIndex));
       localStorage.setItem(STORAGE.BENCHMARKS, String(state.showBenchmarks));
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
-      toast('⚠ Unable to save. Browser storage may be full. Consider exporting and clearing old snapshots.', 8000);
     }
   }
 
@@ -945,6 +975,143 @@
       }
     };
     reader.readAsArrayBuffer(file);
+  }
+
+  // Fetch manifest + all listed spreadsheets from the configured DATA_PATH.
+  // Manifest format:
+  //   {
+  //     "updated": "2026-05-03T14:00:00Z",   // optional, ISO timestamp
+  //     "term": "26FA",                       // optional, display label
+  //     "snapshots": [
+  //       { "date": "2026-04-28", "file": "26FA_Course_Enrollment_Report_042826.xlsx" },
+  //       ...
+  //     ]
+  //   }
+  async function loadFromManifest() {
+    state.loadStatus = 'loading';
+    render();
+
+    const manifestUrl = DATA_PATH + MANIFEST_FILE;
+    try {
+      // Cache-bust to ensure freshly-pushed data shows up without hard refresh
+      const manifestResp = await fetch(manifestUrl + '?t=' + Date.now());
+      if (!manifestResp.ok) {
+        throw new Error(`Manifest not found (HTTP ${manifestResp.status} at ${manifestUrl})`);
+      }
+      const manifest = await manifestResp.json();
+
+      if (!manifest.snapshots || !Array.isArray(manifest.snapshots) || manifest.snapshots.length === 0) {
+        throw new Error('Manifest contains no snapshots.');
+      }
+
+      state.manifestUpdatedAt = manifest.updated || null;
+
+      // Fetch all spreadsheets in parallel
+      const fetches = manifest.snapshots.map(async entry => {
+        const fileUrl = DATA_PATH + entry.file;
+        const resp = await fetch(fileUrl);
+        if (!resp.ok) throw new Error(`Failed to fetch ${entry.file} (HTTP ${resp.status})`);
+        const buf = await resp.arrayBuffer();
+        return { entry, buf };
+      });
+
+      const results = await Promise.all(fetches);
+
+      // Reset snapshots and rebuild from manifest order
+      state.snapshots = [];
+
+      for (const { entry, buf } of results) {
+        try {
+          const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+          const sheetName = wb.SheetNames.find(n => /individual\s*sect/i.test(n)) || wb.SheetNames[0];
+          const sheet = wb.Sheets[sheetName];
+          const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+          ingestRowsSilent(rawRows, entry.file, entry.date);
+        } catch (err) {
+          console.error(`Failed to parse ${entry.file}:`, err);
+        }
+      }
+
+      if (state.snapshots.length === 0) {
+        throw new Error('No snapshots could be parsed from manifest entries.');
+      }
+
+      state.snapshots.sort((a, b) => a.date.localeCompare(b.date));
+      state.currentSnapshotId = state.snapshots[state.snapshots.length - 1].id;
+      recomputeAllDisciplines();
+
+      state.loadStatus = 'loaded';
+      state.loadError = null;
+      state.loadedAt = new Date().toISOString();
+
+      // First-time visitors: open the discipline picker since they haven't
+      // chosen yet. Returning visitors keep their saved disciplines.
+      const isFirstVisit = state.selectedDisciplines.size === 0;
+      render();
+      if (isFirstVisit) {
+        openDisciplineModal();
+      }
+    } catch (err) {
+      console.error('Failed to load enrollment data:', err);
+      state.loadStatus = 'error';
+      state.loadError = err.message || String(err);
+      render();
+    }
+  }
+
+  // Like ingestRows, but used during manifest load — does not toast or modify
+  // currentSnapshotId (the caller decides). Uses the manifest-provided date
+  // rather than re-parsing it from the filename.
+  function ingestRowsSilent(rawRows, filename, manifestDate) {
+    const fall = rawRows.filter(r => {
+      const term = String(r.Term || '').toUpperCase();
+      return r.Course && term.includes('FA');
+    }).map(r => {
+      const prefix = getCoursePrefix(r.Course);
+      return {
+        Section: r.Section,
+        Course: r.Course,
+        'Course Title': r['Course Title'],
+        Institute: String(r.Institute || '').trim(),
+        Location: String(r.Location || '').trim(),
+        Capacity: Number(r.Capacity) || 0,
+        'Enrolled Students': Number(r['Enrolled Students']) || 0,
+        'Avail Seats': Number(r['Avail Seats']) || 0,
+        'Section Fill %': Number(String(r['Section Fill %']).replace('%', '')) || 0,
+        'Wait List': Number(r['Wait List']) || 0,
+        'Course Credit': Number(r['Course Credit']) || 0,
+        'Total Student Credit Hours': Number(r['Total Student Credit Hours']) || 0,
+        'Maximum Course SCH': Number(r['Maximum Course SCH']) || 0,
+        'Section Start Time': r['Section Start Time'],
+        'Meeting Days': r['Meeting Days'],
+        Instructor: r.Instructor,
+        Term: r.Term,
+        _prefix: prefix,
+        _session: getSessionLength(r),
+      };
+    }).filter(r => r._prefix);
+
+    if (fall.length === 0) return;
+
+    fall.forEach(r => {
+      if (!r.Institute) return;
+      if (!state.instituteIndex[r.Institute]) state.instituteIndex[r.Institute] = [];
+      if (!state.instituteIndex[r.Institute].includes(r._prefix)) {
+        state.instituteIndex[r.Institute].push(r._prefix);
+      }
+    });
+    Object.keys(state.instituteIndex).forEach(k => state.instituteIndex[k].sort());
+
+    const date = manifestDate || parseDateFromFilename(filename) || new Date().toISOString().slice(0, 10);
+
+    state.snapshots.push({
+      id: uid(),
+      date,
+      label: fmtDate(date),
+      filename,
+      rows: fall,
+      uploadedAt: new Date().toISOString(),
+    });
   }
 
   function ingestRows(rawRows, filename) {
@@ -1121,9 +1288,11 @@
     updateHeader();
     const dash = el('dashboard');
 
-    if (state.snapshots.length === 0) {
+    // Loading or error → show welcome panel which handles those states
+    if (state.loadStatus === 'loading' || state.loadStatus === 'error' || state.snapshots.length === 0) {
       dash.innerHTML = renderWelcome();
       el('disciplineBtn').style.display = 'none';
+      bindBasic();
       return;
     }
 
@@ -1155,7 +1324,15 @@
 
   function updateHeader() {
     const snap = currentSnapshot();
-    el('reportDate').textContent = snap ? `Report: ${fmtDate(snap.date)}` : 'No data loaded';
+    if (state.loadStatus === 'loading') {
+      el('reportDate').textContent = 'Loading…';
+    } else if (state.loadStatus === 'error') {
+      el('reportDate').textContent = 'Load failed';
+    } else if (snap) {
+      el('reportDate').textContent = `Latest report: ${fmtDate(snap.date)}`;
+    } else {
+      el('reportDate').textContent = 'No data loaded';
+    }
 
     if (state.selectedDisciplines.size === 0) {
       el('disciplineSummary').textContent = 'No disciplines selected';
@@ -1171,7 +1348,10 @@
       : `${state.snapshots.length} snapshots`;
 
     if (snap) {
-      el('footerStamp').textContent = `Current: ${fmtDate(snap.date)} · ${snap.rows.length} total sections`;
+      const updated = state.manifestUpdatedAt
+        ? `Data updated ${fmtDate(state.manifestUpdatedAt.slice(0, 10))}`
+        : `Loaded ${state.loadedAt ? new Date(state.loadedAt).toLocaleString() : ''}`;
+      el('footerStamp').textContent = `${updated} · ${snap.rows.length} sections in latest`;
     }
   }
 
@@ -1180,23 +1360,36 @@
    * ========================================================================= */
 
   function renderWelcome() {
+    if (state.loadStatus === 'loading') {
+      return `
+        <div class="welcome">
+          <h2>Loading enrollment data…</h2>
+          <p>Fetching the latest reports from the data folder. This usually takes a couple of seconds.</p>
+          <div class="loader-bar"><div class="loader-fill"></div></div>
+        </div>
+      `;
+    }
+
+    if (state.loadStatus === 'error') {
+      return `
+        <div class="welcome">
+          <h2>Couldn't load enrollment data.</h2>
+          <p>${escapeHtml(state.loadError || 'Unknown error.')}</p>
+          <p style="font-size:12px;color:var(--ink-mute);margin-top:16px">
+            This dashboard reads from <code>${escapeHtml(DATA_PATH + MANIFEST_FILE)}</code> in the same folder as this page.
+            If you're testing locally, make sure you're serving the directory through a web server (open files via <code>file://</code> won't work — browsers block fetch from local files).
+          </p>
+          <button class="upload-btn" id="retryBtn" type="button">Retry</button>
+        </div>
+      `;
+    }
+
+    // idle, no data — shouldn't normally hit this since init triggers a load
     return `
       <div class="welcome">
-        <h2>A dashboard for the disciplines you watch.</h2>
-        <p>Upload any Brookdale "Course Enrollment Report," pick the prefixes that matter to your department, and watch the numbers move from now to first day of class.</p>
-        <div class="step">
-          <div class="num">1</div>
-          <div class="body"><strong>Upload</strong>The standard .xlsx report. Stays in your browser — nothing leaves your computer.</div>
-        </div>
-        <div class="step">
-          <div class="num">2</div>
-          <div class="body"><strong>Pick disciplines</strong>Any combination — ELEC, MATH, BIOL, whatever you teach or oversee. Save a preset for quick switching.</div>
-        </div>
-        <div class="step">
-          <div class="num">3</div>
-          <div class="body"><strong>Track over time</strong>Each new report becomes a snapshot. See velocity, trends, and which sections are filling vs. stalling.</div>
-        </div>
-        <label class="upload-btn" for="fileInput">Upload First Report</label>
+        <h2>The Enrollment Ledger</h2>
+        <p>This dashboard tracks Brookdale Fall enrollment for the disciplines you select. Data updates automatically as new reports are published.</p>
+        <button class="upload-btn" id="loadDataBtn" type="button">Load Data</button>
       </div>
     `;
   }
@@ -1214,6 +1407,10 @@
   function bindBasic() {
     const b = el('openDiscBtn');
     if (b) b.addEventListener('click', openDisciplineModal);
+    const r = el('retryBtn');
+    if (r) r.addEventListener('click', loadFromManifest);
+    const l = el('loadDataBtn');
+    if (l) l.addEventListener('click', loadFromManifest);
   }
 
   /* =========================================================================
@@ -1899,22 +2096,23 @@
           </div>
           <div class="stats">${totalSections} sections · ${totalEnr} enrolled</div>
           ${isCurrent ? '<span class="badge cur">VIEWING</span>' : `<button class="btn ghost" data-set-current="${s.id}">View</button>`}
-          <button class="btn danger" data-delete-snap="${s.id}">Delete</button>
+          <span></span>
         </div>
       `;
     }).join('');
 
+    const updatedNote = state.manifestUpdatedAt
+      ? `Data last updated ${fmtDate(state.manifestUpdatedAt.slice(0, 10))}`
+      : `Loaded ${state.loadedAt ? new Date(state.loadedAt).toLocaleString() : ''}`;
+
     return `
-      <div class="section-title">Snapshot Library <span class="meta">${state.snapshots.length} snapshots stored locally</span></div>
+      <div class="section-title">Snapshot Library <span class="meta">${state.snapshots.length} snapshots from data folder</span></div>
 
       <div style="background:var(--surface-2);border:1px solid var(--rule);padding:14px 18px;margin-bottom:18px;font-size:13px;color:var(--ink-soft)">
-        <strong style="font-family:Helvetica Neue, sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink)">Storage</strong><br>
-        Snapshots are saved in this browser's local storage. They never leave your computer. To move them to another device, export the JSON below and import it on the other side.
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" id="exportBtn" type="button">↓ Export All Snapshots</button>
-          <label class="btn" for="importInput">↑ Import Snapshots</label>
-          <input type="file" id="importInput" accept=".json">
-          <button class="btn danger" id="clearAllBtn" type="button">Clear All Snapshots</button>
+        <strong style="font-family:Helvetica Neue, sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink)">Data Source</strong><br>
+        Reports load automatically from the <code>${escapeHtml(DATA_PATH)}</code> folder. New reports appear here as they're added. ${updatedNote}.
+        <div style="margin-top:10px">
+          <button class="btn" id="refreshBtn2" type="button">↻ Refresh from source</button>
         </div>
       </div>
 
@@ -2155,7 +2353,7 @@
       });
     });
 
-    // Snapshot manager actions
+    // Snapshot manager actions (view-only since data comes from GitHub)
     document.querySelectorAll('[data-set-current]').forEach(b => {
       b.addEventListener('click', () => {
         state.currentSnapshotId = b.dataset.setCurrent;
@@ -2164,41 +2362,9 @@
         render();
       });
     });
-    document.querySelectorAll('[data-delete-snap]').forEach(b => {
-      b.addEventListener('click', () => {
-        const id = b.dataset.deleteSnap;
-        const snap = state.snapshots.find(s => s.id === id);
-        if (!snap) return;
-        if (!confirm(`Delete snapshot from ${fmtDate(snap.date)}? This cannot be undone.`)) return;
-        state.snapshots = state.snapshots.filter(s => s.id !== id);
-        if (state.currentSnapshotId === id) {
-          state.currentSnapshotId = state.snapshots.length > 0
-            ? state.snapshots[state.snapshots.length - 1].id
-            : null;
-        }
-        recomputeAllDisciplines();
-        saveStorage();
-        render();
-        toast('Snapshot deleted.', 2500);
-      });
-    });
 
-    const exportBtn = el('exportBtn');
-    if (exportBtn) exportBtn.addEventListener('click', exportSnapshots);
-
-    const importInput = el('importInput');
-    if (importInput) importInput.addEventListener('change', importSnapshots);
-
-    const clearAll = el('clearAllBtn');
-    if (clearAll) clearAll.addEventListener('click', () => {
-      if (!confirm('Delete ALL snapshots? This cannot be undone. Consider exporting first.')) return;
-      state.snapshots = [];
-      state.currentSnapshotId = null;
-      recomputeAllDisciplines();
-      saveStorage();
-      render();
-      toast('All snapshots cleared.', 3000);
-    });
+    const refreshBtn2 = el('refreshBtn2');
+    if (refreshBtn2) refreshBtn2.addEventListener('click', loadFromManifest);
   }
 
   /* =========================================================================
@@ -2293,11 +2459,7 @@
    * STATIC EVENT BINDING
    * ========================================================================= */
 
-  el('fileInput').addEventListener('change', (e) => {
-    const f = e.target.files[0];
-    if (f) ingestFile(f);
-    e.target.value = '';
-  });
+  el('refreshBtn').addEventListener('click', loadFromManifest);
   el('disciplineBtn').addEventListener('click', openDisciplineModal);
   el('themeBtn').addEventListener('click', () => {
     const cur = document.documentElement.getAttribute('data-theme');
@@ -2317,7 +2479,10 @@
    * ========================================================================= */
 
   loadStorage();
-  render();
+  // Snapshots now come from GitHub, not localStorage. Clear any leftovers.
+  state.snapshots = [];
+  state.currentSnapshotId = null;
+  loadFromManifest();
 })();
 </script>
 </body>
