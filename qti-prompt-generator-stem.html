@@ -2014,6 +2014,18 @@ Tip: LLMs with web access (Claude, GPT-4o, Gemini) will fetch URLs automatically
 // ── Utility ────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// Render text that may contain LaTeX ($...$ or $$...$$).
+// Escapes HTML in the plain-text segments while leaving math delimiters intact.
+// KaTeX (renderMathInElement) then processes the math after DOM insertion.
+function renderLatex(s){
+  if(!s) return '';
+  // Split on $$...$$ (display) and $...$ (inline), preserving the delimiters
+  var parts = String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g);
+  return parts.map(function(p){
+    if(p.startsWith('$$') || p.startsWith('$')) return p; // math — pass through raw
+    return p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }).join('');
+}
 function escX(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 let toastTimer;
@@ -2762,7 +2774,7 @@ function buildQCard(q,i){
     return `<li class="choice-item ${isCorrect?'correct':''}">
       <span class="choice-letter">${escH(c.letter)}</span>
       <div>
-        <div>${escH(c.text)}</div>
+        <div>${renderLatex(c.text)}</div>
         ${isCorrect?'':((q.distractor_logic||{})[c.letter]?`<div class="choice-error">⚠ ${escH((q.distractor_logic||{})[c.letter])}</div>`:'')}
       </div>
     </li>`;
@@ -2789,7 +2801,7 @@ function buildQCard(q,i){
           <span class="q-badge badge-stem">${escH(q.stem_level)}</span>
           ${q.subject?`<span class="q-badge badge-subj">${escH(SUBJECT_NAMES[q.subject]||q.subject)}</span>`:''}
         </div>
-        <div class="q-stem">${escH(q.stem)}</div>
+        <div class="q-stem">${renderLatex(q.stem)}</div>
       </div>
       <button class="verify-badge needs" id="vbadge-${i}" onclick="event.stopPropagation();toggleVerified(${i})" aria-label="Mark question ${i+1} as verified" title="Click after reviewing the worked solution">⚠ Needs Verification</button>
       <div class="q-actions" onclick="event.stopPropagation()">
@@ -2806,7 +2818,7 @@ function buildQCard(q,i){
         <div class="sol-head">Worked Solution</div>
         <div id="solcontent-${i}">${escH(q.worked_solution||'No worked solution provided.')}</div>
       </div>
-      ${q.rationale?`<div class="rationale-box">${escH(q.rationale)}</div>`:''}
+      ${q.rationale?`<div class="rationale-box">${renderLatex(q.rationale)}</div>`:''}
     </div>`;
 
   // Keyboard open card
@@ -3159,7 +3171,7 @@ function generateStudyGuide(questions, bankName, courseTitle){
   var items = questions.map(function(q,i){
     var choices = (q.choices||[]).map(function(c){
       return '<div class="choice"><span class="choice-letter">'+escH(c.letter)+'.</span>'
-           + '<span class="choice-text">'+escH(c.text)+'</span></div>';
+           + '<span class="choice-text">'+renderLatex(c.text)+'</span></div>';
     }).join('');
     var typeBadge = (q.type||'').replace(/_/g,' ');
     var isFR = q.type === 'free_response';
@@ -3168,7 +3180,7 @@ function generateStudyGuide(questions, bankName, courseTitle){
          + '<span class="q-type">'+escH(typeBadge)+'</span>'
          + (q.units ? '<span class="q-type">'+escH(q.units)+'</span>' : '')
          + '</div>'
-         + '<div class="q-stem">'+escH(q.stem)+'</div>'
+         + '<div class="q-stem">'+renderLatex(q.stem)+'</div>'
          + (isFR ? '<div class="fr-lines"><div></div><div></div><div></div></div>'
                  : '<div class="choices">'+choices+'</div>'
                    +'<div class="answer-blank">Answer: _______</div>')
@@ -3209,6 +3221,7 @@ function generateStudyGuide(questions, bankName, courseTitle){
     + '.fr-lines{margin-top:12px;display:flex;flex-direction:column;gap:14px;}\n'
     + '.fr-lines div{border-bottom:1px solid #bbb;height:20px;}\n'
     + '@media print{body{font-size:11pt;}.page{padding:20px 16px;}}\n'
+    + '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">'
     + '</style></head><body><div class="page">'
     + '<div class="cover">'
     + '<h1>'+escH(bankName)+'</h1>'
@@ -3219,6 +3232,9 @@ function generateStudyGuide(questions, bankName, courseTitle){
     + 'Circle or write your answer for each question. Answers are not included — use this to test your knowledge.</div>'
     + objSection
     + items
+    + '<scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></scr'+'ipt>'
+    + '<scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></scr'+'ipt>'
+    + '<scr'+'ipt>renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],throwOnError:false});</scr'+'ipt>'
     + '</div></body></html>';
 }
 
