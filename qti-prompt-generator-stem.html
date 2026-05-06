@@ -2382,6 +2382,9 @@ function cleanExprForMathJS(expr){
   // Degree symbol to degrees()
   s = s.replace(/(\d+\.?\d*)\s*°/g, function(_,n){ return '('+n+'*pi/180)'; });
   s = s.replace(/(\d+\.?\d*)\s*degrees?/gi, function(_,n){ return '('+n+'*pi/180)'; });
+  // Collapse comma-formatted thousands in expressions: 12,000 → 12000
+  s = s.replace(/(\d{1,3}),(\d{3})/g,'$1$2');
+  s = s.replace(/(\d{1,3}),(\d{3})/g,'$1$2');
   s = s.replace(/\s{2,}/g,' ').trim();
   return s || null;
 }
@@ -2406,7 +2409,7 @@ function getCorrectValue(q){
   var correctChoice = (q.choices||[]).find(function(c){ return c.letter===q.correct; });
   if(!correctChoice) return null;
   var t = correctChoice.text;
-  // Normalize unicode minus/en-dash to hyphen
+  // Normalize unicode minus/en-dash
   t = t.replace(/\u2212/g,'-').replace(/\u2013/g,'-');
   // Strip LaTeX delimiters preserving content
   t = t.replace(/\$\$([^$]+)\$\$/g,function(_,m){return m;});
@@ -2414,18 +2417,29 @@ function getCorrectValue(q){
   t = t.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)');
   t = t.replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1');
   t = t.replace(/\\[a-zA-Z]+/g,'');
-  // Strip variable names and subscripts (T_1, R_{eq}, v_0x, etc.)
+  // Collapse comma-formatted thousands: 12,000 → 12000
+  t = t.replace(/(\d{1,3}),(\d{3})/g,'$1$2');
+  t = t.replace(/(\d{1,3}),(\d{3})/g,'$1$2');
+  // Protect scientific notation e/E before letter strip (replace with ~)
+  t = t.replace(/(\d)([eE])([+\-]?\d)/g,function(_,a,e,b){return a+'~'+b;});
+  // Strip variable names and subscripts
   t = t.replace(/[A-Za-z]+(?:_\{?[A-Za-z0-9]*\}?)?/g,' ');
+  t = t.replace(/[\u2080-\u2089\u00b2\u00b3\u2070-\u2079]/g,'');
   t = t.replace(/[₀₁₂₃₄₅₆₇₈₉]/g,'');
-  t = t.replace(/[{}²³°]/g,'');
-  // Prefer number immediately after = sign
-  var afterEq = t.match(/=\s*(-?[\d.]+(?:[eE][+-]?\d+)?)/);
-  if(afterEq) return parseFloat(afterEq[1]);
-  // Fall back to last number in the text
-  var nums = t.match(/-?[\d.]+(?:[eE][+-]?\d+)?/g);
-  if(!nums) return null;
-  nums = nums.filter(function(n){ return n !== '.' && n !== '-'; });
-  return nums.length ? parseFloat(nums[nums.length-1]) : null;
+  t = t.replace(/[{}°]/g,'');
+  // Restore scientific notation e
+  t = t.replace(/~/g,'e');
+  // Prefer number after = sign
+  var afterEq = t.match(/=\s*(-?[\d.]+(?:[eE][+\-]?\d+)?)/);
+  if(afterEq){ try{ return parseFloat(afterEq[1]); }catch(e){} }
+  // Fall back to last parseable number
+  var nums = (t.match(/-?[\d.]+(?:[eE][+\-]?\d+)?/g)||[])
+    .filter(function(n){ return n!=='.' && n!=='-'; });
+  for(var i=nums.length-1;i>=0;i--){
+    var v=parseFloat(nums[i]);
+    if(isFinite(v)) return v;
+  }
+  return null;
 }
 
 function buildVerificationWidget(q, _qIdx){
