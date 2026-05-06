@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>STEM QTI Prompt Generator [Beta]</title>
+<title>Quantitative Question Bank Generator [Alpha]</title>
 <!-- KaTeX for LaTeX rendering -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
@@ -1169,15 +1169,38 @@ input[type=range] { accent-color: #005f80; }
 .merge-zone { border-color: #b8c8e0; background: #f8faff; }
 .snap-item { background: #f8faff; border-color: #b8c8e0; }
 
+
+/* ── Additional instruction checkboxes ──────────────────── */
+.instr-group { }
+.instr-group-label {
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gray-mid);
+  margin-bottom: 7px;
+  padding-left: 2px;
+}
+
+
+/* ── Question type preset hint ───────────────────────────── */
+#qtypeHint {
+  font-size: .76rem;
+  color: var(--gray-mid);
+  line-height: 1.5;
+  font-style: italic;
+}
+
 </style>
 </head>
 <body>
 
 <!-- ── Header ─────────────────────────────────────────────────────────── -->
 <header class="site-header" role="banner">
-  <div class="logo">STEM <span>QTI</span> Prompt Generator</div>
-  <div class="tagline">Physics · Engineering · Mathematics · Chemistry</div>
-  <span class="header-badge">No API Key Required</span><span class="beta-tag">β Beta</span>
+  <div class="logo">Quantitative <span>Question Bank</span> Generator</div>
+  <div class="tagline">STEM · Business &amp; Economics · Health Sciences · Technology</div>
+  <span class="header-badge">No API Key Required</span><span class="beta-tag">α Alpha</span>
 </header>
 
 <!-- ── Warning banner ─────────────────────────────────────────────────── -->
@@ -1219,7 +1242,7 @@ input[type=range] { accent-color: #005f80; }
       </div>
       <div class="field">
         <label class="field-label" for="subject">Subject Area</label>
-        <select id="subject">
+        <select id="subject" onchange="updateDomainCheckboxes()">
           <optgroup label="Physics">
             <option value="physics-mechanics">Physics — Mechanics (Kinematics, Newton's Laws, Energy)</option>
             <option value="physics-em">Physics — Electricity &amp; Magnetism</option>
@@ -1249,6 +1272,24 @@ input[type=range] { accent-color: #005f80; }
             <option value="chem-organic">Chemistry — Organic Chemistry</option>
             <option value="chem-pchem">Chemistry — Physical Chemistry</option>
             <option value="chem-analytical">Chemistry — Analytical Chemistry</option>
+          </optgroup>
+          <optgroup label="Business &amp; Economics">
+            <option value="biz-finance">Finance (TVM, NPV, IRR, CAPM, Bond Pricing)</option>
+            <option value="biz-accounting">Accounting (Break-even, Ratios, Depreciation)</option>
+            <option value="biz-economics">Economics (Elasticity, Equilibrium, Surplus)</option>
+            <option value="biz-stats">Business Statistics (z-scores, Confidence Intervals, Regression)</option>
+            <option value="biz-cost">Managerial / Cost Accounting (Variance Analysis, Overhead)</option>
+          </optgroup>
+          <optgroup label="Health Sciences">
+            <option value="health-nursing">Nursing — Dosage Calculations</option>
+            <option value="health-pharm">Pharmacology (Drug Concentration, Half-life)</option>
+            <option value="health-nutrition">Nutrition (Caloric Calculations, Macronutrients)</option>
+            <option value="health-allied">Allied Health (BMI, BSA, Unit Conversions)</option>
+          </optgroup>
+          <optgroup label="Technology">
+            <option value="tech-networking">Computer Networking (Subnetting, Bandwidth)</option>
+            <option value="tech-security">Cybersecurity (Key Space, Entropy Calculations)</option>
+            <option value="tech-signals">Data &amp; Signals (Sampling Rates, Bandwidth-Frequency)</option>
           </optgroup>
         </select>
       </div>
@@ -1294,12 +1335,28 @@ input[type=range] { accent-color: #005f80; }
     </div>
 
     <div style="margin-top:16px;">
-      <div class="field-label" style="margin-bottom:10px;">Question Types</div>
-      <div class="check-grid" role="group" aria-label="Question types">
-        <label class="check-item checked"><input type="checkbox" name="qtype" value="numerical_mc" checked> 🔢 Numerical MC</label>
-        <label class="check-item checked"><input type="checkbox" name="qtype" value="symbolic" checked> 🔣 Symbolic / Formula</label>
-        <label class="check-item checked"><input type="checkbox" name="qtype" value="conceptual" checked> 💡 Conceptual</label>
-        <label class="check-item"><input type="checkbox" name="qtype" value="free_response"> ✏ Free Response</label>
+      <div class="field-label" style="margin-bottom:10px;">Question Type Mix</div>
+      <div class="field">
+        <select id="qtypePreset" onchange="applyQtypePreset()" aria-label="Question type mix preset">
+          <option value="mostly-numerical">Mostly Numerical — 60% calculation, 30% conceptual, 10% symbolic</option>
+          <option value="balanced">Balanced — equal mix of numerical, conceptual, and symbolic</option>
+          <option value="conceptual-focus">Conceptual Focus — 60% conceptual, 30% numerical, 10% symbolic</option>
+          <option value="exam-prep">Exam Prep — 50% numerical, 30% symbolic, 20% conceptual</option>
+          <option value="custom">Custom — choose individual types below</option>
+        </select>
+        <span class="field-hint" id="qtypeHint" style="margin-top:6px;display:block;">
+          60% calculation-based, 30% qualitative understanding, 10% formula identification.
+          Ideal for courses focused on problem-solving skills.
+        </span>
+      </div>
+      <!-- Custom checkboxes — shown only when Custom is selected -->
+      <div id="qtypeCustom" style="display:none; margin-top:10px;">
+        <div class="check-grid" role="group" aria-label="Question types">
+          <label class="check-item checked"><input type="checkbox" name="qtype" value="numerical_mc" checked> 🔢 Numerical MC</label>
+          <label class="check-item checked"><input type="checkbox" name="qtype" value="symbolic" checked> 🔣 Symbolic / Formula</label>
+          <label class="check-item checked"><input type="checkbox" name="qtype" value="conceptual" checked> 💡 Conceptual</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="free_response"> ✏ Free Response</label>
+        </div>
       </div>
     </div>
 
@@ -1360,10 +1417,80 @@ input[type=range] { accent-color: #005f80; }
         </select>
       </div>
     </div>
-    <div class="form-grid full" style="margin-top:14px;">
-      <div class="field">
-        <label class="field-label" for="extraContext">Additional Instructions (optional)</label>
-        <textarea id="extraContext" rows="2" placeholder="e.g. Include free body diagrams in problem stems, use real-world engineering contexts, avoid calculus in solutions…"></textarea>
+    <!-- Additional Instructions: checkboxes + free text -->
+    <div class="field" style="margin-top:14px;">
+      <div class="field-label" style="margin-bottom:10px;">Additional Instructions (optional)</div>
+
+      <!-- Problem Style — always shown -->
+      <div class="instr-group" id="instrGroupStyle">
+        <div class="instr-group-label">Problem Style</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrStyle" value="Use realistic real-world scenarios in all problem stems"> Use real-world scenarios</label>
+          <label class="check-item"><input type="checkbox" name="instrStyle" value="Describe any required diagrams (free body diagrams, circuit diagrams, cash flow timelines) in text within the problem stem"> Include diagram descriptions in stems</label>
+          <label class="check-item"><input type="checkbox" name="instrStyle" value="Every problem must be self-contained: all needed values must appear in the stem; do not require students to recall constants unless specified"> Self-contained problems (all values given)</label>
+          <label class="check-item"><input type="checkbox" name="instrStyle" value="Use round numbers where possible to make hand-checking easier"> Use round numbers where possible</label>
+        </div>
+      </div>
+
+      <!-- Solution Constraints — always shown -->
+      <div class="instr-group" id="instrGroupSolution" style="margin-top:10px;">
+        <div class="instr-group-label">Solution Constraints</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Avoid calculus in all solutions; use algebra and arithmetic only"> Avoid calculus — algebra only</label>
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Show full dimensional analysis and unit tracking in every worked solution"> Show full unit analysis in solutions</label>
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Limit to single-formula problems only; do not require multi-step derivations"> Single-formula problems only</label>
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Avoid trigonometry; use only arithmetic and basic algebra"> Avoid trigonometry</label>
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Avoid logarithms and exponential functions"> Avoid logarithms and exponentials</label>
+        </div>
+      </div>
+
+      <!-- Domain-specific: STEM -->
+      <div class="instr-group domain-checks" id="instrGroupSTEM" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">STEM Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use standard gravity g = 9.81 m/s² unless otherwise specified in the problem"> Use g = 9.81 m/s²</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Neglect air resistance in all projectile and fluid problems unless explicitly stated"> Neglect air resistance</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Treat all fluids as ideal (incompressible, inviscid) unless stated otherwise"> Treat fluids as ideal</label>
+        </div>
+      </div>
+
+      <!-- Domain-specific: Business & Economics -->
+      <div class="instr-group domain-checks" id="instrGroupBiz" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">Business &amp; Economics Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use annual compounding for all time-value-of-money problems unless otherwise stated"> Annual compounding unless stated</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Assume perfect competition in all market equilibrium problems unless stated"> Assume perfect competition</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Express all dollar-denominated answers in whole dollars (round to nearest dollar)"> Express answers in whole dollars</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use realistic current market rates and values in problem stems"> Use realistic market values</label>
+        </div>
+      </div>
+
+      <!-- Domain-specific: Health Sciences -->
+      <div class="instr-group domain-checks" id="instrGroupHealth" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">Health Sciences Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use weight-based dosing (mg/kg or mcg/kg) for all dosage calculation problems"> Weight-based dosing (mg/kg)</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Round all calculated doses to the nearest practical administrable amount (nearest 0.1 mL or standard tablet)"> Round to nearest practical dose</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Include a patient safety check step in the worked solution that confirms the calculated dose is within a safe therapeutic range"> Include safety check in worked solution</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use realistic clinical scenarios with appropriate patient demographics and settings"> Use realistic clinical scenarios</label>
+        </div>
+      </div>
+
+      <!-- Domain-specific: Technology -->
+      <div class="instr-group domain-checks" id="instrGroupTech" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">Technology Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Express all network addresses and subnet masks using CIDR notation"> Use CIDR notation</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Show binary conversion steps in all networking and subnetting worked solutions"> Show binary conversion steps</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Assume IPv4 addressing for all networking problems unless IPv6 is explicitly requested"> Assume IPv4</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use realistic network topologies and industry-standard values in problem stems"> Use realistic network values</label>
+        </div>
+      </div>
+
+      <!-- Free text alongside checkboxes -->
+      <div class="field" style="margin-top:12px;">
+        <label class="field-label" for="extraContext">Additional Free-text Instructions</label>
+        <textarea id="extraContext" rows="2" placeholder="Any other instructions not covered above…"></textarea>
       </div>
     </div>
   </div>
@@ -1569,13 +1696,13 @@ Tip: LLMs with web access (Claude, GPT-4o, Gemini) will fetch URLs automatically
 <div class="tab-panel" id="tab-guide" role="tabpanel" aria-labelledby="tbtn-guide">
 <div class="main-wrap">
   <div class="panel-head">
-    <h2>LLM Guide for STEM Questions</h2>
-    <p>STEM question generation requires more careful LLM selection and verification than humanities or professional certification content. Here's what you need to know.</p>
+    <h2>LLM Guide for Quantitative Questions</h2>
+    <p>Quantitative question generation requires careful LLM selection and human verification of all calculations. Here's what you need to know.</p>
   </div>
 
   <div class="section-card">
-    <h3>⚠ The Math Accuracy Problem</h3>
-    <p style="font-size:.87rem;color:var(--gray-light);line-height:1.7;margin-bottom:12px;">All current LLMs make arithmetic and algebraic errors. The frequency varies by model and problem complexity, but no LLM can be trusted to produce 100% numerically correct STEM questions without human verification. Common failure modes:</p>
+    <h3>⚠ Calculation Accuracy Warning</h3>
+    <p style="font-size:.87rem;color:var(--gray-light);line-height:1.7;margin-bottom:12px;">All current LLMs make arithmetic and algebraic errors. No LLM can be trusted to produce 100% numerically correct quantitative questions without human verification. Common failure modes across STEM, Business, Health Sciences, and Technology:</p>
     <ul style="font-size:.84rem;color:var(--gray-light);line-height:1.9;padding-left:20px;">
       <li>Arithmetic errors in multi-step calculations (especially with fractions, exponents, trig)</li>
       <li>Inconsistent units — mixing SI and US, or dropping units mid-calculation</li>
@@ -1728,6 +1855,113 @@ function changeFontSize(dir){
 })();
 
 // ── Tab switching ──────────────────────────────────────────────────────────
+
+// ── Domain group mapping ─────────────────────────────────
+var DOMAIN_MAP = {
+  'physics-mechanics':'stem','physics-em':'stem','physics-thermo':'stem','physics-waves':'stem',
+  'eng-statics':'stem','eng-dynamics':'stem','eng-circuits':'stem','eng-thermo':'stem',
+  'eng-fluids':'stem','eng-materials':'stem',
+  'math-calc1':'stem','math-calc2':'stem','math-calc3':'stem','math-diffeq':'stem',
+  'math-linalg':'stem','math-stats':'stem','math-algebra':'stem',
+  'chem-gen1':'stem','chem-gen2':'stem','chem-organic':'stem',
+  'chem-pchem':'stem','chem-analytical':'stem',
+  'biz-finance':'biz','biz-accounting':'biz','biz-economics':'biz',
+  'biz-stats':'biz','biz-cost':'biz',
+  'health-nursing':'health','health-pharm':'health',
+  'health-nutrition':'health','health-allied':'health',
+  'tech-networking':'tech','tech-security':'tech','tech-signals':'tech',
+};
+
+var DOMAIN_PANEL = {
+  'stem':'instrGroupSTEM',
+  'biz':'instrGroupBiz',
+  'health':'instrGroupHealth',
+  'tech':'instrGroupTech',
+};
+
+function updateDomainCheckboxes(){
+  var subj = $('subject').value;
+  var domain = DOMAIN_MAP[subj] || 'stem';
+  // Hide all domain panels, show the matching one
+  Object.values(DOMAIN_PANEL).forEach(function(id){
+    var el = $(id); if(el) el.style.display = 'none';
+  });
+  var target = $(DOMAIN_PANEL[domain]);
+  if(target) target.style.display = 'block';
+  // Uncheck domain-specific boxes from other groups
+  document.querySelectorAll('.domain-checks input[type=checkbox]').forEach(function(cb){
+    var panel = cb.closest('.instr-group');
+    if(panel && panel.style.display === 'none') cb.checked = false;
+  });
+}
+
+function getInstrCheckboxText(){
+  var lines = [];
+  document.querySelectorAll('input[name=instrStyle]:checked,input[name=instrSolution]:checked,input[name=instrDomain]:checked')
+    .forEach(function(cb){ lines.push(cb.value); });
+  return lines;
+}
+
+// Run on load to show correct domain panel for default subject
+document.addEventListener('DOMContentLoaded', updateDomainCheckboxes);
+
+
+// ── Question type mix presets ────────────────────────────────
+var QTYPE_PRESETS = {
+  'mostly-numerical': {
+    types: ['numerical_mc','conceptual','symbolic'],
+    dist:  'Generate approximately 60% numerical_mc, 30% conceptual, and 10% symbolic questions.',
+    hint:  '60% calculation-based, 30% qualitative understanding, 10% formula identification. Ideal for problem-solving courses.'
+  },
+  'balanced': {
+    types: ['numerical_mc','conceptual','symbolic'],
+    dist:  'Generate an equal mix: approximately 33% numerical_mc, 33% conceptual, and 33% symbolic questions.',
+    hint:  'Equal mix of calculation, conceptual understanding, and formula identification.'
+  },
+  'conceptual-focus': {
+    types: ['conceptual','numerical_mc','symbolic'],
+    dist:  'Generate approximately 60% conceptual, 30% numerical_mc, and 10% symbolic questions.',
+    hint:  '60% qualitative understanding, 30% calculation, 10% formula identification. Ideal for survey or intro courses.'
+  },
+  'exam-prep': {
+    types: ['numerical_mc','symbolic','conceptual'],
+    dist:  'Generate approximately 50% numerical_mc, 30% symbolic, and 20% conceptual questions.',
+    hint:  '50% calculation, 30% formula/symbolic, 20% conceptual. Mirrors typical exam composition.'
+  },
+  'custom': {
+    types: null,  // read from checkboxes
+    dist:  '',
+    hint:  'Select the question types you want included below.'
+  }
+};
+
+function applyQtypePreset(){
+  var preset = $('qtypePreset').value;
+  var config = QTYPE_PRESETS[preset];
+  if(!config) return;
+  // Show/hide custom checkboxes
+  var customDiv = $('qtypeCustom');
+  if(customDiv) customDiv.style.display = (preset === 'custom') ? 'block' : 'none';
+  // Update hint text
+  var hint = $('qtypeHint');
+  if(hint) hint.textContent = config.hint;
+}
+
+function getQtypesForPrompt(){
+  var preset = $('qtypePreset') ? $('qtypePreset').value : 'mostly-numerical';
+  var config = QTYPE_PRESETS[preset] || QTYPE_PRESETS['mostly-numerical'];
+  if(preset === 'custom'){
+    return {
+      types: [...document.querySelectorAll('input[name=qtype]:checked')].map(function(c){return c.value;}),
+      dist: ''
+    };
+  }
+  return {types: config.types, dist: config.dist};
+}
+
+// Run on load
+document.addEventListener('DOMContentLoaded', applyQtypePreset);
+
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b=>{ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
@@ -1783,6 +2017,18 @@ const SUBJECT_NAMES = {
   'chem-organic':'Organic Chemistry',
   'chem-pchem':'Physical Chemistry',
   'chem-analytical':'Analytical Chemistry',
+  'biz-finance':'Finance',
+  'biz-accounting':'Accounting',
+  'biz-economics':'Economics',
+  'biz-stats':'Business Statistics',
+  'biz-cost':'Managerial / Cost Accounting',
+  'health-nursing':'Nursing — Dosage Calculations',
+  'health-pharm':'Pharmacology',
+  'health-nutrition':'Nutrition',
+  'health-allied':'Allied Health',
+  'tech-networking':'Computer Networking',
+  'tech-security':'Cybersecurity',
+  'tech-signals':'Data & Signals',
 };
 
 const DIFF_MAPS = {
@@ -1818,11 +2064,13 @@ function buildPrompt(){
   const llm          = document.querySelector('input[name=llm]:checked')?.value || 'claude';
   const llmNote      = LLM_NOTES[llm] || LLM_NOTES.other;
 
-  const qtypes = [...document.querySelectorAll('input[name=qtype]:checked')].map(c=>c.value);
+  const _qtypeData = getQtypesForPrompt();
+  const qtypes = _qtypeData.types;
+  const qtypeDist = _qtypeData.dist;
   const blooms  = [...document.querySelectorAll('input[name=bloom]:checked')].map(c=>c.value);
   const stemLvls= [...document.querySelectorAll('input[name=stemLevel]:checked')].map(c=>c.value);
 
-  if(!qtypes.length || !blooms.length || !stemLvls.length) return null;
+  if(!qtypes || !qtypes.length || !blooms.length || !stemLvls.length){ toast('Select at least one question type, Bloom\'s level, and STEM level.','error'); return null; }
 
   // Content / URL handling
   const rawContent = $('contentPaste').value.trim();
@@ -1840,9 +2088,20 @@ function buildPrompt(){
   }
 
   const topicLine = topicFocus ? 'Specific topics: '+topicFocus+'\n' : '';
-  const extraLine = extraCtx ? 'Additional instructions: '+extraCtx+'\n' : '';
+  // Gather checkbox instructions
+  const checkboxLines = getInstrCheckboxText();
+  const allInstructions = [];
+  if(checkboxLines.length) allInstructions.push(...checkboxLines);
+  if(extraCtx) allInstructions.push(extraCtx);
+  const extraLine = allInstructions.length
+    ? 'Additional instructions (follow all of these):\n' + allInstructions.map(function(l){ return '- '+l; }).join('\n') + '\n'
+    : '';
+  const _subjectVal = $('subject').value;
+  const domain = DOMAIN_MAP[_subjectVal] || 'stem';
   const notationNote = notation==='latex'
-    ? 'All mathematical expressions, equations, variables, and units MUST use LaTeX notation with $...$ for inline and $$...$$ for display equations. Every variable (e.g. $F$, $m$, $v$) must be in math mode. Never write math in plain text.'
+    ? (domain === 'stem'
+        ? 'All mathematical expressions, equations, variables, and units MUST use LaTeX notation with $...$ for inline and $$...$$ for display equations. Every variable (e.g. $F$, $m$, $v$) must be in math mode. Never write math in plain text.'
+        : 'Use LaTeX notation ($...$) for mathematical formulas and equations only. Write plain currency amounts (e.g. $1,200), percentages (e.g. 5%), and unit labels (e.g. mg/kg, mL) as plain text without LaTeX delimiters.')
     : 'Use plain text for all mathematical notation. Avoid special symbols.';
 
   const qtypeInstructions = [];
@@ -1865,7 +2124,7 @@ Difficulty distribution: ${diffMap}
 ${topicLine}${extraLine}
 NOTATION REQUIREMENT:
 ${notationNote}
-CRITICAL  --  NO VALUE DUPLICATION: Never write a numerical value twice (e.g. do NOT write "15.0 kg$15.0\ \text{kg}$" or "$m = 15.0$\ kg 15.0 kg"). Write each given value exactly once  --  either in plain text OR in LaTeX, not both. If using LaTeX notation, the value appears only inside the $...$ delimiters.
+CRITICAL  --  NO VALUE DUPLICATION: Never write a numerical value twice in ANY field (stem, worked_solution, rationale, choices, or verification_expression). Do NOT write "15.0 kg$15.0\\text{kg}$" or any pattern where a value appears in plain text AND again in LaTeX. Write each given value exactly once, inside $...$ only.
 
 NUMERICAL PRECISION:
 - All numerical answers must be computed to ${sigFigs==='any'?'an appropriate number of':sigFigs} significant figures
@@ -1900,7 +2159,8 @@ ANSWER POSITION: Randomize the correct answer across A, B, C, D. Do NOT always p
 
 ${contentSection}
 
-Respond ONLY with a valid JSON array. No preamble, no explanation, no markdown fences. The array must contain exactly ${numQ} question objects with this exact schema:
+Respond ONLY with a valid JSON array — no preamble, no explanation, no markdown fences, no text after the closing bracket.
+NO META-COMMENTARY: Every JSON field must contain only its intended content. Do NOT write corrections, notes, revision notices, or phrases like "I will replace this", "REVISED:", "Note:", or any self-referential language inside any field. If a question needs to be corrected, silently produce the correct version — never narrate the correction. No preamble, no explanation, no markdown fences. The array must contain exactly ${numQ} question objects with this exact schema:
 
 [
   {
@@ -1967,6 +2227,9 @@ $('btnDlPrompt').addEventListener('click',()=>{
 });
 $('btnClearForm').addEventListener('click',()=>{
   ['courseTitle','bankName','topicFocus','extraContext','contentPaste'].forEach(id=>$(id).value='');
+  if($('qtypePreset')){ $('qtypePreset').value='mostly-numerical'; applyQtypePreset(); }
+  document.querySelectorAll('input[name=instrStyle],input[name=instrSolution],input[name=instrDomain]')
+    .forEach(function(cb){ cb.checked=false; cb.closest('.check-item')?.classList.remove('checked'); });
   $('urlHint').style.display='none';
 });
 
@@ -2109,19 +2372,32 @@ function tryEvaluate(expr){
 }
 
 function getCorrectValue(q){
-  // Extract numeric value from the correct choice text
   var correctChoice = (q.choices||[]).find(function(c){ return c.letter===q.correct; });
   if(!correctChoice) return null;
-  var text = correctChoice.text
-    .replace(/\$\$([^$]+)\$\$/g,function(_,m){return m;})
-    .replace(/\$([^$]+)\$/g,function(_,m){return m;})
-    .replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1')
-    .replace(/\\[a-zA-Z]+/g,'');
-  var match = text.match(/([-+]?[\d.]+(?:[eE][+-]?\d+)?)/);
-  return match ? parseFloat(match[1]) : null;
+  var t = correctChoice.text;
+  // Normalize unicode minus/en-dash to hyphen
+  t = t.replace(/\u2212/g,'-').replace(/\u2013/g,'-');
+  // Strip LaTeX delimiters preserving content
+  t = t.replace(/\$\$([^$]+)\$\$/g,function(_,m){return m;});
+  t = t.replace(/\$([^$]+)\$/g,    function(_,m){return m;});
+  t = t.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)');
+  t = t.replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1');
+  t = t.replace(/\\[a-zA-Z]+/g,'');
+  // Strip variable names and subscripts (T_1, R_{eq}, v_0x, etc.)
+  t = t.replace(/[A-Za-z]+(?:_\{?[A-Za-z0-9]*\}?)?/g,' ');
+  t = t.replace(/[₀₁₂₃₄₅₆₇₈₉]/g,'');
+  t = t.replace(/[{}²³°]/g,'');
+  // Prefer number immediately after = sign
+  var afterEq = t.match(/=\s*(-?[\d.]+(?:[eE][+-]?\d+)?)/);
+  if(afterEq) return parseFloat(afterEq[1]);
+  // Fall back to last number in the text
+  var nums = t.match(/-?[\d.]+(?:[eE][+-]?\d+)?/g);
+  if(!nums) return null;
+  nums = nums.filter(function(n){ return n !== '.' && n !== '-'; });
+  return nums.length ? parseFloat(nums[nums.length-1]) : null;
 }
 
-function buildVerificationWidget(q){
+function buildVerificationWidget(q, _qIdx){
   var qtype = (q.type||'');
   // Only for numerical_mc and symbolic  --  others don't need computation check
   if(qtype !== 'numerical_mc' && qtype !== 'symbolic') return buildConceptLink(q);
@@ -2167,7 +2443,7 @@ function buildVerificationWidget(q){
                +  '<li>Check the <strong>worked solution</strong> &mdash; do the steps match the expression, and does the final value match the choice?</li>'
                +  '<li>If this is a rounding difference, <strong>widen the tolerance</strong> using the field below, then re-check.</li>'
                +  '</ol>'
-               +  '<button class="vw-edit-link" onclick="editQ('+i+');event.stopPropagation();">✎ Edit this question</button>'
+               +  '<button class="vw-edit-link" onclick="editQ('+_qIdx+');event.stopPropagation();">✎ Edit this question</button>'
                +  '</div>';
         }
       } else {
@@ -2293,7 +2569,7 @@ function buildQCard(q,i){
          ${q.units?`<span style="color:var(--gray-mid);font-family:var(--font-mono);font-size:.78rem;">Units: ${escH(q.units)}</span>`:''}
        </div>` : '';
 
-  const conceptLink = buildVerificationWidget(q);
+  const conceptLink = buildVerificationWidget(q, i);
 
   div.innerHTML = `
     <div class="q-card-head" onclick="toggleCard(${i})" role="button" aria-expanded="false" aria-controls="qbody-${i}" tabindex="0">
