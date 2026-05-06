@@ -1,0 +1,2642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Virtual Slide Rule — A Working Mannheim for Teaching</title>
+<meta name="description" content="An interactive, working virtual slide rule with full Mannheim scales, guided tutorials, practice problems, calculator comparison, and printable worksheets. Built for engineering and mathematics instruction.">
+<style>
+  /* ===========================================================
+     Design tokens — mid-century scientific instrument aesthetic
+     Ivory body, engraved black scales, amber cursor.
+     =========================================================== */
+  :root {
+    --ivory:        #f0e6d0;
+    --ivory-edge:   #e2d4b3;
+    --ivory-deep:   #d8c89e;
+    --ink:          #1a1410;
+    --ink-soft:     #3a2f24;
+    --hairline:     #c0392b;
+    --cursor-glass: rgba(255, 200, 100, 0.22);
+    --cursor-edge:  #8b6914;
+    --brass:        #b8860b;
+    --brass-light:  #d4a017;
+    --paper:        #faf6ec;
+    --paper-line:   #8a7a55;
+    --shadow:       rgba(60, 40, 20, 0.35);
+    --accent:       #5a3a1a;
+    --accent-2:     #2e5266;
+    --good:         #2d7a4f;
+    --bad:          #a83232;
+
+    --font-display: 'Baskerville', 'Libre Baskerville', 'Hoefler Text', 'Garamond', Georgia, serif;
+    --font-body:    'Iowan Old Style', 'Palatino Linotype', 'Palatino', Georgia, serif;
+    --font-mono:    'Courier Prime', 'Courier New', 'Consolas', monospace;
+    --font-label:   'Helvetica Neue', 'Helvetica', 'Arial Narrow', sans-serif;
+
+    --r-radius: 4px;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+    --space-7: 3rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ivory:        #2a2218;
+      --ivory-edge:   #1f1810;
+      --ivory-deep:   #15100a;
+      --ink:          #f0e6d0;
+      --ink-soft:     #d8c89e;
+      --hairline:     #ff6b5a;
+      --cursor-glass: rgba(255, 180, 80, 0.18);
+      --cursor-edge:  #d4a017;
+      --brass:        #d4a017;
+      --brass-light:  #f0c040;
+      --paper:        #1a1612;
+      --paper-line:   #4a3f2a;
+      --shadow:       rgba(0, 0, 0, 0.6);
+      --accent:       #d4a017;
+      --accent-2:     #7eb6d4;
+      --good:         #5fbf85;
+      --bad:          #e07070;
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse at top, var(--paper) 0%, transparent 70%),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0px,
+        transparent 27px,
+        rgba(138, 122, 85, 0.08) 28px
+      ),
+      var(--paper);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Skip link */
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 0;
+    background: var(--ink);
+    color: var(--paper);
+    padding: var(--space-2) var(--space-4);
+    z-index: 10000;
+    text-decoration: none;
+    font-family: var(--font-label);
+    font-size: 0.875rem;
+  }
+  .skip-link:focus { top: 0; }
+
+  /* Focus styles — visible, instrument-style */
+  :focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 2px;
+  }
+
+  /* ============== Header ============== */
+  header.masthead {
+    border-bottom: 3px double var(--paper-line);
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    text-align: center;
+    background: linear-gradient(180deg, transparent 0%, rgba(184, 134, 11, 0.04) 100%);
+  }
+  header.masthead .eyebrow {
+    font-family: var(--font-label);
+    font-size: 0.7rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 var(--space-2);
+  }
+  header.masthead h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    margin: 0;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+  }
+  header.masthead .subtitle {
+    font-family: var(--font-display);
+    font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+    color: var(--ink-soft);
+    margin: var(--space-2) 0 0;
+    font-style: italic;
+  }
+  header.masthead .meta-row {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-5);
+    margin-top: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    flex-wrap: wrap;
+  }
+  header.masthead .meta-row span::before {
+    content: "◆ ";
+    color: var(--brass);
+  }
+
+  /* ============== Tab navigation ============== */
+  nav.tabs {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--space-4) var(--space-4) 0;
+  }
+  .tab-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-bottom: 2px solid var(--paper-line);
+  }
+  .tab-list button {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: var(--space-3) var(--space-4);
+    min-height: 44px;
+    font-family: var(--font-label);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: -2px;
+  }
+  .tab-list button:hover {
+    color: var(--ink);
+    background: rgba(184, 134, 11, 0.08);
+  }
+  .tab-list button[aria-selected="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--brass);
+    font-weight: 700;
+  }
+
+  /* ============== Main layout ============== */
+  main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--space-5) var(--space-4) var(--space-7);
+  }
+
+  .panel {
+    display: none;
+  }
+  .panel[data-active="true"] {
+    display: block;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .panel[data-active="true"] { animation: none; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* ============== Slide Rule Container ============== */
+  .rule-stage {
+    position: relative;
+    margin: var(--space-5) auto var(--space-4);
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: var(--space-4) 0;
+  }
+
+  .rule-wrap {
+    position: relative;
+    margin: 0 auto;
+    transition: transform 0.25s ease;
+    transform-origin: center top;
+  }
+
+  .rule-wrap[data-zoom="2"]   { transform: scale(1.4); margin-top: var(--space-7); margin-bottom: var(--space-7); }
+  .rule-wrap[data-zoom="3"]   { transform: scale(1.85); margin-top: 4rem; margin-bottom: 5rem; }
+
+  .slide-rule {
+    display: block;
+    width: 1200px;
+    max-width: 100%;
+    height: auto;
+    filter: drop-shadow(0 4px 12px var(--shadow));
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+
+  /* ============== Controls under rule ============== */
+  .control-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-3) var(--space-4);
+    background: var(--ivory);
+    border: 1px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    margin: var(--space-4) auto;
+    max-width: 1100px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 2px 6px var(--shadow);
+  }
+  .control-bar > * { font-family: var(--font-label); font-size: 0.85rem; }
+  .control-bar label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--ink-soft);
+  }
+  .control-bar input[type="number"] {
+    width: 90px;
+    padding: var(--space-2);
+    border: 1px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 36px;
+  }
+  .control-bar button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--accent);
+    background: var(--ivory);
+    color: var(--accent);
+    font-family: var(--font-label);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: var(--r-radius);
+    transition: all 0.15s ease;
+  }
+  .control-bar button:hover {
+    background: var(--accent);
+    color: var(--paper);
+  }
+  .control-bar button.primary {
+    background: var(--accent);
+    color: var(--paper);
+  }
+  .control-bar button.primary:hover {
+    background: var(--ink);
+  }
+  .control-bar .divider {
+    width: 1px;
+    height: 28px;
+    background: var(--ivory-deep);
+  }
+  .zoom-buttons { display: inline-flex; gap: 2px; }
+  .zoom-buttons button {
+    border-radius: 0;
+    padding: var(--space-2) var(--space-3);
+  }
+  .zoom-buttons button:first-child { border-radius: var(--r-radius) 0 0 var(--r-radius); }
+  .zoom-buttons button:last-child { border-radius: 0 var(--r-radius) var(--r-radius) 0; }
+  .zoom-buttons button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--paper);
+  }
+
+  /* ============== Readout panel ============== */
+  .readout {
+    max-width: 1100px;
+    margin: 0 auto var(--space-5);
+    background: var(--ink);
+    color: var(--brass-light);
+    border-radius: var(--r-radius);
+    padding: var(--space-3) var(--space-4);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.6);
+  }
+  .readout-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-3);
+  }
+  .readout-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-2);
+    border-left: 2px solid var(--brass);
+  }
+  .readout-cell .label {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--brass);
+    text-transform: uppercase;
+  }
+  .readout-cell .value {
+    font-size: 1rem;
+    color: var(--brass-light);
+    font-variant-numeric: tabular-nums;
+  }
+  .readout-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 var(--space-2);
+    text-align: center;
+    border-bottom: 1px dashed var(--brass);
+    padding-bottom: var(--space-2);
+  }
+  .readout[data-hidden="true"] .readout-grid { filter: blur(8px); pointer-events: none; user-select: none; }
+  .readout[data-hidden="true"]::after {
+    content: "Readouts hidden — read the scales yourself";
+    display: block;
+    text-align: center;
+    color: var(--brass);
+    font-size: 0.8rem;
+    margin-top: -2.5rem;
+    position: relative;
+    z-index: 2;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ============== Content panels (prose) ============== */
+  .content-card {
+    background: var(--ivory);
+    border: 1px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    padding: var(--space-5);
+    margin-bottom: var(--space-5);
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .content-card h2 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.5rem;
+    margin: 0 0 var(--space-4);
+    color: var(--ink);
+    border-bottom: 1px solid var(--ivory-deep);
+    padding-bottom: var(--space-3);
+  }
+  .content-card h3 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.15rem;
+    margin: var(--space-5) 0 var(--space-3);
+    color: var(--accent);
+  }
+  .content-card p { margin: 0 0 var(--space-3); }
+  .content-card ul, .content-card ol { margin: 0 0 var(--space-3); padding-left: var(--space-5); }
+  .content-card li { margin-bottom: var(--space-2); }
+
+  /* Tutorial mode */
+  .tutorial-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+  @media (min-width: 900px) {
+    .tutorial-grid { grid-template-columns: 1fr 1fr; }
+  }
+  .tutorial-step {
+    background: var(--paper);
+    border-left: 4px solid var(--brass);
+    padding: var(--space-4);
+    border-radius: 0 var(--r-radius) var(--r-radius) 0;
+  }
+  .tutorial-step .step-num {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--brass);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .tutorial-step h4 {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    margin: var(--space-1) 0 var(--space-2);
+    color: var(--ink);
+  }
+  .tutorial-step p { margin: 0 0 var(--space-2); font-size: 0.95rem; }
+
+  .example-bank {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-3);
+    margin: var(--space-4) 0;
+  }
+  .example-bank button {
+    background: var(--paper);
+    border: 1px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    padding: var(--space-4);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    text-align: left;
+    transition: all 0.15s ease;
+    min-height: 80px;
+  }
+  .example-bank button:hover {
+    background: var(--ivory);
+    border-color: var(--brass);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--shadow);
+  }
+  .example-bank .ex-prob {
+    font-size: 1.1rem;
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .example-bank .ex-desc {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    margin-top: var(--space-1);
+  }
+
+  .narration {
+    background: var(--paper);
+    border: 1px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    padding: var(--space-4);
+    margin: var(--space-4) 0;
+    min-height: 100px;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--ink);
+    position: relative;
+  }
+  .narration::before {
+    content: "◊";
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    background: var(--paper);
+    padding: 0 8px;
+    color: var(--brass);
+    font-size: 1.2rem;
+  }
+  .narration .step-counter {
+    font-family: var(--font-label);
+    font-style: normal;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+    display: block;
+    margin-bottom: var(--space-2);
+  }
+
+  /* Practice mode */
+  .practice-card {
+    background: var(--ivory);
+    border: 2px solid var(--paper-line);
+    border-radius: var(--r-radius);
+    padding: var(--space-5);
+    text-align: center;
+    margin-bottom: var(--space-4);
+  }
+  .practice-card .problem {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 2.2rem;
+    color: var(--ink);
+    margin: var(--space-2) 0 var(--space-4);
+  }
+  .practice-card .answer-row {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .practice-card input[type="number"] {
+    width: 140px;
+    padding: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    border: 2px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    text-align: center;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 48px;
+  }
+  .practice-card input[type="number"]:focus {
+    border-color: var(--brass);
+  }
+  .practice-card .feedback {
+    margin-top: var(--space-4);
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.1rem;
+    min-height: 1.5em;
+  }
+  .practice-card .feedback.good { color: var(--good); }
+  .practice-card .feedback.bad  { color: var(--bad); }
+  .practice-stats {
+    display: flex;
+    justify-content: space-around;
+    background: var(--paper);
+    padding: var(--space-3);
+    border-radius: var(--r-radius);
+    margin-bottom: var(--space-4);
+    border: 1px solid var(--ivory-deep);
+  }
+  .practice-stats .stat {
+    text-align: center;
+  }
+  .practice-stats .stat .num {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    color: var(--ink);
+    display: block;
+  }
+  .practice-stats .stat .lbl {
+    font-family: var(--font-label);
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* Calculator vs slide rule */
+  .race-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+  @media (min-width: 800px) {
+    .race-grid { grid-template-columns: 1fr 1fr; }
+  }
+  .race-side {
+    background: var(--ivory);
+    padding: var(--space-5);
+    border-radius: var(--r-radius);
+    border: 1px solid var(--ivory-deep);
+  }
+  .race-side h3 {
+    margin-top: 0;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.3rem;
+    color: var(--accent);
+  }
+  .race-result {
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    padding: var(--space-3);
+    background: var(--paper);
+    border-radius: var(--r-radius);
+    margin: var(--space-3) 0;
+    min-height: 2.5em;
+    border: 1px solid var(--ivory-deep);
+    color: var(--ink);
+  }
+  .race-side .digits {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+  .race-side .pros, .race-side .cons {
+    font-size: 0.9rem;
+    margin-top: var(--space-3);
+  }
+  .race-side .pros::before {
+    content: "Strengths — ";
+    font-weight: 700;
+    color: var(--good);
+    font-family: var(--font-label);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.75rem;
+  }
+  .race-side .cons::before {
+    content: "Trade-offs — ";
+    font-weight: 700;
+    color: var(--bad);
+    font-family: var(--font-label);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.75rem;
+  }
+
+  /* History panel - log addition viz */
+  .log-viz {
+    background: var(--paper);
+    border: 1px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    padding: var(--space-5);
+    margin: var(--space-4) 0;
+  }
+  .log-viz svg { display: block; width: 100%; height: auto; }
+
+  .pull-quote {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.4rem;
+    line-height: 1.4;
+    color: var(--ink);
+    border-left: 3px solid var(--brass);
+    padding-left: var(--space-5);
+    margin: var(--space-5) 0;
+    color: var(--ink-soft);
+  }
+  .pull-quote cite {
+    display: block;
+    font-size: 0.85rem;
+    font-family: var(--font-label);
+    font-style: normal;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-top: var(--space-3);
+  }
+
+  /* Worksheet */
+  .worksheet-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+    align-items: end;
+  }
+  .worksheet-controls > div {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .worksheet-controls label {
+    font-family: var(--font-label);
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .worksheet-controls select, .worksheet-controls input {
+    padding: var(--space-2);
+    border: 1px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    font-family: var(--font-body);
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 40px;
+  }
+  .worksheet-controls button {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-5);
+    background: var(--accent);
+    color: var(--paper);
+    border: none;
+    border-radius: var(--r-radius);
+    font-family: var(--font-label);
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .worksheet-controls button:hover { background: var(--ink); }
+
+  .worksheet-output {
+    background: var(--paper);
+    border: 1px solid var(--ivory-deep);
+    padding: var(--space-6);
+    margin: var(--space-4) 0;
+    min-height: 200px;
+    border-radius: var(--r-radius);
+  }
+  .worksheet-output h3 {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    text-align: center;
+    margin: 0 0 var(--space-2);
+  }
+  .worksheet-output .ws-meta {
+    text-align: center;
+    font-family: var(--font-label);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: var(--space-4);
+    border-bottom: 1px solid var(--ivory-deep);
+    padding-bottom: var(--space-3);
+  }
+  .worksheet-output .ws-row-name {
+    margin-bottom: var(--space-4);
+    font-family: var(--font-body);
+  }
+  .worksheet-output ol {
+    columns: 2;
+    column-gap: var(--space-6);
+    padding-left: var(--space-5);
+  }
+  .worksheet-output ol li {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    margin-bottom: var(--space-3);
+    break-inside: avoid;
+    padding-right: var(--space-2);
+  }
+  .worksheet-output .answer-key {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px dashed var(--ivory-deep);
+  }
+  .worksheet-output .answer-key h4 {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    margin: 0 0 var(--space-3);
+  }
+
+  @media print {
+    body * { visibility: hidden; }
+    .worksheet-output, .worksheet-output * { visibility: visible; }
+    .worksheet-output {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      border: none;
+      box-shadow: none;
+    }
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: var(--space-6) var(--space-4);
+    border-top: 3px double var(--paper-line);
+    margin-top: var(--space-6);
+    font-family: var(--font-label);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    letter-spacing: 0.05em;
+  }
+  footer .ornament {
+    color: var(--brass);
+    font-size: 1.5rem;
+    margin-bottom: var(--space-2);
+  }
+
+  /* ============== Video components ============== */
+  .intro-video {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+    max-width: 1100px;
+    margin: 0 auto var(--space-5);
+    background: var(--ivory);
+    border: 1px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    padding: var(--space-4);
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  @media (min-width: 800px) {
+    .intro-video { grid-template-columns: 1.6fr 1fr; }
+  }
+  .intro-video-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--r-radius);
+    overflow: hidden;
+    background: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ivory-deep);
+  }
+  .intro-video-frame iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .intro-video-caption {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--space-2);
+  }
+  .intro-video-caption p:last-child {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.05rem;
+    color: var(--ink);
+    margin: 0;
+    line-height: 1.5;
+  }
+  .eyebrow-mini {
+    font-family: var(--font-label);
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 var(--space-2);
+  }
+  .eyebrow-mini::before {
+    content: "▸ ";
+  }
+
+  .video-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+    margin-top: var(--space-4);
+  }
+  @media (min-width: 800px) {
+    .video-grid { grid-template-columns: 1fr 1fr; }
+  }
+  .video-card {
+    background: var(--paper);
+    border: 1px solid var(--ivory-deep);
+    border-radius: var(--r-radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .video-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px var(--shadow);
+  }
+  .video-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--ink);
+  }
+  .video-frame iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .video-meta {
+    padding: var(--space-4);
+  }
+  .video-meta h3 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.2rem;
+    margin: var(--space-1) 0 0;
+    color: var(--ink);
+  }
+  .video-meta .video-runtime {
+    font-family: var(--font-label);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0;
+  }
+  .video-meta .video-host {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    margin: var(--space-1) 0 var(--space-3);
+  }
+  .video-meta p:last-child {
+    font-size: 0.95rem;
+    margin: 0;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+
+  /* Helper text under rule */
+  .interaction-hint {
+    text-align: center;
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    margin-top: var(--space-3);
+  }
+  .interaction-hint kbd {
+    font-family: var(--font-mono);
+    background: var(--ivory);
+    padding: 2px 6px;
+    border: 1px solid var(--ivory-deep);
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-style: normal;
+  }
+
+  /* Aria-live region (visually hidden) */
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0);
+    white-space: nowrap; border: 0;
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 700px) {
+    .tab-list button {
+      padding: var(--space-2) var(--space-3);
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+    }
+    .practice-card .problem { font-size: 1.6rem; }
+    .worksheet-output ol { columns: 1; }
+    .control-bar { gap: var(--space-2); padding: var(--space-2); }
+    .rule-stage { padding: var(--space-2) 0; }
+  }
+</style>
+</head>
+<body>
+
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<header class="masthead">
+  <p class="eyebrow">Engineering &amp; Technology · Brookdale Community College</p>
+  <h1>The Virtual Slide Rule</h1>
+  <p class="subtitle">A working Mannheim, drawn in light — and the mathematics that made it possible</p>
+  <div class="meta-row">
+    <span>10-inch scale length</span>
+    <span>11 scales</span>
+    <span>Drag the slide. Drag the cursor.</span>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Module sections">
+  <ul class="tab-list" role="tablist">
+    <li role="presentation"><button role="tab" aria-selected="true"  aria-controls="panel-rule"      id="tab-rule"      tabindex="0">The Rule</button></li>
+    <li role="presentation"><button role="tab" aria-selected="false" aria-controls="panel-tutorial"  id="tab-tutorial"  tabindex="-1">Tutorial</button></li>
+    <li role="presentation"><button role="tab" aria-selected="false" aria-controls="panel-practice"  id="tab-practice"  tabindex="-1">Practice</button></li>
+    <li role="presentation"><button role="tab" aria-selected="false" aria-controls="panel-vs-calc"   id="tab-vs-calc"   tabindex="-1">vs. Calculator</button></li>
+    <li role="presentation"><button role="tab" aria-selected="false" aria-controls="panel-history"   id="tab-history"   tabindex="-1">Why It Works</button></li>
+    <li role="presentation"><button role="tab" aria-selected="false" aria-controls="panel-worksheet" id="tab-worksheet" tabindex="-1">Worksheets</button></li>
+  </ul>
+</nav>
+
+<main id="main">
+
+  <!-- ============== The Rule (always visible across panels via shared component) ============== -->
+  <section id="panel-rule" class="panel" role="tabpanel" aria-labelledby="tab-rule" data-active="true">
+
+    <div class="intro-video">
+      <div class="intro-video-frame">
+        <iframe
+          src="https://www.youtube-nocookie.com/embed/TNP_unReOpw?rel=0"
+          title="Introduction to the Slide Rule — Bob the Science Guy (4 minutes)"
+          loading="lazy"
+          allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen></iframe>
+      </div>
+      <div class="intro-video-caption">
+        <p class="eyebrow-mini">Watch first · 4 minutes</p>
+        <p>A brief, plain-spoken introduction to the analog computer that designed cathedrals, the F-16, and Apollo. Then come back here and pick one up.</p>
+      </div>
+    </div>
+
+    <div class="rule-stage" id="rule-stage-main">
+      <div class="rule-wrap" id="rule-wrap" data-zoom="1">
+        <!-- SVG slide rule injected by JS -->
+        <svg class="slide-rule" id="slide-rule-svg" viewBox="0 0 1200 380" role="img" aria-label="Interactive slide rule. Drag the center slide horizontally to slide the C, B, CI, CF, S, and T scales. Drag the cursor with the red hairline horizontally to read values across all scales.">
+        </svg>
+      </div>
+    </div>
+
+    <div class="control-bar" role="toolbar" aria-label="Slide rule controls">
+      <label>Zoom
+        <span class="zoom-buttons" role="group" aria-label="Zoom level">
+          <button data-zoom="1" aria-pressed="true">1×</button>
+          <button data-zoom="2" aria-pressed="false">1.4×</button>
+          <button data-zoom="3" aria-pressed="false">1.85×</button>
+        </span>
+      </label>
+      <span class="divider" aria-hidden="true"></span>
+      <button id="btn-reset">Reset</button>
+      <button id="btn-toggle-readout">Hide Readouts</button>
+      <span class="divider" aria-hidden="true"></span>
+      <label>Set cursor at <input type="number" id="set-cursor" step="any" min="1" max="10" value="2"></label>
+      <button id="btn-set-cursor">Place</button>
+      <span class="divider" aria-hidden="true"></span>
+      <label>Set slide so C-1 lands at D- <input type="number" id="set-slide" step="any" min="1" max="10" value="2"></label>
+      <button id="btn-set-slide">Place</button>
+    </div>
+
+    <p class="interaction-hint">
+      Drag the <strong>center slide</strong> to align scales. Drag the <strong>cursor</strong> (the amber window with a red hairline) to read values. On a keyboard, click the slide or cursor and use <kbd>←</kbd> <kbd>→</kbd>; hold <kbd>Shift</kbd> for fine adjustment.
+    </p>
+
+    <div class="readout" id="readout" aria-live="polite" data-hidden="false">
+      <p class="readout-title">Hairline Readout · what the cursor crosses on each scale</p>
+      <div class="readout-grid" id="readout-grid">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <div class="content-card">
+      <h2>The Layout, At a Glance</h2>
+      <p>This is a <em>Mannheim-pattern</em> slide rule, the standard form taught from the late nineteenth century through the 1970s. Top to bottom you have:</p>
+      <ul>
+        <li><strong>K</strong> — cubes (3 cycles). Numbers compress because three logarithmic decades fit in one length.</li>
+        <li><strong>A &amp; B</strong> — squares (2 cycles each). A is on the body; B is on the slide. Use them together for square roots and squares.</li>
+        <li><strong>CI</strong> — inverted C. Reads right-to-left. Lets you turn division into multiplication.</li>
+        <li><strong>CF &amp; DF</strong> — folded at π. Useful for chained calculations involving circles and angles.</li>
+        <li><strong>C &amp; D</strong> — the workhorses. Same scale; D is on the body, C is on the slide. Multiplication and division happen here.</li>
+        <li><strong>L</strong> — the linear log scale. The mantissa of log₁₀(x). This scale is where the magic is exposed: it's the only <em>linear</em> scale on the rule.</li>
+        <li><strong>S</strong> — sines (degrees).</li>
+        <li><strong>T</strong> — tangents (degrees).</li>
+      </ul>
+      <p>The C and D scales — and only those two — share the same logarithmic spacing. Lining up <code>C-1</code> over <code>D-2</code> physically <em>adds</em> the logarithm of every number on C to log 2. That is the entire trick. Read the answer wherever the cursor lands.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>Video Resources — Going Deeper</h2>
+      <p>Two short videos from instructors who actually used these tools. Watch either or both — they reinforce different aspects of what's happening on the rule above.</p>
+
+      <div class="video-grid">
+        <article class="video-card">
+          <div class="video-frame">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/wXAxjqVbU5Y?rel=0"
+              title="How to Use the Slide Rule by Dr. Courtney Willis (9 minutes)"
+              loading="lazy"
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen></iframe>
+          </div>
+          <div class="video-meta">
+            <p class="video-runtime">9 min · Technique</p>
+            <h3>How to Use the Slide Rule</h3>
+            <p class="video-host">Dr. Courtney Willis</p>
+            <p>Step-by-step demonstration of the basic operations. A good companion to the Tutorial tab — watch this, then try the same problems on the rule yourself.</p>
+          </div>
+        </article>
+
+        <article class="video-card">
+          <div class="video-frame">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/waiprjueVpQ?rel=0"
+              title="The Slide Rule by James Grime, singingbanana (7 minutes)"
+              loading="lazy"
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen></iframe>
+          </div>
+          <div class="video-meta">
+            <p class="video-runtime">7 min · Mathematics &amp; History</p>
+            <h3>The Slide Rule</h3>
+            <p class="video-host">James Grime · singingbanana</p>
+            <p>The mathematician's take. Connects the slide rule to logarithms in a way that makes the underlying idea click. Pairs naturally with the “Why It Works” tab.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== Tutorial ============== -->
+  <section id="panel-tutorial" class="panel" role="tabpanel" aria-labelledby="tab-tutorial">
+
+    <!-- Shared rule placeholder filled by JS -->
+    <div class="rule-stage" id="rule-stage-tutorial"></div>
+
+    <div class="content-card">
+      <h2>Worked Examples — Watch the Slide Move</h2>
+      <p>Pick a problem. The slide rule above will animate to demonstrate the technique, with narration of each step.</p>
+      <div class="example-bank" id="example-bank">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="narration" id="narration" aria-live="polite">
+        <span class="step-counter">Step 0 of 0</span>
+        Choose an example above to begin a worked demonstration.
+      </div>
+
+      <div class="control-bar" style="max-width: 600px;">
+        <button id="btn-tut-prev">◀ Prev step</button>
+        <button id="btn-tut-play" class="primary">▶ Auto-play</button>
+        <button id="btn-tut-next">Next step ▶</button>
+      </div>
+
+      <h3>The Five Operations You Should Master</h3>
+      <ol>
+        <li><strong>Multiply <em>a × b</em></strong> — Place C-1 over D-<em>a</em>. Move cursor to C-<em>b</em>. Read D.</li>
+        <li><strong>Divide <em>a ÷ b</em></strong> — Place cursor on D-<em>a</em>. Move C-<em>b</em> under the hairline. Read D under C-1.</li>
+        <li><strong>Square</strong> — Set cursor on D-<em>x</em>. Read x² directly above on A.</li>
+        <li><strong>Square root</strong> — Set cursor on A-<em>x</em>. Read √x below on D. (Use left half of A for x with an odd number of digits to the left of the decimal, right half for even.)</li>
+        <li><strong>Reciprocal</strong> — Set cursor on D (or C). Read 1/x on CI directly above.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============== Practice ============== -->
+  <section id="panel-practice" class="panel" role="tabpanel" aria-labelledby="tab-practice">
+
+    <div class="rule-stage" id="rule-stage-practice"></div>
+
+    <div class="content-card">
+      <h2>Practice Problems</h2>
+      <p>Use the slide rule above to solve. Slide rule answers are typically accurate to 3 significant figures — within ±1% counts as correct.</p>
+
+      <div class="practice-stats">
+        <div class="stat"><span class="num" id="prac-attempted">0</span><span class="lbl">Attempted</span></div>
+        <div class="stat"><span class="num" id="prac-correct">0</span><span class="lbl">Correct</span></div>
+        <div class="stat"><span class="num" id="prac-streak">0</span><span class="lbl">Streak</span></div>
+      </div>
+
+      <div class="worksheet-controls">
+        <div>
+          <label for="prac-type">Problem type</label>
+          <select id="prac-type">
+            <option value="mult">Multiplication (C × D)</option>
+            <option value="div">Division (D ÷ C)</option>
+            <option value="sq">Squares (D → A)</option>
+            <option value="sqrt">Square roots (A → D)</option>
+            <option value="recip">Reciprocals (D → CI)</option>
+            <option value="cube">Cubes (D → K)</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </div>
+        <div>
+          <label for="prac-difficulty">Difficulty</label>
+          <select id="prac-difficulty">
+            <option value="easy">Easy (1 decimal)</option>
+            <option value="medium" selected>Medium (2 decimals)</option>
+            <option value="hard">Hard (3 decimals)</option>
+          </select>
+        </div>
+        <button id="btn-new-problem">New Problem</button>
+      </div>
+
+      <div class="practice-card">
+        <p class="problem" id="practice-problem">Press “New Problem” to begin.</p>
+        <div class="answer-row">
+          <input type="number" id="practice-answer" step="any" placeholder="Your answer" aria-label="Your answer">
+          <button id="btn-check" class="primary" style="min-height: 48px; padding: 0 var(--space-5); background: var(--accent); color: var(--paper); border: none; border-radius: 4px; font-family: var(--font-label); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;">Check</button>
+        </div>
+        <p class="feedback" id="practice-feedback" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== vs. Calculator ============== -->
+  <section id="panel-vs-calc" class="panel" role="tabpanel" aria-labelledby="tab-vs-calc">
+
+    <div class="rule-stage" id="rule-stage-vs"></div>
+
+    <div class="content-card">
+      <h2>Slide Rule vs. Calculator — A Side-by-Side</h2>
+      <p>Why care about a slide rule when a calculator gives you ten digits in milliseconds? Because the comparison <em>itself</em> teaches something important: precision is not the only — or even the most important — goal of computation.</p>
+
+      <div class="control-bar" style="max-width: 700px;">
+        <label>a = <input type="number" id="vs-a" step="any" value="2.34"></label>
+        <label>operation
+          <select id="vs-op" style="padding: 8px; border-radius: 4px; border: 1px solid var(--ivory-deep); background: var(--paper); color: var(--ink); min-height: 40px;">
+            <option value="*">×</option>
+            <option value="/">÷</option>
+            <option value="sq">a²</option>
+            <option value="sqrt">√a</option>
+          </select>
+        </label>
+        <label>b = <input type="number" id="vs-b" step="any" value="3.14"></label>
+        <button id="btn-vs-go" class="primary">Compare</button>
+      </div>
+
+      <div class="race-grid">
+        <div class="race-side">
+          <h3>The Slide Rule Says</h3>
+          <div class="race-result" id="vs-rule">—</div>
+          <p class="digits" id="vs-rule-digits">3 significant figures · ~0.1–1% accuracy</p>
+          <p class="pros">forces estimation, builds magnitude intuition, no batteries, you understand <em>where</em> the number comes from, fast for chained problems.</p>
+          <p class="cons">3-figure precision; you must place the decimal point yourself; trigonometry needs separate scales.</p>
+        </div>
+        <div class="race-side">
+          <h3>The Calculator Says</h3>
+          <div class="race-result" id="vs-calc">—</div>
+          <p class="digits">10+ significant figures · machine precision</p>
+          <p class="pros">very precise, decimal point automatic, handles any function, good for unfamiliar territory.</p>
+          <p class="cons">false precision (your inputs are rarely accurate to 10 digits), atrophies estimation skill, opaque — you can't see why the answer is what it is.</p>
+        </div>
+      </div>
+
+      <div class="content-card" style="margin-top: var(--space-5);">
+        <h3>The Real Lesson</h3>
+        <p>An engineer measuring a beam to ±1 mm and dividing by a load known to ±5% gets a result accurate to maybe 2 figures, no matter what the calculator displays. The slide rule's 3-figure precision is <em>honest</em> for most engineering work; the calculator's 10 digits are theatre.</p>
+        <p>The slide rule also forces you to track orders of magnitude separately. When students do this for a semester, they stop accepting calculator outputs that are obviously wrong by a factor of ten — a habit that survives long after the slide rule goes back in the drawer.</p>
+        <p class="pull-quote">
+          “The slide rule taught a generation of engineers to <em>think</em> before computing. The calculator teaches us to compute before thinking.”
+          <cite>— A common engineering-school refrain</cite>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== History / Why It Works ============== -->
+  <section id="panel-history" class="panel" role="tabpanel" aria-labelledby="tab-history">
+
+    <div class="content-card">
+      <h2>Why a Slide Rule Works</h2>
+      <p>The slide rule is the physical embodiment of a single algebraic identity:</p>
+      <p style="text-align: center; font-family: var(--font-display); font-style: italic; font-size: 1.5rem; margin: var(--space-5) 0;">
+        log(<em>a</em> × <em>b</em>) = log(<em>a</em>) + log(<em>b</em>)
+      </p>
+      <p>If you mark off a ruler so that the position of every number <em>x</em> is proportional to log(<em>x</em>) rather than to <em>x</em> itself, then sliding two such rulers against each other <strong>physically adds their logarithms</strong>. The combined position is log(a) + log(b) = log(a × b), and reading the number at that position gives you the product.</p>
+
+      <div class="log-viz">
+        <svg viewBox="0 0 800 220" aria-label="Diagram showing how aligning two logarithmic rulers adds their logarithms.">
+          <defs>
+            <pattern id="grid" width="40" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 20" fill="none" stroke="var(--ivory-deep)" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="800" height="220" fill="url(#grid)"/>
+
+          <!-- Linear ruler showing logs -->
+          <line x1="50" y1="40" x2="750" y2="40" stroke="var(--ink)" stroke-width="1.5"/>
+          <text x="50" y="32" font-family="serif" font-size="11" fill="var(--ink-soft)" text-anchor="start">linear ruler showing position = log(x)</text>
+          <!-- ticks for 1..10 -->
+          <g id="linear-ticks-host"></g>
+
+          <!-- Two log rulers stacked -->
+          <line x1="50" y1="120" x2="750" y2="120" stroke="var(--ink)" stroke-width="1.5"/>
+          <text x="50" y="112" font-family="serif" font-size="11" fill="var(--ink-soft)" text-anchor="start">D scale (fixed) — number x at position log(x)</text>
+          <g id="log-d-ticks"></g>
+
+          <!-- Slide showing C scale offset by log(2) -->
+          <line x1="260.6" y1="160" x2="960.6" y2="160" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="50" y="152" font-family="serif" font-size="11" fill="var(--accent)" text-anchor="start">C scale (slid right by log 2 ≈ 0.301) — multiplication of D × 2</text>
+          <g id="log-c-ticks"></g>
+
+          <!-- Vertical guide showing 2×3 = 6 -->
+          <line x1="260.6" y1="120" x2="260.6" y2="160" stroke="var(--hairline)" stroke-dasharray="2,2" stroke-width="0.8"/>
+          <text x="262" y="115" font-family="serif" font-size="10" fill="var(--hairline)">log 2</text>
+
+          <line x1="594.5" y1="120" x2="594.5" y2="180" stroke="var(--hairline)" stroke-width="1.2"/>
+          <text x="596" y="195" font-family="serif" font-size="11" fill="var(--hairline)">log 2 + log 3 = log 6 ✓</text>
+        </svg>
+      </div>
+
+      <h3>A Brief History</h3>
+      <p>Logarithms were invented by John Napier in 1614. Within a year, Edmund Gunter had marked them on a wooden ruler — “Gunter's line.” In 1622 William Oughtred slid two of these rulers against each other and the slide rule was born. For three and a half centuries it was the universal tool of engineers, scientists, and navigators.</p>
+      <p>The Apollo astronauts carried Pickett N600-ES slide rules to the moon. The Boeing 747 was designed with slide rules. So was the Empire State Building, the interstate highway system, and the first nuclear submarines. The handheld electronic calculator killed the slide rule industry between roughly 1972 and 1976 — perhaps the fastest extinction of any major engineering tool.</p>
+
+      <h3>What Was Lost When We Moved to Calculators</h3>
+      <ul>
+        <li><strong>Forced estimation.</strong> A slide rule reads only the mantissa. The user always tracks the order of magnitude in their head.</li>
+        <li><strong>Honest precision.</strong> Three significant figures matched what most engineering measurements actually delivered.</li>
+        <li><strong>Visible mathematics.</strong> The user could <em>see</em> log(a) + log(b) happening as they moved the slide.</li>
+        <li><strong>Mechanical intuition.</strong> The hand learned what numbers were “close” and what scales of magnitude felt like.</li>
+      </ul>
+      <p class="pull-quote">
+        “I think the calculator pretty well destroyed the kind of physical intuition for numbers that the slide rule built.”
+        <cite>— Common observation from engineers who used both</cite>
+      </p>
+
+      <h3>What Was Gained</h3>
+      <ul>
+        <li>Precision when you actually need it (rare in engineering, common in science).</li>
+        <li>Trigonometry in radians, exponentials, log base e — all directly accessible.</li>
+        <li>Speed for one-off calculations.</li>
+        <li>No skill required to use — which is also the problem.</li>
+      </ul>
+
+      <p>Teaching the slide rule today isn't nostalgia. It's a way of teaching that <em>numbers are physical objects</em> with positions, scales, and relationships — and that calculation is something you can <em>see</em>. That habit of mind, once formed, makes a better engineer regardless of what tool ends up in their hand.</p>
+    </div>
+  </section>
+
+  <!-- ============== Worksheets ============== -->
+  <section id="panel-worksheet" class="panel" role="tabpanel" aria-labelledby="tab-worksheet">
+    <div class="content-card">
+      <h2>Printable Worksheet Generator</h2>
+      <p>Generate a worksheet of slide rule problems with answer key. Print directly from the browser, or copy into Canvas.</p>
+
+      <div class="worksheet-controls">
+        <div>
+          <label for="ws-title">Title</label>
+          <input type="text" id="ws-title" value="Slide Rule Practice" style="min-width: 220px;">
+        </div>
+        <div>
+          <label for="ws-type">Problem type</label>
+          <select id="ws-type">
+            <option value="mult">Multiplication</option>
+            <option value="div">Division</option>
+            <option value="sq">Squares</option>
+            <option value="sqrt">Square roots</option>
+            <option value="cube">Cubes</option>
+            <option value="recip">Reciprocals</option>
+            <option value="mixed" selected>Mixed</option>
+          </select>
+        </div>
+        <div>
+          <label for="ws-count">How many</label>
+          <input type="number" id="ws-count" value="20" min="5" max="50" step="1">
+        </div>
+        <div>
+          <label for="ws-diff">Difficulty</label>
+          <select id="ws-diff">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <button id="btn-ws-generate">Generate</button>
+        <button id="btn-ws-print">Print</button>
+      </div>
+
+      <div class="worksheet-output" id="worksheet-output">
+        <h3>Click “Generate” to create a worksheet.</h3>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="ornament">◊ ◊ ◊</div>
+  <p>Built for <span class="program">Engineering &amp; Technology</span> · Brookdale Community College · 2026</p>
+  <p style="margin-top: var(--space-2); font-size: 0.7rem; opacity: 0.7;">A virtual Mannheim slide rule, drawn in SVG. The mathematics is the same one Oughtred used in 1622.</p>
+</footer>
+
+<div class="sr-only" id="live-status" aria-live="polite"></div>
+
+<script>
+/* ===========================================================
+ * VIRTUAL SLIDE RULE — engine
+ * Single instance, mounted into multiple stages by relocating
+ * the same SVG element when tabs change.
+ * =========================================================== */
+
+(function () {
+  'use strict';
+
+  // ---------- Geometry ----------
+  // SVG viewBox: 1200 wide x 360 tall.
+  // Active scale region: x = 100 to x = 1100 → 1000 units = "10 inches"
+  const SCALE_X0 = 100;
+  const SCALE_X1 = 1100;
+  const SCALE_LEN = SCALE_X1 - SCALE_X0; // 1000
+  const VB_W = 1200;
+  const VB_H = 380;
+
+  // Y positions of each scale (centerline)
+  const Y = {
+    K:  40,
+    A:  72,
+    B:  110,    // on slide
+    CI: 138,    // on slide
+    CF: 162,    // on slide
+    DF: 196,    // body
+    C:  228,    // on slide  (wait — see layout below)
+    D:  260,
+    L:  292,
+    S:  308,
+    T:  324
+  };
+
+  // Layout strategy: typical Mannheim grouping.
+  // Top stator (body):  K, A, DF, L (we'll put L on bottom stator instead)
+  // Slide:              B, CI, CF, C
+  // Bottom stator (body): D, L, S, T
+  //
+  // Rearranged to match traditional Pickett/K&E ordering:
+  //   Top stator:     K, A
+  //   Slide:          B, CI, CF, C
+  //   Bottom stator:  D, L, S, T
+  // (DF on top stator is uncommon; we'll put DF at top of slide just above B for variety
+  //  — actually, traditional placement is: top stator K, A, DF; slide CF, CIF, CI, C; bottom D, L; S, T on back.
+  //  For a one-sided virtual rule, simplify:
+  //   Top body:  K, A
+  //   Slide:     B, CI, CF, C    [4 scales]
+  //   Bottom body: D, L, S, T)
+
+  const TOP_BODY_Y    = { y0: 30,  y1: 95  };  // contains K, A
+  const SLIDE_Y       = { y0: 95,  y1: 235 };  // contains B, CI, CF, C
+  const BOTTOM_BODY_Y = { y0: 235, y1: 360 };  // contains DF, D, L, S, T
+
+  // Re-assign Y positions to fit
+  Y.K  =  55;
+  Y.A  =  85;
+  Y.B  = 115;
+  Y.CI = 150;
+  Y.CF = 185;
+  Y.C  = 220;
+  Y.D  = 280;   // pushed down to leave room for DF above
+  Y.L  = 308;
+  Y.S  = 332;
+  Y.T  = 354;
+
+  // ---------- Math ----------
+  // Position on a 1-decade log scale (length = SCALE_LEN, anchored at SCALE_X0).
+  // value in [1, 10] → x in [SCALE_X0, SCALE_X1]
+  function logPos(value) {
+    return SCALE_X0 + Math.log10(value) * SCALE_LEN;
+  }
+  // Inverse
+  function logVal(x) {
+    return Math.pow(10, (x - SCALE_X0) / SCALE_LEN);
+  }
+  // For 2-decade scales (A/B): value in [1,100], length = SCALE_LEN
+  function logPos2(value) {
+    return SCALE_X0 + (Math.log10(value) / 2) * SCALE_LEN;
+  }
+  function logVal2(x) {
+    return Math.pow(10, ((x - SCALE_X0) / SCALE_LEN) * 2);
+  }
+  // For 3-decade scales (K): value in [1,1000]
+  function logPos3(value) {
+    return SCALE_X0 + (Math.log10(value) / 3) * SCALE_LEN;
+  }
+  function logVal3(x) {
+    return Math.pow(10, ((x - SCALE_X0) / SCALE_LEN) * 3);
+  }
+
+  // ---------- SVG helpers ----------
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function elem(tag, attrs, parent) {
+    const e = document.createElementNS(SVG_NS, tag);
+    if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // Generate ticks for a log scale spanning [vmin, vmax] (single decade=1..10, two-decade=1..100, etc.)
+  // ticksFn: function(value) → returns x-position on scale.
+  // levelSpec: array of {step, tickHeight, label?}
+  // For 1-decade C/D/CI/CF: detailed ticks.
+  function makeDecadeTicks() {
+    // Returns an array of {value, height, label} for one decade [1, 10]
+    const ticks = [];
+    // Major integers 1..10
+    for (let v = 1; v <= 10; v++) {
+      ticks.push({ value: v, height: 12, label: (v === 10 ? '1' : String(v)), bold: true });
+    }
+    // 0.1 subdivisions between 1..2 (finest), 1..4 (medium), 1..10 (coarse)
+    // Between 1 and 2: every 0.02 (50 minor ticks)
+    for (let v = 1.1; v < 2; v += 0.1) ticks.push({ value: +v.toFixed(1), height: 8, label: String(Math.round(v*10) % 10) });
+    for (let v = 1.02; v < 2; v += 0.02) {
+      const r = Math.round(v * 100);
+      if (r % 10 !== 0) ticks.push({ value: r / 100, height: 4 });
+    }
+    // Between 2 and 4: every 0.05
+    for (let v = 2.1; v < 4; v += 0.1) ticks.push({ value: +v.toFixed(1), height: 7 });
+    for (let v = 2.05; v < 4; v += 0.1) ticks.push({ value: +v.toFixed(2), height: 4 });
+    // Between 4 and 10: every 0.1
+    for (let v = 4.1; v < 10; v += 0.1) ticks.push({ value: +v.toFixed(1), height: 6 });
+    return ticks;
+  }
+
+  function makeDoubleDecadeTicks() {
+    // Two decades 1..100 — fewer ticks per decade
+    const ticks = [];
+    for (let d = 0; d < 2; d++) {
+      const mult = Math.pow(10, d);
+      for (let v = 1; v <= 10; v++) {
+        const val = v * mult;
+        ticks.push({ value: val, height: 11, label: String(v === 10 ? 1 : v), bold: true });
+      }
+      for (let v = 1.1; v < 10; v += 0.1) {
+        const val = +(v * mult).toFixed(2);
+        const isHalf = (Math.round(v * 10) % 5 === 0);
+        ticks.push({ value: val, height: isHalf ? 7 : 4 });
+      }
+    }
+    return ticks;
+  }
+
+  function makeTripleDecadeTicks() {
+    const ticks = [];
+    for (let d = 0; d < 3; d++) {
+      const mult = Math.pow(10, d);
+      for (let v = 1; v <= 10; v++) {
+        const val = v * mult;
+        ticks.push({ value: val, height: 10, label: String(v === 10 ? 1 : v), bold: true });
+      }
+      for (let v = 1.5; v < 10; v += 1) {
+        ticks.push({ value: v * mult, height: 5 });
+      }
+    }
+    return ticks;
+  }
+
+  // ---------- Build the SVG slide rule ----------
+  const svg = document.getElementById('slide-rule-svg');
+
+  // Background / body groups
+  const defs = elem('defs', null, svg);
+
+  // Subtle ivory texture
+  const grad = elem('linearGradient', { id: 'ivoryGrad', x1: '0', y1: '0', x2: '0', y2: '1' }, defs);
+  elem('stop', { offset: '0%',   'stop-color': 'var(--ivory)' }, grad);
+  elem('stop', { offset: '50%',  'stop-color': 'var(--ivory)' }, grad);
+  elem('stop', { offset: '100%', 'stop-color': 'var(--ivory-edge)' }, grad);
+
+  const slideGrad = elem('linearGradient', { id: 'slideGrad', x1: '0', y1: '0', x2: '0', y2: '1' }, defs);
+  elem('stop', { offset: '0%',   'stop-color': 'var(--ivory-edge)' }, slideGrad);
+  elem('stop', { offset: '50%',  'stop-color': 'var(--ivory)' }, slideGrad);
+  elem('stop', { offset: '100%', 'stop-color': 'var(--ivory-edge)' }, slideGrad);
+
+  // Cursor gradient
+  const cursorGrad = elem('linearGradient', { id: 'cursorGrad', x1: '0', y1: '0', x2: '1', y2: '0' }, defs);
+  elem('stop', { offset: '0%',   'stop-color': 'rgba(255,200,100,0.05)' }, cursorGrad);
+  elem('stop', { offset: '50%',  'stop-color': 'var(--cursor-glass)' }, cursorGrad);
+  elem('stop', { offset: '100%', 'stop-color': 'rgba(255,200,100,0.05)' }, cursorGrad);
+
+  // ===== TOP BODY =====
+  const topBody = elem('g', { id: 'top-body' }, svg);
+  elem('rect', {
+    x: 5, y: TOP_BODY_Y.y0, width: VB_W - 10, height: TOP_BODY_Y.y1 - TOP_BODY_Y.y0,
+    fill: 'url(#ivoryGrad)', stroke: 'var(--ink-soft)', 'stroke-width': 1.2, rx: 2
+  }, topBody);
+
+  // ===== BOTTOM BODY =====
+  const bottomBody = elem('g', { id: 'bottom-body' }, svg);
+  elem('rect', {
+    x: 5, y: BOTTOM_BODY_Y.y0, width: VB_W - 10, height: BOTTOM_BODY_Y.y1 - BOTTOM_BODY_Y.y0,
+    fill: 'url(#ivoryGrad)', stroke: 'var(--ink-soft)', 'stroke-width': 1.2, rx: 2
+  }, bottomBody);
+
+  // ===== SLIDE =====
+  // The slide is a transformable group; we apply translateX = slideOffset
+  const slideClipBox = elem('g', { id: 'slide-clip' }, svg);
+  // Slide background rectangle (full width — extends beyond visible area when slid)
+  // We render it inside a transform group and rely on the body covering the protruding portion.
+  const slideTrans = elem('g', { id: 'slide-transform' }, slideClipBox);
+  const slideRect = elem('rect', {
+    x: -SCALE_LEN, y: SLIDE_Y.y0,    // extra width left and right
+    width: VB_W + 2 * SCALE_LEN,
+    height: SLIDE_Y.y1 - SLIDE_Y.y0,
+    fill: 'url(#slideGrad)',
+    stroke: 'var(--ink-soft)',
+    'stroke-width': 0.8,
+    'pointer-events': 'all',
+    cursor: 'grab',
+    id: 'slide-rect'
+  }, slideTrans);
+
+  // Add masking rectangles (top body and bottom body) drawn AFTER the slide so the slide is "trimmed"
+  // We'll handle by drawing top-body and bottom-body cover rectangles with no fill, stroke only? 
+  // Simpler: render order. Slide drawn before stators, then cover stators after.
+  // We'll re-append top body and bottom body AFTER the slide by appending again at end.
+
+  // ---------- Render scales ----------
+
+  // Helper to render a scale on an arbitrary parent
+  function renderScale(parent, opts) {
+    // opts: {ticks, y, name, labelLeft, labelRight, color, reversed, decades, labelOffsetY, fontSize}
+    const g = elem('g', { 'data-scale': opts.name }, parent);
+    const color = opts.color || 'var(--ink)';
+    const fontSize = opts.fontSize || 9;
+    const decades = opts.decades || 1;
+
+    opts.ticks.forEach(t => {
+      let x;
+      if (decades === 1) x = logPos(t.value);
+      else if (decades === 2) x = logPos2(t.value);
+      else if (decades === 3) x = logPos3(t.value);
+
+      if (opts.reversed) {
+        x = SCALE_X0 + SCALE_X1 - x; // mirror around center of scale
+      }
+
+      const yLine = opts.y;
+      const h = t.height || 5;
+
+      // Tick mark — extending UP from the scale line for top scales, DOWN for bottom? 
+      // Convention: ticks go from the line toward the label. We'll keep ticks above and labels above.
+      const tickY1 = yLine - h;
+      elem('line', {
+        x1: x, y1: yLine, x2: x, y2: tickY1,
+        stroke: color, 'stroke-width': t.bold ? 1.0 : 0.5
+      }, g);
+
+      if (t.label) {
+        elem('text', {
+          x: x, y: tickY1 - 2,
+          'font-family': 'var(--font-label)',
+          'font-size': fontSize,
+          'text-anchor': 'middle',
+          fill: color,
+          'font-weight': t.bold ? '700' : '400'
+        }, g).textContent = t.label;
+      }
+    });
+
+    // Scale baseline
+    elem('line', {
+      x1: SCALE_X0, y1: opts.y, x2: SCALE_X1, y2: opts.y,
+      stroke: color, 'stroke-width': 0.6
+    }, g);
+
+    // Scale name on left
+    if (opts.labelLeft) {
+      elem('text', {
+        x: 30, y: opts.y + 3,
+        'font-family': 'var(--font-display)',
+        'font-style': 'italic',
+        'font-size': 13,
+        'font-weight': 700,
+        fill: opts.nameColor || 'var(--ink)',
+        'text-anchor': 'middle'
+      }, g).textContent = opts.labelLeft;
+    }
+    if (opts.labelRight) {
+      elem('text', {
+        x: VB_W - 30, y: opts.y + 3,
+        'font-family': 'var(--font-display)',
+        'font-style': 'italic',
+        'font-size': 13,
+        'font-weight': 700,
+        fill: opts.nameColor || 'var(--ink)',
+        'text-anchor': 'middle'
+      }, g).textContent = opts.labelRight;
+    }
+
+    return g;
+  }
+
+  // K scale (cubes, 3 decades)
+  renderScale(topBody, {
+    name: 'K',
+    ticks: makeTripleDecadeTicks(),
+    y: Y.K, decades: 3,
+    labelLeft: 'K', labelRight: 'K',
+    fontSize: 8
+  });
+
+  // A scale (squares, 2 decades)
+  renderScale(topBody, {
+    name: 'A',
+    ticks: makeDoubleDecadeTicks(),
+    y: Y.A, decades: 2,
+    labelLeft: 'A', labelRight: 'A'
+  });
+
+  // ===== Slide scales =====
+  // B (squares, 2 decades) — same as A but on slide
+  renderScale(slideTrans, {
+    name: 'B',
+    ticks: makeDoubleDecadeTicks(),
+    y: Y.B, decades: 2,
+    labelLeft: 'B', labelRight: 'B'
+  });
+
+  // CI (inverted C — single decade reversed)
+  renderScale(slideTrans, {
+    name: 'CI',
+    ticks: makeDecadeTicks(),
+    y: Y.CI, decades: 1, reversed: true,
+    labelLeft: 'CI', labelRight: 'CI',
+    color: 'var(--bad)', nameColor: 'var(--bad)'
+  });
+
+  // CF (folded at π — same shape as C but offset by log(π))
+  // We draw it as a regular C scale, then translate the entire group by -log10(π)*SCALE_LEN
+  // such that the value π appears at the left end and 1 appears at log(10/π) from left.
+  // More accurately: CF[1] is at position log(π); CF[π] is at position 0 (left end).
+  // We'll create a custom tick set offset by log(π).
+  const PI_LOG = Math.log10(Math.PI);
+  function makeFoldedDecadeTicks(offsetLog) {
+    // Create ticks for a folded scale: position(v) = (log(v) - offsetLog) mod 1, mapped to scale length
+    const base = makeDecadeTicks();
+    const out = [];
+    base.forEach(t => {
+      let frac = (Math.log10(t.value) - offsetLog);
+      // wrap to [0,1)
+      while (frac < 0) frac += 1;
+      while (frac >= 1) frac -= 1;
+      const x = SCALE_X0 + frac * SCALE_LEN;
+      out.push({ ...t, _x: x });
+    });
+    return out;
+  }
+
+  // Custom render for folded scales (since standard renderScale uses logPos directly)
+  function renderFoldedScale(parent, opts) {
+    const g = elem('g', { 'data-scale': opts.name }, parent);
+    const color = opts.color || 'var(--ink)';
+    const fontSize = opts.fontSize || 9;
+
+    opts.ticks.forEach(t => {
+      const x = t._x;
+      const h = t.height || 5;
+      const yLine = opts.y;
+      const tickY1 = yLine - h;
+      elem('line', {
+        x1: x, y1: yLine, x2: x, y2: tickY1,
+        stroke: color, 'stroke-width': t.bold ? 1.0 : 0.5
+      }, g);
+      if (t.label) {
+        elem('text', {
+          x: x, y: tickY1 - 2,
+          'font-family': 'var(--font-label)',
+          'font-size': fontSize,
+          'text-anchor': 'middle',
+          fill: color,
+          'font-weight': t.bold ? '700' : '400'
+        }, g).textContent = t.label;
+      }
+    });
+
+    elem('line', {
+      x1: SCALE_X0, y1: opts.y, x2: SCALE_X1, y2: opts.y,
+      stroke: color, 'stroke-width': 0.6
+    }, g);
+
+    if (opts.labelLeft) {
+      elem('text', {
+        x: 30, y: opts.y + 3,
+        'font-family': 'var(--font-display)',
+        'font-style': 'italic',
+        'font-size': 13,
+        'font-weight': 700,
+        fill: opts.nameColor || 'var(--ink)',
+        'text-anchor': 'middle'
+      }, g).textContent = opts.labelLeft;
+    }
+    if (opts.labelRight) {
+      elem('text', {
+        x: VB_W - 30, y: opts.y + 3,
+        'font-family': 'var(--font-display)',
+        'font-style': 'italic',
+        'font-size': 13,
+        'font-weight': 700,
+        fill: opts.nameColor || 'var(--ink)',
+        'text-anchor': 'middle'
+      }, g).textContent = opts.labelRight;
+    }
+  }
+
+  renderFoldedScale(slideTrans, {
+    name: 'CF',
+    ticks: makeFoldedDecadeTicks(PI_LOG),
+    y: Y.CF,
+    labelLeft: 'CF', labelRight: 'CF'
+  });
+
+  // C (single decade)
+  renderScale(slideTrans, {
+    name: 'C',
+    ticks: makeDecadeTicks(),
+    y: Y.C, decades: 1,
+    labelLeft: 'C', labelRight: 'C'
+  });
+
+  // ===== Bottom body scales =====
+  // DF (folded D, on body) — placed in bottom body, above D
+  renderFoldedScale(bottomBody, {
+    name: 'DF',
+    ticks: makeFoldedDecadeTicks(PI_LOG),
+    y: 254,  // bottom body starts at 235; DF ticks extend up to ~243, clearing edge; ample gap to D at 280
+    labelLeft: 'DF', labelRight: 'DF'
+  });
+
+  // D (single decade, on bottom body)
+  renderScale(bottomBody, {
+    name: 'D',
+    ticks: makeDecadeTicks(),
+    y: Y.D, decades: 1,
+    labelLeft: 'D', labelRight: 'D'
+  });
+
+  // L (linear log scale — mantissa) — special: position ∝ value, label = position
+  function renderLScale(parent) {
+    const g = elem('g', { 'data-scale': 'L' }, parent);
+    const color = 'var(--accent-2)';
+    // Major every 0.1 from 0 to 1
+    for (let v = 0; v <= 1.001; v += 0.1) {
+      const vRounded = Math.round(v * 10) / 10;
+      const x = SCALE_X0 + vRounded * SCALE_LEN;
+      elem('line', { x1: x, y1: Y.L, x2: x, y2: Y.L - 8, stroke: color, 'stroke-width': 1 }, g);
+      elem('text', {
+        x: x, y: Y.L - 10,
+        'font-family': 'var(--font-label)',
+        'font-size': 8.5,
+        'text-anchor': 'middle',
+        fill: color,
+        'font-weight': '700'
+      }, g).textContent = vRounded.toFixed(1);
+    }
+    // Minor every 0.02
+    for (let v = 0.02; v < 1; v += 0.02) {
+      if (Math.round(v * 100) % 10 === 0) continue;
+      const x = SCALE_X0 + v * SCALE_LEN;
+      elem('line', { x1: x, y1: Y.L, x2: x, y2: Y.L - 4, stroke: color, 'stroke-width': 0.5 }, g);
+    }
+    elem('line', { x1: SCALE_X0, y1: Y.L, x2: SCALE_X1, y2: Y.L, stroke: color, 'stroke-width': 0.6 }, g);
+    elem('text', {
+      x: 30, y: Y.L + 3,
+      'font-family': 'var(--font-display)', 'font-style': 'italic',
+      'font-size': 13, 'font-weight': 700, fill: color, 'text-anchor': 'middle'
+    }, g).textContent = 'L';
+    elem('text', {
+      x: VB_W - 30, y: Y.L + 3,
+      'font-family': 'var(--font-display)', 'font-style': 'italic',
+      'font-size': 13, 'font-weight': 700, fill: color, 'text-anchor': 'middle'
+    }, g).textContent = 'L';
+  }
+  renderLScale(bottomBody);
+
+  // S scale (sines) — position ∝ log(sin(angle)*10), angles in degrees
+  // Range typically 5.74° to 90°. sin(5.74°) ≈ 0.1, sin(90°) = 1.
+  // We'll render so that at the cursor pointing to D-x (x in 1..10), the angle is sin⁻¹(x/10).
+  function renderSScale(parent) {
+    const g = elem('g', { 'data-scale': 'S' }, parent);
+    const color = 'var(--accent-2)';
+    const angles = [
+      6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90
+    ];
+    angles.forEach(deg => {
+      const sinV = Math.sin(deg * Math.PI / 180); // 0.1 to 1
+      const x = SCALE_X0 + Math.log10(sinV * 10) * SCALE_LEN;
+      const isMajor = deg % 5 === 0 || deg === 90;
+      elem('line', { x1: x, y1: Y.S, x2: x, y2: Y.S - (isMajor ? 8 : 5), stroke: color, 'stroke-width': isMajor ? 0.8 : 0.5 }, g);
+      if (isMajor) {
+        elem('text', {
+          x: x, y: Y.S - 10,
+          'font-family': 'var(--font-label)',
+          'font-size': 7.5,
+          'text-anchor': 'middle',
+          fill: color
+        }, g).textContent = String(deg);
+      }
+    });
+    // Minor degree marks every 1 degree from 6 to 30, every 5 from 30 to 90
+    for (let deg = 6; deg <= 30; deg++) {
+      if (angles.includes(deg)) continue;
+      const sinV = Math.sin(deg * Math.PI / 180);
+      const x = SCALE_X0 + Math.log10(sinV * 10) * SCALE_LEN;
+      elem('line', { x1: x, y1: Y.S, x2: x, y2: Y.S - 3, stroke: color, 'stroke-width': 0.4 }, g);
+    }
+    elem('line', { x1: SCALE_X0, y1: Y.S, x2: SCALE_X1, y2: Y.S, stroke: color, 'stroke-width': 0.6 }, g);
+    elem('text', {
+      x: 30, y: Y.S + 3,
+      'font-family': 'var(--font-display)', 'font-style': 'italic',
+      'font-size': 12, 'font-weight': 700, fill: color, 'text-anchor': 'middle'
+    }, g).textContent = 'S';
+    elem('text', {
+      x: VB_W - 30, y: Y.S + 3,
+      'font-family': 'var(--font-display)', 'font-style': 'italic',
+      'font-size': 12, 'font-weight': 700, fill: color, 'text-anchor': 'middle'
+    }, g).textContent = 'S';
+  }
+  renderSScale(bottomBody);
+
+  // T scale (tangents) — angles 5.71° to 45°, tan from 0.1 to 1
+  function renderTScale(parent) {
+    const g = elem('g', { 'data-scale': 'T' }, parent);
+    const color = 'var(--accent-2)';
+    const angles = [6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 35, 40, 45];
+    angles.forEach(deg => {
+      const tanV = Math.tan(deg * Math.PI / 180);
+      const x = SCALE_X0 + Math.log10(tanV * 10) * SCALE_LEN;
+      const isMajor = deg % 5 === 0 || deg === 45;
+      elem('line', { x1: x, y1: Y.T, x2: x, y2: Y.T - (isMajor ? 8 : 5), stroke: color, 'stroke-width': isMajor ? 0.8 : 0.5 }, g);
+      if (isMajor) {
+        elem('text', {
+          x: x, y: Y.T - 10,
+          'font-family': 'var(--font-label)',
+          'font-size': 7.5,
+          'text-anchor': 'middle',
+          fill: color
+        }, g).textContent = String(deg);
+      }
+    });
+    for (let deg = 6; deg <= 45; deg++) {
+      if (angles.includes(deg)) continue;
+      const tanV = Math.tan(deg * Math.PI / 180);
+      const x = SCALE_X0 + Math.log10(tanV * 10) * SCALE_LEN;
+      elem('line', { x1: x, y1: Y.T, x2: x, y2: Y.T - 3, stroke: color, 'stroke-width': 0.4 }, g);
+    }
+    elem('line', { x1: SCALE_X0, y1: Y.T, x2: SCALE_X1, y2: Y.T, stroke: color, 'stroke-width': 0.6 }, g);
+    elem('text', {
+      x: 30, y: Y.T + 3,
+      'font-family': 'var(--font-display)', 'font-style': 'italic',
+      'font-size': 12, 'font-weight': 700, fill: color, 'text-anchor': 'middle'
+    }, g).textContent = 'T';
+    elem('text', {
+      x: VB_W - 30, y: Y.T + 3,
+      'font-family': 'var(--font-display)', 'font-style': 'italic',
+      'font-size': 12, 'font-weight': 700, fill: color, 'text-anchor': 'middle'
+    }, g).textContent = 'T';
+  }
+  renderTScale(bottomBody);
+
+  // ---------- Body covers ----------
+  // The slide protrudes beyond the visible area. We need to mask it where it overlaps top and bottom bodies.
+  // Easiest approach: re-append top and bottom body groups (as cover strips) ABOVE the slide,
+  // so they obscure the slide outside SLIDE_Y region.
+  // But we want the SCALE LINES of stators visible. We need cover rectangles only on the protruding ends.
+  //
+  // Clean approach: add cover rectangles to the LEFT and RIGHT of the slide region (outside x = SCALE_X0..SCALE_X1)
+  // colored as the body background, on the SLIDE row only. This hides the protruding slide edges.
+  //
+  // We'll add two body-colored rectangles flanking the slide region at SLIDE_Y rows.
+
+  const leftCover = elem('rect', {
+    x: 0, y: SLIDE_Y.y0,
+    width: SCALE_X0 - 5,    // up to scale start (a bit before)
+    height: SLIDE_Y.y1 - SLIDE_Y.y0,
+    fill: 'url(#ivoryGrad)',
+    stroke: 'none'
+  }, svg);
+  const rightCover = elem('rect', {
+    x: SCALE_X1 + 5, y: SLIDE_Y.y0,
+    width: VB_W - SCALE_X1 - 5,
+    height: SLIDE_Y.y1 - SLIDE_Y.y0,
+    fill: 'url(#ivoryGrad)',
+    stroke: 'none'
+  }, svg);
+
+  // Edge separators — thin lines marking where slide meets stators
+  elem('line', { x1: 5, y1: SLIDE_Y.y0, x2: VB_W - 5, y2: SLIDE_Y.y0, stroke: 'var(--ink-soft)', 'stroke-width': 0.6 }, svg);
+  elem('line', { x1: 5, y1: SLIDE_Y.y1, x2: VB_W - 5, y2: SLIDE_Y.y1, stroke: 'var(--ink-soft)', 'stroke-width': 0.6 }, svg);
+
+  // ---------- Cursor ----------
+  // The cursor is a transparent vertical strip with a red hairline.
+  // It moves left-right via translateX.
+  const cursorWidth = 60;
+  const cursorGroup = elem('g', { id: 'cursor-group', cursor: 'grab' }, svg);
+  const cursorRect = elem('rect', {
+    x: -cursorWidth / 2, y: TOP_BODY_Y.y0 - 5,
+    width: cursorWidth,
+    height: BOTTOM_BODY_Y.y1 - TOP_BODY_Y.y0 + 10,
+    fill: 'url(#cursorGrad)',
+    stroke: 'var(--cursor-edge)',
+    'stroke-width': 1.2,
+    rx: 3,
+    'pointer-events': 'all',
+    id: 'cursor-rect'
+  }, cursorGroup);
+  // Hairline
+  elem('line', {
+    x1: 0, y1: TOP_BODY_Y.y0 - 5,
+    x2: 0, y2: BOTTOM_BODY_Y.y1 + 5,
+    stroke: 'var(--hairline)',
+    'stroke-width': 1.5,
+    'pointer-events': 'none'
+  }, cursorGroup);
+  // Top and bottom cursor caps
+  elem('rect', {
+    x: -cursorWidth / 2, y: TOP_BODY_Y.y0 - 8,
+    width: cursorWidth, height: 5,
+    fill: 'var(--cursor-edge)',
+    rx: 1,
+    'pointer-events': 'none'
+  }, cursorGroup);
+  elem('rect', {
+    x: -cursorWidth / 2, y: BOTTOM_BODY_Y.y1 + 3,
+    width: cursorWidth, height: 5,
+    fill: 'var(--cursor-edge)',
+    rx: 1,
+    'pointer-events': 'none'
+  }, cursorGroup);
+
+  // ---------- State ----------
+  const state = {
+    slideOffset: 0,    // pixels in viewBox units; positive = slide moved right
+    cursorX: SCALE_X0, // viewBox x position
+    readoutHidden: false
+  };
+
+  function applyTransforms() {
+    slideTrans.setAttribute('transform', `translate(${state.slideOffset}, 0)`);
+    cursorGroup.setAttribute('transform', `translate(${state.cursorX}, 0)`);
+    updateReadout();
+  }
+
+  // ---------- Pointer/drag interaction ----------
+  // We need to convert client-space pixels to SVG viewBox units.
+  function clientToSvg(clientX) {
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return clientX;
+    // Inverse: svgX = (clientX - ctm.e) / ctm.a
+    return (clientX - ctm.e) / ctm.a;
+  }
+
+  let drag = null; // { type: 'slide'|'cursor', startSvgX, startState }
+
+  function onPointerDown(e, type) {
+    e.preventDefault();
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
+    target.style.cursor = 'grabbing';
+    drag = {
+      type,
+      pointerId: e.pointerId,
+      startSvgX: clientToSvg(e.clientX),
+      startSlide: state.slideOffset,
+      startCursor: state.cursorX,
+      target
+    };
+  }
+
+  function onPointerMove(e) {
+    if (!drag) return;
+    const svgX = clientToSvg(e.clientX);
+    const dx = svgX - drag.startSvgX;
+    if (drag.type === 'slide') {
+      state.slideOffset = drag.startSlide + dx;
+      // Constrain so slide can't be moved completely off rule
+      const maxOffset = SCALE_LEN;
+      if (state.slideOffset > maxOffset) state.slideOffset = maxOffset;
+      if (state.slideOffset < -maxOffset) state.slideOffset = -maxOffset;
+    } else if (drag.type === 'cursor') {
+      state.cursorX = drag.startCursor + dx;
+      if (state.cursorX < SCALE_X0) state.cursorX = SCALE_X0;
+      if (state.cursorX > SCALE_X1) state.cursorX = SCALE_X1;
+    }
+    applyTransforms();
+  }
+
+  function onPointerUp(e) {
+    if (!drag) return;
+    try { drag.target.releasePointerCapture(drag.pointerId); } catch (_) {}
+    drag.target.style.cursor = 'grab';
+    drag = null;
+  }
+
+  slideRect.addEventListener('pointerdown', e => onPointerDown(e, 'slide'));
+  cursorRect.addEventListener('pointerdown', e => onPointerDown(e, 'cursor'));
+  document.addEventListener('pointermove', onPointerMove);
+  document.addEventListener('pointerup', onPointerUp);
+  document.addEventListener('pointercancel', onPointerUp);
+
+  // Keyboard support
+  // Make slide and cursor focusable
+  slideRect.setAttribute('tabindex', '0');
+  slideRect.setAttribute('role', 'slider');
+  slideRect.setAttribute('aria-label', 'Slide rule slide. Drag horizontally or use arrow keys to position.');
+  cursorRect.setAttribute('tabindex', '0');
+  cursorRect.setAttribute('role', 'slider');
+  cursorRect.setAttribute('aria-label', 'Slide rule cursor. Drag horizontally or use arrow keys to position.');
+
+  function handleKey(e, type) {
+    let step = e.shiftKey ? 1 : 5;  // shift = fine
+    let dx = 0;
+    if (e.key === 'ArrowLeft') dx = -step;
+    else if (e.key === 'ArrowRight') dx = step;
+    else if (e.key === 'Home') {
+      if (type === 'slide') state.slideOffset = 0;
+      else state.cursorX = SCALE_X0;
+      applyTransforms();
+      e.preventDefault();
+      return;
+    } else if (e.key === 'End') {
+      if (type === 'slide') state.slideOffset = 0;
+      else state.cursorX = SCALE_X1;
+      applyTransforms();
+      e.preventDefault();
+      return;
+    } else return;
+    e.preventDefault();
+    if (type === 'slide') {
+      state.slideOffset += dx;
+      const maxOffset = SCALE_LEN;
+      state.slideOffset = Math.max(-maxOffset, Math.min(maxOffset, state.slideOffset));
+    } else {
+      state.cursorX += dx;
+      state.cursorX = Math.max(SCALE_X0, Math.min(SCALE_X1, state.cursorX));
+    }
+    applyTransforms();
+  }
+  slideRect.addEventListener('keydown', e => handleKey(e, 'slide'));
+  cursorRect.addEventListener('keydown', e => handleKey(e, 'cursor'));
+
+  // ---------- Readout ----------
+  // For each scale, compute the value at the current cursor position.
+  // For slide scales, the cursor's position relative to the slide is (cursorX - slideOffset).
+  function valueAtCursorOnScale(scaleName) {
+    const cx = state.cursorX;
+    const cxOnSlide = cx - state.slideOffset; // for scales on the slide
+
+    switch (scaleName) {
+      case 'K':  return logVal3(cx);
+      case 'A':  return logVal2(cx);
+      case 'B':  return logVal2(cxOnSlide);
+      case 'CI': {
+        // CI is reversed: value at x = logVal( SCALE_X0 + SCALE_X1 - x )
+        return logVal(SCALE_X0 + SCALE_X1 - cxOnSlide);
+      }
+      case 'CF': {
+        // Folded by log(π). Value = 10^( ((x - SCALE_X0)/SCALE_LEN + log(π)) mod 1 )
+        let frac = (cxOnSlide - SCALE_X0) / SCALE_LEN + PI_LOG;
+        while (frac >= 1) frac -= 1;
+        while (frac < 0) frac += 1;
+        return Math.pow(10, frac);
+      }
+      case 'C':  return logVal(cxOnSlide);
+      case 'DF': {
+        let frac = (cx - SCALE_X0) / SCALE_LEN + PI_LOG;
+        while (frac >= 1) frac -= 1;
+        while (frac < 0) frac += 1;
+        return Math.pow(10, frac);
+      }
+      case 'D':  return logVal(cx);
+      case 'L': {
+        // Linear scale. Value is mantissa = (cx - SCALE_X0) / SCALE_LEN  (in 0..1)
+        return (cx - SCALE_X0) / SCALE_LEN;
+      }
+      case 'S': {
+        // sin scale: position = log10(sin(deg)*10)*SCALE_LEN + SCALE_X0
+        // → sin(deg)*10 = 10^((cx - SCALE_X0)/SCALE_LEN)
+        // → sin(deg) = 10^(...) / 10
+        const sinV = Math.pow(10, (cx - SCALE_X0) / SCALE_LEN) / 10;
+        if (sinV <= 0 || sinV > 1) return null;
+        return Math.asin(sinV) * 180 / Math.PI;
+      }
+      case 'T': {
+        const tanV = Math.pow(10, (cx - SCALE_X0) / SCALE_LEN) / 10;
+        if (tanV <= 0) return null;
+        const deg = Math.atan(tanV) * 180 / Math.PI;
+        if (deg > 45) return null;
+        return deg;
+      }
+    }
+    return null;
+  }
+
+  function fmt(v, scaleName) {
+    if (v === null || isNaN(v)) return '—';
+    if (scaleName === 'L') return v.toFixed(3);
+    if (scaleName === 'S' || scaleName === 'T') return v.toFixed(2) + '°';
+    if (scaleName === 'K') return v.toFixed(v < 10 ? 3 : v < 100 ? 2 : 1);
+    if (scaleName === 'A' || scaleName === 'B') return v.toFixed(v < 10 ? 3 : 2);
+    return v.toFixed(3);
+  }
+
+  const readoutEl = document.getElementById('readout');
+  const readoutGrid = document.getElementById('readout-grid');
+  const SCALE_NAMES = ['K','A','B','CI','CF','C','DF','D','L','S','T'];
+
+  // Build cells once
+  SCALE_NAMES.forEach(n => {
+    const cell = document.createElement('div');
+    cell.className = 'readout-cell';
+    cell.innerHTML = `<span class="label">${n}</span><span class="value" data-scale="${n}">—</span>`;
+    readoutGrid.appendChild(cell);
+  });
+
+  function updateReadout() {
+    SCALE_NAMES.forEach(n => {
+      const v = valueAtCursorOnScale(n);
+      const span = readoutGrid.querySelector(`[data-scale="${n}"]`);
+      if (span) span.textContent = fmt(v, n);
+    });
+  }
+
+  // ---------- Controls ----------
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    state.slideOffset = 0;
+    state.cursorX = SCALE_X0;
+    applyTransforms();
+  });
+
+  const btnReadout = document.getElementById('btn-toggle-readout');
+  btnReadout.addEventListener('click', () => {
+    state.readoutHidden = !state.readoutHidden;
+    readoutEl.dataset.hidden = state.readoutHidden ? 'true' : 'false';
+    btnReadout.textContent = state.readoutHidden ? 'Show Readouts' : 'Hide Readouts';
+  });
+
+  // Zoom buttons
+  const ruleWrap = document.getElementById('rule-wrap');
+  document.querySelectorAll('.zoom-buttons button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const z = btn.dataset.zoom;
+      ruleWrap.dataset.zoom = z;
+      document.querySelectorAll('.zoom-buttons button').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+    });
+  });
+
+  // Set cursor / slide via inputs
+  document.getElementById('btn-set-cursor').addEventListener('click', () => {
+    const v = parseFloat(document.getElementById('set-cursor').value);
+    if (isNaN(v) || v < 1 || v > 10) return;
+    state.cursorX = logPos(v);
+    applyTransforms();
+  });
+  document.getElementById('btn-set-slide').addEventListener('click', () => {
+    // Place slide so that C-1 (left index of C) lands at D-v
+    const v = parseFloat(document.getElementById('set-slide').value);
+    if (isNaN(v) || v < 1 || v > 10) return;
+    // C-1 is at logPos(1) = SCALE_X0 in slide-local coords. To place it at D-v in world coords:
+    // worldX = SCALE_X0 + slideOffset = logPos(v)  →  slideOffset = logPos(v) - SCALE_X0
+    state.slideOffset = logPos(v) - SCALE_X0;
+    applyTransforms();
+  });
+
+  // ---------- Tutorial mode ----------
+  const tutorialExamples = [
+    {
+      id: 'mult-2-3',
+      label: '2 × 3',
+      desc: 'Basic multiplication',
+      steps: [
+        { narration: "We want 2 × 3. On a slide rule, multiplication is addition of logarithms — the slide does the addition for us.", slideTo: 0, cursorTo: SCALE_X0 },
+        { narration: "Step 1: Place the LEFT INDEX of C (C-1) directly over D-2. Watch the slide.", slideTo: logPos(2) - SCALE_X0, cursorTo: logPos(2) },
+        { narration: "Step 2: Move the cursor to C-3.", slideTo: logPos(2) - SCALE_X0, cursorTo: logPos(2) + (logPos(3) - SCALE_X0) },
+        { narration: "Step 3: Read D under the cursor. The hairline crosses D at 6. So 2 × 3 = 6. The slide added log 2 + log 3 = log 6 for you, mechanically." }
+      ]
+    },
+    {
+      id: 'mult-2.5-3.4',
+      label: '2.5 × 3.4',
+      desc: 'Multiplication with decimals',
+      steps: [
+        { narration: "Goal: 2.5 × 3.4. Slide rules ignore decimal points — we work with the digits and place the decimal at the end.", slideTo: 0, cursorTo: SCALE_X0 },
+        { narration: "Place C-1 over D-2.5.", slideTo: logPos(2.5) - SCALE_X0, cursorTo: logPos(2.5) },
+        { narration: "Move cursor to C-3.4.", slideTo: logPos(2.5) - SCALE_X0, cursorTo: logPos(2.5) + (logPos(3.4) - SCALE_X0) },
+        { narration: "Read D: about 8.5. Order-of-magnitude check: 2.5 × 3.4 ≈ 2 × 3.5 ≈ 7. Our answer 8.5 is in the right ballpark. The true answer is 8.50 — exactly what the rule shows." }
+      ]
+    },
+    {
+      id: 'div-7-2',
+      label: '7 ÷ 2',
+      desc: 'Division (slide subtracts logs)',
+      steps: [
+        { narration: "Goal: 7 ÷ 2. Division is logarithmic subtraction — set the dividend on D, slide the divisor on C under it, read the answer at C-1.", slideTo: 0, cursorTo: SCALE_X0 },
+        { narration: "Place the cursor on D-7.", slideTo: 0, cursorTo: logPos(7) },
+        { narration: "Slide C-2 under the hairline. Now C-1 (left index) hangs over the answer.", slideTo: logPos(7) - logPos(2), cursorTo: logPos(7) },
+        { narration: "Move the cursor back to C-1.", slideTo: logPos(7) - logPos(2), cursorTo: logPos(7) - logPos(2) + SCALE_X0 },
+        { narration: "Read D under the cursor: 3.5. So 7 ÷ 2 = 3.5. ✓" }
+      ]
+    },
+    {
+      id: 'square-2.5',
+      label: '2.5²',
+      desc: 'Squaring with the A scale',
+      steps: [
+        { narration: "Goal: 2.5². The A scale shows the square of D directly above. No slide motion needed.", slideTo: 0, cursorTo: SCALE_X0 },
+        { narration: "Move the cursor to D-2.5.", slideTo: 0, cursorTo: logPos(2.5) },
+        { narration: "Look UP from D. The hairline crosses A at about 6.25. So 2.5² ≈ 6.25. ✓ (The exact answer is 6.25.)" }
+      ]
+    },
+    {
+      id: 'sqrt-50',
+      label: '√50',
+      desc: 'Square root with the A scale',
+      steps: [
+        { narration: "Goal: √50. Square root is the inverse operation — find the value on A, read √ on D below.", slideTo: 0, cursorTo: SCALE_X0 },
+        { narration: "Move cursor to A-50. Important: A has TWO halves. 50 has two digits to the LEFT of the decimal — use the RIGHT half of A.", slideTo: 0, cursorTo: logPos2(50) },
+        { narration: "Read D under the hairline: about 7.07. So √50 ≈ 7.07. ✓ (Exact: 7.0710678...)" }
+      ]
+    },
+    {
+      id: 'recip-4',
+      label: '1 ÷ 4',
+      desc: 'Reciprocal with CI',
+      steps: [
+        { narration: "Goal: 1 ÷ 4 = 0.25. The CI scale gives reciprocals directly — no slide motion.", slideTo: 0, cursorTo: SCALE_X0 },
+        { narration: "Move cursor to C-4 (or D-4 — same place). Read CI under the hairline: 2.5.", slideTo: 0, cursorTo: logPos(4) },
+        { narration: "Place the decimal: 1/4 is between 0.1 and 1, so 2.5 → 0.25. ✓" }
+      ]
+    }
+  ];
+
+  const exampleBank = document.getElementById('example-bank');
+  let currentTutorial = null;
+  let currentStep = 0;
+  let autoPlayTimer = null;
+
+  tutorialExamples.forEach(ex => {
+    const btn = document.createElement('button');
+    btn.innerHTML = `<span class="ex-prob">${ex.label}</span><span class="ex-desc">${ex.desc}</span>`;
+    btn.addEventListener('click', () => loadTutorial(ex));
+    exampleBank.appendChild(btn);
+  });
+
+  function loadTutorial(ex) {
+    stopAutoPlay();
+    currentTutorial = ex;
+    currentStep = 0;
+    showStep();
+  }
+
+  function showStep() {
+    if (!currentTutorial) return;
+    const step = currentTutorial.steps[currentStep];
+    const total = currentTutorial.steps.length;
+    document.getElementById('narration').innerHTML =
+      `<span class="step-counter">Step ${currentStep + 1} of ${total} · ${currentTutorial.label}</span>${step.narration}`;
+    if ('slideTo' in step) animateTo({ slide: step.slideTo, cursor: step.cursorTo });
+  }
+
+  function animateTo({ slide, cursor }, duration = 800) {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      if (slide !== undefined) state.slideOffset = slide;
+      if (cursor !== undefined) state.cursorX = cursor;
+      applyTransforms();
+      return;
+    }
+    const startSlide = state.slideOffset;
+    const startCursor = state.cursorX;
+    const targetSlide = slide !== undefined ? slide : state.slideOffset;
+    const targetCursor = cursor !== undefined ? cursor : state.cursorX;
+    const t0 = performance.now();
+    function tick(now) {
+      const t = Math.min(1, (now - t0) / duration);
+      // Ease in-out
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      state.slideOffset = startSlide + (targetSlide - startSlide) * eased;
+      state.cursorX = startCursor + (targetCursor - startCursor) * eased;
+      applyTransforms();
+      if (t < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  document.getElementById('btn-tut-prev').addEventListener('click', () => {
+    if (!currentTutorial) return;
+    currentStep = Math.max(0, currentStep - 1);
+    showStep();
+  });
+  document.getElementById('btn-tut-next').addEventListener('click', () => {
+    if (!currentTutorial) return;
+    if (currentStep < currentTutorial.steps.length - 1) {
+      currentStep++;
+      showStep();
+    }
+  });
+  const btnPlay = document.getElementById('btn-tut-play');
+  btnPlay.addEventListener('click', () => {
+    if (autoPlayTimer) {
+      stopAutoPlay();
+      btnPlay.textContent = '▶ Auto-play';
+    } else {
+      if (!currentTutorial) return;
+      btnPlay.textContent = '■ Stop';
+      autoPlayTimer = setInterval(() => {
+        if (!currentTutorial || currentStep >= currentTutorial.steps.length - 1) {
+          stopAutoPlay();
+          btnPlay.textContent = '▶ Auto-play';
+          return;
+        }
+        currentStep++;
+        showStep();
+      }, 3500);
+    }
+  });
+  function stopAutoPlay() {
+    if (autoPlayTimer) {
+      clearInterval(autoPlayTimer);
+      autoPlayTimer = null;
+    }
+  }
+
+  // ---------- Practice mode ----------
+  let practiceProblem = null;
+  const practiceState = { attempted: 0, correct: 0, streak: 0 };
+
+  function rand(min, max, decimals) {
+    const r = Math.random() * (max - min) + min;
+    const m = Math.pow(10, decimals);
+    return Math.round(r * m) / m;
+  }
+
+  function genProblem(type, difficulty) {
+    const decimals = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : 3;
+    let a, b;
+    let actualType = type;
+    if (type === 'mixed') {
+      const types = ['mult','div','sq','sqrt','recip','cube'];
+      actualType = types[Math.floor(Math.random() * types.length)];
+    }
+    switch (actualType) {
+      case 'mult':  a = rand(1.1, 9.9, decimals); b = rand(1.1, 9.9, decimals); return { text: `${a} × ${b}`, answer: a * b, type: actualType };
+      case 'div':   a = rand(1.1, 9.9, decimals); b = rand(1.1, 9.9, decimals); return { text: `${a} ÷ ${b}`, answer: a / b, type: actualType };
+      case 'sq':    a = rand(1.1, 9.9, decimals); return { text: `${a}²`, answer: a * a, type: actualType };
+      case 'sqrt': {
+        const v = rand(2, 99, 1);
+        return { text: `√${v}`, answer: Math.sqrt(v), type: actualType };
+      }
+      case 'recip': a = rand(1.1, 9.9, decimals); return { text: `1 ÷ ${a}`, answer: 1 / a, type: actualType };
+      case 'cube':  a = rand(1.1, 9.9, decimals); return { text: `${a}³`, answer: a * a * a, type: actualType };
+    }
+  }
+
+  function newPracticeProblem() {
+    const type = document.getElementById('prac-type').value;
+    const difficulty = document.getElementById('prac-difficulty').value;
+    practiceProblem = genProblem(type, difficulty);
+    document.getElementById('practice-problem').textContent = practiceProblem.text + ' = ?';
+    document.getElementById('practice-answer').value = '';
+    document.getElementById('practice-feedback').textContent = '';
+    document.getElementById('practice-feedback').className = 'feedback';
+    document.getElementById('practice-answer').focus();
+  }
+
+  function checkPracticeAnswer() {
+    if (!practiceProblem) return;
+    const userAns = parseFloat(document.getElementById('practice-answer').value);
+    if (isNaN(userAns)) return;
+    const tolerance = Math.abs(practiceProblem.answer * 0.01) + 0.005;
+    practiceState.attempted++;
+    const correct = Math.abs(userAns - practiceProblem.answer) <= tolerance;
+    const fb = document.getElementById('practice-feedback');
+    if (correct) {
+      practiceState.correct++;
+      practiceState.streak++;
+      fb.textContent = `Correct — within slide rule precision. Exact: ${practiceProblem.answer.toFixed(4)}`;
+      fb.className = 'feedback good';
+    } else {
+      practiceState.streak = 0;
+      fb.textContent = `Off by more than 1%. Exact answer: ${practiceProblem.answer.toFixed(4)}. You answered ${userAns}.`;
+      fb.className = 'feedback bad';
+    }
+    document.getElementById('prac-attempted').textContent = practiceState.attempted;
+    document.getElementById('prac-correct').textContent = practiceState.correct;
+    document.getElementById('prac-streak').textContent = practiceState.streak;
+  }
+
+  document.getElementById('btn-new-problem').addEventListener('click', newPracticeProblem);
+  document.getElementById('btn-check').addEventListener('click', checkPracticeAnswer);
+  document.getElementById('practice-answer').addEventListener('keydown', e => {
+    if (e.key === 'Enter') checkPracticeAnswer();
+  });
+
+  // ---------- vs. Calculator ----------
+  document.getElementById('btn-vs-go').addEventListener('click', () => {
+    const a = parseFloat(document.getElementById('vs-a').value);
+    const b = parseFloat(document.getElementById('vs-b').value);
+    const op = document.getElementById('vs-op').value;
+    let calcResult, ruleResult;
+    if (op === '*') { calcResult = a * b; }
+    else if (op === '/') { calcResult = a / b; }
+    else if (op === 'sq') { calcResult = a * a; }
+    else if (op === 'sqrt') { calcResult = Math.sqrt(a); }
+    if (isNaN(calcResult)) {
+      document.getElementById('vs-rule').textContent = '—';
+      document.getElementById('vs-calc').textContent = '—';
+      return;
+    }
+    // "Slide rule" result: round to 3 sig figs
+    ruleResult = roundSig(calcResult, 3);
+    document.getElementById('vs-rule').textContent = ruleResult.toString();
+    document.getElementById('vs-calc').textContent = calcResult.toString();
+  });
+
+  function roundSig(x, sig) {
+    if (x === 0) return 0;
+    const d = Math.ceil(Math.log10(Math.abs(x)));
+    const power = sig - d;
+    const m = Math.pow(10, power);
+    return Math.round(x * m) / m;
+  }
+
+  // ---------- Worksheets ----------
+  function generateWorksheet() {
+    const title = document.getElementById('ws-title').value || 'Slide Rule Practice';
+    const type = document.getElementById('ws-type').value;
+    const count = Math.max(5, Math.min(50, parseInt(document.getElementById('ws-count').value) || 20));
+    const difficulty = document.getElementById('ws-diff').value;
+
+    const problems = [];
+    for (let i = 0; i < count; i++) problems.push(genProblem(type, difficulty));
+
+    const out = document.getElementById('worksheet-output');
+    const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    let html = `<h3>${escapeHtml(title)}</h3>
+      <div class="ws-meta">Brookdale Community College · Engineering &amp; Technology · ${date}</div>
+      <div class="ws-row-name"><strong>Name:</strong> _______________________________ &nbsp; <strong>Date:</strong> _______________</div>
+      <p style="font-style: italic; font-size: 0.9rem;">Solve each problem using the slide rule. Slide rule answers should be accurate to 3 significant figures. Show your work where indicated.</p>
+      <ol>`;
+    problems.forEach(p => {
+      html += `<li>${escapeHtml(p.text)} = __________</li>`;
+    });
+    html += '</ol><div class="answer-key"><h4>Answer Key (Tear Off)</h4><ol>';
+    problems.forEach(p => {
+      html += `<li>${roundSig(p.answer, 3)}</li>`;
+    });
+    html += '</ol></div>';
+    out.innerHTML = html;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  }
+
+  document.getElementById('btn-ws-generate').addEventListener('click', generateWorksheet);
+  document.getElementById('btn-ws-print').addEventListener('click', () => window.print());
+
+  // ---------- Tabs ----------
+  // When switching tabs, move the slide rule SVG into the active panel's stage.
+  // Maintains the rule's state.
+  const stages = {
+    'panel-rule':      document.getElementById('rule-stage-main'),
+    'panel-tutorial':  document.getElementById('rule-stage-tutorial'),
+    'panel-practice':  document.getElementById('rule-stage-practice'),
+    'panel-vs-calc':   document.getElementById('rule-stage-vs')
+  };
+  const ruleHostInitial = document.getElementById('rule-stage-main');
+  // Already inside rule-stage-main via HTML structure.
+
+  const tabs = document.querySelectorAll('[role="tab"]');
+  const panels = document.querySelectorAll('[role="tabpanel"]');
+
+  function activateTab(tabBtn) {
+    tabs.forEach(t => {
+      const isActive = t === tabBtn;
+      t.setAttribute('aria-selected', isActive);
+      t.setAttribute('tabindex', isActive ? '0' : '-1');
+    });
+    const panelId = tabBtn.getAttribute('aria-controls');
+    panels.forEach(p => {
+      p.dataset.active = (p.id === panelId) ? 'true' : 'false';
+    });
+    // Move rule wrap into the right stage (if that panel has one)
+    const targetStage = stages[panelId];
+    if (targetStage && !targetStage.contains(ruleWrap)) {
+      targetStage.appendChild(ruleWrap);
+    }
+  }
+
+  tabs.forEach((tab, idx) => {
+    tab.addEventListener('click', () => activateTab(tab));
+    tab.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const dir = e.key === 'ArrowRight' ? 1 : -1;
+        const newIdx = (idx + dir + tabs.length) % tabs.length;
+        tabs[newIdx].focus();
+        activateTab(tabs[newIdx]);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        tabs[0].focus(); activateTab(tabs[0]);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        tabs[tabs.length - 1].focus(); activateTab(tabs[tabs.length - 1]);
+      }
+    });
+  });
+
+  // ---------- History panel mini diagram ----------
+  // Build linear ticks (top ruler) and log ticks (D + C scales) inside the visualization SVG
+  const linearHost = document.getElementById('linear-ticks-host');
+  if (linearHost) {
+    // Linear 0..1 mapped to x = 50..750
+    for (let i = 0; i <= 10; i++) {
+      const x = 50 + (i / 10) * 700;
+      elem('line', { x1: x, y1: 38, x2: x, y2: 50, stroke: 'var(--ink)', 'stroke-width': 1 }, linearHost);
+      elem('text', { x: x, y: 65, 'font-family': 'serif', 'font-size': 10, 'text-anchor': 'middle', fill: 'var(--ink)' }, linearHost).textContent = (i / 10).toFixed(1);
+    }
+  }
+  function vizLogTicks(parent, yLine, color) {
+    if (!parent) return;
+    for (let v = 1; v <= 10; v++) {
+      const x = 50 + Math.log10(v) * 700;
+      elem('line', { x1: x, y1: yLine - 6, x2: x, y2: yLine, stroke: color, 'stroke-width': 1 }, parent);
+      elem('text', { x: x, y: yLine + 14, 'font-family': 'serif', 'font-size': 10, 'text-anchor': 'middle', fill: color }, parent).textContent = (v === 10 ? '10' : String(v));
+    }
+  }
+  function vizLogTicksOffset(parent, yLine, color, xOffset) {
+    if (!parent) return;
+    for (let v = 1; v <= 10; v++) {
+      const x = xOffset + Math.log10(v) * 700;
+      elem('line', { x1: x, y1: yLine - 6, x2: x, y2: yLine, stroke: color, 'stroke-width': 1 }, parent);
+      elem('text', { x: x, y: yLine + 14, 'font-family': 'serif', 'font-size': 10, 'text-anchor': 'middle', fill: color }, parent).textContent = (v === 10 ? '10' : String(v));
+    }
+  }
+  vizLogTicks(document.getElementById('log-d-ticks'), 120, 'var(--ink)');
+  vizLogTicksOffset(document.getElementById('log-c-ticks'), 160, 'var(--accent)', 50 + Math.log10(2) * 700);
+
+  // ---------- Initial state ----------
+  applyTransforms();
+  generateWorksheet();
+  newPracticeProblem();
+
+  // Touch action: prevent the page from scrolling while dragging the rule
+  // Already handled via touch-action: none CSS
+
+})();
+</script>
+
+</body>
+</html>
