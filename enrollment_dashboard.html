@@ -1994,29 +1994,128 @@
         : null,
     }));
 
-    // Apply free-text search across text-bearing columns. Match is case-
-    // insensitive substring against the rendered values, so "smith" finds
-    // an instructor named Smith and "math 1" finds MATH-1xx courses.
+    // Apply free-text search across text-bearing columns.
     //
-    // Separators (spaces, hyphens, underscores) are normalized to a single
-    // space in both the search term and the haystack, so "ENGI 101",
-    // "ENGI-101", and "engi_101" all match section code "ENGI-101-001RL".
-    const normalizeForSearch = (s) =>
-      String(s == null ? '' : s).toLowerCase().replace(/[\s_-]+/g, ' ').trim();
+    // Semantics:
+    //   1. Each whitespace-separated word is its own ANDed search term.
+    //      "ENGI 101 LINC" => find rows containing "engi" AND "101" AND "linc".
+    //   2. Quoted phrases are treated as a single term, preserving any spaces.
+    //      'powell "Calculus I"' => name "powell" AND literal phrase "calculus i".
+    //   3. Both the query and the haystack are normalized by lowercasing and
+    //      collapsing all whitespace/punctuation to nothing for compact matching.
+    //      So "M,W" in the data is matched as "mw"; the user typing "MW" finds it.
+    //      The section code "ENGI-101-001RL" is matched as "engi101001rl", and
+    //      a search for "engi 101" splits into "engi" + "101", both of which
+    //      appear in the normalized haystack.
+    //   4. Inside quoted phrases, internal spaces ARE preserved (other
+    //      separators still get collapsed). So "Calculus I" matches "Calculus I"
+    //      and "Calculus-I" but treats the space between Calculus and I as
+    //      a single space.
+    //   5. Day code tokens (M, T, W, TH, F, S, and R as alias for TH) are
+    //      treated specially: they match only against the Meeting Days field,
+    //      so "M W" means "section meets on both Monday AND Wednesday" rather
+    //      than "row contains the letter m AND the letter w somewhere."
 
-    const searchTerm = normalizeForSearch(state.tableSearch);
-    const searchable = (r) => normalizeForSearch([
-      r.Section,
-      r['Course Title'],
-      r.Location,
-      r['Meeting Days'],
-      r['Section Start Time'],
-      r.Instructor,
-      r.Course,
-    ].join(' '));
-    const searched = searchTerm
-      ? enriched.filter(r => searchable(r).includes(searchTerm))
-      : enriched;
+    // Brookdale day codes. R is an alias for TH (some academic conventions
+    // use R for Thursday); we normalize both to "TH" internally.
+    const DAY_CODES = new Set(['M', 'T', 'W', 'TH', 'F', 'S']);
+    const isDayToken = (raw) => {
+      const upper = String(raw).toUpperCase();
+      if (upper === 'R') return 'TH';
+      return DAY_CODES.has(upper) ? upper : null;
+    };
+
+    // Parse a Meeting Days string into a Set of canonical day codes.
+    // Examples: "M,W"        -> {M, W}
+    //           "T TH"       -> {T, TH}
+    //           "M T W TH"   -> {M, T, W, TH}
+    //           "W F, F"     -> {W, F}     (de-duplicated)
+    function parseDays(raw) {
+      const codes = new Set();
+      if (!raw) return codes;
+      // TH is two letters and must be recognized before T to avoid the H
+      // splitting off into nothing. We do this by tokenizing on non-letter
+      // boundaries, then matching each token against the day set.
+      const tokens = String(raw).toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+      for (const tok of tokens) {
+        if (DAY_CODES.has(tok)) codes.add(tok);
+        else if (tok === 'R') codes.add('TH');
+        // For tokens like "MWF" (compact, no separators) we walk them
+        else {
+          let i = 0;
+          while (i < tok.length) {
+            // Try TH first (two chars)
+            if (tok.slice(i, i + 2) === 'TH') { codes.add('TH'); i += 2; continue; }
+            const c = tok[i];
+            if (DAY_CODES.has(c)) codes.add(c);
+            else if (c === 'R') codes.add('TH');
+            i += 1;
+          }
+        }
+      }
+      return codes;
+    }
+
+    // Compact normalize: lowercase, strip all whitespace/punctuation
+    const normCompact = (s) =>
+      String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, '');
+
+    // Phrase normalize (for quoted terms): lowercase, collapse separators to
+    // a single space so internal word boundaries are preserved
+    const normPhrase = (s) =>
+      String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, ' ').trim();
+
+    // Tokenize the search input into a list of search terms. Quoted strings
+    // become single phrase tokens; unquoted whitespace splits into multiple.
+    // Day codes (M, T, W, TH, F, S, R) become 'day' tokens.
+    function tokenizeSearch(input) {
+      const tokens = [];
+      const re = /"([^"]*)"|(\S+)/g;
+      let m;
+      while ((m = re.exec(input)) !== null) {
+        if (m[1] !== undefined) {
+          // Quoted phrase — always a phrase token, never reinterpreted
+          const phrase = normPhrase(m[1]);
+          if (phrase) tokens.push({ kind: 'phrase', value: phrase });
+        } else if (m[2] !== undefined) {
+          // Unquoted word — check if it's a day code
+          const dayCode = isDayToken(m[2]);
+          if (dayCode) {
+            tokens.push({ kind: 'day', value: dayCode });
+          } else {
+            const word = normCompact(m[2]);
+            if (word) tokens.push({ kind: 'word', value: word });
+          }
+        }
+      }
+      return tokens;
+    }
+
+    const tokens = tokenizeSearch(state.tableSearch);
+
+    // Build the haystacks for each row, including parsed day codes
+    const haystack = (r) => {
+      const raw = [
+        r.Section, r['Course Title'], r.Location, r['Meeting Days'],
+        r['Section Start Time'], r.Instructor, r.Course,
+      ].join(' ');
+      return {
+        compact: normCompact(raw),
+        phrase: normPhrase(raw),
+        days: parseDays(r['Meeting Days']),
+      };
+    };
+
+    const searched = tokens.length === 0
+      ? enriched
+      : enriched.filter(r => {
+          const h = haystack(r);
+          return tokens.every(t => {
+            if (t.kind === 'phrase') return h.phrase.includes(t.value);
+            if (t.kind === 'day') return h.days.has(t.value);
+            return h.compact.includes(t.value);
+          });
+        });
 
     const sorted = searched.slice().sort((a, b) => {
       let av = a[state.sortKey], bv = b[state.sortKey];
@@ -2090,7 +2189,7 @@
             type="text"
             id="tableSearchInput"
             class="search-input"
-            placeholder="Search sections, titles, instructors, locations…"
+            placeholder='Search — try "ENGI 101 LINC" or "Powell M W" or "MATH T TH"'
             value="${escapeHtml(state.tableSearch)}"
             autocomplete="off"
             spellcheck="false">
