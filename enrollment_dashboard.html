@@ -622,6 +622,73 @@
   .spark { display: inline-block; vertical-align: middle; }
 
   /* Table */
+  .table-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 10px;
+  }
+  .table-search {
+    flex: 1;
+    max-width: 480px;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .table-search .search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink-mute);
+    font-size: 14px;
+    pointer-events: none;
+  }
+  .search-input {
+    width: 100%;
+    padding: 9px 36px 9px 32px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus {
+    outline: none;
+    border-color: var(--rule-strong);
+  }
+  .search-input::placeholder {
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+  .search-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--ink-mute);
+    font-size: 18px;
+    line-height: 1;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .search-clear:hover { color: var(--ink); }
+  .search-count {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-mute);
+    white-space: nowrap;
+  }
   .table-wrap {
     background: var(--surface);
     border: 1px solid var(--rule);
@@ -872,6 +939,7 @@
     sortKey: 'Section',
     sortDir: 1,
     showBenchmarks: true,
+    tableSearch: '',        // search box content for full section detail table
 
     // Loading state for GitHub-hosted data
     loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
@@ -1926,7 +1994,31 @@
         : null,
     }));
 
-    const sorted = enriched.slice().sort((a, b) => {
+    // Apply free-text search across text-bearing columns. Match is case-
+    // insensitive substring against the rendered values, so "smith" finds
+    // an instructor named Smith and "math 1" finds MATH-1xx courses.
+    //
+    // Separators (spaces, hyphens, underscores) are normalized to a single
+    // space in both the search term and the haystack, so "ENGI 101",
+    // "ENGI-101", and "engi_101" all match section code "ENGI-101-001RL".
+    const normalizeForSearch = (s) =>
+      String(s == null ? '' : s).toLowerCase().replace(/[\s_-]+/g, ' ').trim();
+
+    const searchTerm = normalizeForSearch(state.tableSearch);
+    const searchable = (r) => normalizeForSearch([
+      r.Section,
+      r['Course Title'],
+      r.Location,
+      r['Meeting Days'],
+      r['Section Start Time'],
+      r.Instructor,
+      r.Course,
+    ].join(' '));
+    const searched = searchTerm
+      ? enriched.filter(r => searchable(r).includes(searchTerm))
+      : enriched;
+
+    const sorted = searched.slice().sort((a, b) => {
       let av = a[state.sortKey], bv = b[state.sortKey];
       if (av === null) av = -Infinity; if (bv === null) bv = -Infinity;
       if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * state.sortDir;
@@ -1977,8 +2069,35 @@
 
     const arrow = (k) => state.sortKey === k ? `<span class="arrow">${state.sortDir === 1 ? '▲' : '▼'}</span>` : '';
 
+    // Choose an appropriate empty-state message based on cause
+    const emptyMessage = searched.length === 0
+      ? (searchTerm
+          ? `No sections match "${escapeHtml(state.tableSearch)}".`
+          : 'No sections match the current filters.')
+      : null;
+
+    // Match count display: only shown when searching
+    const matchCount = searchTerm
+      ? `<span class="search-count">${searched.length} of ${enriched.length}</span>`
+      : '';
+
     return `
       <div class="section-title">Full Section Detail <span class="meta">click any column to sort</span></div>
+      <div class="table-toolbar">
+        <div class="table-search">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input
+            type="text"
+            id="tableSearchInput"
+            class="search-input"
+            placeholder="Search sections, titles, instructors, locations…"
+            value="${escapeHtml(state.tableSearch)}"
+            autocomplete="off"
+            spellcheck="false">
+          ${state.tableSearch ? '<button class="search-clear" id="tableSearchClear" type="button" aria-label="Clear search">×</button>' : ''}
+        </div>
+        ${matchCount}
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -1986,7 +2105,7 @@
               ${headers.map(h => `<th data-sort="${h.k}" class="${h.right ? 'right' : ''}">${h.label}${arrow(h.k)}</th>`).join('')}
             </tr>
           </thead>
-          <tbody>${rows || '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--ink-mute);font-style:italic">No sections match the current filters.</td></tr>'}</tbody>
+          <tbody>${rows || `<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--ink-mute);font-style:italic">${emptyMessage}</td></tr>`}</tbody>
         </table>
       </div>
     `;
@@ -2460,6 +2579,35 @@
         render();
       });
     });
+
+    // Table search input
+    const searchInput = el('tableSearchInput');
+    if (searchInput) {
+      // Re-render on each keystroke; restore focus/cursor after re-render
+      // since render() replaces the input element.
+      searchInput.addEventListener('input', (e) => {
+        const newValue = e.target.value;
+        const cursorPos = e.target.selectionStart;
+        state.tableSearch = newValue;
+        render();
+        const restored = el('tableSearchInput');
+        if (restored) {
+          restored.focus();
+          // Restore cursor to the spot the user was typing
+          try { restored.setSelectionRange(cursorPos, cursorPos); } catch (_) {}
+        }
+      });
+    }
+
+    const searchClear = el('tableSearchClear');
+    if (searchClear) {
+      searchClear.addEventListener('click', () => {
+        state.tableSearch = '';
+        render();
+        const restored = el('tableSearchInput');
+        if (restored) restored.focus();
+      });
+    }
 
     // Snapshot manager actions (view-only since data comes from GitHub)
     document.querySelectorAll('[data-set-current]').forEach(b => {
