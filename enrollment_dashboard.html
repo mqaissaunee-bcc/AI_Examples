@@ -2,14 +2,11 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v4.4
-  Date:     May 12, 2026
-  Features: GitHub-hosted data, generic discipline picker, college-wide
-            benchmarks with toggle, hover tooltips, GitHub Action for
-            manifest regeneration, filename normalization, FTE Progress
-            tracking, three-way theme cycle (Cream / White / Dark).
-
-  Canonical baseline: v4.2 (May 12, 2026 earlier).
+  Version:  v4.5
+  Date:     May 13, 2026
+  Features: Adds fill-status bucket filter (All / Full / Almost full /
+            Underfilled / Empty) and sibling section display when a bucket
+            is active. Built on v4.4 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -736,6 +733,45 @@
   .badge.low { background: transparent; color: var(--warn); border-color: var(--warn); }
   .badge.zero { background: var(--warn); color: #fff; border-color: var(--warn); }
 
+  /* Sibling section indicator — shown beneath section codes when a
+     fill-status filter is active, to surface context the filter hides */
+  .sibling-row {
+    display: block;
+    margin-top: 5px;
+    padding-top: 5px;
+    border-top: 1px dotted var(--rule);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--ink-mute);
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+  }
+  .sibling-row.warn { color: var(--warn); font-weight: 600; }
+  .sibling-row .sib {
+    display: inline-block;
+    margin-right: 10px;
+    padding: 1px 6px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    border-radius: 2px;
+  }
+  .sibling-row .sib strong { color: var(--ink); font-weight: 700; }
+  .sibling-row .sib em { font-style: normal; }
+  .sibling-row .sib.sib-full strong { color: var(--good); }
+  .sibling-row .sib.sib-empty strong { color: var(--warn); }
+  .sibling-row .sib.sib-available em { color: var(--good); font-weight: 600; }
+  .sibling-row .sib .sib-scope {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 4px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid var(--rule);
+    color: var(--ink-mute);
+  }
+
   .delta-cell {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -884,7 +920,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v4.4</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v4.5</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -940,6 +976,7 @@
     sortDir: 1,
     showBenchmarks: true,
     tableSearch: '',        // search box content for full section detail table
+    fillBucket: 'all',      // 'all' | 'full' | 'almost' | 'under' | 'empty'
 
     // Loading state for GitHub-hosted data
     loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
@@ -1349,6 +1386,23 @@
   }
 
   // Filtered current rows by selected disciplines + sub-filters
+  // Returns true if a row matches the active fill-status bucket.
+  // Buckets match the same thresholds the dashboard uses for badge colors:
+  //   full     fill >= 100%
+  //   almost   75% <= fill < 100%
+  //   under    0 < fill < 50% (i.e., has some enrollment but under-filled)
+  //   empty    enrolled === 0
+  function rowInFillBucket(r, bucket) {
+    if (bucket === 'all') return true;
+    const fill = Number(r['Section Fill %']) || 0;
+    const enrolled = Number(r['Enrolled Students']) || 0;
+    if (bucket === 'full')   return fill >= 100;
+    if (bucket === 'almost') return fill >= 75 && fill < 100;
+    if (bucket === 'under')  return enrolled > 0 && fill < 50;
+    if (bucket === 'empty')  return enrolled === 0;
+    return true;
+  }
+
   function filteredRows() {
     const snap = currentSnapshot();
     if (!snap) return [];
@@ -1356,6 +1410,7 @@
       if (!state.selectedDisciplines.has(r._prefix)) return false;
       if (state.activeDisciplineFilter.size > 0 && !state.activeDisciplineFilter.has(r._prefix)) return false;
       if (state.activeLocations.size > 0 && !state.activeLocations.has(r.Location)) return false;
+      if (!rowInFillBucket(r, state.fillBucket)) return false;
       return true;
     });
   }
@@ -1573,7 +1628,8 @@
       ? prevSnap.rows.filter(r =>
           state.selectedDisciplines.has(r._prefix) &&
           (state.activeDisciplineFilter.size === 0 || state.activeDisciplineFilter.has(r._prefix)) &&
-          (state.activeLocations.size === 0 || state.activeLocations.has(r.Location))
+          (state.activeLocations.size === 0 || state.activeLocations.has(r.Location)) &&
+          rowInFillBucket(r, state.fillBucket)
         )
       : null;
 
@@ -1707,6 +1763,14 @@
       .map(r => r.Location)
       .filter(Boolean))].sort();
 
+    const buckets = [
+      { id: 'all',    label: 'All',         title: 'Show every section' },
+      { id: 'full',   label: 'Full',        title: 'Sections at 100% capacity' },
+      { id: 'almost', label: 'Almost full', title: 'Sections at 75-99% fill — likely to fill before classes start' },
+      { id: 'under',  label: 'Underfilled', title: 'Sections under 50% fill with at least one student' },
+      { id: 'empty',  label: 'Empty',       title: 'Sections with zero enrolled students' },
+    ];
+
     return `
       <div class="filter-bar">
         ${present.length > 1 ? `
@@ -1727,6 +1791,12 @@
             `).join('')}
           </div>
         ` : ''}
+        <div class="filter-group">
+          <span class="lbl">Fill</span>
+          ${buckets.map(b => `
+            <button class="chip ${state.fillBucket === b.id ? 'active' : ''}" data-bucket="${b.id}" title="${escapeHtml(b.title)}">${escapeHtml(b.label)}</button>
+          `).join('')}
+        </div>
         <div class="filter-group">
           <span class="lbl">Compare</span>
           <button class="chip ${state.showBenchmarks ? 'active' : ''}" id="benchToggle" type="button" title="Compare against college-wide fall enrollment">
@@ -1765,7 +1835,8 @@
       // Apply location/discipline-filter to be consistent with rest of view
       const inFilter = (r) =>
         (state.activeDisciplineFilter.size === 0 || state.activeDisciplineFilter.has(r._prefix)) &&
-        (state.activeLocations.size === 0 || state.activeLocations.has(r.Location));
+        (state.activeLocations.size === 0 || state.activeLocations.has(r.Location)) &&
+        rowInFillBucket(r, state.fillBucket);
 
       const rows = snap.rows.filter(r => r._prefix === p && inFilter(r));
       const prevRows = prevSnap ? prevSnap.rows.filter(r => r._prefix === p && inFilter(r)) : null;
@@ -2125,6 +2196,57 @@
       return av.localeCompare(bv) * state.sortDir;
     });
 
+    // Sibling map: Course code -> all sections of that course (in current snapshot).
+    // Used when a fill-status bucket is active to surface context the filter hides:
+    // "this section is full — are there alternative sections?" or
+    // "this section is empty — is it the only one, or can students go elsewhere?"
+    const showSiblings = state.fillBucket !== 'all';
+    const snapNow = currentSnapshot();
+    const siblingsByCourse = {};
+    if (showSiblings && snapNow) {
+      snapNow.rows.forEach(row => {
+        if (!siblingsByCourse[row.Course]) siblingsByCourse[row.Course] = [];
+        siblingsByCourse[row.Course].push(row);
+      });
+    }
+
+    // Test whether a sibling row would have been visible under the user's
+    // current scope (selected disciplines, sub-filters, location). If not,
+    // we tag it as "outside scope" in the display.
+    const isInScope = (r) => {
+      if (!state.selectedDisciplines.has(r._prefix)) return false;
+      if (state.activeDisciplineFilter.size > 0 && !state.activeDisciplineFilter.has(r._prefix)) return false;
+      if (state.activeLocations.size > 0 && !state.activeLocations.has(r.Location)) return false;
+      return true;
+    };
+
+    // Build the sibling indicator HTML for a given row, or '' if none
+    function renderSiblingIndicator(row) {
+      const allSections = siblingsByCourse[row.Course] || [];
+      const siblings = allSections.filter(s => s.Section !== row.Section);
+
+      if (siblings.length === 0) {
+        return `<div class="sibling-row warn" title="No other sections of this course exist in this snapshot">⚠ Only section of ${escapeHtml(row.Course)}</div>`;
+      }
+
+      const items = siblings.map(s => {
+        const sFill = Number(s['Section Fill %']) || 0;
+        const sEnr = Number(s['Enrolled Students']) || 0;
+        const sCap = Number(s.Capacity) || 0;
+        const seats = Math.max(0, sCap - sEnr);
+        const outOfScope = !isInScope(s);
+        const cls = sFill >= 100 ? 'sib-full' : sEnr === 0 ? 'sib-empty' : 'sib-available';
+        const scopeTag = outOfScope ? ` <span class="sib-scope">${escapeHtml(s.Location || '?')}</span>` : '';
+        return `<span class="sib ${cls}"><strong>${escapeHtml(s.Section.split('-').slice(-1)[0] || s.Section)}</strong> ${sEnr}/${sCap}${seats > 0 ? ` <em>(${seats} open)</em>` : ''}${scopeTag}</span>`;
+      }).join(' ');
+
+      const label = siblings.length === 1
+        ? `1 other section of ${escapeHtml(row.Course)}:`
+        : `${siblings.length} other sections of ${escapeHtml(row.Course)}:`;
+
+      return `<div class="sibling-row">${label} ${items}</div>`;
+    }
+
     const rows = sorted.map(r => {
       const fill = r['Section Fill %'];
       const fillBadge =
@@ -2147,9 +2269,11 @@
         deltaCell = '<span style="color:var(--ink-mute);font-style:italic">new</span>';
       }
 
+      const siblingHTML = showSiblings ? renderSiblingIndicator(r) : '';
+
       return `
         <tr>
-          <td style="border-left:3px solid ${color}"><strong>${escapeHtml(r.Section)}</strong></td>
+          <td style="border-left:3px solid ${color}"><strong>${escapeHtml(r.Section)}</strong>${siblingHTML}</td>
           <td>${escapeHtml(r['Course Title'] || '')}</td>
           <td>${escapeHtml(r.Location || '')}</td>
           <td class="right">${r.Capacity}</td>
@@ -2658,10 +2782,19 @@
       });
     });
 
+    // Fill-status bucket filter (mutually exclusive)
+    document.querySelectorAll('[data-bucket]').forEach(b => {
+      b.addEventListener('click', () => {
+        state.fillBucket = b.dataset.bucket;
+        render();
+      });
+    });
+
     const reset = el('resetFilters');
     if (reset) reset.addEventListener('click', () => {
       state.activeDisciplineFilter.clear();
       state.activeLocations.clear();
+      state.fillBucket = 'all';
       render();
     });
 
