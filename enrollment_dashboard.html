@@ -2,11 +2,14 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v4.5
+  Version:  v4.6
   Date:     May 13, 2026
-  Features: Adds fill-status bucket filter (All / Full / Almost full /
-            Underfilled / Empty) and sibling section display when a bucket
-            is active. Built on v4.4 canonical baseline.
+  Features: Adds per-discipline collapsibility for "Sections at a Glance"
+            (smart default + localStorage), context-aware siblings (hide
+            non-alternatives, flag absence of alternatives), and a compact
+            discipline comparison table replacing the card panels (auto-
+            hides when only one discipline is in view). Built on v4.4
+            canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -500,6 +503,59 @@
     margin-bottom: 16px;
   }
 
+  /* Compact discipline comparison table (replaces card grid in v4.5) */
+  .discipline-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+    overflow-x: auto;
+  }
+  .discipline-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+  }
+  .discipline-table thead th {
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--rule-strong);
+    padding: 8px 12px;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 10px;
+    color: var(--ink-mute);
+    font-weight: 600;
+  }
+  .discipline-table thead th.right { text-align: right; }
+  .discipline-table tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: middle;
+  }
+  .discipline-table tbody td.right { text-align: right; }
+  .discipline-table tbody tr:last-child td { border-bottom: none; }
+  .discipline-table tbody tr:hover { background: var(--surface-2); }
+  .discipline-table .ds-disc {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .discipline-table .ds-disc .swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--rule);
+  }
+  .discipline-table .ds-trend {
+    width: 110px;
+    padding-right: 14px;
+  }
+  .discipline-table .ds-bench {
+    font-size: 11px;
+  }
+
   .panel {
     background: var(--surface);
     border: 1px solid var(--rule);
@@ -539,10 +595,59 @@
   .panel .panel-sparkline { margin-top: 10px; }
 
   /* Course cards */
+  .discipline-group {
+    margin-bottom: 16px;
+  }
+  .discipline-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--rule);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    font-family: 'Helvetica Neue', sans-serif;
+    text-align: left;
+    transition: background 0.15s;
+    margin-bottom: 10px;
+  }
+  .discipline-header:hover { background: var(--surface-2); }
+  .discipline-header .dh-arrow {
+    font-size: 10px;
+    color: var(--ink-mute);
+    width: 12px;
+    display: inline-block;
+  }
+  .discipline-header .dh-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--rule);
+  }
+  .discipline-header .dh-label {
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+  }
+  .discipline-header .discipline-meta {
+    font-size: 11px;
+    color: var(--ink-mute);
+    margin-left: auto;
+    font-weight: 400;
+  }
+  .discipline-header .collapsed-trace {
+    font-style: italic;
+  }
+
   .course-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
     gap: 14px;
+    margin-bottom: 14px;
   }
   .course-card {
     background: var(--surface);
@@ -771,6 +876,12 @@
     border: 1px solid var(--rule);
     color: var(--ink-mute);
   }
+  .sibling-row .sib-note {
+    color: var(--ink-mute);
+    font-style: italic;
+    font-size: 10px;
+    margin-left: 4px;
+  }
 
   .delta-cell {
     font-weight: 700;
@@ -920,7 +1031,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v4.5</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v4.6</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -955,6 +1066,7 @@
     SNAPSHOTS: 'enroll-snapshots',
     INSTITUTE_INDEX: 'enroll-inst-idx',
     BENCHMARKS: 'enroll-benchmarks',
+    CARD_EXPANSION: 'enroll-card-expansion',
   };
 
   const state = {
@@ -977,6 +1089,8 @@
     showBenchmarks: true,
     tableSearch: '',        // search box content for full section detail table
     fillBucket: 'all',      // 'all' | 'full' | 'almost' | 'under' | 'empty'
+    cardExpansion: {},      // explicit per-discipline overrides: { ELEC: true, MATH: false }
+                            //   missing key => use smart default (expand if <20 sections)
 
     // Loading state for GitHub-hosted data
     loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
@@ -1063,6 +1177,9 @@
 
       const bm = localStorage.getItem(STORAGE.BENCHMARKS);
       if (bm !== null) state.showBenchmarks = bm === 'true';
+
+      const ce = localStorage.getItem(STORAGE.CARD_EXPANSION);
+      if (ce) state.cardExpansion = JSON.parse(ce);
     } catch (err) {
       console.error('Storage load error:', err);
     }
@@ -1074,6 +1191,7 @@
       localStorage.setItem(STORAGE.PRESETS, JSON.stringify(state.presets));
       localStorage.setItem(STORAGE.INSTITUTE_INDEX, JSON.stringify(state.instituteIndex));
       localStorage.setItem(STORAGE.BENCHMARKS, String(state.showBenchmarks));
+      localStorage.setItem(STORAGE.CARD_EXPANSION, JSON.stringify(state.cardExpansion));
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
     }
@@ -1820,8 +1938,7 @@
       .sort();
 
     // If the user has narrowed via the discipline filter chips, only show
-    // panels for those disciplines. Empty panels for non-focused disciplines
-    // would just be confusing zeros.
+    // panels for those disciplines.
     if (state.activeDisciplineFilter.size > 0) {
       present = present.filter(p => state.activeDisciplineFilter.has(p));
     }
@@ -1831,13 +1948,21 @@
         <p style="color:var(--ink-mute);font-style:italic;padding:14px 0">None of your selected disciplines appear in this snapshot.</p>`;
     }
 
-    const cards = present.map(p => {
-      // Apply location/discipline-filter to be consistent with rest of view
-      const inFilter = (r) =>
-        (state.activeDisciplineFilter.size === 0 || state.activeDisciplineFilter.has(r._prefix)) &&
-        (state.activeLocations.size === 0 || state.activeLocations.has(r.Location)) &&
-        rowInFillBucket(r, state.fillBucket);
+    // Auto-hide: with only one discipline in view, the KPI strip above already
+    // shows everything this section would. Skipping it removes redundant noise.
+    if (present.length === 1) {
+      return '';
+    }
 
+    const inFilter = (r) =>
+      (state.activeDisciplineFilter.size === 0 || state.activeDisciplineFilter.has(r._prefix)) &&
+      (state.activeLocations.size === 0 || state.activeLocations.has(r.Location)) &&
+      rowInFillBucket(r, state.fillBucket);
+
+    const showBench = state.showBenchmarks;
+    const cw = showBench ? collegeWideStats(snap) : null;
+
+    const tableRows = present.map(p => {
       const rows = snap.rows.filter(r => r._prefix === p && inFilter(r));
       const prevRows = prevSnap ? prevSnap.rows.filter(r => r._prefix === p && inFilter(r)) : null;
 
@@ -1845,53 +1970,56 @@
       const enrolled = sum(rows, 'Enrolled Students');
       const capacity = sum(rows, 'Capacity');
       const fill = capacity > 0 ? (enrolled / capacity * 100) : 0;
-      const sch = sum(rows, 'Total Student Credit Hours');
-      const fullCount = rows.filter(r => r['Section Fill %'] >= 100).length;
-      const emptyCount = rows.filter(r => r['Enrolled Students'] === 0).length;
 
-      let dEnr = '', dFill = '', dSCH = '';
-      if (prevRows) {
+      let dFill = '';
+      if (prevRows && prevRows.length > 0) {
         const ePrev = sum(prevRows, 'Enrolled Students');
         const cPrev = sum(prevRows, 'Capacity');
         const fPrev = cPrev > 0 ? (ePrev / cPrev * 100) : 0;
-        const schPrev = sum(prevRows, 'Total Student Credit Hours');
-        dEnr = miniDelta(enrolled - ePrev);
         dFill = miniDelta(fill - fPrev, 'pp', 1);
-        dSCH = miniDelta(sch - schPrev);
       }
 
-      // College-wide benchmark row
-      const showBench = state.showBenchmarks;
-      const cw = showBench ? collegeWideStats(snap) : null;
-      const benchRow = cw
-        ? `<div class="stat-row" title="College-wide fill across every fall section in the latest report"><span class="k">vs. College</span><span class="v" style="font-size:11px;color:var(--ink-mute)">${cw.fill.toFixed(1)}%</span><span class="d">${miniDelta(fill - cw.fill, 'pp', 1, 'Compared to the college-wide fill rate right now. "pp" = percentage points.')}</span></div>`
-        : '';
+      const vsCollegeCell = cw
+        ? `<span class="ds-bench">${miniDelta(fill - cw.fill, 'pp', 1, 'Compared to the college-wide fill rate right now.')}</span>`
+        : '<span style="color:var(--ink-mute)">—</span>';
 
       // Sparkline of total enrollment for this discipline across snapshots
       const enrSeries = state.snapshots.map(s =>
         sum(s.rows.filter(r => r._prefix === p && inFilter(r)), 'Enrolled Students')
       );
-
-      const sparkSVG = renderSparkline(enrSeries, colorFor(p), 220, 36);
+      const sparkCell = state.snapshots.length > 1
+        ? renderSparkline(enrSeries, colorFor(p), 100, 22)
+        : '<span style="color:var(--ink-mute)">—</span>';
 
       return `
-        <div class="panel" style="border-top-color:${colorFor(p)}">
-          <h3><span class="swatch" style="background:${colorFor(p)}"></span>${p}</h3>
-          <div class="panel-sub">${sections} section${sections !== 1 ? 's' : ''}${prevRows ? ` · was ${prevRows.length}` : ''}</div>
-          <div class="stat-row"><span class="k">Enrolled / Cap</span><span class="v">${enrolled} / ${capacity}</span><span class="d">${dEnr}</span></div>
-          <div class="stat-row"><span class="k">Fill Rate</span><span class="v">${fill.toFixed(1)}%</span><span class="d">${dFill}</span></div>
-          ${benchRow}
-          <div class="stat-row"><span class="k">Credit Hours</span><span class="v">${sch}</span><span class="d">${dSCH}</span></div>
-          <div class="stat-row"><span class="k">At Capacity</span><span class="v">${fullCount}</span><span class="d"></span></div>
-          <div class="stat-row"><span class="k">Empty</span><span class="v">${emptyCount}</span><span class="d"></span></div>
-          ${state.snapshots.length > 1 ? `<div class="panel-sparkline">${sparkSVG}</div>` : ''}
-        </div>
+        <tr>
+          <td class="ds-disc"><span class="swatch" style="background:${colorFor(p)}"></span><strong>${escapeHtml(p)}</strong></td>
+          <td class="right">${sections}</td>
+          <td class="right">${enrolled} / ${capacity}</td>
+          <td class="right"><strong>${fill.toFixed(1)}%</strong> ${dFill}</td>
+          <td class="right">${vsCollegeCell}</td>
+          <td class="ds-trend">${sparkCell}</td>
+        </tr>
       `;
     }).join('');
 
     return `
       <div class="section-title">By Discipline <span class="meta">${filteredRows().length} sections in view</span></div>
-      <div class="grid-auto">${cards}</div>
+      <div class="discipline-table-wrap">
+        <table class="discipline-table">
+          <thead>
+            <tr>
+              <th>Discipline</th>
+              <th class="right">Sections</th>
+              <th class="right">Enrolled</th>
+              <th class="right">Fill</th>
+              <th class="right">vs. College</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
     `;
   }
 
@@ -1942,80 +2070,130 @@
    * COURSE CARDS
    * ========================================================================= */
 
-  function renderCourseGrid() {
-    const rows = filteredRows().slice().sort((a, b) => {
-      if (a._prefix !== b._prefix) return a._prefix.localeCompare(b._prefix);
-      return String(a.Section).localeCompare(String(b.Section));
-    });
+  // Smart default for whether a discipline's cards should be expanded:
+  // small disciplines (<20 sections) auto-expand; large ones auto-collapse.
+  // An explicit user choice in state.cardExpansion overrides the default.
+  const SMART_EXPAND_THRESHOLD = 20;
+  function isDisciplineExpanded(prefix, sectionCount) {
+    if (Object.prototype.hasOwnProperty.call(state.cardExpansion, prefix)) {
+      return state.cardExpansion[prefix];
+    }
+    return sectionCount < SMART_EXPAND_THRESHOLD;
+  }
 
-    if (rows.length === 0) {
+  // Render a single section card. Extracted so we can call it per-discipline.
+  function renderSectionCard(r) {
+    const fill = r['Section Fill %'];
+    const fillCapped = Math.min(100, fill);
+    const tags = [];
+    if (fill >= 100) tags.push('<span class="tag full">● At Capacity</span>');
+    else if (r['Enrolled Students'] === 0) tags.push('<span class="tag empty">● Empty</span>');
+    if (r['Wait List'] > 0) tags.push(`<span class="tag wait">+${r['Wait List']} waitlist</span>`);
+
+    const days = cleanCell(r['Meeting Days'], '—');
+    const time = cleanCell(r['Section Start Time'], 'TBA');
+    const instructor = cleanCell(r.Instructor, 'TBA');
+    const color = colorFor(r._prefix);
+
+    const hist = sectionHistory(r.Section);
+    const enrSeries = hist.map(h => h.row ? h.row['Enrolled Students'] : null).filter(v => v !== null);
+    const showSpark = enrSeries.length >= 2;
+
+    const prevSnap = previousSnapshot();
+    let velocity = '';
+    if (prevSnap) {
+      const prevRow = prevSnap.rows.find(x => x.Section === r.Section);
+      if (prevRow) {
+        const diff = r['Enrolled Students'] - prevRow['Enrolled Students'];
+        velocity = diff === 0
+          ? '<span class="v-flat">no change</span>'
+          : diff > 0
+            ? `<span class="v-up">+${diff} since ${fmtDateShort(prevSnap.date)}</span>`
+            : `<span class="v-down">${diff} since ${fmtDateShort(prevSnap.date)}</span>`;
+      } else {
+        velocity = '<span class="v-flat">new section</span>';
+      }
+    }
+
+    return `
+      <div class="course-card" style="border-left-color:${color}">
+        <div class="cc-head">
+          <span class="code">${escapeHtml(r.Section)}</span>
+          <span class="loc">${escapeHtml(r.Location || '—')}</span>
+        </div>
+        <div class="title">${escapeHtml(r['Course Title'] || '')}</div>
+        <div class="meter"><div class="fill" style="width:${fillCapped}%;background:${color}"></div></div>
+        <div class="num-row">
+          <span><strong>${r['Enrolled Students']}</strong> / ${r.Capacity} enrolled</span>
+          <span><strong>${fill.toFixed(0)}%</strong></span>
+        </div>
+        <div class="delta-row">
+          <span>${velocity}</span>
+          ${showSpark ? renderSparkline(enrSeries, color, 90, 22) : ''}
+        </div>
+        <div class="meta-row">
+          <span>${escapeHtml(days)} · ${escapeHtml(time)}</span>
+          <span>${escapeHtml(instructor)}</span>
+          ${tags.length ? '<span style="flex-basis:100%;margin-top:4px">' + tags.join(' &nbsp; ') + '</span>' : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCourseGrid() {
+    const allRows = filteredRows();
+
+    if (allRows.length === 0) {
       return `<div class="section-title">Sections at a Glance</div>
         <p style="color:var(--ink-mute);font-style:italic;padding:14px 0">No sections match the current filters.</p>`;
     }
 
-    const cards = rows.map(r => {
-      const fill = r['Section Fill %'];
-      const fillCapped = Math.min(100, fill);
-      const tags = [];
-      if (fill >= 100) tags.push('<span class="tag full">● At Capacity</span>');
-      else if (r['Enrolled Students'] === 0) tags.push('<span class="tag empty">● Empty</span>');
-      if (r['Wait List'] > 0) tags.push(`<span class="tag wait">+${r['Wait List']} waitlist</span>`);
+    // Group rows by discipline prefix
+    const byPrefix = {};
+    allRows.forEach(r => {
+      if (!byPrefix[r._prefix]) byPrefix[r._prefix] = [];
+      byPrefix[r._prefix].push(r);
+    });
 
-      const days = cleanCell(r['Meeting Days'], '—');
-      const time = cleanCell(r['Section Start Time'], 'TBA');
-      const instructor = cleanCell(r.Instructor, 'TBA');
-      const color = colorFor(r._prefix);
+    // Sort prefixes alphabetically; sort rows within each group by section code
+    const prefixes = Object.keys(byPrefix).sort();
+    prefixes.forEach(p => byPrefix[p].sort((a, b) => String(a.Section).localeCompare(String(b.Section))));
 
-      // Section history series
-      const hist = sectionHistory(r.Section);
-      const enrSeries = hist.map(h => h.row ? h.row['Enrolled Students'] : null).filter(v => v !== null);
-      const showSpark = enrSeries.length >= 2;
+    // Render one section per discipline with a collapsible header
+    const groups = prefixes.map(prefix => {
+      const sections = byPrefix[prefix];
+      const expanded = isDisciplineExpanded(prefix, sections.length);
+      const color = colorFor(prefix);
+      const totalEnrolled = sum(sections, 'Enrolled Students');
+      const totalCapacity = sum(sections, 'Capacity');
+      const groupFill = totalCapacity > 0 ? (totalEnrolled / totalCapacity * 100) : 0;
 
-      // Velocity vs prev snapshot
-      const prevSnap = previousSnapshot();
-      let velocity = '';
-      if (prevSnap) {
-        const prevRow = prevSnap.rows.find(x => x.Section === r.Section);
-        if (prevRow) {
-          const diff = r['Enrolled Students'] - prevRow['Enrolled Students'];
-          velocity = diff === 0
-            ? '<span class="v-flat">no change</span>'
-            : diff > 0
-              ? `<span class="v-up">+${diff} since ${fmtDateShort(prevSnap.date)}</span>`
-              : `<span class="v-down">${diff} since ${fmtDateShort(prevSnap.date)}</span>`;
-        } else {
-          velocity = '<span class="v-flat">new section</span>';
-        }
-      }
+      // Trace shows summary even when collapsed
+      const arrow = expanded ? '▼' : '▶';
+      const trace = expanded
+        ? `<span class="discipline-meta">${sections.length} section${sections.length === 1 ? '' : 's'} · ${totalEnrolled} / ${totalCapacity} enrolled · ${groupFill.toFixed(0)}% fill</span>`
+        : `<span class="discipline-meta collapsed-trace">${sections.length} section card${sections.length === 1 ? '' : 's'} (click to show) · ${totalEnrolled} / ${totalCapacity} enrolled · ${groupFill.toFixed(0)}% fill</span>`;
+
+      const cardsHtml = expanded
+        ? `<div class="course-grid">${sections.map(renderSectionCard).join('')}</div>`
+        : '';
 
       return `
-        <div class="course-card" style="border-left-color:${color}">
-          <div class="cc-head">
-            <span class="code">${escapeHtml(r.Section)}</span>
-            <span class="loc">${escapeHtml(r.Location || '—')}</span>
-          </div>
-          <div class="title">${escapeHtml(r['Course Title'] || '')}</div>
-          <div class="meter"><div class="fill" style="width:${fillCapped}%;background:${color}"></div></div>
-          <div class="num-row">
-            <span><strong>${r['Enrolled Students']}</strong> / ${r.Capacity} enrolled</span>
-            <span><strong>${fill.toFixed(0)}%</strong></span>
-          </div>
-          <div class="delta-row">
-            <span>${velocity}</span>
-            ${showSpark ? renderSparkline(enrSeries, color, 90, 22) : ''}
-          </div>
-          <div class="meta-row">
-            <span>${escapeHtml(days)} · ${escapeHtml(time)}</span>
-            <span>${escapeHtml(instructor)}</span>
-            ${tags.length ? '<span style="flex-basis:100%;margin-top:4px">' + tags.join(' &nbsp; ') + '</span>' : ''}
-          </div>
+        <div class="discipline-group">
+          <button class="discipline-header" data-toggle-discipline="${escapeHtml(prefix)}" aria-expanded="${expanded}">
+            <span class="dh-arrow">${arrow}</span>
+            <span class="dh-swatch" style="background:${color}"></span>
+            <span class="dh-label">${escapeHtml(prefix)}</span>
+            ${trace}
+          </button>
+          ${cardsHtml}
         </div>
       `;
     }).join('');
 
     return `
-      <div class="section-title">Sections at a Glance <span class="meta">card view</span></div>
-      <div class="course-grid">${cards}</div>
+      <div class="section-title">Sections at a Glance <span class="meta">click a discipline to expand or collapse its cards</span></div>
+      ${groups}
     `;
   }
 
@@ -2223,26 +2401,79 @@
     // Build the sibling indicator HTML for a given row, or '' if none
     function renderSiblingIndicator(row) {
       const allSections = siblingsByCourse[row.Course] || [];
-      const siblings = allSections.filter(s => s.Section !== row.Section);
+      const allSiblings = allSections.filter(s => s.Section !== row.Section);
+      const totalSectionsOfCourse = allSections.length;
 
-      if (siblings.length === 0) {
+      // No other sections at all — high-stakes flag (especially for "empty" view,
+      // where cancelling this section would kill the course for the term)
+      if (allSiblings.length === 0) {
         return `<div class="sibling-row warn" title="No other sections of this course exist in this snapshot">⚠ Only section of ${escapeHtml(row.Course)}</div>`;
       }
 
-      const items = siblings.map(s => {
-        const sFill = Number(s['Section Fill %']) || 0;
+      // Filter to "useful" siblings based on the active bucket.
+      // The principle: show alternatives, summarize non-alternatives.
+      //
+      //   Full bucket   -> useful sibling = one with available seats
+      //                    (a full sibling isn't an answer to "where do extras go")
+      //   Empty bucket  -> useful sibling = one with any enrollment
+      //                    (an empty sibling doesn't help absorb students;
+      //                     it's just another section in trouble)
+      //   Almost/Under  -> useful sibling = one with seats
+      //                    (people viewing these are still capacity-planning)
+      //   All bucket    -> shouldn't reach here (siblings hidden in 'all' view)
+      const bucket = state.fillBucket;
+      let isUseful;
+      let principle;
+      if (bucket === 'empty') {
+        isUseful = (s) => (Number(s['Enrolled Students']) || 0) > 0;
+        principle = 'with enrollment';
+      } else {
+        // full, almost, under: show siblings that can absorb students
+        isUseful = (s) => {
+          const cap = Number(s.Capacity) || 0;
+          const enr = Number(s['Enrolled Students']) || 0;
+          return cap > enr;
+        };
+        principle = 'with available seats';
+      }
+
+      const useful = allSiblings.filter(isUseful);
+      const uselessCount = allSiblings.length - useful.length;
+
+      // No useful alternatives — flag it prominently
+      if (useful.length === 0) {
+        const tot = totalSectionsOfCourse;
+        let warningText;
+        if (bucket === 'empty') {
+          warningText = `⚠ All ${tot} sections of ${escapeHtml(row.Course)} are empty`;
+        } else {
+          warningText = `⚠ No alternatives — all ${tot} sections of ${escapeHtml(row.Course)} are full`;
+        }
+        return `<div class="sibling-row warn">${warningText}</div>`;
+      }
+
+      // Render useful siblings; show a small note about hidden non-alternatives
+      const items = useful.map(s => {
         const sEnr = Number(s['Enrolled Students']) || 0;
         const sCap = Number(s.Capacity) || 0;
         const seats = Math.max(0, sCap - sEnr);
         const outOfScope = !isInScope(s);
-        const cls = sFill >= 100 ? 'sib-full' : sEnr === 0 ? 'sib-empty' : 'sib-available';
+        // Pick a CSS class based on the sibling's own state
+        const sFill = Number(s['Section Fill %']) || 0;
+        const cls = sEnr === 0 ? 'sib-empty' : sFill >= 100 ? 'sib-full' : 'sib-available';
         const scopeTag = outOfScope ? ` <span class="sib-scope">${escapeHtml(s.Location || '?')}</span>` : '';
-        return `<span class="sib ${cls}"><strong>${escapeHtml(s.Section.split('-').slice(-1)[0] || s.Section)}</strong> ${sEnr}/${sCap}${seats > 0 ? ` <em>(${seats} open)</em>` : ''}${scopeTag}</span>`;
+        const seatsHtml = bucket === 'empty'
+          ? ` <em>(${sEnr} enrolled)</em>`
+          : seats > 0 ? ` <em>(${seats} open)</em>` : '';
+        return `<span class="sib ${cls}"><strong>${escapeHtml(s.Section.split('-').slice(-1)[0] || s.Section)}</strong> ${sEnr}/${sCap}${seatsHtml}${scopeTag}</span>`;
       }).join(' ');
 
-      const label = siblings.length === 1
-        ? `1 other section of ${escapeHtml(row.Course)}:`
-        : `${siblings.length} other sections of ${escapeHtml(row.Course)}:`;
+      const usefulNoun = useful.length === 1 ? 'alternative' : 'alternatives';
+      let label = `${useful.length} ${usefulNoun} of ${escapeHtml(row.Course)} ${principle}:`;
+      if (uselessCount > 0) {
+        const otherWord = bucket === 'empty' ? 'also empty' : 'also full';
+        label += ` <span class="sib-note">(${uselessCount} other section${uselessCount === 1 ? '' : 's'} ${otherWord})</span>`;
+      }
 
       return `<div class="sibling-row">${label} ${items}</div>`;
     }
@@ -2786,6 +3017,23 @@
     document.querySelectorAll('[data-bucket]').forEach(b => {
       b.addEventListener('click', () => {
         state.fillBucket = b.dataset.bucket;
+        render();
+      });
+    });
+
+    // Per-discipline card collapse/expand toggle
+    document.querySelectorAll('[data-toggle-discipline]').forEach(b => {
+      b.addEventListener('click', () => {
+        const prefix = b.dataset.toggleDiscipline;
+        // Read the current effective state (smart default if no override)
+        const snap = currentSnapshot();
+        const count = snap
+          ? snap.rows.filter(r => r._prefix === prefix && state.selectedDisciplines.has(r._prefix)).length
+          : 0;
+        const wasExpanded = isDisciplineExpanded(prefix, count);
+        // Store explicit user choice (the opposite of current state)
+        state.cardExpansion[prefix] = !wasExpanded;
+        saveStorage();
         render();
       });
     });
