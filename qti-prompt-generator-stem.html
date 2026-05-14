@@ -1790,6 +1790,8 @@ Tip: LLMs with web access (Claude, GPT-4o, Gemini) will fetch URLs automatically
           <option value="json">JSON (backup / import)</option>
           <option value="csv">CSV (spreadsheet review)</option>
           <option value="study-guide">📄 Student Study Guide (printable HTML — no answers)</option>
+          <option value="d2l-qti21-zip">📗 D2L Brightspace QTI 2.1 — ZIP package</option>
+          <option value="d2l-qti21-xml">📗 D2L Brightspace QTI 2.1 — Single XML file</option>
         </select>
       </div>
       <div class="field">
@@ -2019,10 +2021,18 @@ function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 // KaTeX (renderMathInElement) then processes the math after DOM insertion.
 function renderLatex(s){
   if(!s) return '';
+  // Patterns that look like $...$ but are NOT math — strip the delimiters
+  // Covers: IP addresses, CIDR prefixes, plain numbers, subnet masks
+  var plainDollar = /^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|\d+(?:\.\d+)?\/\d*|[\d.]+)\$$/;
   // Split on $$...$$ (display) and $...$ (inline), preserving the delimiters
   var parts = String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g);
   return parts.map(function(p){
-    if(p.startsWith('$$') || p.startsWith('$')) return p; // math — pass through raw
+    if(p.startsWith('$$')) return p; // display math — always pass through
+    if(p.startsWith('$')){
+      // Strip $ delimiters if the content looks like a plain value, not math
+      if(plainDollar.test(p)) return p.slice(1,-1); // remove the $ wrappers
+      return p; // real math — pass through raw
+    }
     return p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }).join('');
 }
@@ -2308,7 +2318,7 @@ function buildPrompt(){
   const notationNote = notation==='latex'
     ? (domain === 'stem'
         ? 'All mathematical expressions, equations, variables, and units MUST use LaTeX notation with $...$ for inline and $$...$$ for display equations. Every variable (e.g. $F$, $m$, $v$) must be in math mode. Never write math in plain text. IMPORTANT: Never use $ as a currency symbol — $ is reserved as a math delimiter. If a physics or engineering problem involves a dollar amount, write it as plain text (e.g. "500 dollars" or "USD 500").'
-        : 'Use LaTeX notation ($...$) for mathematical formulas and equations ONLY. CRITICAL: Never use the $ symbol as a currency indicator inside question text — the $ character is reserved as a math delimiter and will cause rendering errors. Write all dollar amounts as plain numerals with the word "dollars" or use USD notation: write "40,000 dollars" or "USD 40,000", never "$40,000" in the stem or choices. Percentages (e.g. 5%), unit labels (e.g. mg/kg, mL), and currency amounts are always plain text.')
+        : 'Use LaTeX notation ($...$) for mathematical formulas and equations ONLY. CRITICAL — items that must NEVER be wrapped in $...$: (1) Currency — write "40,000 dollars" or "USD 40,000", never "$40,000". (2) IP addresses — write 192.168.10.0 not $192.168.10.0$. (3) CIDR prefix lengths — write /24 or prefix-length 24, never $/24$. (4) Subnet masks like 255.255.255.0 — plain text only. (5) Percentages like 5%, unit labels like mg/kg or mL — plain text only. The $ character is a math delimiter; using it around non-math text causes broken rendering.')
     : 'Use plain text for all mathematical notation. Avoid special symbols.';
 
   const qtypeInstructions = [];
@@ -3146,6 +3156,26 @@ $('btnExport').addEventListener('click', async()=>{
       msg.textContent='✓ Student study guide exported — '+qs.length+' questions, no answers. Open in browser and print to PDF.';
       toast('Study guide downloaded!','success');
 
+    } else if(fmt==='d2l-qti21-xml'){
+      const xml = buildD2LQTI21XML(qs, bankName);
+      dlBlob(new Blob([xml],{type:'application/xml'}), bankName.replace(/\s+/g,'_')+'_D2L_QTI21.xml');
+      msg.className='status-msg ok show'; msg.style.display='';
+      msg.textContent='✓ D2L QTI 2.1 XML exported — '+qs.length+' questions. Import via: Course Admin → Import/Export/Copy Components.';
+      toast('D2L QTI 2.1 XML downloaded!','success');
+
+    } else if(fmt==='d2l-qti21-zip'){
+      const zip = new JSZip();
+      zip.file('imsmanifest.xml', buildD2LManifest(qs, bankName));
+      qs.forEach(function(q,idx){
+        var qid = 'q_'+(q.id||idx);
+        zip.file(qid+'.xml', buildD2LItemXML(q, idx, bankName));
+      });
+      const blob = await zip.generateAsync({type:'blob'});
+      dlBlob(blob, bankName.replace(/\s+/g,'_')+'_D2L_QTI21.zip');
+      msg.className='status-msg ok show'; msg.style.display='';
+      msg.textContent='✓ D2L QTI 2.1 ZIP exported — '+qs.length+' questions + manifest. Import via: Course Admin → Import/Export/Copy Components.';
+      toast('D2L QTI 2.1 ZIP downloaded!','success');
+
     } else {
       // QTI variants (qti-calc, qti-sa, qti-mixed)
       let banks = [{name:bankName, questions:qs}];
@@ -3164,6 +3194,341 @@ $('btnExport').addEventListener('click', async()=>{
   $('btnExport').disabled=false;
   $('btnExport').textContent='⬇ Download';
 });
+
+
+// ================================================================
+// D2L BRIGHTSPACE QTI 2.1 BUILDER
+// ================================================================
+
+function escXml(s){
+  return String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&apos;');
+}
+
+// Strip LaTeX delimiters for plain-text contexts (D2L renders its own math)
+function stripLatex(s){
+  return String(s||'')
+    .replace(/\$\$([^$]+)\$\$/g,'$1')
+    .replace(/\$([^$\n]+)\$/g,'$1')
+    .replace(/\\text\{([^}]*)\}/g,'$1')
+    .replace(/\\cdot/g,'·')
+    .replace(/\\times/g,'×')
+    .replace(/\\div/g,'÷')
+    .replace(/\\pm/g,'±')
+    .replace(/\\leq/g,'≤')
+    .replace(/\\geq/g,'≥')
+    .replace(/\\approx/g,'≈')
+    .replace(/\\infty/g,'∞')
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)')
+    .replace(/\\sqrt\{([^}]+)\}/g,'sqrt($1)')
+    .replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1')
+    .replace(/\\[a-zA-Z]+/g,'')
+    .replace(/[{}]/g,'')
+    .replace(/_/g,'')
+    .replace(/\^/g,'')
+    .trim();
+}
+
+function buildD2LQTI21XML(questions, bankName){
+  var now = new Date().toISOString();
+  var safeName = escXml(bankName);
+
+  // Map tool question types → QTI 2.1 interaction types
+  function getInteractionType(q){
+    var t = (q.type||'').toLowerCase();
+    if(t==='essay'||t==='command_response') return 'extendedText';
+    if(t==='short_answer') return 'extendedTextShort';
+    if(t==='fill_in_the_blank') return 'textEntry';
+    return 'choice'; // numerical_mc, conceptual, symbolic, default
+  }
+
+  function buildChoiceItem(q, idx){
+    var qid = 'q_'+(q.id||idx);
+    var stem = escXml(stripLatex(q.stem||''));
+    var choices = (q.choices||[]);
+    var correctLetter = (q.correct||'A').toUpperCase();
+    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+
+    // Build choice identifiers
+    var choiceIds = choices.map(function(c){ return 'ch_'+qid+'_'+c.letter.toUpperCase(); });
+    var correctId = 'ch_'+qid+'_'+correctLetter;
+
+    var choicesXml = choices.map(function(c,ci){
+      return '        <simpleChoice identifier="'+choiceIds[ci]+'">'+escXml(stripLatex(c.text))+'</simpleChoice>';
+    }).join('\n');
+
+    var feedbackXml = feedback
+      ? '\n  <modalFeedback identifier="fb_'+qid+'_correct" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
+      : '';
+
+    var feedbackRef = feedback
+      ? '\n    <setOutcomeValue identifier="FEEDBACK">\n      <baseValue baseType="identifier">fb_'+qid+'_correct</baseValue>\n    </setOutcomeValue>'
+      : '';
+
+    return '<!-- Question '+(idx+1)+': '+escXml((q.type||'mc'))+' | '+escXml(q.difficulty||'medium')+' -->\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'"\n'+
+'  title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false"\n'+
+'  timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">\n'+
+'    <correctResponse>\n'+
+'      <value>'+correctId+'</value>\n'+
+'    </correctResponse>\n'+
+'  </responseDeclaration>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+(feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '')+
+'  <itemBody>\n'+
+'    <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1">\n'+
+'      <prompt>'+stem+'</prompt>\n'+
+choicesXml+'\n'+
+'    </choiceInteraction>\n'+
+'  </itemBody>\n'+
+'  <responseProcessing>\n'+
+'    <responseCondition>\n'+
+'      <responseIf>\n'+
+'        <match><variable identifier="RESPONSE"/><correct identifier="RESPONSE"/></match>\n'+
+'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">1</baseValue></setOutcomeValue>'+
+feedbackRef+'\n'+
+'      </responseIf>\n'+
+'    </responseCondition>\n'+
+'  </responseProcessing>\n'+
+feedbackXml+'\n'+
+'</assessmentItem>';
+  }
+
+  function buildTextEntryItem(q, idx){
+    var qid = 'q_'+(q.id||idx);
+    var stem = escXml(stripLatex(q.stem||''));
+    var correct = escXml(stripLatex(q.correct||''));
+    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+    var feedbackXml = feedback
+      ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
+      : '';
+
+    return '<!-- Question '+(idx+1)+': fill_in_the_blank -->\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'"\n'+
+'  title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string">\n'+
+'    <correctResponse><value>'+correct+'</value></correctResponse>\n'+
+'  </responseDeclaration>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+(feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '')+
+'  <itemBody>\n'+
+'    <p>'+stem+'</p>\n'+
+'    <textEntryInteraction responseIdentifier="RESPONSE" expectedLength="30"/>\n'+
+'  </itemBody>\n'+
+'  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p1/rptemplates/match_correct"/>\n'+
+feedbackXml+'\n'+
+'</assessmentItem>';
+  }
+
+  function buildExtendedTextItem(q, idx, isShort){
+    var qid = 'q_'+(q.id||idx);
+    var stem = escXml(stripLatex(q.stem||''));
+    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+    var feedbackXml = feedback
+      ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
+      : '';
+    var expectedLines = isShort ? '3' : '10';
+    var expectedChars = isShort ? '200' : '1000';
+
+    return '<!-- Question '+(idx+1)+': '+(isShort?'short_answer':'essay')+' -->\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'"\n'+
+'  title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+(feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '')+
+'  <itemBody>\n'+
+'    <extendedTextInteraction responseIdentifier="RESPONSE"\n'+
+'      expectedLines="'+expectedLines+'" expectedLength="'+expectedChars+'">\n'+
+'      <prompt>'+stem+'</prompt>\n'+
+'    </extendedTextInteraction>\n'+
+'  </itemBody>\n'+
+feedbackXml+'\n'+
+'</assessmentItem>';
+  }
+
+  // Build all items
+  var items = questions.map(function(q, idx){
+    var itype = getInteractionType(q);
+    if(itype === 'textEntry')        return buildTextEntryItem(q, idx);
+    if(itype === 'extendedTextShort') return buildExtendedTextItem(q, idx, true);
+    if(itype === 'extendedText')      return buildExtendedTextItem(q, idx, false);
+    return buildChoiceItem(q, idx);
+  });
+
+  // Wrap in assessmentTest
+  var itemRefs = questions.map(function(q, idx){
+    return '      <assessmentItemRef identifier="q_'+(q.id||idx)+'" href="q_'+(q.id||idx)+'.xml" required="false" fixed="false"/>';
+  }).join('\n');
+
+  // For single-file export, embed all items concatenated with XML declarations
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<!-- D2L Brightspace QTI 2.1 Export -->\n'+
+'<!-- Bank: '+safeName+' | '+questions.length+' questions | Generated: '+now+' -->\n'+
+'<!-- Import via: D2L > Course Admin > Import/Export/Copy Components > Import Components -->\n\n'+
+items.join('\n\n<!-- ─────────────────────────────────────────── -->\n\n');
+}
+
+function buildD2LManifest(questions, bankName){
+  var safeName = escXml(bankName);
+  var now = new Date().toISOString();
+  var resources = questions.map(function(q, idx){
+    var qid = 'q_'+(q.id||idx);
+    return '    <resource identifier="'+qid+'" type="imsqti_item_xmlv2p1" href="'+qid+'.xml">\n'+
+'      <file href="'+qid+'.xml"/>\n'+
+'    </resource>';
+  }).join('\n');
+
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"\n'+
+'  xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_v1p2"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imscp_v1p1 http://www.imsglobal.org/xsd/imscp_v1p1p2.xsd"\n'+
+'  identifier="'+safeName.replace(/\s+/g,'_')+'_manifest">\n'+
+'  <metadata>\n'+
+'    <schema>IMS Content</schema>\n'+
+'    <schemaversion>1.1.3</schemaversion>\n'+
+'    <imsmd:lom>\n'+
+'      <imsmd:general>\n'+
+'        <imsmd:title><imsmd:langstring xml:lang="en">'+safeName+'</imsmd:langstring></imsmd:title>\n'+
+'      </imsmd:general>\n'+
+'    </imsmd:lom>\n'+
+'  </metadata>\n'+
+'  <organizations/>\n'+
+'  <resources>\n'+
+resources+'\n'+
+'  </resources>\n'+
+'</manifest>';
+}
+
+function buildD2LItemXML(q, idx, bankName){
+  var safeName = escXml(bankName);
+  var qid = 'q_'+(q.id||idx);
+  var itype = (function(){
+    var t = (q.type||'').toLowerCase();
+    if(t==='essay'||t==='command_response') return 'extendedText';
+    if(t==='short_answer') return 'extendedTextShort';
+    if(t==='fill_in_the_blank') return 'textEntry';
+    return 'choice';
+  })();
+
+  var stem = escXml(stripLatex(q.stem||''));
+  var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+
+  if(itype === 'choice'){
+    var choices = (q.choices||[]);
+    var correctLetter = (q.correct||'A').toUpperCase();
+    var correctId = 'ch_'+qid+'_'+correctLetter;
+    var choicesXml = choices.map(function(c){
+      return '        <simpleChoice identifier="ch_'+qid+'_'+c.letter.toUpperCase()+'">'+escXml(stripLatex(c.text))+'</simpleChoice>';
+    }).join('\n');
+    var feedbackXml = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
+    var feedbackDecl = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
+    var feedbackRef = feedback ? '\n        <setOutcomeValue identifier="FEEDBACK"><baseValue baseType="identifier">fb_'+qid+'</baseValue></setOutcomeValue>' : '';
+
+    return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">\n'+
+'    <correctResponse><value>'+correctId+'</value></correctResponse>\n'+
+'  </responseDeclaration>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+feedbackDecl+
+'  <itemBody>\n'+
+'    <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1">\n'+
+'      <prompt>'+stem+'</prompt>\n'+
+choicesXml+'\n'+
+'    </choiceInteraction>\n'+
+'  </itemBody>\n'+
+'  <responseProcessing>\n'+
+'    <responseCondition>\n'+
+'      <responseIf>\n'+
+'        <match><variable identifier="RESPONSE"/><correct identifier="RESPONSE"/></match>\n'+
+'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">1</baseValue></setOutcomeValue>'+feedbackRef+'\n'+
+'      </responseIf>\n'+
+'    </responseCondition>\n'+
+'  </responseProcessing>\n'+
+feedbackXml+'\n'+
+'</assessmentItem>';
+  }
+
+  if(itype === 'textEntry'){
+    var correct = escXml(stripLatex(q.correct||''));
+    var feedbackXml2 = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
+    var feedbackDecl2 = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
+    return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string">\n'+
+'    <correctResponse><value>'+correct+'</value></correctResponse>\n'+
+'  </responseDeclaration>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+feedbackDecl2+
+'  <itemBody><p>'+stem+'</p>\n'+
+'    <textEntryInteraction responseIdentifier="RESPONSE" expectedLength="30"/>\n'+
+'  </itemBody>\n'+
+'  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p1/rptemplates/match_correct"/>\n'+
+feedbackXml2+'\n'+
+'</assessmentItem>';
+  }
+
+  // extendedText / extendedTextShort
+  var isShort = itype === 'extendedTextShort';
+  var feedbackXml3 = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
+  var feedbackDecl3 = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+feedbackDecl3+
+'  <itemBody>\n'+
+'    <extendedTextInteraction responseIdentifier="RESPONSE"\n'+
+'      expectedLines="'+(isShort?'3':'10')+'" expectedLength="'+(isShort?'200':'1000')+'">\n'+
+'      <prompt>'+stem+'</prompt>\n'+
+'    </extendedTextInteraction>\n'+
+'  </itemBody>\n'+
+feedbackXml3+'\n'+
+'</assessmentItem>';
+}
+
 
 // ── Study Guide builder ──────────────────────────────────────────────────
 function generateStudyGuide(questions, bankName, courseTitle){
