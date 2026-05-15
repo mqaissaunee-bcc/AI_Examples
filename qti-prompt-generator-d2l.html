@@ -47,6 +47,31 @@
 html { scroll-behavior: smooth; }
 
 
+
+/* ── Non-quantitative discipline collapse ────────────────────────── */
+.quant-section {
+  transition: opacity .25s ease, max-height .3s ease;
+  overflow: hidden;
+  max-height: 1200px;
+}
+.quant-section.quant-hidden {
+  max-height: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+}
+.non-quant-notice {
+  display: none;
+  font-size: .82rem;
+  color: #888;
+  font-style: italic;
+  padding: 6px 0 2px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.non-quant-notice.visible { display: block; }
+
 /* ── Domain Tab Strip ─────────────────────────────────────────────── */
 .domain-tabs {
   display: flex; gap: 0; background: var(--slate); border-bottom: 2px solid var(--border);
@@ -1553,7 +1578,7 @@ input[type=range] { accent-color: #005f80; }
   </div>
 
   <!-- Numerical settings -->
-  <div class="section-card">
+  <div class="section-card quant-section" id="notationSection">
     <h3>🔢 Numerical &amp; Notation Settings</h3>
     <div class="form-grid">
       <div class="field">
@@ -1587,7 +1612,7 @@ input[type=range] { accent-color: #005f80; }
       </div>
     </div>
     <!-- Additional Instructions: checkboxes + free text -->
-    <div class="field" style="margin-top:14px;">
+    <div class="field quant-section" id="additionalInstrSection" style="margin-top:14px;">
       <div class="field-label" style="margin-bottom:10px;">Additional Instructions (optional)</div>
 
       <!-- Problem Style — always shown -->
@@ -1847,11 +1872,13 @@ Tip: LLMs with web access (Claude, GPT-4o, Gemini) will fetch URLs automatically
   <!-- Export section (shown after validation) -->
   <div class="section-card" id="exportCard" style="display:none;">
     <h3>⬇ Export to Brightspace</h3>
-    <div class="export-verify-bar" id="verifyBar" role="status" aria-live="polite">
+    <div class="quant-section" id="verifySection">
+<div class="export-verify-bar" id="verifyBar" role="status" aria-live="polite">
       <span class="verify-count-pill" id="verifyPill">0/0 verified</span>
       <span id="verifyMsg">Please verify each question's calculation before exporting.</span>
       <button class="btn btn-ghost" id="btnVerifyAll" onclick="verifyAll()" style="padding:4px 12px;font-size:.68rem;margin-left:auto;flex-shrink:0;" title="Mark all questions as verified">✓ Verify All</button>
     </div>
+</div><!-- /verifySection -->
     <div class="export-grid">
       <div class="field">
         <label class="field-label" for="expFormat">Format</label>
@@ -2184,6 +2211,8 @@ function updateDomainCheckboxes(){
     var panel = cb.closest('.instr-group');
     if(panel && panel.style.display === 'none') cb.checked = false;
   });
+  // Sync quantitative control visibility
+  updateQuantitativeControls();
 }
 
 function getInstrCheckboxText(){
@@ -3908,6 +3937,58 @@ function generateStudyGuide(questions, bankName, courseTitle){
 
 
 
+
+// ================================================================
+// NON-QUANTITATIVE DISCIPLINE CONTROLS
+// ================================================================
+var NON_QUANT_SUBJECTS = new Set([
+  'hum-history','hum-polisci','hum-intlrel',
+  'hum-comm','hum-writing','hum-journalism',
+  'hum-psych','hum-sociology','hum-education',
+  'hum-english','hum-philosophy','hum-arts'
+]);
+
+function isNonQuantitative(){
+  if(currentDomain === 'hum') return true;
+  var subj = $('subject') ? $('subject').value : '';
+  return NON_QUANT_SUBJECTS.has(subj);
+}
+
+function updateQuantitativeControls(){
+  var hide = isNonQuantitative();
+  var sections = ['notationSection','additionalInstrSection','verifySection'];
+  sections.forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    if(hide){
+      el.classList.add('quant-hidden');
+      // Add or show the notice
+      var notice = el.querySelector('[data-quant-notice]');
+      if(!notice){
+        notice = document.createElement('p');
+        notice.setAttribute('data-quant-notice','');
+        notice.className = 'non-quant-notice';
+        notice.textContent = 'Not applicable for non-quantitative disciplines.';
+        el.parentNode.insertBefore(notice, el.nextSibling);
+      }
+      notice.classList.add('visible');
+    } else {
+      el.classList.remove('quant-hidden');
+      var notice = el.parentNode ? el.parentNode.querySelector('[data-quant-notice]') : null;
+      if(notice) notice.classList.remove('visible');
+    }
+  });
+
+  // Also uncheck numerical_mc and symbolic qtypes when non-quantitative
+  // and re-check multiple_choice + conceptual + scenario as defaults
+  if(hide){
+    ['numerical_mc','symbolic','free_response'].forEach(function(v){
+      var cb = document.querySelector('input[name="qtype"][value="'+v+'"]');
+      if(cb){ cb.checked = false; cb.closest('label').classList.remove('checked'); }
+    });
+  }
+}
+
 // ================================================================
 // DOMAIN TAB STRIP
 // ================================================================
@@ -3949,6 +4030,9 @@ function switchDomain(domain){
       ? 'LaTeX required for all math and units.'
       : 'LaTeX for formulas only. Plain text for currency, IP addresses, and units.';
   }
+
+  // Show/hide quantitative controls
+  updateQuantitativeControls();
 }
 
 // Initialize on load — hide non-STEM optgroups
