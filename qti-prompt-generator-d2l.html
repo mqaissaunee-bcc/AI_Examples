@@ -1,0 +1,3967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Brightspace Question Bank Generator</title>
+<!-- KaTeX for LaTeX rendering -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<!-- JSZip for export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" onerror="this.remove();var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';document.head.appendChild(s);"></script>
+<style>
+/* ── Design: Scientific / Instrument-grade aesthetic ─────────────────────
+   Monospace accents, precise grid, deep slate + electric cyan + amber.
+   Feels like a lab instrument dashboard — authoritative, exacting.
+──────────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&family=IBM+Plex+Serif:ital,wght@0,400;1,400&display=swap');
+
+:root {
+  --navy:       #f0f4ff;
+  --slate:      #e4eaf5;
+  --slate-mid:  #d8e0f0;
+  --border:     #b8c8e0;
+  --cyan:       #005f80;
+  --cyan-dim:   #004060;
+  --amber:      #8a5000;
+  --amber-dim:  #6a3800;
+  --green:      #006840;
+  --red:        #900000;
+  --white:      #1a2744;
+  --gray-light: #3a4a6a;
+  --gray-mid:   #6a7a9a;
+  --card-bg:    #ffffff;
+  --input-bg:   #f8faff;
+  --radius:     6px;
+  --font-mono:  'IBM Plex Mono', monospace;
+  --font-body:  'IBM Plex Sans', sans-serif;
+  --font-serif: 'IBM Plex Serif', serif;
+  --focus-ring: 0 0 0 3px rgba(0,95,128,.25);
+  --shadow:     0 4px 20px rgba(0,0,0,.12);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+
+/* ── Domain Tab Strip ─────────────────────────────────────────────── */
+.domain-tabs {
+  display: flex; gap: 0; background: var(--slate); border-bottom: 2px solid var(--border);
+  padding: 0 24px; flex-wrap: wrap;
+}
+.domain-tab {
+  padding: 10px 20px; border: none; background: transparent; cursor: pointer;
+  font-size: .85rem; font-weight: 600; color: var(--gray-mid); border-bottom: 3px solid transparent;
+  margin-bottom: -2px; transition: color .15s, border-color .15s; font-family: var(--font-body);
+  white-space: nowrap;
+}
+.domain-tab:hover  { color: var(--cyan); }
+.domain-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); background: transparent; }
+.domain-tab:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+
+body {
+  font-family: var(--font-body);
+  background: #f0f4ff;
+  color: #1a2744;
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.site-header {
+  background: #1a2744;
+  border-bottom: 3px solid #005f80;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 56px;
+}
+.site-header .logo   { color: #60c8f0; }
+.site-header .logo span { color: #f5a623; }
+.site-header .tagline { color: rgba(255,255,255,.6); border-left: 1px solid rgba(255,255,255,.2); padding-left: 16px; font-size: .72rem; }
+.header-badge { background: rgba(0,95,128,.35); color: #a0e0ff; border: 1px solid rgba(0,200,224,.4); border-radius: 4px; padding: 3px 9px; font-family: var(--font-mono); font-size: .65rem; font-weight: 600; letter-spacing: .06em; margin-left: auto; }
+
+/* ── Warning banner ──────────────────────────────────────────────────── */
+.warn-banner {
+  background: rgba(245,166,35,.08);
+  border-top: 3px solid var(--amber);
+  border-bottom: 1px solid rgba(245,166,35,.2);
+  padding: 10px 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: .82rem;
+  color: #c8a060;
+  line-height: 1.5;
+}
+.warn-banner .wi { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+.warn-banner strong { color: var(--amber); }
+
+/* ── Tab navigation ──────────────────────────────────────────────────── */
+.tab-nav {
+  background: var(--slate);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  padding: 0 24px;
+  gap: 2px;
+  overflow-x: auto;
+}
+.tab-btn {
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  color: var(--gray-light);
+  padding: 14px 18px 12px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn:hover { color: var(--white); }
+.tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.tab-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Main layout ─────────────────────────────────────────────────────── */
+.main-wrap {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+}
+
+/* ── Panel header ────────────────────────────────────────────────────── */
+.panel-head {
+  margin-bottom: 24px;
+}
+.panel-head h2 {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.panel-head p {
+  font-size: .85rem;
+  color: var(--gray-light);
+  line-height: 1.6;
+}
+
+/* ── Form elements ───────────────────────────────────────────────────── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.form-grid.full { grid-template-columns: 1fr; }
+@media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-label {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  font-weight: 600;
+  color: var(--gray-light);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.field-hint {
+  font-size: .75rem;
+  color: var(--gray-mid);
+  line-height: 1.5;
+}
+
+input[type=text], input[type=number], select, textarea {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--white);
+  font-family: var(--font-body);
+  font-size: .87rem;
+  padding: 9px 12px;
+  width: 100%;
+  transition: border-color .15s;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: var(--focus-ring);
+}
+select option { background: var(--slate); }
+textarea { resize: vertical; }
+
+/* ── Section card ────────────────────────────────────────────────────── */
+.section-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 22px 24px;
+  margin-bottom: 20px;
+  position: relative;
+}
+.section-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan), transparent);
+  border-radius: 8px 8px 0 0;
+}
+.section-card h3 {
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Checkbox grid ───────────────────────────────────────────────────── */
+.check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: .82rem;
+  color: var(--gray-light);
+  transition: border-color .15s, color .15s;
+  user-select: none;
+}
+.check-item:hover { border-color: var(--cyan-dim); color: var(--white); }
+.check-item.checked { border-color: var(--cyan); color: var(--cyan); background: rgba(0,200,224,.07); }
+.check-item input[type=checkbox] { accent-color: var(--cyan); width: 14px; height: 14px; }
+
+/* ── Slider ──────────────────────────────────────────────────────────── */
+.slider-wrap { display: flex; align-items: center; gap: 14px; }
+input[type=range] {
+  flex: 1;
+  accent-color: var(--cyan);
+  height: 4px;
+  cursor: pointer;
+}
+.slider-val {
+  font-family: var(--font-mono);
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--cyan);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-primary { background: var(--cyan); color: var(--navy); }
+.btn-primary:hover:not(:disabled) { background: #00e0fa; }
+.btn-amber { background: var(--amber); color: var(--navy); }
+.btn-amber:hover:not(:disabled) { background: #ffc040; }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--gray-light); }
+.btn-ghost:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+.btn-danger { background: transparent; border: 1px solid var(--red); color: var(--red); }
+.btn-danger:hover:not(:disabled) { background: rgba(224,85,85,.1); }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+
+/* ── Prompt output ───────────────────────────────────────────────────── */
+.prompt-out-wrap { display: none; margin-top: 24px; }
+.prompt-out-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.prompt-out-head h3 {
+  font-family: var(--font-mono);
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+#promptOutput {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  font-family: var(--font-mono);
+  font-size: .75rem;
+  color: #a0b8d8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 420px;
+  overflow-y: auto;
+  line-height: 1.7;
+}
+.token-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: .75rem;
+  color: var(--gray-mid);
+}
+.token-pill {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.token-pill.ok { background: rgba(0,200,122,.12); color: var(--green); border: 1px solid rgba(0,200,122,.3); }
+.token-pill.warn { background: rgba(245,166,35,.12); color: var(--amber); border: 1px solid rgba(245,166,35,.3); }
+.token-pill.over { background: rgba(224,85,85,.12); color: var(--red); border: 1px solid rgba(224,85,85,.3); }
+
+/* ── LLM destination cards ───────────────────────────────────────────── */
+.llm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 14px; margin-top: 4px; }
+.llm-card {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.llm-card:hover { border-color: var(--cyan-dim); }
+.llm-card.selected { border-color: var(--cyan); background: rgba(0,200,224,.06); }
+.llm-card input[type=radio] { display: none; }
+.llm-name { font-weight: 700; font-size: .85rem; margin-bottom: 4px; }
+.llm-note { font-size: .72rem; color: var(--gray-light); line-height: 1.5; }
+.llm-badge {
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-top: 6px;
+  display: inline-block;
+}
+.llm-best { background: rgba(0,200,122,.15); color: var(--green); border: 1px solid rgba(0,200,122,.3); }
+.llm-good { background: rgba(0,200,224,.12); color: var(--cyan); border: 1px solid rgba(0,200,224,.25); }
+.llm-ok   { background: rgba(245,166,35,.12); color: var(--amber); border: 1px solid rgba(245,166,35,.25); }
+
+/* ── Review panel ────────────────────────────────────────────────────── */
+.review-wrap { display: none; margin-top: 24px; }
+.review-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.stat-chip {
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  color: var(--gray-light);
+  letter-spacing: .04em;
+}
+.q-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.q-card:hover { border-color: var(--cyan-dim); }
+.q-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+.q-num {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  font-weight: 600;
+  color: var(--cyan);
+  background: rgba(0,200,224,.1);
+  border: 1px solid var(--cyan-dim);
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.q-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
+.q-badge {
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 3px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.badge-type   { background: rgba(0,200,224,.12); color: var(--cyan);  border: 1px solid rgba(0,200,224,.25); }
+.badge-diff   { background: rgba(245,166,35,.12); color: var(--amber); border: 1px solid rgba(245,166,35,.25); }
+.badge-bloom  { background: rgba(0,200,122,.1);   color: var(--green); border: 1px solid rgba(0,200,122,.2); }
+.badge-stem   { background: rgba(160,120,255,.12);color: #b090ff;     border: 1px solid rgba(160,120,255,.25); }
+.badge-subj   { background: rgba(255,160,100,.1); color: #ffaa66;     border: 1px solid rgba(255,160,100,.25); }
+.q-stem {
+  font-size: .88rem;
+  color: var(--white);
+  line-height: 1.6;
+  flex: 1;
+}
+.q-actions { display: flex; gap: 6px; align-items: flex-start; flex-shrink: 0; }
+.q-act-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--gray-light);
+  font-size: .8rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: all .15s;
+}
+.q-act-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.q-act-btn.del:hover { border-color: var(--red); color: var(--red); }
+
+.q-card-body { display: none; padding: 0 16px 14px; }
+.q-card-body.open { display: block; }
+
+.choices-list { list-style: none; margin: 10px 0; display: flex; flex-direction: column; gap: 5px; }
+.choice-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: .84rem;
+}
+.choice-item.correct { border-color: var(--green); background: rgba(0,200,122,.05); }
+.choice-letter {
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--gray-light);
+  min-width: 20px;
+  margin-top: 1px;
+}
+.choice-item.correct .choice-letter { color: var(--green); }
+.choice-error {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  color: var(--gray-mid);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.solution-toggle {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: none;
+  border: 1px solid var(--amber-dim);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all .15s;
+}
+.solution-toggle:hover { border-color: var(--amber); background: rgba(245,166,35,.08); }
+
+.solution-box {
+  display: none;
+  background: rgba(245,166,35,.05);
+  border: 1px solid rgba(245,166,35,.2);
+  border-radius: 4px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  font-size: .83rem;
+  line-height: 1.8;
+  color: #c8a860;
+}
+.solution-box.open { display: block; }
+.solution-box .sol-head {
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 8px;
+}
+
+.rationale-box {
+  background: rgba(0,200,224,.04);
+  border-left: 3px solid var(--cyan-dim);
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: .82rem;
+  color: var(--gray-light);
+  line-height: 1.6;
+  border-radius: 0 4px 4px 0;
+}
+
+
+/* Tolerance field per-question */
+.tolerance-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: .82rem;
+  color: var(--gray-light);
+}
+.tolerance-row input[type=number] {
+  width: 80px;
+  padding: 5px 8px;
+  font-family: var(--font-mono);
+  font-size: .82rem;
+}
+.tolerance-row select { width: 110px; font-size: .82rem; }
+
+/* ── JSON paste area ─────────────────────────────────────────────────── */
+.json-area {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  color: #a0b8d8;
+  resize: vertical;
+  min-height: 220px;
+  width: 100%;
+  line-height: 1.7;
+}
+.json-area:focus { outline: none; border-color: var(--cyan); box-shadow: var(--focus-ring); }
+
+/* ── Status message ──────────────────────────────────────────────────── */
+.status-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: .84rem;
+  margin-top: 14px;
+  display: none;
+}
+.status-msg.show { display: flex; }
+.status-msg.ok  { background: rgba(0,200,122,.08); border: 1px solid rgba(0,200,122,.25); color: #80e0b0; }
+.status-msg.err { background: rgba(224,85,85,.08);  border: 1px solid rgba(224,85,85,.25);  color: #e09090; }
+.status-msg.warn { background: rgba(245,166,35,.08); border: 1px solid rgba(245,166,35,.25); color: #c8a060; }
+
+/* ── Edit modal ──────────────────────────────────────────────────────── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--slate);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h3 {
+  font-family: var(--font-mono);
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.modal-close { background: none; border: none; color: var(--gray-light); font-size: 1.2rem; cursor: pointer; }
+.modal-close:hover { color: var(--white); }
+.modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.modal-foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ── Export section ──────────────────────────────────────────────────── */
+.export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 600px) { .export-grid { grid-template-columns: 1fr; } }
+
+/* ── Toast ───────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--slate);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 18px;
+  font-family: var(--font-mono);
+  font-size: .75rem;
+  color: var(--white);
+  box-shadow: var(--shadow);
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all .25s;
+  z-index: 999;
+  max-width: 340px;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.ok  { border-color: var(--green); color: var(--green); }
+#toast.err { border-color: var(--red);  color: var(--red); }
+
+
+/* ── Verification badge on each card ──────────────────────────── */
+.verify-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+  transition: all .2s;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.verify-badge.needs {
+  background: rgba(245,166,35,.12);
+  color: var(--amber);
+  border: 1px solid rgba(245,166,35,.4);
+}
+.verify-badge.needs:hover {
+  background: rgba(245,166,35,.22);
+  border-color: var(--amber);
+}
+.verify-badge.done {
+  background: rgba(0,200,122,.12);
+  color: var(--green);
+  border: 1px solid rgba(0,200,122,.35);
+}
+.verify-badge.done:hover {
+  background: rgba(0,200,122,.2);
+}
+/* Card gets green left border when verified */
+.q-card.verified {
+  border-left: 3px solid var(--green);
+}
+.q-card.needs-verify {
+  border-left: 3px solid var(--amber);
+}
+
+/* ── Export verification counter ───────────────────────────────── */
+.export-verify-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: .82rem;
+  margin-bottom: 14px;
+  background: rgba(245,166,35,.07);
+  border: 1px solid rgba(245,166,35,.25);
+  color: var(--amber);
+}
+.export-verify-bar.all-verified {
+  background: rgba(0,200,122,.07);
+  border-color: rgba(0,200,122,.25);
+  color: var(--green);
+}
+.verify-count-pill {
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(245,166,35,.15);
+  color: var(--amber);
+  border: 1px solid rgba(245,166,35,.3);
+}
+.verify-count-pill.full {
+  background: rgba(0,200,122,.15);
+  color: var(--green);
+  border-color: rgba(0,200,122,.3);
+}
+
+
+
+/* ── Beta tag ──────────────────────────────────────────────────── */
+.beta-tag {
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  background: rgba(160,100,255,.15);
+  color: #c090ff;
+  border: 1px solid rgba(160,100,255,.35);
+  border-radius: 4px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+
+/* ── Light / dark theme ──────────────────────────────────── */
+
+/* ── Theme toggle button ─────────────────────────────────── */
+.theme-toggle {
+  background: none;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  color: rgba(255,255,255,.75);
+  cursor: pointer;
+  transition: all .2s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 12px;
+}
+.theme-toggle:hover { border-color: rgba(255,255,255,.6); color: #fff; }
+
+
+/* ── Computation verification widget ────────────────────── */
+.verification-widget {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: rgba(0,80,110,.08);
+  border: 1px solid rgba(0,200,224,.2);
+  font-size: .82rem;
+}
+.vw-label {
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  color: var(--gray-light);
+}
+.vw-expr {
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  color: var(--cyan);
+  background: rgba(0,200,224,.06);
+  border-radius: 3px;
+  padding: 3px 8px;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+.vw-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .83rem;
+  font-weight: 600;
+}
+.vw-pass {
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  background: rgba(0,200,122,.1);
+  border: 1px solid rgba(0,200,122,.3);
+  color: var(--green);
+}
+
+.vw-near-miss {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: rgba(138,80,0,.07);
+  border: 1px solid rgba(138,80,0,.3);
+  color: #6a3800;
+  font-size: .83rem;
+}
+.vw-fail {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: rgba(144,0,0,.07);
+  border: 1px solid rgba(144,0,0,.25);
+  color: #600000;
+  font-size: .83rem;
+}
+.vw-fail ol, .vw-near-miss ol {
+  margin: 8px 0 4px 18px;
+  line-height: 1.9;
+  font-size: .81rem;
+}
+.vw-fail .vw-edit-link, .vw-near-miss .vw-edit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  cursor: pointer;
+  background: none;
+  color: inherit;
+  text-decoration: none;
+  transition: background .15s;
+}
+.vw-fail .vw-edit-link:hover     { background: rgba(144,0,0,.1); }
+.vw-near-miss .vw-edit-link:hover { background: rgba(138,80,0,.1); }
+
+.vw-skip {
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  background: rgba(245,166,35,.08);
+  border: 1px solid rgba(245,166,35,.25);
+  color: var(--amber);
+  font-size: .78rem;
+}
+.vw-wa-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--amber);
+  border: 1px solid rgba(245,166,35,.35);
+  border-radius: 4px;
+  padding: 3px 9px;
+  text-decoration: none;
+  transition: all .15s;
+  margin-top: 6px;
+  display: inline-flex;
+}
+.vw-wa-link:hover { border-color: var(--amber); background: rgba(245,166,35,.1); }
+
+
+/* ── Worked solution — more prominent ───────────────────── */
+.solution-box {
+  display: none;
+  background: rgba(245,166,35,.06);
+  border: 2px solid rgba(245,166,35,.3);
+  border-radius: 6px;
+  padding: 16px 18px;
+  margin-top: 10px;
+  font-size: .9rem;
+  line-height: 1.9;
+  color: var(--white);
+}
+.solution-box.open { display: block; }
+.sol-head {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(245,166,35,.2);
+}
+.solution-toggle {
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: rgba(245,166,35,.08);
+  border: 1.5px solid rgba(245,166,35,.4);
+  border-radius: 4px;
+  padding: 6px 14px;
+  cursor: pointer;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all .15s;
+  width: 100%;
+  justify-content: center;
+}
+.solution-toggle:hover {
+  background: rgba(245,166,35,.15);
+  border-color: var(--amber);
+}
+
+
+/* ── Print ───────────────────────────────────────────────── */
+.btn-print {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--gray-light);
+}
+.btn-print:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+@media print {
+  .site-header, .tab-nav, .warn-banner, .progress-bar-wrap,
+  .btn-row, .q-actions, .solution-toggle,
+  .verification-widget, .export-verify-bar, .theme-toggle { display: none !important; }
+  .q-card-body { display: block !important; }
+  .solution-box { display: block !important; border: 1px solid #ccc !important; }
+  body { background: white !important; color: black !important; }
+  .q-card { border: 1px solid #ccc !important; margin-bottom: 16px !important; page-break-inside: avoid; }
+}
+
+/* ── KaTeX overrides ─────────────────────────────────────── */
+.katex { color: var(--white); font-size: 1em; }
+.katex-display { margin: 8px 0; overflow-x: auto; }
+
+/* ── LLM jump links ──────────────────────────────────────── */
+.llm-jump-section {
+  margin-top: 20px;
+  padding: 16px 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.llm-jump-label {
+  font-family: var(--font-mono);
+  font-size: .67rem;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--gray-light);
+  margin-bottom: 10px;
+}
+.llm-jump-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.llm-jump-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 20px;
+  border: 1.5px solid var(--llm-color, var(--border));
+  color: var(--llm-color, var(--gray-light));
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-decoration: none;
+  transition: all .15s;
+}
+.llm-jump-btn:hover {
+  background: color-mix(in srgb, var(--llm-color) 12%, transparent);
+  text-decoration: none;
+}
+.llm-jump-icon { font-size: .8rem; }
+
+/* ── Font size control ───────────────────────────────────── */
+.font-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+.font-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 4px;
+  color: rgba(255,255,255,.85);
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: all .15s;
+}
+.font-btn:hover { border-color: rgba(255,255,255,.6); color: #fff; }
+.font-size-label {
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  color: rgba(255,255,255,.5);
+  min-width: 28px;
+  text-align: center;
+}
+/* Font size steps applied to body */
+body.fs-large  { font-size: 17px; }
+body.fs-larger { font-size: 19px; }
+
+/* ── Header contrast improvements ────────────────────────── */
+/* Dark mode: header stays dark navy — improve text contrast */
+.site-header .logo,
+.site-header .tagline,
+.header-badge,
+.beta-tag {
+  /* already on dark bg — ensure visibility */
+}
+/* Light mode: header stays dark so badges remain legible */
+
+
+/* ── Light mode element adjustments ─────────────────────── */
+.warn-banner { background: #fff8e6; border-top-color: #c07800; color: #6a4000; border-bottom: 1px solid #f0d080; }
+.warn-banner strong { color: #8a5000; }
+.tab-nav { background: #e4eaf5; border-bottom: 1px solid #b8c8e0; }
+.tab-btn { color: #4a5a7a; }
+.tab-btn.active { color: #005f80; border-bottom-color: #005f80; }
+.tab-btn:hover { color: #1a2744; }
+.section-card { background: #ffffff; border-color: #b8c8e0; }
+.section-card::before { background: linear-gradient(90deg, #005f80, transparent); }
+.section-card h3 { color: #005f80; }
+.panel-head h2 { color: #005f80; }
+input[type=text], input[type=number], input[type=password], select, textarea {
+  background: #ffffff; border-color: #b8c8e0; color: #1a2744;
+}
+input:focus, select:focus, textarea:focus { border-color: #005f80; }
+select option { background: #ffffff; color: #1a2744; }
+.check-item { background: #f0f4ff; border-color: #b8c8e0; color: #4a5a7a; }
+.check-item:hover { border-color: #005f80; color: #1a2744; }
+.check-item.checked { border-color: #005f80; color: #005f80; background: rgba(0,95,128,.07); }
+.check-item input[type=checkbox] { accent-color: #005f80; }
+input[type=range] { accent-color: #005f80; }
+.slider-val { color: #005f80; }
+.btn-primary { background: #005f80; color: #ffffff; }
+.btn-primary:hover:not(:disabled) { background: #007aa0; }
+.btn-amber, .btn-cyan { background: #005f80; color: #ffffff; }
+.btn-amber:hover:not(:disabled), .btn-cyan:hover:not(:disabled) { background: #007aa0; }
+.btn-ghost { border-color: #b8c8e0; color: #4a5a7a; }
+.btn-ghost:hover:not(:disabled) { border-color: #005f80; color: #005f80; }
+.q-card { background: #ffffff; border-color: #b8c8e0; }
+.q-card:hover { border-color: #005f80; }
+.q-card.needs-verify { border-left-color: #c07800; }
+.q-card.verified { border-left-color: #006840; }
+.q-num { background: rgba(0,95,128,.08); border-color: #005f80; color: #005f80; }
+.q-badge.badge-type   { background: rgba(0,95,128,.1);  color: #005f80; border-color: rgba(0,95,128,.25); }
+.q-badge.badge-diff   { background: rgba(138,80,0,.1);  color: #8a5000; border-color: rgba(138,80,0,.25); }
+.q-badge.badge-bloom  { background: rgba(0,104,64,.1);  color: #006840; border-color: rgba(0,104,64,.2); }
+.q-badge.badge-stem   { background: rgba(80,40,160,.1); color: #5028a0; border-color: rgba(80,40,160,.25); }
+.choice-item { background: #f8faff; border-color: #b8c8e0; }
+.choice-item.correct { border-color: #006840; background: rgba(0,104,64,.05); }
+.choice-letter { color: #6a7a9a; }
+.choice-item.correct .choice-letter { color: #006840; }
+.choice-error { color: #8a7a6a; }
+.solution-box { background: #fff8e6; border-color: rgba(138,80,0,.3); color: #3a2000; }
+.sol-head { color: #8a5000; border-bottom-color: rgba(138,80,0,.2); }
+.solution-toggle { color: #8a5000; background: rgba(138,80,0,.06); border-color: rgba(138,80,0,.35); }
+.solution-toggle:hover { background: rgba(138,80,0,.12); border-color: #8a5000; }
+.rationale-box { background: rgba(0,95,128,.04); border-left-color: #005f80; color: #3a4a6a; }
+.verification-widget { background: rgba(0,70,100,.05); border-color: rgba(0,95,128,.2); }
+.vw-label { color: #3a4a6a; }
+.vw-expr { color: #004060; background: rgba(0,95,128,.07); }
+.vw-pass { background: rgba(0,104,64,.08); border-color: rgba(0,104,64,.25); color: #004820; }
+.vw-fail { background: rgba(144,0,0,.06); border-color: rgba(144,0,0,.2); color: #600000; }
+.vw-skip { background: rgba(138,80,0,.06); border-color: rgba(138,80,0,.2); color: #6a3800; }
+.vw-wa-link { color: #8a5000; border-color: rgba(138,80,0,.35); }
+.vw-wa-link:hover { background: rgba(138,80,0,.08); border-color: #8a5000; }
+
+.verify-badge.needs { background: rgba(138,80,0,.1); color: #6a3800; border-color: rgba(138,80,0,.4); }
+.verify-badge.done  { background: rgba(0,104,64,.1); color: #004820; border-color: rgba(0,104,64,.3); }
+.export-verify-bar { background: rgba(138,80,0,.06); border-color: rgba(138,80,0,.2); color: #6a3800; }
+.export-verify-bar.all-verified { background: rgba(0,104,64,.06); border-color: rgba(0,104,64,.2); color: #004820; }
+.verify-count-pill { background: rgba(138,80,0,.12); color: #6a3800; border-color: rgba(138,80,0,.3); }
+.verify-count-pill.full { background: rgba(0,104,64,.12); color: #004820; border-color: rgba(0,104,64,.3); }
+.stat-chip { border-color: #b8c8e0; color: #4a5a7a; }
+#toast { background: #ffffff; border-color: #b8c8e0; color: #1a2744; box-shadow: 0 4px 20px rgba(0,0,0,.15); }
+#toast.ok  { border-color: #006840; color: #004820; }
+#toast.err { border-color: #900000; color: #600000; }
+.prompt-out-head h3 { color: #005f80; }
+#promptOutput { background: #f8faff; border-color: #b8c8e0; color: #2a3a5a; }
+.token-pill.ok   { background: rgba(0,104,64,.1); color: #004820; border-color: rgba(0,104,64,.3); }
+.token-pill.warn { background: rgba(138,80,0,.1); color: #6a3800; border-color: rgba(138,80,0,.3); }
+.token-pill.over { background: rgba(144,0,0,.1); color: #600000; border-color: rgba(144,0,0,.3); }
+.llm-card { background: #f8faff; border-color: #b8c8e0; }
+.llm-card.selected { background: rgba(0,95,128,.06); border-color: #005f80; }
+.llm-jump-section { background: #f0f4ff; border-color: #b8c8e0; }
+.llm-jump-label { color: #4a5a7a; }
+.status-msg.ok   { background: rgba(0,104,64,.07); border-color: rgba(0,104,64,.25); color: #004820; }
+.status-msg.err  { background: rgba(144,0,0,.06); border-color: rgba(144,0,0,.2); color: #600000; }
+.status-msg.warn { background: rgba(138,80,0,.07); border-color: rgba(138,80,0,.25); color: #6a3800; }
+.json-area { background: #f8faff; border-color: #b8c8e0; color: #2a3a5a; }
+.modal-box { background: #f0f4ff; border-color: #b8c8e0; }
+.modal-head { border-bottom-color: #b8c8e0; }
+.modal-head h3 { color: #005f80; }
+.modal-foot { border-top-color: #b8c8e0; }
+/* gen log (API only) */
+.gen-status { background: #ffffff; border-color: #b8c8e0; }
+.gen-log { color: #3a4a6a; }
+.gen-log .log-ok   { color: #006840; }
+.gen-log .log-err  { color: #900000; }
+.gen-log .log-info { color: #005f80; }
+.progress-bar-wrap { background: #e4eaf5; border-bottom-color: #b8c8e0; }
+.progress-bar-track { background: #d8e0f0; }
+.api-panel { background: rgba(0,95,128,.04); border-color: rgba(0,95,128,.2); color: #3a4a6a; }
+.merge-zone { border-color: #b8c8e0; background: #f8faff; }
+.snap-item { background: #f8faff; border-color: #b8c8e0; }
+
+
+/* ── Additional instruction checkboxes ──────────────────── */
+.instr-group { }
+.instr-group-label {
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gray-mid);
+  margin-bottom: 7px;
+  padding-left: 2px;
+}
+
+
+/* ── Question type preset hint ───────────────────────────── */
+#qtypeHint {
+  font-size: .76rem;
+  color: var(--gray-mid);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+
+/* ── File upload tip ─────────────────────────────────────── */
+.upload-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: rgba(0,95,128,.06);
+  border: 1px solid rgba(0,95,128,.2);
+  border-radius: var(--radius);
+  font-size: .82rem;
+  color: var(--gray-light);
+  line-height: 1.6;
+}
+.upload-tip-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.upload-tip strong { color: var(--white); }
+
+
+/* ── Snapshot / Merge / Objectives features ─────────────────── */
+.feat-desc {
+  font-size: .84rem;
+  color: var(--gray-mid);
+  margin-bottom: 14px;
+  line-height: 1.6;
+  background: rgba(0,95,128,.05);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border-left: 3px solid var(--cyan);
+}
+.snap-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--slate);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  font-size: .84rem;
+}
+.snap-info { flex: 1; }
+.snap-name { font-weight: 700; color: var(--white); }
+.snap-meta { font-size: .74rem; color: var(--gray-mid); margin-top: 2px; }
+.snap-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.snap-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--gray-light);
+  cursor: pointer;
+  font-size: .74rem;
+  padding: 3px 10px;
+  transition: .15s;
+}
+.snap-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.snap-btn.del:hover { border-color: var(--red); color: var(--red); }
+.snap-empty { font-size: .82rem; color: var(--gray-mid); padding: 10px 0; }
+.merge-drop {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: .15s;
+  background: rgba(0,95,128,.03);
+  position: relative;
+  font-size: .86rem;
+  color: var(--gray-light);
+}
+.merge-drop:hover, .merge-drop.dragover {
+  border-color: var(--cyan);
+  background: rgba(0,95,128,.07);
+}
+.merge-drop input[type=file] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.obj-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--slate);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  font-size: .84rem;
+}
+.obj-label { flex: 1; color: var(--white); }
+.obj-count {
+  font-size: .74rem;
+  background: var(--cyan);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.obj-del {
+  background: none;
+  border: none;
+  color: var(--gray-mid);
+  cursor: pointer;
+  font-size: .9rem;
+  padding: 0 3px;
+  flex-shrink: 0;
+}
+.obj-del:hover { color: var(--red); }
+.obj-cov-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: .82rem;
+}
+.obj-cov-name { flex: 1; color: var(--gray-light); }
+.obj-cov-bar { width: 120px; height: 8px; background: var(--slate-mid); border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+.obj-cov-fill { height: 100%; background: var(--cyan); border-radius: 4px; transition: width .3s; }
+.obj-cov-count { width: 32px; text-align: right; color: var(--gray-mid); font-size: .76rem; }
+
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<header class="site-header" role="banner">
+  <div class="logo">Brightspace <span style="color:var(--cyan)">Question Bank</span> Generator
+    <div class="logo-sub">No API Key Required · Works with Any LLM · D2L Brightspace Ready</div>
+  </div>
+  <span class="header-badge">Faculty Tool — Free</span>
+</header>
+
+<!-- ── Domain Tab Strip ──────────────────────────────────────────── -->
+<div class="domain-tabs" role="tablist" aria-label="Subject domain">
+  <button class="domain-tab active" role="tab" aria-selected="true"  data-domain="stem"   onclick="switchDomain('stem')">🔬 STEM</button>
+  <button class="domain-tab"        role="tab" aria-selected="false" data-domain="biz"    onclick="switchDomain('biz')">📊 Business &amp; Economics</button>
+  <button class="domain-tab"        role="tab" aria-selected="false" data-domain="health" onclick="switchDomain('health')">🩺 Health Sciences</button>
+  <button class="domain-tab"        role="tab" aria-selected="false" data-domain="tech"   onclick="switchDomain('tech')">💻 Technology</button>
+  <button class="domain-tab"        role="tab" aria-selected="false" data-domain="hum"    onclick="switchDomain('hum')">📚 Humanities &amp; Social Sciences</button>
+</div>
+
+
+<!-- ── Warning banner ─────────────────────────────────────────────────── -->
+<div class="warn-banner" role="alert">
+  <span class="wi">⚠</span>
+  <div><strong>Calculation accuracy notice:</strong> AI-generated STEM questions require human verification before use in assessments. Check all numerical answers, worked solutions, and formula representations. Expand the <strong>Worked Solution</strong> on each question card and verify every step yourself before exporting.</div>
+</div>
+
+<!-- ── Tab navigation ─────────────────────────────────────────────────── -->
+<nav class="tab-nav" role="tablist" aria-label="Main sections">
+  <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-build" id="tbtn-build" onclick="switchTab('build')">⚙ 1. Configure</button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-prompt" id="tbtn-prompt" onclick="switchTab('prompt')">📋 2. Generated Prompt</button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-review" id="tbtn-review" onclick="switchTab('review')">🔬 3. Review &amp; Export <span id='reviewTabCount' style='font-size:.65rem;opacity:.7;'></span></button>
+  <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-guide" id="tbtn-guide" onclick="switchTab('guide')">📖 LLM Guide</button>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════
+     TAB 1 — CONFIGURE
+══════════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="tab-build" role="tabpanel" aria-labelledby="tbtn-build">
+<div class="main-wrap">
+
+  <div class="panel-head">
+    <h2>Configure Your Question Bank</h2>
+    <p>Set up your course details and question parameters. The generated prompt will include detailed instructions for producing numerically accurate, pedagogically sound STEM questions.</p>
+  </div>
+
+  <!-- Course Info -->
+  <div class="section-card">
+    <h3>📚 Course Information</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="courseTitle">Course Title</label>
+        <input type="text" id="courseTitle" placeholder="e.g. NETW 101, Pharmacology I, BUSN 210">
+      </div>
+      <div class="field">
+        <label class="field-label" for="bankName">Question Bank Name</label>
+        <input type="text" id="bankName" placeholder="e.g. Unit 3 — Networking Fundamentals">
+      </div>
+      <div class="field">
+        <label class="field-label" for="subject">Subject Area</label>
+        <select id="subject" onchange="updateDomainCheckboxes()">
+          <!-- STEM -->
+          <optgroup label="Physics" data-domain="stem">
+            <option value="physics-mechanics">Physics — Mechanics (Kinematics, Newton's Laws, Energy)</option>
+            <option value="physics-em">Physics — Electricity &amp; Magnetism</option>
+            <option value="physics-thermo">Physics — Thermodynamics &amp; Statistical Mechanics</option>
+            <option value="physics-waves">Physics — Waves, Optics &amp; Modern Physics</option>
+          </optgroup>
+          <optgroup label="Engineering" data-domain="stem">
+            <option value="eng-statics">Engineering — Statics</option>
+            <option value="eng-dynamics">Engineering — Dynamics</option>
+            <option value="eng-circuits">Engineering — Electric Circuits</option>
+            <option value="eng-thermo">Engineering — Thermodynamics</option>
+            <option value="eng-fluids">Engineering — Fluid Mechanics</option>
+            <option value="eng-materials">Engineering — Mechanics of Materials</option>
+          </optgroup>
+          <optgroup label="Mathematics" data-domain="stem">
+            <option value="math-calc1">Mathematics — Calculus I (Limits, Derivatives)</option>
+            <option value="math-calc2">Mathematics — Calculus II (Integration, Series)</option>
+            <option value="math-calc3">Mathematics — Calculus III (Multivariable)</option>
+            <option value="math-diffeq">Mathematics — Differential Equations</option>
+            <option value="math-linalg">Mathematics — Linear Algebra</option>
+            <option value="math-stats">Mathematics — Statistics &amp; Probability</option>
+            <option value="math-algebra">Mathematics — College Algebra &amp; Precalculus</option>
+          </optgroup>
+          <optgroup label="Chemistry" data-domain="stem">
+            <option value="chem-gen1">Chemistry — General Chemistry I</option>
+            <option value="chem-gen2">Chemistry — General Chemistry II</option>
+            <option value="chem-organic">Chemistry — Organic Chemistry</option>
+            <option value="chem-pchem">Chemistry — Physical Chemistry</option>
+            <option value="chem-analytical">Chemistry — Analytical Chemistry</option>
+          </optgroup>
+          <!-- BUSINESS & ECONOMICS -->
+          <optgroup label="Finance &amp; Accounting" data-domain="biz">
+            <option value="biz-finance">Finance (TVM, NPV, IRR, CAPM, Bond Pricing)</option>
+            <option value="biz-accounting">Accounting (Break-even, Ratios, Depreciation)</option>
+            <option value="biz-cost">Managerial / Cost Accounting (Variance Analysis, Overhead)</option>
+          </optgroup>
+          <optgroup label="Economics &amp; Statistics" data-domain="biz">
+            <option value="biz-economics">Economics (Elasticity, Equilibrium, Surplus)</option>
+            <option value="biz-stats">Business Statistics (z-scores, Confidence Intervals, Regression)</option>
+          </optgroup>
+          <!-- HEALTH SCIENCES -->
+          <optgroup label="Nursing &amp; Pharmacology" data-domain="health">
+            <option value="health-nursing">Nursing — Dosage Calculations</option>
+            <option value="health-pharm">Pharmacology (Drug Concentration, Half-life)</option>
+          </optgroup>
+          <optgroup label="Allied Health &amp; Nutrition" data-domain="health">
+            <option value="health-nutrition">Nutrition (Caloric Calculations, Macronutrients)</option>
+            <option value="health-allied">Allied Health (BMI, BSA, Unit Conversions)</option>
+          </optgroup>
+          <!-- HUMANITIES & SOCIAL SCIENCES -->
+          <optgroup label="History &amp; Political Science" data-domain="hum">
+            <option value="hum-history">History (US, World, Regional)</option>
+            <option value="hum-polisci">Political Science &amp; Government</option>
+            <option value="hum-intlrel">International Relations</option>
+          </optgroup>
+          <optgroup label="Communications &amp; Media" data-domain="hum">
+            <option value="hum-comm">Communications &amp; Media Studies</option>
+            <option value="hum-writing">Writing &amp; Rhetoric</option>
+            <option value="hum-journalism">Journalism &amp; Digital Media</option>
+          </optgroup>
+          <optgroup label="Social Sciences" data-domain="hum">
+            <option value="hum-psych">Psychology</option>
+            <option value="hum-sociology">Sociology &amp; Anthropology</option>
+            <option value="hum-education">Education &amp; Pedagogy</option>
+          </optgroup>
+          <optgroup label="Arts &amp; Literature" data-domain="hum">
+            <option value="hum-english">English &amp; Literature</option>
+            <option value="hum-philosophy">Philosophy &amp; Ethics</option>
+            <option value="hum-arts">Art History &amp; Visual Arts</option>
+          </optgroup>
+          <!-- TECHNOLOGY -->
+          <optgroup label="Networking &amp; Security" data-domain="tech">
+            <option value="tech-networking">Computer Networking (Subnetting, Bandwidth)</option>
+            <option value="tech-security">Cybersecurity (Key Space, Entropy Calculations)</option>
+          </optgroup>
+          <optgroup label="Data &amp; Signals" data-domain="tech">
+            <option value="tech-signals">Data &amp; Signals (Sampling Rates, Bandwidth-Frequency)</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label" for="level">Course Level</label>
+        <select id="level">
+          <option value="intro">Introductory / Survey (100–200 level)</option>
+          <option value="intermediate" selected>Intermediate (200–300 level)</option>
+          <option value="upper">Upper Division (300–400 level)</option>
+          <option value="graduate">Graduate</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid full" style="margin-top:14px;">
+      <div class="field">
+        <label class="field-label" for="topicFocus">Specific Topics / Concepts (optional)</label>
+        <input type="text" id="topicFocus" placeholder="e.g. rotational dynamics, moment of inertia, angular momentum">
+        <span class="field-hint">Comma-separated topics. Leave blank to cover the full subject area.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Question Parameters -->
+  <div class="section-card">
+    <h3>🎛 Question Parameters</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="numQ">Number of Questions</label>
+        <div class="slider-wrap">
+          <input type="range" id="numQ" min="3" max="30" value="10" oninput="$('numQVal').textContent=this.value">
+          <span class="slider-val" id="numQVal">10</span>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="diffSelect">Difficulty Mix</label>
+        <select id="diffSelect">
+          <option value="balanced">Balanced — Easy 20% / Medium 60% / Hard 20%</option>
+          <option value="introductory">Introductory — Easy 50% / Medium 50%</option>
+          <option value="exam">Exam-Ready — Medium 40% / Hard 60%</option>
+          <option value="challenge">Challenge — Medium 20% / Hard 80%</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div class="field-label" style="margin-bottom:10px;">Question Type Mix</div>
+      <div class="field">
+        <select id="qtypePreset" onchange="applyQtypePreset()" aria-label="Question type mix preset">
+          <option value="mostly-numerical">Mostly Numerical — 60% calculation, 30% conceptual, 10% symbolic</option>
+          <option value="balanced">Balanced — equal mix of numerical, conceptual, and symbolic</option>
+          <option value="conceptual-focus">Conceptual Focus — 60% conceptual, 30% numerical, 10% symbolic</option>
+          <option value="exam-prep">Exam Prep — 50% numerical, 30% symbolic, 20% conceptual</option>
+          <option value="custom">Custom — choose individual types below</option>
+        </select>
+        <span class="field-hint" id="qtypeHint" style="margin-top:6px;display:block;">
+          60% calculation-based, 30% qualitative understanding, 10% formula identification.
+          Ideal for courses focused on problem-solving skills.
+        </span>
+      </div>
+      <!-- Custom checkboxes — shown only when Custom is selected -->
+      <div id="qtypeCustom" style="display:none; margin-top:10px;">
+        <div class="check-grid" role="group" aria-label="Question types">
+          <label class="check-item checked"><input type="checkbox" name="qtype" value="multiple_choice" checked> ☑ Multiple Choice</label>
+          <label class="check-item checked"><input type="checkbox" name="qtype" value="conceptual" checked> 💡 Conceptual</label>
+          <label class="check-item checked"><input type="checkbox" name="qtype" value="scenario" checked> 🎬 Scenario-Based</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="numerical_mc"> 🔢 Numerical MC</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="symbolic"> 🔣 Symbolic / Formula</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="true_false"> ✔✘ True / False</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="analysis"> 🔍 Analysis / Application</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="fill_in_the_blank"> ✏ Fill in the Blank</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="short_answer"> 📝 Short Answer</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="essay"> 📄 Essay</label>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div class="field-label" style="margin-bottom:10px;">Bloom's Taxonomy Levels</div>
+      <div class="check-grid" role="group" aria-label="Bloom's levels">
+        <label class="check-item"><input type="checkbox" name="bloom" value="Remember"> Remember</label>
+        <label class="check-item checked"><input type="checkbox" name="bloom" value="Understand" checked> Understand</label>
+        <label class="check-item checked"><input type="checkbox" name="bloom" value="Apply" checked> Apply</label>
+        <label class="check-item checked"><input type="checkbox" name="bloom" value="Analyze" checked> Analyze</label>
+        <label class="check-item"><input type="checkbox" name="bloom" value="Evaluate"> Evaluate</label>
+        <label class="check-item"><input type="checkbox" name="bloom" value="Create"> Create</label>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div class="field-label" style="margin-bottom:10px;">STEM Cognitive Level</div>
+      <div class="check-grid" role="group" aria-label="STEM cognitive levels">
+        <label class="check-item checked"><input type="checkbox" name="stemLevel" value="Single-step" checked> Single-step</label>
+        <label class="check-item checked"><input type="checkbox" name="stemLevel" value="Multi-step" checked> Multi-step</label>
+        <label class="check-item"><input type="checkbox" name="stemLevel" value="Multi-concept"> Multi-concept</label>
+        <label class="check-item"><input type="checkbox" name="stemLevel" value="Proof-based"> Proof-based</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Numerical settings -->
+  <div class="section-card">
+    <h3>🔢 Numerical &amp; Notation Settings</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="sigFigs">Significant Figures</label>
+        <select id="sigFigs">
+          <option value="2">2 significant figures</option>
+          <option value="3" selected>3 significant figures</option>
+          <option value="4">4 significant figures</option>
+          <option value="any">Any (problem-appropriate)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label" for="defaultTolerance">Default Tolerance (±%)</label>
+        <input type="number" id="defaultTolerance" value="5" min="0.1" max="50" step="0.5">
+        <span class="field-hint">Applied to all numerical questions. Faculty can override per question in Step 3.</span>
+      </div>
+      <div class="field">
+        <label class="field-label" for="unitSystem">Unit System</label>
+        <select id="unitSystem">
+          <option value="SI">SI (metric) — meters, kilograms, seconds</option>
+          <option value="US">US Customary — feet, pounds, seconds</option>
+          <option value="both">Both — specify in each problem</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label" for="notation">Notation Format</label>
+        <select id="notation">
+          <option value="latex" selected>LaTeX (rendered in preview, recommended)</option>
+          <option value="plain">Plain text (no special notation)</option>
+        </select>
+      </div>
+    </div>
+    <!-- Additional Instructions: checkboxes + free text -->
+    <div class="field" style="margin-top:14px;">
+      <div class="field-label" style="margin-bottom:10px;">Additional Instructions (optional)</div>
+
+      <!-- Problem Style — always shown -->
+      <div class="instr-group" id="instrGroupStyle">
+        <div class="instr-group-label">Problem Style</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrStyle" value="Use realistic real-world scenarios in all problem stems"> Use real-world scenarios</label>
+          <label class="check-item"><input type="checkbox" name="instrStyle" value="Describe any required diagrams (free body diagrams, circuit diagrams, cash flow timelines) in text within the problem stem"> Include diagram descriptions in stems</label>
+          <label class="check-item"><input type="checkbox" name="instrStyle" value="Every problem must be self-contained: all needed values must appear in the stem; do not require students to recall constants unless specified"> Self-contained problems (all values given)</label>
+          <label class="check-item"><input type="checkbox" name="instrStyle" value="Use round numbers where possible to make hand-checking easier"> Use round numbers where possible</label>
+        </div>
+      </div>
+
+      <!-- Solution Constraints — always shown -->
+      <div class="instr-group" id="instrGroupSolution" style="margin-top:10px;">
+        <div class="instr-group-label">Solution Constraints</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Avoid calculus in all solutions; use algebra and arithmetic only"> Avoid calculus — algebra only</label>
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Show full dimensional analysis and unit tracking in every worked solution"> Show full unit analysis in solutions</label>
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Limit to single-formula problems only; do not require multi-step derivations"> Single-formula problems only</label>
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Avoid trigonometry; use only arithmetic and basic algebra"> Avoid trigonometry</label>
+          <label class="check-item"><input type="checkbox" name="instrSolution" value="Avoid logarithms and exponential functions"> Avoid logarithms and exponentials</label>
+        </div>
+      </div>
+
+      <!-- Domain-specific: STEM -->
+      <div class="instr-group domain-checks" id="instrGroupSTEM" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">STEM Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use standard gravity g = 9.81 m/s² unless otherwise specified in the problem"> Use g = 9.81 m/s²</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Neglect air resistance in all projectile and fluid problems unless explicitly stated"> Neglect air resistance</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Treat all fluids as ideal (incompressible, inviscid) unless stated otherwise"> Treat fluids as ideal</label>
+        </div>
+      </div>
+
+      <!-- Domain-specific: Business & Economics -->
+      <div class="instr-group domain-checks" id="instrGroupBiz" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">Business &amp; Economics Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use annual compounding for all time-value-of-money problems unless otherwise stated"> Annual compounding unless stated</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Assume perfect competition in all market equilibrium problems unless stated"> Assume perfect competition</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Express all dollar-denominated answers in whole dollars (round to nearest dollar)"> Express answers in whole dollars</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use realistic current market rates and values in problem stems"> Use realistic market values</label>
+        </div>
+      </div>
+
+      <!-- Domain-specific: Health Sciences -->
+      <div class="instr-group domain-checks" id="instrGroupHealth" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">Health Sciences Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use weight-based dosing (mg/kg or mcg/kg) for all dosage calculation problems"> Weight-based dosing (mg/kg)</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Round all calculated doses to the nearest practical administrable amount (nearest 0.1 mL or standard tablet)"> Round to nearest practical dose</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Include a patient safety check step in the worked solution that confirms the calculated dose is within a safe therapeutic range"> Include safety check in worked solution</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use realistic clinical scenarios with appropriate patient demographics and settings"> Use realistic clinical scenarios</label>
+        </div>
+      </div>
+
+      <!-- Domain-specific: Technology -->
+      <div class="instr-group domain-checks" id="instrGroupTech" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">Technology Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Express all network addresses and subnet masks using CIDR notation"> Use CIDR notation</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Show binary conversion steps in all networking and subnetting worked solutions"> Show binary conversion steps</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Assume IPv4 addressing for all networking problems unless IPv6 is explicitly requested"> Assume IPv4</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use realistic network topologies and industry-standard values in problem stems"> Use realistic network values</label>
+        </div>
+      </div>
+
+      <div id="instrGroupHum" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">Humanities &amp; Social Sciences Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Ground all questions in specific historical periods, events, or named theorists"> Ground in specific contexts</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Include primary source references or document excerpts where relevant"> Reference primary sources</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use Socratic / analytical question style rather than recall-only"> Analytical over recall</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Avoid culturally biased framing; use inclusive and globally representative examples"> Inclusive examples</label>
+        </div>
+      </div>
+
+      <!-- Free text alongside checkboxes -->
+      <div class="field" style="margin-top:12px;">
+        <label class="field-label" for="extraContext">Additional Free-text Instructions</label>
+        <textarea id="extraContext" rows="2" placeholder="Any other instructions not covered above…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Source content -->
+  <div class="section-card">
+    <h3>📄 Source Content (optional)</h3>
+    <div class="field">
+      <label class="field-label" for="contentPaste">Paste Lecture Notes, Textbook Excerpts, or a URL</label>
+      <textarea id="contentPaste" rows="5" placeholder="Paste your course notes, worked examples, textbook content, or a URL to a course page…
+
+Tip: LLMs with web access (Claude, GPT-4o, Gemini) will fetch URLs automatically."></textarea>
+      <span class="field-hint">
+        Source content helps the AI generate questions aligned to your specific curriculum and notation.
+        <span id="urlHint" style="display:none; color:var(--cyan); font-weight:600;"> 🔗 URL detected — will be fetched automatically.</span>
+      </span>
+      <div class="upload-tip" role="note">
+        <span class="upload-tip-icon">📎</span>
+        <div>
+          <strong>Have slides, a study guide, or a PDF?</strong>
+          After copying the generated prompt, upload your file directly to your LLM alongside it.
+          <strong>Claude</strong>, <strong>ChatGPT</strong>, and <strong>Gemini</strong> all accept
+          PDF and PPTX uploads — the LLM will read your materials and base questions on them.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LLM selector -->
+  <div class="section-card">
+    <h3>🤖 Target LLM</h3>
+    <div class="llm-grid" role="radiogroup" aria-label="Target LLM">
+      <label class="llm-card selected">
+        <input type="radio" name="llm" value="claude" checked>
+        <div class="llm-name">Claude</div>
+        <div class="llm-note">Best LaTeX accuracy and distractor quality for STEM</div>
+        <span class="llm-badge llm-best">Recommended</span>
+      </label>
+      <label class="llm-card">
+        <input type="radio" name="llm" value="gpt4">
+        <div class="llm-name">GPT-4o / 4.1</div>
+        <div class="llm-note">Strong numerical accuracy; verify complex algebra</div>
+        <span class="llm-badge llm-good">Good</span>
+      </label>
+      <label class="llm-card">
+        <input type="radio" name="llm" value="gemini">
+        <div class="llm-name">Gemini 2.0/2.5</div>
+        <div class="llm-note">Large context; verify calculations carefully</div>
+        <span class="llm-badge llm-good">Good</span>
+      </label>
+      <label class="llm-card">
+        <input type="radio" name="llm" value="other">
+        <div class="llm-name">Other LLM</div>
+        <div class="llm-note">Generic prompt; verify all output rigorously</div>
+        <span class="llm-badge llm-ok">Verify carefully</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btnGenerate">⚙ Generate Prompt</button>
+    <button class="btn btn-ghost" id="btnClearForm">↺ Clear Form</button>
+  </div>
+
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TAB 2 — GENERATED PROMPT
+══════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-prompt" role="tabpanel" aria-labelledby="tbtn-prompt">
+<div class="main-wrap">
+  <div class="panel-head">
+    <h2>Your Generated Prompt</h2>
+    <p>Copy this prompt and paste it into your chosen LLM. The AI will return a JSON array — paste that back in Step 3.</p>
+  </div>
+
+  <div class="prompt-out-wrap" id="promptWrap">
+    <div class="prompt-out-head">
+      <h3>📋 Prompt Ready</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="btnCopy">📋 Copy Prompt</button>
+        <button class="btn btn-ghost" id="btnDlPrompt">⬇ Download .txt</button>
+      </div>
+    </div>
+    <pre id="promptOutput" aria-live="polite" aria-label="Generated prompt"></pre>
+    <div class="token-bar">
+      <span>Estimated tokens:</span>
+      <span class="token-pill ok" id="tokenPill">—</span>
+      <span id="tokenMsg" style="font-size:.72rem;"></span>
+    </div>
+
+    <!-- ── LLM Jump Links ──────────────────────────────────── -->
+    <div class="llm-jump-section" id="llmJumpLinks" style="display:none;"
+         role="navigation" aria-label="Open LLM in new tab">
+      <div class="llm-jump-label">Open your LLM and paste the prompt above:</div>
+      <div class="llm-jump-row">
+        <a class="llm-jump-btn" href="https://claude.ai" target="_blank" rel="noopener noreferrer"
+           style="--llm-color:#c97b3a;">
+          <span class="llm-jump-icon">◆</span> Claude
+        </a>
+        <a class="llm-jump-btn" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer"
+           style="--llm-color:#10a37f;">
+          <span class="llm-jump-icon">⬡</span> ChatGPT
+        </a>
+        <a class="llm-jump-btn" href="https://gemini.google.com" target="_blank" rel="noopener noreferrer"
+           style="--llm-color:#4285f4;">
+          <span class="llm-jump-icon">✦</span> Gemini
+        </a>
+        <a class="llm-jump-btn" href="https://copilot.microsoft.com" target="_blank" rel="noopener noreferrer"
+           style="--llm-color:#0078d4;">
+          <span class="llm-jump-icon">⬡</span> Copilot
+        </a>
+        <a class="llm-jump-btn" href="https://www.perplexity.ai" target="_blank" rel="noopener noreferrer"
+           style="--llm-color:#20b2aa;">
+          <span class="llm-jump-icon">◎</span> Perplexity
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div id="noPromptMsg" style="text-align:center;padding:60px 20px;color:var(--gray-mid);">
+    <div style="font-size:2.5rem;margin-bottom:12px;">⚙</div>
+    <div style="font-family:var(--font-mono);font-size:.8rem;">Configure your question bank in Step 1 first.</div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TAB 3 — REVIEW & EXPORT
+══════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-review" role="tabpanel" aria-labelledby="tbtn-review">
+<div class="main-wrap">
+  <div class="panel-head">
+    <h2>Review &amp; Export</h2>
+    <p>Paste the JSON from your LLM below. Validate it, review each question (checking all worked solutions and numerical answers), then export.</p>
+  </div>
+
+  <div class="section-card">
+    <h3>📥 Paste LLM Response</h3>
+    <textarea class="json-area" id="jsonPaste" placeholder='Paste the full JSON response from your LLM here. The array should look like:
+[
+  {
+    "id": "q1",
+    "type": "numerical_mc",
+    "subject": "physics-mechanics",
+    "stem": "A 5 kg block slides down a frictionless incline at $\\theta = 30°$...",
+    "choices": [...],
+    "correct": "B",
+    "worked_solution": "Step 1: ...",
+    "distractor_logic": {"A": "forgot sin/cos swap", "C": "used wrong mass"},
+    "bloom": "Apply",
+    "stem_level": "Single-step",
+    "difficulty": "medium",
+    "tolerance_pct": 5,
+    "units": "m/s²",
+    "verification_expression": "15.0 * sqrt(2 * 45.0 / 9.81)",
+    "rationale": "..."
+  }
+]'></textarea>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnValidate">✓ Validate &amp; Preview</button>
+      <button class="btn btn-ghost" id="btnClearJson">✕ Clear</button>
+    </div>
+    <div class="status-msg" id="validationMsg" role="alert" aria-live="polite"></div>
+  </div>
+
+  <!-- Review panel (shown after validation) -->
+  <div class="review-wrap" id="reviewWrap">
+    <div class="review-stats" id="reviewStats" aria-live="polite"></div>
+    <div id="qList" role="list" aria-label="Question list"></div>
+  </div>
+
+  <!-- Export section (shown after validation) -->
+  <div class="section-card" id="exportCard" style="display:none;">
+    <h3>⬇ Export to Brightspace</h3>
+    <div class="export-verify-bar" id="verifyBar" role="status" aria-live="polite">
+      <span class="verify-count-pill" id="verifyPill">0/0 verified</span>
+      <span id="verifyMsg">Please verify each question's calculation before exporting.</span>
+      <button class="btn btn-ghost" id="btnVerifyAll" onclick="verifyAll()" style="padding:4px 12px;font-size:.68rem;margin-left:auto;flex-shrink:0;" title="Mark all questions as verified">✓ Verify All</button>
+    </div>
+    <div class="export-grid">
+      <div class="field">
+        <label class="field-label" for="expFormat">Format</label>
+        <select id="expFormat">
+          <option value="d2l-qti21-zip" selected>📗 D2L Brightspace QTI 2.1 — ZIP package (recommended)</option>
+          <option value="d2l-qti21-xml">📗 D2L Brightspace QTI 2.1 — Single XML file</option>
+          <option value="json">JSON (backup / import)</option>
+          <option value="csv">CSV (spreadsheet review)</option>
+          <option value="study-guide">📄 Student Study Guide (printable HTML — no answers)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label" for="ptsPerQ">Points per Question</label>
+        <input type="number" id="ptsPerQ" value="1" min="0.5" max="100" step="0.5">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-amber" id="btnExport">⬇ Download</button>
+      <button class="btn btn-ghost" id="btnSnapshot">📸 Save Snapshot</button>
+      <button class="btn btn-ghost" id="btnMerge">🔀 Merge Bank</button>
+      <button class="btn btn-ghost" id="btnObjectives">🎯 Objectives</button>
+    </div>
+    <div class="status-msg" id="exportMsg" role="alert" aria-live="polite"></div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TAB 4 — LLM GUIDE
+══════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-guide" role="tabpanel" aria-labelledby="tbtn-guide">
+<div class="main-wrap">
+  <div class="panel-head">
+    <h2>LLM Guide for Quantitative Questions</h2>
+    <p>Quantitative question generation requires careful LLM selection and human verification of all calculations. Here's what you need to know.</p>
+  </div>
+
+  <div class="section-card">
+    <h3>⚠ Calculation Accuracy Warning</h3>
+    <p style="font-size:.87rem;color:var(--gray-light);line-height:1.7;margin-bottom:12px;">All current LLMs make arithmetic and algebraic errors. No LLM can be trusted to produce 100% numerically correct quantitative questions without human verification. Common failure modes across STEM, Business, Health Sciences, and Technology:</p>
+    <ul style="font-size:.84rem;color:var(--gray-light);line-height:1.9;padding-left:20px;">
+      <li>Arithmetic errors in multi-step calculations (especially with fractions, exponents, trig)</li>
+      <li>Inconsistent units — mixing SI and US, or dropping units mid-calculation</li>
+      <li>Incorrect distractor derivation — distractors that don't correspond to real student errors</li>
+      <li>LaTeX rendering errors — malformed expressions that don't render correctly</li>
+      <li>Self-contradiction — stem assumes one scenario, worked solution solves a different one</li>
+    </ul>
+  </div>
+
+  <div class="section-card">
+    <h3>📊 Model Comparison for STEM</h3>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:10px 12px;font-family:var(--font-mono);font-size:.68rem;color:var(--gray-light);letter-spacing:.06em;">Model</th>
+          <th style="text-align:center;padding:10px 8px;font-family:var(--font-mono);font-size:.68rem;color:var(--gray-light);">LaTeX</th>
+          <th style="text-align:center;padding:10px 8px;font-family:var(--font-mono);font-size:.68rem;color:var(--gray-light);">Arithmetic</th>
+          <th style="text-align:center;padding:10px 8px;font-family:var(--font-mono);font-size:.68rem;color:var(--gray-light);">Distractors</th>
+          <th style="text-align:center;padding:10px 8px;font-family:var(--font-mono);font-size:.68rem;color:var(--gray-light);">JSON</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 12px;font-weight:700;">Claude Sonnet 4.6</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--green);">★★★★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--green);">★★★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--green);">★★★★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--green);">★★★★★</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 12px;font-weight:700;">GPT-4o / 4.1</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--green);">★★★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--cyan);">★★★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--cyan);">★★★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--green);">★★★★</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:10px 12px;font-weight:700;">Gemini 2.0/2.5 Pro</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--cyan);">★★★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--cyan);">★★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--cyan);">★★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--cyan);">★★★★</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 12px;font-weight:700;">Other / Local</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--amber);">★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--amber);">★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--amber);">★★</td>
+          <td style="text-align:center;padding:10px 8px;color:var(--amber);">★★★</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <h3>✅ Verification Workflow</h3>
+    <ol style="font-size:.85rem;color:var(--gray-light);line-height:2;padding-left:20px;">
+      <li>Generate questions → paste JSON into Step 3 → validate</li>
+      <li>For each <strong>numerical_mc</strong> question: expand the card (it auto-opens) and click <strong>▼ Hide Worked Solution</strong> to verify every step. Check the formula used, the substituted values, the arithmetic, significant figures, and units. When satisfied, click the <strong>⚠ Needs Verification</strong> badge — it turns green when marked verified.</li>
+      <li>Use <strong>🔍 Find Teaching Resources</strong> to locate authoritative explanations and worked examples for the concept being tested</li>
+      <li>Expand the worked solution toggle on each card — read through every step</li>
+      <li>Check that each distractor corresponds to a <em>real</em> student error (documented in <code>distractor_logic</code>)</li>
+      <li>Verify LaTeX renders correctly in the preview (KaTeX is shown above each question)</li>
+      <li>Edit any question with errors using the ✎ button</li>
+      <li>Export only after verifying all questions</li>
+    </ol>
+  </div>
+</div>
+</div>
+
+<!-- ── Snapshot Modal ─────────────────────────────────────────── -->
+<div class="modal-overlay" id="snapshotModal" role="dialog" aria-modal="true" aria-labelledby="snapshotModalTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="snapshotModalTitle">📸 Question Bank Snapshots</h3>
+      <button class="modal-close" id="snapshotClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="feat-desc">Save a named snapshot of your current questions. Restore any snapshot to return to that state. Up to 10 snapshots stored in your browser.</p>
+      <div class="field" style="display:flex;gap:8px;margin-bottom:14px;">
+        <input type="text" id="snapshotName" placeholder="Snapshot name…" style="flex:1;">
+        <button class="btn btn-primary" id="btnSaveSnap">💾 Save</button>
+      </div>
+      <ul id="snapList" style="list-style:none;padding:0;margin:0;"></ul>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="snapshotDone">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Merge Modal ────────────────────────────────────────────── -->
+<div class="modal-overlay" id="mergeModal" role="dialog" aria-modal="true" aria-labelledby="mergeModalTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="mergeModalTitle">🔀 Merge Question Bank</h3>
+      <button class="modal-close" id="mergeClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="feat-desc">Upload a JSON file exported from this tool to merge its questions into your current bank. Duplicate questions will be flagged.</p>
+      <div class="merge-drop" id="mergeDropZone" role="button" tabindex="0" aria-label="Drop JSON file here or click to browse">
+        <input type="file" id="mergeFileInput" accept=".json" aria-label="Select JSON file">
+        <div>📂 Drop a JSON file here or <strong>click to browse</strong></div>
+        <div style="font-size:.78rem;color:var(--gray-mid);margin-top:4px;">Accepts .json files exported from this tool</div>
+      </div>
+      <div id="mergePreview" style="display:none;margin-top:14px;">
+        <div id="mergeStats" style="font-size:.84rem;margin-bottom:10px;"></div>
+        <div id="mergeDupWarn" style="display:none;padding:8px 12px;background:rgba(138,80,0,.08);border:1px solid rgba(138,80,0,.3);border-radius:var(--radius);font-size:.82rem;color:#6a3800;margin-bottom:10px;">
+          <span id="mergeDupText"></span>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:.84rem;cursor:pointer;">
+          <input type="checkbox" id="mergeSkipDups" checked> Skip duplicate questions
+        </label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="mergeDone">Cancel</button>
+      <button class="btn btn-primary" id="btnDoMerge" style="display:none;">🔀 Merge Questions</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Objectives Modal ───────────────────────────────────────── -->
+<div class="modal-overlay" id="objectivesModal" role="dialog" aria-modal="true" aria-labelledby="objectivesModalTitle">
+  <div class="modal-box" style="max-width:700px;">
+    <div class="modal-head">
+      <h3 id="objectivesModalTitle">🎯 Learning Objectives</h3>
+      <button class="modal-close" id="objectivesClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="feat-desc">Define course learning objectives. Tags are stored per-question and embedded in QTI metadata on export.</p>
+      <div class="field" style="display:flex;gap:8px;margin-bottom:14px;">
+        <input type="text" id="newObjInput" placeholder="Add a learning objective…" style="flex:1;">
+        <button class="btn btn-primary" id="btnAddObj">+ Add</button>
+      </div>
+      <ul id="objMasterList" style="list-style:none;padding:0;margin:0 0 18px;"></ul>
+      <div style="font-family:var(--font-mono);font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gray-mid);margin-bottom:8px;">Coverage</div>
+      <div id="objCoverage"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="objectivesDone">Done</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Edit modal ──────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="editModalTitle">Edit Question</h3>
+      <button class="modal-close" id="editClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label class="field-label" for="editStem">Question Stem (LaTeX OK)</label>
+        <textarea id="editStem" rows="4"></textarea>
+      </div>
+      <div class="field">
+        <label class="field-label" for="editSolution">Worked Solution</label>
+        <textarea id="editSolution" rows="5"></textarea>
+      </div>
+      <div class="field">
+        <label class="field-label" for="editCorrect">Correct Answer Letter</label>
+        <input type="text" id="editCorrect" maxlength="1" style="width:80px;">
+      </div>
+      <div class="field">
+        <label class="field-label" for="editRationale">Rationale / Feedback</label>
+        <textarea id="editRationale" rows="3"></textarea>
+      </div>
+      <div class="field">
+        <label class="field-label" for="editTolerance">Tolerance (%)</label>
+        <input type="number" id="editTolerance" value="5" min="0" max="50" step="0.5" style="width:100px;">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="editCancel">Cancel</button>
+      <button class="btn btn-primary" id="editSave">✓ Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ───────────────────────────────────────────────────────────── -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+// ── Utility ────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// Render text that may contain LaTeX ($...$ or $$...$$).
+// Escapes HTML in the plain-text segments while leaving math delimiters intact.
+// KaTeX (renderMathInElement) then processes the math after DOM insertion.
+function renderLatex(s){
+  if(!s) return '';
+  // Patterns that look like $...$ but are NOT math — strip the delimiters
+  // Covers: IP addresses, CIDR prefixes, plain numbers, subnet masks
+  var plainDollar = /^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|\d+(?:\.\d+)?\/\d*|[\d.]+)\$$/;
+  // Split on $$...$$ (display) and $...$ (inline), preserving the delimiters
+  var parts = String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g);
+  return parts.map(function(p){
+    if(p.startsWith('$$')) return p; // display math — always pass through
+    if(p.startsWith('$')){
+      // Strip $ delimiters if the content looks like a plain value, not math
+      if(plainDollar.test(p)) return p.slice(1,-1); // remove the $ wrappers
+      return p; // real math — pass through raw
+    }
+    return p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }).join('');
+}
+function escX(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let toastTimer;
+function toast(msg, type=''){
+  const t=$('toast');
+  t.textContent=msg; t.className='show '+(type==='success'?'ok':type==='error'?'err':'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.className='',3000);
+}
+
+
+// ── Font size control ─────────────────────────────────────
+var FONT_STEPS = ['', 'fs-large', 'fs-larger'];
+var FONT_LABELS = ['100%', '113%', '127%'];
+var _fontIdx = 0;
+function changeFontSize(dir){
+  document.body.classList.remove(FONT_STEPS[_fontIdx]);
+  _fontIdx = Math.max(0, Math.min(FONT_STEPS.length-1, _fontIdx + dir));
+  if(FONT_STEPS[_fontIdx]) document.body.classList.add(FONT_STEPS[_fontIdx]);
+  var lbl = $('fontSizeLabel'); if(lbl) lbl.textContent = FONT_LABELS[_fontIdx];
+  try{ localStorage.setItem('stem_font', _fontIdx); }catch(e){}
+}
+(function initFont(){
+  try{
+    var saved = parseInt(localStorage.getItem('stem_font')||'0');
+    if(saved > 0 && saved < FONT_STEPS.length){
+      _fontIdx = saved;
+      if(FONT_STEPS[saved]) document.body.classList.add(FONT_STEPS[saved]);
+      document.addEventListener('DOMContentLoaded', function(){
+        var lbl=$('fontSizeLabel'); if(lbl) lbl.textContent=FONT_LABELS[saved];
+      });
+    }
+  }catch(e){}
+})();
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+
+// ── Domain group mapping ─────────────────────────────────
+var DOMAIN_MAP = {
+  'physics-mechanics':'stem','physics-em':'stem','physics-thermo':'stem','physics-waves':'stem',
+  'eng-statics':'stem','eng-dynamics':'stem','eng-circuits':'stem','eng-thermo':'stem',
+  'eng-fluids':'stem','eng-materials':'stem',
+  'math-calc1':'stem','math-calc2':'stem','math-calc3':'stem','math-diffeq':'stem',
+  'math-linalg':'stem','math-stats':'stem','math-algebra':'stem',
+  'chem-gen1':'stem','chem-gen2':'stem','chem-organic':'stem',
+  'chem-pchem':'stem','chem-analytical':'stem',
+  'biz-finance':'biz','biz-accounting':'biz','biz-economics':'biz',
+  'biz-stats':'biz','biz-cost':'biz',
+  'health-nursing':'health','health-pharm':'health',
+  'health-nutrition':'health','health-allied':'health',
+  'tech-networking':'tech','tech-security':'tech','tech-signals':'tech',
+  'hum-history':'hum','hum-polisci':'hum','hum-intlrel':'hum',
+  'hum-comm':'hum','hum-writing':'hum','hum-journalism':'hum',
+  'hum-psych':'hum','hum-sociology':'hum','hum-education':'hum',
+  'hum-english':'hum','hum-philosophy':'hum','hum-arts':'hum'
+};
+
+var DOMAIN_PANEL = {
+  'stem':'instrGroupSTEM',
+  'biz':'instrGroupBiz',
+  'health':'instrGroupHealth',
+  'tech':'instrGroupTech',
+  'hum':'instrGroupHum',
+};
+
+function updateDomainCheckboxes(){
+  var subj = $('subject').value;
+  var domain = DOMAIN_MAP[subj] || 'stem';
+  // Hide all domain panels, show the matching one
+  Object.values(DOMAIN_PANEL).forEach(function(id){
+    var el = $(id); if(el) el.style.display = 'none';
+  });
+  var target = $(DOMAIN_PANEL[domain]);
+  if(target) target.style.display = 'block';
+  // Uncheck domain-specific boxes from other groups
+  document.querySelectorAll('.domain-checks input[type=checkbox]').forEach(function(cb){
+    var panel = cb.closest('.instr-group');
+    if(panel && panel.style.display === 'none') cb.checked = false;
+  });
+}
+
+function getInstrCheckboxText(){
+  var lines = [];
+  document.querySelectorAll('input[name=instrStyle]:checked,input[name=instrSolution]:checked,input[name=instrDomain]:checked')
+    .forEach(function(cb){ lines.push(cb.value); });
+  return lines;
+}
+
+// Run on load to show correct domain panel for default subject
+document.addEventListener('DOMContentLoaded', updateDomainCheckboxes);
+
+
+// ── Question type mix presets ────────────────────────────────
+var QTYPE_PRESETS = {
+  'mostly-numerical': {
+    types: ['numerical_mc','conceptual','symbolic'],
+    dist:  'Generate approximately 60% numerical_mc, 30% conceptual, and 10% symbolic questions.',
+    hint:  '60% calculation-based, 30% qualitative understanding, 10% formula identification. Ideal for problem-solving courses.'
+  },
+  'balanced': {
+    types: ['numerical_mc','conceptual','symbolic'],
+    dist:  'Generate an equal mix: approximately 33% numerical_mc, 33% conceptual, and 33% symbolic questions.',
+    hint:  'Equal mix of calculation, conceptual understanding, and formula identification.'
+  },
+  'conceptual-focus': {
+    types: ['conceptual','numerical_mc','symbolic'],
+    dist:  'Generate approximately 60% conceptual, 30% numerical_mc, and 10% symbolic questions.',
+    hint:  '60% qualitative understanding, 30% calculation, 10% formula identification. Ideal for survey or intro courses.'
+  },
+  'exam-prep': {
+    types: ['numerical_mc','symbolic','conceptual'],
+    dist:  'Generate approximately 50% numerical_mc, 30% symbolic, and 20% conceptual questions.',
+    hint:  '50% calculation, 30% formula/symbolic, 20% conceptual. Mirrors typical exam composition.'
+  },
+  'custom': {
+    types: null,  // read from checkboxes
+    dist:  '',
+    hint:  'Select the question types you want included below.'
+  }
+};
+
+function applyQtypePreset(){
+  var preset = $('qtypePreset').value;
+  var config = QTYPE_PRESETS[preset];
+  if(!config) return;
+  // Show/hide custom checkboxes
+  var customDiv = $('qtypeCustom');
+  if(customDiv) customDiv.style.display = (preset === 'custom') ? 'block' : 'none';
+  // Update hint text
+  var hint = $('qtypeHint');
+  if(hint) hint.textContent = config.hint;
+}
+
+function getQtypesForPrompt(){
+  var preset = $('qtypePreset') ? $('qtypePreset').value : 'mostly-numerical';
+  var config = QTYPE_PRESETS[preset] || QTYPE_PRESETS['mostly-numerical'];
+  if(preset === 'custom'){
+    return {
+      types: [...document.querySelectorAll('input[name=qtype]:checked')].map(function(c){return c.value;}),
+      dist: ''
+    };
+  }
+  return {types: config.types, dist: config.dist};
+}
+
+// Run on load
+document.addEventListener('DOMContentLoaded', applyQtypePreset);
+
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>{ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tbtn-'+name).classList.add('active');
+  document.getElementById('tbtn-'+name).setAttribute('aria-selected','true');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// ── Checkbox styling ───────────────────────────────────────────────────────
+document.querySelectorAll('.check-item input[type=checkbox]').forEach(cb=>{
+  cb.addEventListener('change',()=>{
+    cb.closest('.check-item').classList.toggle('checked', cb.checked);
+  });
+});
+document.querySelectorAll('.llm-card input[type=radio]').forEach(r=>{
+  r.addEventListener('change',()=>{
+    document.querySelectorAll('.llm-card').forEach(c=>c.classList.remove('selected'));
+    r.closest('.llm-card').classList.add('selected');
+  });
+});
+
+// ── URL detection ──────────────────────────────────────────────────────────
+(function(){
+  const ta=$('contentPaste'), hint=$('urlHint');
+  if(!ta||!hint) return;
+  const RE=/https?:\/\/[^\s"'<>]+/i;
+  function chk(){ hint.style.display=RE.test(ta.value)?'inline':'none'; }
+  ta.addEventListener('input',chk);
+  ta.addEventListener('paste',()=>setTimeout(chk,50));
+})();
+
+// ── Subject → domain map for prompt ───────────────────────────────────────
+const SUBJECT_NAMES = {
+  'physics-mechanics':'Physics  --  Mechanics',
+  'physics-em':'Physics  --  Electricity & Magnetism',
+  'physics-thermo':'Physics  --  Thermodynamics',
+  'physics-waves':'Physics  --  Waves & Optics',
+  'eng-statics':'Engineering Statics',
+  'eng-dynamics':'Engineering Dynamics',
+  'eng-circuits':'Electric Circuits',
+  'eng-thermo':'Engineering Thermodynamics',
+  'eng-fluids':'Fluid Mechanics',
+  'eng-materials':'Mechanics of Materials',
+  'math-calc1':'Calculus I',
+  'math-calc2':'Calculus II',
+  'math-calc3':'Calculus III (Multivariable)',
+  'math-diffeq':'Differential Equations',
+  'math-linalg':'Linear Algebra',
+  'math-stats':'Statistics & Probability',
+  'math-algebra':'College Algebra & Precalculus',
+  'chem-gen1':'General Chemistry I',
+  'chem-gen2':'General Chemistry II',
+  'chem-organic':'Organic Chemistry',
+  'chem-pchem':'Physical Chemistry',
+  'chem-analytical':'Analytical Chemistry',
+  'biz-finance':'Finance',
+  'biz-accounting':'Accounting',
+  'biz-economics':'Economics',
+  'biz-stats':'Business Statistics',
+  'biz-cost':'Managerial / Cost Accounting',
+  'health-nursing':'Nursing — Dosage Calculations',
+  'health-pharm':'Pharmacology',
+  'health-nutrition':'Nutrition',
+  'health-allied':'Allied Health',
+  'tech-networking':'Computer Networking',
+  'tech-security':'Cybersecurity',
+  'tech-signals':'Data & Signals',
+};
+
+const DIFF_MAPS = {
+  'balanced':'Easy 20%, Medium 60%, Hard 20%',
+  'introductory':'Easy 50%, Medium 50%',
+  'exam':'Medium 40%, Hard 60%',
+  'challenge':'Medium 20%, Hard 80%',
+};
+
+const LLM_NOTES = {
+  'claude':'You are Claude (Anthropic). Always use LaTeX delimiters ($...$ for inline, $$...$$ for display). Ensure all numeric values are computed correctly before writing choices.',
+  'gpt4':'You are GPT-4. Always use LaTeX delimiters ($...$ for inline, $$...$$ for display). Double-check all arithmetic before providing choices.',
+  'gemini':'Always use LaTeX delimiters ($...$ for inline, $$...$$ for display). Verify each numerical answer against the worked solution before writing choices.',
+  'other':'Always use LaTeX delimiters ($...$ for inline, $$...$$ for display). Verify all calculations. Produce only valid JSON.',
+};
+
+// ── Prompt builder ─────────────────────────────────────────────────────────
+function buildPrompt(){
+  const courseTitle  = $('courseTitle').value.trim() || 'STEM Course';
+  const bankName     = $('bankName').value.trim()    || 'Question Bank';
+  const subject      = $('subject').value;
+  const subjectName  = SUBJECT_NAMES[subject] || subject;
+  const level        = $('level').value;
+  const topicFocus   = $('topicFocus').value.trim();
+  const numQ         = parseInt($('numQ').value) || 10;
+  const diff         = $('diffSelect').value;
+  const diffMap      = DIFF_MAPS[diff] || DIFF_MAPS.balanced;
+  const sigFigs      = $('sigFigs').value;
+  const tolerance    = $('defaultTolerance').value || '5';
+  const unitSystem   = $('unitSystem').value;
+  const notation     = $('notation').value;
+  const extraCtx     = $('extraContext').value.trim();
+  const llm          = document.querySelector('input[name=llm]:checked')?.value || 'claude';
+  const llmNote      = LLM_NOTES[llm] || LLM_NOTES.other;
+
+  const _qtypeData = getQtypesForPrompt();
+  const qtypes = _qtypeData.types;
+  const qtypeDist = _qtypeData.dist;
+  const blooms  = [...document.querySelectorAll('input[name=bloom]:checked')].map(c=>c.value);
+  const stemLvls= [...document.querySelectorAll('input[name=stemLevel]:checked')].map(c=>c.value);
+
+  if(!qtypes || !qtypes.length || !blooms.length || !stemLvls.length){ toast('Select at least one question type, Bloom\'s level, and STEM level.','error'); return null; }
+
+  // Content / URL handling
+  const rawContent = $('contentPaste').value.trim();
+  const urls = (rawContent.match(/https?:\/\/[^\s"'<>]+/gi)||[]);
+  const isUrlOnly = rawContent.length>0 && rawContent.split('\n').filter(l=>l.trim()).every(l=>/^https?:\/\//i.test(l.trim()));
+  let contentSection = '';
+  if(!rawContent){
+    contentSection = '\n(No source content provided. Generate questions based on your knowledge of '+subjectName+' at the '+level+' level.)\n';
+  } else if(urls.length && isUrlOnly){
+    contentSection = '\nSOURCE CONTENT  --  FETCH AND READ THESE URLS BEFORE GENERATING:\n'+urls.map(u=>'  - '+u).join('\n')+'\nBase questions primarily on that content.\n';
+  } else if(urls.length){
+    contentSection = '\nSOURCE CONTENT:\n'+rawContent.substring(0,6000)+'\n(Also fetch any URLs listed above if you have web access.)\n';
+  } else {
+    contentSection = '\nSOURCE CONTENT (use as the primary basis for questions):\n'+rawContent.substring(0,6000)+'\n';
+  }
+
+  const topicLine = topicFocus ? 'Specific topics: '+topicFocus+'\n' : '';
+  // Gather checkbox instructions
+  const checkboxLines = getInstrCheckboxText();
+  const allInstructions = [];
+  if(checkboxLines.length) allInstructions.push(...checkboxLines);
+  if(extraCtx) allInstructions.push(extraCtx);
+  const extraLine = allInstructions.length
+    ? 'Additional instructions (follow all of these):\n' + allInstructions.map(function(l){ return '- '+l; }).join('\n') + '\n'
+    : '';
+  const _subjectVal = $('subject').value;
+  const domain = DOMAIN_MAP[_subjectVal] || 'stem';
+  const notationNote = notation==='latex'
+    ? (domain === 'stem'
+        ? 'All mathematical expressions, equations, variables, and units MUST use LaTeX notation with $...$ for inline and $$...$$ for display equations. Every variable (e.g. $F$, $m$, $v$) must be in math mode. Never write math in plain text. IMPORTANT: Never use $ as a currency symbol — $ is reserved as a math delimiter. If a physics or engineering problem involves a dollar amount, write it as plain text (e.g. "500 dollars" or "USD 500").'
+        : domain === 'hum'
+          ? 'Do NOT use LaTeX. Write all questions in plain text. No $...$ delimiters. Focus on analytical reasoning and discipline-specific vocabulary.'
+          : 'Use LaTeX notation ($...$) for mathematical formulas and equations ONLY. CRITICAL — items that must NEVER be wrapped in $...$: (1) Currency — write "40,000 dollars" or "USD 40,000", never "$40,000". (2) IP addresses — write 192.168.10.0 not $192.168.10.0$. (3) CIDR prefix lengths — write /24 or prefix-length 24, never $/24$. (4) Subnet masks like 255.255.255.0 — plain text only. (5) Percentages like 5%, unit labels like mg/kg or mL — plain text only. The $ character is a math delimiter; using it around non-math text causes broken rendering.')
+    : 'Use plain text for all mathematical notation. Avoid special symbols.';
+
+  const qtypeInstructions = [];
+  if(qtypes.includes('numerical_mc'))
+    qtypeInstructions.push('- "numerical_mc": A quantitative problem requiring calculation. The stem presents a scenario with given values. Exactly 4 choices (A-D); one correct numerical answer. Each wrong choice MUST correspond to a specific, named student error (e.g., "forgot to square the radius", "used diameter instead of radius"). Document each distractor\'s error in the distractor_logic field. The correct answer must match the worked_solution result exactly.');
+  if(qtypes.includes('symbolic'))
+    qtypeInstructions.push('- "symbolic": A formula identification or algebraic manipulation question. Choices are different mathematical expressions. No floating-point arithmetic required  --  correct answer is an exact symbolic form.');
+  if(qtypes.includes('conceptual'))
+    qtypeInstructions.push('- "conceptual": A qualitative understanding question. No calculation required. Tests physical intuition, principle identification, or interpretation of results.');
+  if(qtypes.includes('multiple_choice'))
+    qtypeInstructions.push('- "multiple_choice": A standard 4-option multiple choice question. One clearly correct answer, three plausible distractors based on common misconceptions.');
+  if(qtypes.includes('scenario'))
+    qtypeInstructions.push('- "scenario": A situation-based question presenting a realistic context or case. Student selects the best response or analysis from 4 options.');
+  if(qtypes.includes('true_false'))
+    qtypeInstructions.push('- "true_false": A statement the student marks True or False. Use type: "conceptual" in the JSON output with only two choices: A. True and B. False.');
+  if(qtypes.includes('analysis'))
+    qtypeInstructions.push('- "analysis": A higher-order question requiring evaluation, comparison, or application of concepts (Bloom\'s Analyze/Evaluate). Works for all disciplines.');
+  if(qtypes.includes('free_response'))
+    qtypeInstructions.push('- "free_response": An open-ended show-your-work problem. choices must be an empty array []. The correct field must contain a complete model answer (3-8 sentences covering all required steps). The worked_solution must be a full step-by-step solution.');
+
+  return `${llmNote}
+
+You are generating a STEM question bank for: ${courseTitle}
+Bank name: ${bankName}
+Subject: ${subjectName}
+Level: ${level}
+Difficulty distribution: ${diffMap}
+${topicLine}${extraLine}
+NOTATION REQUIREMENT:
+${notationNote}
+CRITICAL  --  NO VALUE DUPLICATION: Never write a numerical value twice in ANY field (stem, worked_solution, rationale, choices, or verification_expression). Do NOT write "15.0 kg$15.0\\text{kg}$" or any pattern where a value appears in plain text AND again in LaTeX. Write each given value exactly once, inside $...$ only.
+
+NUMERICAL PRECISION:
+- All numerical answers must be computed to ${sigFigs==='any'?'an appropriate number of':sigFigs} significant figures
+- Default tolerance: ±${tolerance}% (include in tolerance_pct field for each numerical question)
+- Unit system: ${unitSystem==='SI'?'SI (meters, kilograms, seconds, etc.)':unitSystem==='US'?'US Customary (feet, pounds, seconds, etc.)':'Specify units clearly in each problem'}
+- Every worked solution must show unit analysis/dimensional analysis
+
+QUESTION TYPE REQUIREMENTS:
+${qtypeInstructions.join('\n')}
+
+DISTRACTOR ENGINEERING (critical for numerical_mc):
+Each wrong answer must be derived from a specific, realistic student mistake:
+- Unit conversion error (e.g., forgot to convert cm to m)
+- Sign error (e.g., used wrong direction for a vector)
+- Wrong formula (e.g., used kinetic energy formula for potential energy)
+- Algebraic error (e.g., forgot to square a term)
+- Rounding at the wrong step
+Document the specific error for each distractor in the distractor_logic object.
+
+WORKED SOLUTION REQUIREMENT:
+Every question must include a complete worked_solution field with:
+1. Given values listed
+2. Relevant formula(s) identified
+3. Substitution shown step by step
+4. Dimensional analysis
+5. Final answer with correct significant figures and units
+
+BLOOM'S LEVELS to include: ${blooms.join(', ')}
+STEM COGNITIVE LEVELS to include: ${stemLvls.join(', ')}
+
+ANSWER POSITION: Randomize the correct answer across A, B, C, D. Do NOT always put the correct answer in the same position.
+
+${contentSection}
+
+Respond ONLY with a valid JSON array — no preamble, no explanation, no markdown fences, no text after the closing bracket.
+NO META-COMMENTARY: Every JSON field must contain only its intended content. Do NOT write corrections, notes, revision notices, or phrases like "I will replace this", "REVISED:", "Note:", or any self-referential language inside any field. If a question needs to be corrected, silently produce the correct version — never narrate the correction. No preamble, no explanation, no markdown fences. The array must contain exactly ${numQ} question objects with this exact schema:
+
+[
+  {
+    "id": "q1",
+    "type": "numerical_mc | symbolic | conceptual | free_response",
+    "subject": "${subject}",
+    "stem": "Full question text with $LaTeX$ notation",
+    "choices": [
+      {"letter": "A", "text": "choice text with $LaTeX$ if needed"},
+      {"letter": "B", "text": "..."},
+      {"letter": "C", "text": "..."},
+      {"letter": "D", "text": "..."}
+    ],
+    "correct": "A",
+    "worked_solution": "Step-by-step solution with $LaTeX$",
+    "distractor_logic": {
+      "B": "forgot to convert cm to m",
+      "C": "used diameter instead of radius",
+      "D": "dropped negative sign"
+    },
+    "bloom": "${blooms[0]}",
+    "stem_level": "${stemLvls[0]}",
+    "difficulty": "easy | medium | hard",
+    "tolerance_pct": ${tolerance},
+    "units": "m/s (or null for non-numerical)",
+    "rationale": "2-3 sentence explanation of why the correct answer is right and why each distractor is wrong"
+  }
+]
+
+For free_response: choices = [], correct = model answer text, distractor_logic = {}.
+For symbolic/conceptual: tolerance_pct = null, units = null.
+CRITICAL: Every numerical_mc answer must be verified against its worked_solution before you finalize it.
+VERIFICATION EXPRESSION REQUIRED: For every numerical_mc question, populate the "verification_expression" field
+with a self-contained arithmetic expression that evaluates to the correct answer — no variable names, only numbers
+and functions. Examples: "9.81 * sin(30*pi/180) * 5" or "1/(1/10 + 1/20)" or "sqrt(2 * 45.0 / 9.81) * 15.0".
+This expression will be evaluated by a browser math engine to check your answer automatically.
+EXACTLY ONE CORRECT ANSWER: Each numerical_mc question must have exactly one unambiguously correct answer — not "the closest" or "the best approximation." Each distractor must be derived from a specific calculation error, not just a nearby value. If the calculation does not yield a clean answer matching exactly one choice, redesign the problem with different given values.`;
+}
+
+// ── Generate button ────────────────────────────────────────────────────────
+$('btnGenerate').addEventListener('click',()=>{
+  const prompt = buildPrompt();
+  if(!prompt){ toast('Select at least one question type, Bloom\'s level, and STEM level.','error'); return; }
+  $('promptOutput').textContent = prompt;
+  $('promptWrap').style.display = 'block';
+  $('llmJumpLinks').style.display = 'block';
+  $('noPromptMsg').style.display = 'none';
+  // Token estimate
+  const tokens = Math.round(prompt.length/3.8);
+  const pill = $('tokenPill');
+  pill.textContent = tokens.toLocaleString()+' tokens';
+  if(tokens<8000){ pill.className='token-pill ok'; $('tokenMsg').textContent='Well within context limits for all LLMs.'; }
+  else if(tokens<24000){ pill.className='token-pill warn'; $('tokenMsg').textContent='Large prompt  --  use Claude or GPT-4o for best results.'; }
+  else { pill.className='token-pill over'; $('tokenMsg').textContent='Very large  --  consider reducing question count or content.'; }
+  switchTab('prompt');
+  toast('✓ Prompt ready  --  copy it, paste into your LLM, then bring the JSON to Tab 3.','success');
+});
+
+$('btnCopy').addEventListener('click',()=>{
+  navigator.clipboard.writeText($('promptOutput').textContent).then(()=>toast('Copied to clipboard!','success'));
+});
+$('btnDlPrompt').addEventListener('click',()=>{
+  dlBlob(new Blob([$('promptOutput').textContent],{type:'text/plain'}), ($('bankName').value.trim()||'stem_prompt')+'.txt');
+});
+$('btnClearForm').addEventListener('click',()=>{
+  ['courseTitle','bankName','topicFocus','extraContext','contentPaste'].forEach(id=>$(id).value='');
+  if($('qtypePreset')){ $('qtypePreset').value='mostly-numerical'; applyQtypePreset(); }
+  document.querySelectorAll('input[name=instrStyle],input[name=instrSolution],input[name=instrDomain]')
+    .forEach(function(cb){ cb.checked=false; cb.closest('.check-item')?.classList.remove('checked'); });
+  $('urlHint').style.display='none';
+});
+
+// ── Validation & Review ────────────────────────────────────────────────────
+let parsedQuestions = [];
+let editingIdx = -1;
+
+$('btnValidate').addEventListener('click',()=>{
+  const raw = $('jsonPaste').value.trim();
+  const vm = $('validationMsg');
+  vm.className='status-msg'; vm.style.display='none';
+  if(!raw){ vm.className='status-msg err show'; vm.textContent='Paste JSON from your LLM first.'; return; }
+  try{
+    let arr = JSON.parse(raw.replace(/^```(?:json)?\n?/,'').replace(/\n?```$/,''));
+    if(!Array.isArray(arr)) arr = arr.questions || arr.data || Object.values(arr);
+    if(!Array.isArray(arr)) throw new Error('Expected a JSON array.');
+    // Normalise fields
+    arr = arr.map((q,i)=>({
+      id: q.id||'q'+(i+1),
+      type: (q.type||'numerical_mc').toLowerCase(),
+      subject: q.subject||'',
+      stem: q.stem||'',
+      choices: q.choices||[],
+      correct: (q.correct||'A').toUpperCase().trim(),
+      worked_solution: q.worked_solution||q.workedSolution||'',
+      distractor_logic: q.distractor_logic||q.distractorLogic||{},
+      bloom: q.bloom||'Apply',
+      stem_level: q.stem_level||q.stemLevel||'Single-step',
+      difficulty: (q.difficulty||'medium').toLowerCase(),
+      tolerance_pct: q.tolerance_pct!=null ? Number(q.tolerance_pct) : Number($('defaultTolerance').value||5),
+      units: q.units||null,
+      verification_expression: q.verification_expression||q.verificationExpression||'',
+      rationale: q.rationale||'',
+    }));
+    parsedQuestions = arr;
+    vm.className='status-msg ok show';
+    vm.innerHTML='✅ <strong>'+arr.length+' questions validated.</strong> Review each question below  --  verify all worked solutions and numerical answers before exporting.';
+    renderReview();
+    $('reviewWrap').style.display='block';
+    $('exportCard').style.display='block';
+    toast('✅ '+arr.length+' questions validated!','success');
+  } catch(e){
+    vm.className='status-msg err show';
+    vm.textContent='❌ JSON parse error: '+e.message;
+    parsedQuestions=[];
+    $('reviewWrap').style.display='none';
+    $('exportCard').style.display='none';
+  }
+});
+
+$('btnClearJson').addEventListener('click',()=>{
+  $('jsonPaste').value=''; parsedQuestions=[];
+  $('validationMsg').className='status-msg';
+  $('reviewWrap').style.display='none';
+  $('exportCard').style.display='none';
+});
+
+// ── Render review ──────────────────────────────────────────────────────────
+function renderReview(){
+  const byType = t => parsedQuestions.filter(q=>q.type===t).length;
+  const stats = [
+    'Total: '+parsedQuestions.length,
+    'Numerical MC: '+byType('numerical_mc'),
+    'Symbolic: '+byType('symbolic'),
+    'Conceptual: '+byType('conceptual'),
+    'Free Response: '+byType('free_response'),
+  ].filter(s=>!s.endsWith(': 0'));
+  $('reviewStats').innerHTML = stats.map(s=>`<span class="stat-chip">${escH(s)}</span>`).join('');
+
+  const list = $('qList');
+  list.innerHTML = '';
+  parsedQuestions.forEach((q,i)=>{ list.appendChild(buildQCard(q,i)); });
+
+  // Re-render KaTeX after DOM update
+  setTimeout(()=>{
+    if(window.renderMathInElement){
+      renderMathInElement(list, {
+        delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+        throwOnError:false
+      });
+    }
+  },100);
+}
+
+
+
+
+// ── Verification helpers ──────────────────────────────────────────
+// The worked solution pane is the primary verification tool.
+function getQuestions(){ return parsedQuestions; }
+
+
+// ═══════════════════════════════════════════════════════════
+// COMPUTATION VERIFICATION  --  Option C
+// 1. Run math.js on verification_expression (fast, in-browser)
+// 2. If math.js can't evaluate it, fall back to Wolfram Alpha link
+// 3. Always show concept search below
+// ═══════════════════════════════════════════════════════════
+function cleanExprForMathJS(expr){
+  if(!expr) return null;
+  var s = String(expr);
+  // Strip LaTeX delimiters preserving content
+  s = s.replace(/\$\$([^$]+)\$\$/g, function(_,m){return m;});
+  s = s.replace(/\$([^$]+)\$/g,    function(_,m){return m;});
+  // Convert LaTeX math to mathjs syntax
+  s = s.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)');
+  s = s.replace(/\\sqrt\{([^}]+)\}/g,'sqrt($1)');
+  s = s.replace(/\\sqrt\b/g,'sqrt');
+  s = s.replace(/\\sin\b/g,'sin').replace(/\\cos\b/g,'cos').replace(/\\tan\b/g,'tan');
+  s = s.replace(/\\ln\b/g,'log').replace(/\\log\b/g,'log10');
+  s = s.replace(/\\pi\b/g,'pi').replace(/\\theta\b/g,'theta');
+  s = s.replace(/\\times\b/g,'*').replace(/\\cdot\b/g,'*').replace(/\\div\b/g,'/');
+  // Unit words → strip (mathjs handles units separately, keep numbers)
+  s = s.replace(/\b(m\/s\^2|m\/s²|m\/s|kg|N|J|W|Pa|Hz|rad|deg|ohm|Ohm|Ω)\b/g,'');
+  s = s.replace(/\\text\{([^}]*)\}/g,'');
+  s = s.replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1');
+  s = s.replace(/\\[a-zA-Z]+/g,'');
+  s = s.replace(/[{}]/g,'');
+  // Degree symbol to degrees()
+  s = s.replace(/(\d+\.?\d*)\s*°/g, function(_,n){ return '('+n+'*pi/180)'; });
+  s = s.replace(/(\d+\.?\d*)\s*degrees?/gi, function(_,n){ return '('+n+'*pi/180)'; });
+  // Collapse comma-formatted thousands in expressions: 12,000 → 12000
+  s = s.replace(/(\d{1,3}),(\d{3})/g,'$1$2');
+  s = s.replace(/(\d{1,3}),(\d{3})/g,'$1$2');
+  s = s.replace(/\s{2,}/g,' ').trim();
+  return s || null;
+}
+
+function tryEvaluate(expr){
+  // Returns {ok:true, result:number} or {ok:false, reason:string}
+  if(!expr) return {ok:false, reason:'no expression'};
+  var clean = cleanExprForMathJS(expr);
+  if(!clean) return {ok:false, reason:'empty after cleaning'};
+  if(typeof math === 'undefined') return {ok:false, reason:'math.js not loaded'};
+  try {
+    var result = math.evaluate(clean);
+    if(typeof result !== 'number' || !isFinite(result))
+      return {ok:false, reason:'non-numeric result'};
+    return {ok:true, result:result, expr:clean};
+  } catch(e) {
+    return {ok:false, reason:e.message||'parse error', expr:clean};
+  }
+}
+
+function getCorrectValue(q){
+  var correctChoice = (q.choices||[]).find(function(c){ return c.letter===q.correct; });
+  if(!correctChoice) return null;
+  var t = correctChoice.text;
+  // Normalize unicode minus/en-dash
+  t = t.replace(/\u2212/g,'-').replace(/\u2013/g,'-');
+  // Strip LaTeX delimiters preserving content
+  t = t.replace(/\$\$([^$]+)\$\$/g,function(_,m){return m;});
+  t = t.replace(/\$([^$]+)\$/g,    function(_,m){return m;});
+  t = t.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)');
+  t = t.replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1');
+  t = t.replace(/\\[a-zA-Z]+/g,'');
+  // Collapse comma-formatted thousands: 12,000 → 12000
+  t = t.replace(/(\d{1,3}),(\d{3})/g,'$1$2');
+  t = t.replace(/(\d{1,3}),(\d{3})/g,'$1$2');
+  // Protect scientific notation e/E before letter strip (replace with ~)
+  t = t.replace(/(\d)([eE])([+\-]?\d)/g,function(_,a,e,b){return a+'~'+b;});
+  // Strip variable names and subscripts
+  t = t.replace(/[A-Za-z]+(?:_\{?[A-Za-z0-9]*\}?)?/g,' ');
+  t = t.replace(/[\u2080-\u2089\u00b2\u00b3\u2070-\u2079]/g,'');
+  t = t.replace(/[₀₁₂₃₄₅₆₇₈₉]/g,'');
+  t = t.replace(/[{}°]/g,'');
+  // Restore scientific notation e
+  t = t.replace(/~/g,'e');
+  // Prefer number after = sign
+  var afterEq = t.match(/=\s*(-?[\d.]+(?:[eE][+\-]?\d+)?)/);
+  if(afterEq){ try{ return parseFloat(afterEq[1]); }catch(e){} }
+  // Fall back to last parseable number
+  var nums = (t.match(/-?[\d.]+(?:[eE][+\-]?\d+)?/g)||[])
+    .filter(function(n){ return n!=='.' && n!=='-'; });
+  for(var i=nums.length-1;i>=0;i--){
+    var v=parseFloat(nums[i]);
+    if(isFinite(v)) return v;
+  }
+  return null;
+}
+
+function buildVerificationWidget(q, _qIdx){
+  var qtype = (q.type||'');
+  // Only for numerical_mc and symbolic  --  others don't need computation check
+  if(qtype !== 'numerical_mc' && qtype !== 'symbolic') return '';
+
+  var expr = (q.verification_expression||'').trim();
+  var correctVal = getCorrectValue(q);
+  var tol = (q.tolerance_pct||5)/100;
+  var html = '<div class="verification-widget">';
+  html += '<div class="vw-label">⚙ Computation Check</div>';
+
+  if(expr){
+    html += '<div class="vw-expr">' + escH(expr) + '</div>';
+    var evalResult = tryEvaluate(expr);
+    if(evalResult.ok){
+      var computed = Math.round(evalResult.result * 1e6)/1e6;
+      if(correctVal !== null){
+        // Use absolute margin to correctly handle negative answers
+        var _margin = Math.abs(correctVal) * tol;
+        // Near-zero fallback: if answer is very small, use absolute tolerance of 0.01
+        if(_margin < 0.01) _margin = 0.01;
+        var lo = correctVal - _margin, hi = correctVal + _margin;
+        var pass = computed >= lo && computed <= hi;
+        if(pass){
+          html += '<div class="vw-pass">✅ Computed: <strong>' + computed + '</strong>'
+               +  '  --  matches correct answer (' + correctVal + ') within ±' + (tol*100) + '%</div>';
+        } else {
+          // Near-miss: computed is within 20% of correct but outside set tolerance
+          var pctOff = Math.abs(computed - correctVal) / (Math.abs(correctVal) || 1) * 100;
+          var isNearMiss = pctOff <= 20;
+          var cssClass = isNearMiss ? 'vw-near-miss' : 'vw-fail';
+          var icon = isNearMiss ? '🔶' : '⚠';
+          var nearNote = isNearMiss
+            ? '<br><small><strong>Near miss (' + pctOff.toFixed(1) + '% off):</strong> This may be a rounding difference '
+            + 'or a minor formula variation. Check whether the expression uses the same rounding as the answer choice.</small>'
+            : '';
+          html += '<div class="' + cssClass + '">'
+               +  icon + ' Computed: <strong>' + computed + '</strong>'
+               +  ' &mdash; does NOT match correct answer (' + correctVal + ') within &plusmn;' + (tol*100) + '%'
+               +  nearNote
+               +  '<ol>'
+               +  '<li>Check the <strong>verification expression</strong> above &mdash; does it compute the quantity the question actually asks for?</li>'
+               +  '<li>Check the <strong>correct answer choice</strong> &mdash; is the right letter designated? The AI sometimes marks the wrong choice.</li>'
+               +  '<li>Check the <strong>worked solution</strong> &mdash; do the steps match the expression, and does the final value match the choice?</li>'
+               +  '<li>If this is a rounding difference, <strong>widen the tolerance</strong> using the field below, then re-check.</li>'
+               +  '</ol>'
+               +  '<button class="vw-edit-link" onclick="editQ('+_qIdx+');event.stopPropagation();">✎ Edit this question</button>'
+               +  '</div>';
+        }
+      } else {
+        html += '<div class="vw-pass">✅ Computed: <strong>' + computed + '</strong>'
+             +  ' (verify this matches the correct answer)</div>';
+      }
+    } else {
+      // math.js failed  --  fall back to Wolfram Alpha
+      var waExpr = expr.replace(/(\d+\.?\d*)\s*°/g,'$1 degrees')
+                       .replace(/°/g,' degrees').replace(/\*/g,'*');
+      var waUrl = 'https://www.wolframalpha.com/input?i='
+               + encodeURIComponent(waExpr.substring(0,200));
+      html += '<div class="vw-skip">⚡ Expression too complex for browser evaluation'
+           +  (evalResult.expr ? ' (<code>'+escH(evalResult.expr.substring(0,60))+'</code>)' : '')
+           +  '</div>';
+      html += '<a class="vw-wa-link" href="' + waUrl + '" target="_blank" rel="noopener"'
+           +  ' title="Verify: ' + escH(expr).replace(/"/g,"'").substring(0,80) + '">'
+           +  '🔎 Verify on Wolfram Alpha</a>';
+    }
+  } else {
+    // No verification_expression provided
+    html += '<div class="vw-skip">No <code>verification_expression</code> in this question.'
+         +  ' Re-generate with an updated prompt to get computation checking.</div>';
+  }
+
+  // Always show concept search
+  html += '</div>';
+  return html;
+}
+
+
+
+// ── Per-question verification state ──────────────────────────────
+var verifiedSet = {};   // qid → true
+
+function toggleVerified(idx){
+  var q = getQuestions()[idx];
+  if(!q) return;
+  var qid = q.id || ('q'+idx);
+  verifiedSet[qid] = !verifiedSet[qid];
+  var card = document.getElementById('qcard-'+idx);
+  var badge = document.getElementById('vbadge-'+idx);
+  var solBox = document.getElementById('solbox-'+idx);
+  var solTog = document.getElementById('soltog-'+idx);
+  if(verifiedSet[qid]){
+    if(card){ card.classList.add('verified'); card.classList.remove('needs-verify'); }
+    if(badge){ badge.className='verify-badge done'; badge.textContent='\u2713 Verified'; }
+  } else {
+    if(card){ card.classList.remove('verified'); card.classList.add('needs-verify'); }
+    if(badge){ badge.className='verify-badge needs'; badge.textContent='\u26A0 Needs Verification'; }
+    // Re-expand worked solution when un-verifying
+    if(solBox && !solBox.classList.contains('open')){
+      solBox.classList.add('open');
+      if(solTog){ solTog.textContent='\u25BC Hide Worked Solution'; solTog.setAttribute('aria-expanded','true'); }
+      if(window.renderMathInElement) renderMathInElement(solBox,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});
+    }
+  }
+  updateVerifyBar();
+}
+
+
+function verifyAll(){
+  var qs = getQuestions();
+  qs.forEach(function(q, idx){
+    var qid = q.id || ('q'+idx);
+    verifiedSet[qid] = true;
+    var card  = document.getElementById('qcard-'+idx);
+    var badge = document.getElementById('vbadge-'+idx);
+    if(card){ card.classList.add('verified'); card.classList.remove('needs-verify'); }
+    if(badge){ badge.className='verify-badge done'; badge.textContent='✓ Verified'; }
+  });
+  updateVerifyBar();
+  toast('All ' + qs.length + ' questions marked as verified.', 'success');
+}
+
+function updateVerifyBar(){
+  var qs = getQuestions();
+  var total = qs.length;
+  var done  = qs.filter(function(q,i){ return verifiedSet[q.id||('q'+i)]; }).length;
+  var bar   = document.getElementById('verifyBar');
+  var pill  = document.getElementById('verifyPill');
+  var msg   = document.getElementById('verifyMsg');
+  if(!bar) return;
+  if(done === total && total > 0){
+    bar.className='export-verify-bar all-verified';
+    if(pill){ pill.className='verify-count-pill full'; pill.textContent=done+'/'+total+' verified'; }
+    if(msg) msg.textContent='\u2713 All questions verified \u2014 ready to export.';
+  } else {
+    bar.className='export-verify-bar';
+    if(pill){ pill.className='verify-count-pill'; pill.textContent=done+'/'+total+' verified'; }
+    if(msg) msg.textContent='Please verify each question\'s calculation before exporting.';
+  }
+}
+
+function buildQCard(q,i){
+  const div = document.createElement('div');
+  div.className='q-card needs-verify'; div.id='qcard-'+i;
+  div.setAttribute('role','listitem');
+
+  const typeLabel = {'numerical_mc':'Numerical MC','symbolic':'Symbolic','conceptual':'Conceptual','free_response':'Free Response'}[q.type]||q.type;
+  const distractorHtml = Object.entries(q.distractor_logic||{}).map(([k,v])=>
+    `<div class="choice-error" title="Distractor logic">⚠ ${escH(k)}: ${escH(v)}</div>`
+  ).join('');
+
+  const choicesHtml = (q.choices||[]).map(c=>{
+    const isCorrect = c.letter === q.correct;
+    return `<li class="choice-item ${isCorrect?'correct':''}">
+      <span class="choice-letter">${escH(c.letter)}</span>
+      <div>
+        <div>${renderLatex(c.text)}</div>
+        ${isCorrect?'':((q.distractor_logic||{})[c.letter]?`<div class="choice-error">⚠ ${escH((q.distractor_logic||{})[c.letter])}</div>`:'')}
+      </div>
+    </li>`;
+  }).join('');
+
+  const toleranceRow = (q.type==='numerical_mc')
+    ? `<div class="tolerance-row">
+         <span>Tolerance:</span>
+         <input type="number" value="${q.tolerance_pct||5}" min="0.1" max="50" step="0.5" aria-label="Tolerance percent" onchange="parsedQuestions[${i}].tolerance_pct=parseFloat(this.value)" style="width:75px;">
+         <span>%</span>
+         ${q.units?`<span style="color:var(--gray-mid);font-family:var(--font-mono);font-size:.78rem;">Units: ${escH(q.units)}</span>`:''}
+       </div>` : '';
+
+  const conceptLink = buildVerificationWidget(q, i);
+
+  div.innerHTML = `
+    <div class="q-card-head" onclick="toggleCard(${i})" role="button" aria-expanded="false" aria-controls="qbody-${i}" tabindex="0">
+      <span class="q-num">#${i+1}</span>
+      <div style="flex:1;">
+        <div class="q-badges">
+          <span class="q-badge badge-type">${escH(typeLabel)}</span>
+          <span class="q-badge badge-diff">${escH(q.difficulty)}</span>
+          <span class="q-badge badge-bloom">${escH(q.bloom)}</span>
+          <span class="q-badge badge-stem">${escH(q.stem_level)}</span>
+          ${q.subject?`<span class="q-badge badge-subj">${escH(SUBJECT_NAMES[q.subject]||q.subject)}</span>`:''}
+        </div>
+        <div class="q-stem">${renderLatex(q.stem)}</div>
+      </div>
+      <button class="verify-badge needs" id="vbadge-${i}" onclick="event.stopPropagation();toggleVerified(${i})" aria-label="Mark question ${i+1} as verified" title="Click after reviewing the worked solution">⚠ Needs Verification</button>
+      <div class="q-actions" onclick="event.stopPropagation()">
+        <button class="q-act-btn" onclick="editQ(${i})" aria-label="Edit question ${i+1}">✎</button>
+        <button class="q-act-btn del" onclick="deleteQ(${i})" aria-label="Delete question ${i+1}">✕</button>
+      </div>
+    </div>
+    <div class="q-card-body" id="qbody-${i}">
+      <ul class="choices-list">${choicesHtml}</ul>
+      ${toleranceRow}
+      ${conceptLink}
+      <button class="solution-toggle" onclick="toggleSolution(${i})" id="soltog-${i}" aria-expanded="false" aria-controls="solbox-${i}">▶ Show Worked Solution</button>
+      <div class="solution-box" id="solbox-${i}" role="region" aria-label="Worked solution">
+        <div class="sol-head">Worked Solution</div>
+        <div id="solcontent-${i}">${escH(q.worked_solution||'No worked solution provided.')}</div>
+      </div>
+      ${q.rationale?`<div class="rationale-box">${renderLatex(q.rationale)}</div>`:''}
+    </div>`;
+
+  // Keyboard open card
+  // Auto-expand card body for numerical_mc (needs calculation verification)
+  if(q.type==='numerical_mc'){
+    var autoBody=document.getElementById('qbody-'+i);
+    var autoHead=autoBody?autoBody.previousElementSibling:null;
+    var autoSol=document.getElementById('solbox-'+i);
+    var autoTog=document.getElementById('soltog-'+i);
+    if(autoBody){ autoBody.classList.add('open'); if(autoHead) autoHead.setAttribute('aria-expanded','true'); }
+    if(autoSol){ autoSol.classList.add('open'); }
+    if(autoTog){ autoTog.textContent='▼ Hide Worked Solution'; autoTog.setAttribute('aria-expanded','true'); }
+  }
+
+  div.querySelector('.q-card-head').addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleCard(i); }
+  });
+
+  return div;
+}
+
+function toggleCard(i){
+  const body = $('qbody-'+i);
+  const head = body.previousElementSibling;
+  const open = body.classList.toggle('open');
+  head.setAttribute('aria-expanded', open);
+  if(open){
+    // Render KaTeX in this card
+    setTimeout(()=>{
+      if(window.renderMathInElement){
+        renderMathInElement(body,{
+          delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+          throwOnError:false
+        });
+      }
+    },50);
+  }
+}
+
+function toggleSolution(i){
+  const box=$('solbox-'+i), tog=$('soltog-'+i);
+  const open = box.classList.toggle('open');
+  tog.textContent = open ? '▼ Hide Worked Solution' : '▶ Show Worked Solution';
+  tog.setAttribute('aria-expanded', open);
+  if(open && window.renderMathInElement){
+    setTimeout(()=>{
+      renderMathInElement(box,{
+        delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+        throwOnError:false
+      });
+    },50);
+  }
+}
+
+function deleteQ(i){
+  if(!confirm('Delete question '+(i+1)+'?')) return;
+  parsedQuestions.splice(i,1);
+  renderReview();
+  toast('Question deleted.','');
+}
+
+function editQ(i){
+  editingIdx=i;
+  const q=parsedQuestions[i];
+  $('editStem').value=q.stem||'';
+  $('editSolution').value=q.worked_solution||'';
+  $('editCorrect').value=q.correct||'A';
+  $('editRationale').value=q.rationale||'';
+  $('editTolerance').value=q.tolerance_pct||5;
+  $('editModal').classList.add('open');
+  $('editStem').focus();
+}
+
+$('editSave').addEventListener('click',()=>{
+  if(editingIdx<0) return;
+  const q=parsedQuestions[editingIdx];
+  q.stem=$('editStem').value.trim()||q.stem;
+  q.worked_solution=$('editSolution').value.trim();
+  q.correct=$('editCorrect').value.trim().toUpperCase()||q.correct;
+  q.rationale=$('editRationale').value.trim();
+  q.tolerance_pct=parseFloat($('editTolerance').value)||5;
+  $('editModal').classList.remove('open');
+  renderReview();
+  toast('Question saved.','success');
+});
+
+$('editClose').addEventListener('click',()=>$('editModal').classList.remove('open'));
+$('editCancel').addEventListener('click',()=>$('editModal').classList.remove('open'));
+$('editModal').addEventListener('click',e=>{ if(e.target===$('editModal')) $('editModal').classList.remove('open'); });
+
+// ── GIFT builder ───────────────────────────────────────────────────────────
+function escGIFT(s){ return String(s||'').replace(/([~=#{}:\\])/g,'\\$1'); }
+
+function buildGIFT(questions, catName){
+  const SKIP=new Set(['free_response']);
+  const lines=['// Moodle GIFT  --  STEM Question Bank','// Generated: '+new Date().toISOString(),'','$CATEGORY: $course$/top/'+escGIFT(catName),''];
+  let exported=0, skipped=0;
+  questions.forEach((q,idx)=>{
+    const t=q.type;
+    if(SKIP.has(t)){ skipped++; return; }
+    const title=escGIFT((q.stem||'Q'+(idx+1)).slice(0,80).replace(/\n/g,' ').replace(/\$[^$]+\$/g,''));
+    const stem=escGIFT(q.stem.replace(/\$[^$]+\$/g,'[formula]').replace(/\$\$[^$]+\$\$/g,'[equation]'));
+    const fb=q.rationale?'\n####'+escGIFT(q.rationale):'';
+    const meta='// Q'+(idx+1)+' | '+q.bloom+' | '+q.difficulty+' | '+q.stem_level;
+    if(t==='conceptual'||t==='symbolic'||t==='numerical_mc'){
+      const ci='ABCD'.indexOf((q.correct||'A').toUpperCase().charAt(0));
+      const cl=(q.choices||[]).map((c,i2)=>'    '+(i2===ci?'=':'~%0%')+escGIFT(c.text.replace(/\$[^$]+\$/g,'').trim())).join('\n');
+      lines.push(meta);
+      lines.push('::'+title+'::'+stem+'{\n'+cl+fb+'\n}');
+      lines.push(''); exported++;
+    }
+  });
+  lines.push('// Exported: '+exported+' | Skipped: '+skipped+' (free_response not supported in GIFT)');
+  return {text:lines.join('\n'),exported,skipped};
+}
+
+// ── QTI XML builder ────────────────────────────────────────────────────────
+function buildQTIXML(questions, bankName, pts){
+  const ident=bankName.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40)||'STEM_QB';
+  const items=questions.map((q,i)=>{
+    const qid='item_'+(i+1)+'_'+ident;
+    const isFR=q.type==='free_response';
+    const isNum=q.type==='numerical_mc';
+    // Canvas question type
+    const cqt = isNum ? 'calculated_question' : isFR ? 'essay_question' : 'multiple_choice_question';
+    const correctLetter=(q.correct||'A').toUpperCase().charAt(0);
+    const correctIdx='ABCD'.indexOf(correctLetter);
+
+    let presentation, resprocessing;
+
+    if(isFR){
+      presentation=`<presentation>
+        <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
+        <response_str ident="response1" rcardinality="Single"><render_fib rows="10" columns="80"/></response_str>
+      </presentation>`;
+      resprocessing=`<resprocessing>
+        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
+        <respcondition continue="Yes"><conditionvar><other/></conditionvar></respcondition>
+      </resprocessing>
+      <itemfeedback ident="fb"><flow_mat><material>
+        <mattext texttype="text/plain">Model answer: ${escX(q.worked_solution||q.correct||'')}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
+      </material></flow_mat></itemfeedback>`;
+    } else if(isNum){
+      // calculated_question: answer + tolerance
+      const correctChoice=(q.choices||[])[correctIdx>=0?correctIdx:0];
+      const correctVal=correctChoice?correctChoice.text.replace(/[^0-9.\-+eE]/g,''):'0';
+      const tol=q.tolerance_pct||5;
+      presentation=`<presentation>
+        <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
+        <response_str ident="response1" rcardinality="Single"><render_fib rows="1" columns="20"/></response_str>
+      </presentation>`;
+      resprocessing=`<resprocessing>
+        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
+        <respcondition continue="No">
+          <conditionvar><vargte respident="response1">${escX(String(parseFloat(correctVal)*(1-tol/100)))}</vargte><varlte respident="response1">${escX(String(parseFloat(correctVal)*(1+tol/100)))}</varlte></conditionvar>
+          <setvar action="Set" varname="SCORE">${pts}</setvar>
+          <displayfeedback feedbacktype="Response" linkrefid="fb_correct"/>
+        </respcondition>
+        <respcondition continue="Yes"><conditionvar><other/></conditionvar>
+          <displayfeedback feedbacktype="Response" linkrefid="fb_incorrect"/>
+        </respcondition>
+      </resprocessing>
+      <itemfeedback ident="fb_correct"><flow_mat><material>
+        <mattext texttype="text/plain">Correct! ${escX(q.worked_solution||'')}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
+      </material></flow_mat></itemfeedback>
+      <itemfeedback ident="fb_incorrect"><flow_mat><material>
+        <mattext texttype="text/plain">Incorrect. Correct answer: ${escX(correctVal)}${q.units?' '+escX(q.units):''}${q.worked_solution?'\n\nWorked solution:\n'+escX(q.worked_solution):''}</mattext>
+      </material></flow_mat></itemfeedback>`;
+    } else {
+      // symbolic / conceptual  --  standard multichoice
+      const choices=(q.choices||[]).map(c=>`          <response_label ident="${c.letter}">
+            <material><mattext texttype="text/html">${escX(c.text)}</mattext></material>
+          </response_label>`).join('\n');
+      presentation=`<presentation>
+        <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
+        <response_lid ident="response1" rcardinality="Single"><render_choice>
+${choices}
+        </render_choice></response_lid>
+      </presentation>`;
+      resprocessing=`<resprocessing>
+        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
+        <respcondition continue="No">
+          <conditionvar><varequal respident="response1">${escX(correctLetter)}</varequal></conditionvar>
+          <setvar action="Set" varname="SCORE">${pts}</setvar>
+          <displayfeedback feedbacktype="Response" linkrefid="fb"/>
+        </respcondition>
+      </resprocessing>
+      <itemfeedback ident="fb"><flow_mat><material>
+        <mattext texttype="text/plain">${escX(q.rationale||'Correct!')}${q.worked_solution?'\n\nWorked solution:\n'+escX(q.worked_solution):''}</mattext>
+      </material></flow_mat></itemfeedback>`;
+    }
+
+    return `    <item ident="${qid}" title="${escX(q.stem.substring(0,80))}">
+      <itemmetadata><qtimetadata>
+        <qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>${cqt}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>points_possible</fieldlabel><fieldentry>${pts}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>bloom_level</fieldlabel><fieldentry>${escX(q.bloom)}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>stem_level</fieldlabel><fieldentry>${escX(q.stem_level)}</fieldentry></qtimetadatafield>
+        <qtimetadatafield><fieldlabel>difficulty</fieldlabel><fieldentry>${escX(q.difficulty)}</fieldentry></qtimetadatafield>
+        ${q.subject?`<qtimetadatafield><fieldlabel>subject</fieldlabel><fieldentry>${escX(q.subject)}</fieldentry></qtimetadatafield>`:''}
+        ${q.units?`<qtimetadatafield><fieldlabel>units</fieldlabel><fieldentry>${escX(q.units)}</fieldentry></qtimetadatafield>`:''}
+      </qtimetadata></itemmetadata>
+      ${presentation}
+      ${resprocessing}
+    </item>`;
+  }).join('\n\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<questestinterop xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.imsglobal.org/xsd/ims_qtiasiv1p2 http://www.imsglobal.org/xsd/ims_qtiasiv1p2p1.xsd">
+  <objectbank ident="${ident}">
+    <qtimetadata>
+      <qtimetadatafield><fieldlabel>bank_title</fieldlabel><fieldentry>${escX(bankName)}</fieldentry></qtimetadatafield>
+    </qtimetadata>
+${items}
+  </objectbank>
+</questestinterop>`;
+}
+
+function buildManifest(entries){
+  const resources=entries.map(e=>`    <resource identifier="res_${e.ident}" type="imsqti_xmlv1p2"><file href="${e.file}"/></resource>`).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="man_${Date.now()}" xmlns="http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1">
+  <metadata><schema>IMS Content</schema><schemaversion>1.1.3</schemaversion></metadata>
+  <organizations/>
+  <resources>\n${resources}\n  </resources>
+</manifest>`;
+}
+
+async function makeZip(banks, pts){
+  const zip = new JSZip();
+  const entries = [];
+  for(const b of banks){
+    const ident = b.name.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
+    const fname = ident+'.xml';
+    zip.file(fname, buildQTIXML(b.questions, b.name, pts));
+    entries.push({ident, file:fname});
+  }
+  zip.file('imsmanifest.xml', buildManifest(entries));
+  const blob = await zip.generateAsync({type:'blob'});
+  return blob;
+}
+
+function buildCSV(questions){
+  const hdr='ID,Type,Subject,Difficulty,Bloom,STEM Level,Stem,Correct,Units,Tolerance %,Rationale\n';
+  const rows=questions.map(q=>[
+    q.id,q.type,q.subject||'',q.difficulty,q.bloom,q.stem_level,
+    '"'+q.stem.replace(/"/g,'""').replace(/\n/g,' ')+'"',
+    q.correct,q.units||'',q.tolerance_pct||'',
+    '"'+(q.rationale||'').replace(/"/g,'""').replace(/\n/g,' ')+'"'
+  ].join(','));
+  return hdr+rows.join('\n');
+}
+
+function dlBlob(blob, fname){
+  const u=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=u; a.download=fname; a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),2000);
+}
+
+// ── Export handler ─────────────────────────────────────────────────────────
+
+$('btnExport').addEventListener('click', async()=>{
+  if(!parsedQuestions.length){ toast('Validate questions first.','error'); return; }
+  const fmt=$('expFormat').value;
+  const bankName=$('bankName').value.trim()||'Question_Bank';
+  const courseTitle=($('courseTitle')||{value:''}).value.trim();
+  const qs=parsedQuestions;
+  const msg=$('exportMsg');
+  msg.className='status-msg'; msg.style.display='none';
+  $('btnExport').disabled=true; $('btnExport').textContent='Exporting…';
+
+  try{
+    if(fmt==='json'){
+      dlBlob(new Blob([JSON.stringify({bankName,generated:new Date().toISOString(),questions:qs},null,2)],{type:'application/json'}), bankName.replace(/\s+/g,'_')+'_questions.json');
+      msg.className='status-msg ok show'; msg.style.display='';
+      msg.textContent='✓ JSON exported — '+qs.length+' questions.';
+      toast('JSON exported!','success');
+
+    } else if(fmt==='csv'){
+      dlBlob(new Blob([buildCSV(qs)],{type:'text/csv'}), bankName.replace(/\s+/g,'_')+'_questions.csv');
+      msg.className='status-msg ok show'; msg.style.display='';
+      msg.textContent='✓ CSV exported — '+qs.length+' questions.';
+      toast('CSV exported!','success');
+
+    } else if(fmt==='study-guide'){
+      const html=generateStudyGuide(qs, bankName, courseTitle);
+      dlBlob(new Blob([html],{type:'text/html'}), bankName.replace(/\s+/g,'_')+'_StudyGuide.html');
+      msg.className='status-msg ok show'; msg.style.display='';
+      msg.textContent='✓ Student study guide exported — '+qs.length+' questions, no answers.';
+      toast('Study guide downloaded!','success');
+
+    } else if(fmt==='d2l-qti21-xml'){
+      const xml=buildD2LQTI21XML(qs,bankName);
+      dlBlob(new Blob([xml],{type:'application/xml'}), bankName.replace(/\s+/g,'_')+'_D2L_QTI21.xml');
+      msg.className='status-msg ok show'; msg.style.display='';
+      msg.textContent='✓ D2L QTI 2.1 XML exported — '+qs.length+' questions. Import via: Course Admin → Import/Export/Copy Components.';
+      toast('D2L QTI 2.1 XML downloaded!','success');
+
+    } else {
+      // d2l-qti21-zip (default)
+      const zip=new JSZip();
+      zip.file('imsmanifest.xml',buildD2LManifest(qs,bankName));
+      qs.forEach(function(q,i){ var qid='q_'+(q.id||i); zip.file(qid+'.xml',buildD2LItemXML(q,i,bankName)); });
+      const blob=await zip.generateAsync({type:'blob'});
+      dlBlob(blob, bankName.replace(/\s+/g,'_')+'_D2L_QTI21.zip');
+      msg.className='status-msg ok show'; msg.style.display='';
+      msg.textContent='✓ D2L QTI 2.1 ZIP exported — '+qs.length+' questions + manifest. Import via: Course Admin → Import/Export/Copy Components.';
+      toast('D2L QTI 2.1 ZIP downloaded!','success');
+    }
+  } catch(e){
+    msg.className='status-msg err show'; msg.style.display='';
+    msg.textContent='Export error: '+e.message;
+    toast('Export failed.','error');
+  }
+  $('btnExport').disabled=false;
+  $('btnExport').textContent='⬇ Download';
+})
+;
+
+
+// ================================================================
+// D2L BRIGHTSPACE QTI 2.1 BUILDER
+// ================================================================
+
+function escXml(s){
+  return String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&apos;');
+}
+
+// Strip LaTeX delimiters for plain-text contexts (D2L renders its own math)
+function stripLatex(s){
+  return String(s||'')
+    .replace(/\$\$([^$]+)\$\$/g,'$1')
+    .replace(/\$([^$\n]+)\$/g,'$1')
+    .replace(/\\text\{([^}]*)\}/g,'$1')
+    .replace(/\\cdot/g,'·')
+    .replace(/\\times/g,'×')
+    .replace(/\\div/g,'÷')
+    .replace(/\\pm/g,'±')
+    .replace(/\\leq/g,'≤')
+    .replace(/\\geq/g,'≥')
+    .replace(/\\approx/g,'≈')
+    .replace(/\\infty/g,'∞')
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)')
+    .replace(/\\sqrt\{([^}]+)\}/g,'sqrt($1)')
+    .replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1')
+    .replace(/\\[a-zA-Z]+/g,'')
+    .replace(/[{}]/g,'')
+    .replace(/_/g,'')
+    .replace(/\^/g,'')
+    .trim();
+}
+
+function buildD2LQTI21XML(questions, bankName){
+  var now = new Date().toISOString();
+  var safeName = escXml(bankName);
+
+  // Map tool question types → QTI 2.1 interaction types
+  function getInteractionType(q){
+    var t = (q.type||'').toLowerCase();
+    if(t==='essay'||t==='command_response') return 'extendedText';
+    if(t==='short_answer') return 'extendedTextShort';
+    if(t==='fill_in_the_blank') return 'textEntry';
+    return 'choice'; // numerical_mc, conceptual, symbolic, default
+  }
+
+  function buildChoiceItem(q, idx){
+    var qid = 'q_'+(q.id||idx);
+    var stem = escXml(stripLatex(q.stem||''));
+    var choices = (q.choices||[]);
+    var correctLetter = (q.correct||'A').toUpperCase();
+    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+
+    // Build choice identifiers
+    var choiceIds = choices.map(function(c){ return 'ch_'+qid+'_'+c.letter.toUpperCase(); });
+    var correctId = 'ch_'+qid+'_'+correctLetter;
+
+    var choicesXml = choices.map(function(c,ci){
+      return '        <simpleChoice identifier="'+choiceIds[ci]+'">'+escXml(stripLatex(c.text))+'</simpleChoice>';
+    }).join('\n');
+
+    var feedbackXml = feedback
+      ? '\n  <modalFeedback identifier="fb_'+qid+'_correct" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
+      : '';
+
+    var feedbackRef = feedback
+      ? '\n    <setOutcomeValue identifier="FEEDBACK">\n      <baseValue baseType="identifier">fb_'+qid+'_correct</baseValue>\n    </setOutcomeValue>'
+      : '';
+
+    return '<!-- Question '+(idx+1)+': '+escXml((q.type||'mc'))+' | '+escXml(q.difficulty||'medium')+' -->\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'"\n'+
+'  title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false"\n'+
+'  timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">\n'+
+'    <correctResponse>\n'+
+'      <value>'+correctId+'</value>\n'+
+'    </correctResponse>\n'+
+'  </responseDeclaration>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+(feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '')+
+'  <itemBody>\n'+
+'    <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1">\n'+
+'      <prompt>'+stem+'</prompt>\n'+
+choicesXml+'\n'+
+'    </choiceInteraction>\n'+
+'  </itemBody>\n'+
+'  <responseProcessing>\n'+
+'    <responseCondition>\n'+
+'      <responseIf>\n'+
+'        <match><variable identifier="RESPONSE"/><correct identifier="RESPONSE"/></match>\n'+
+'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">1</baseValue></setOutcomeValue>'+
+feedbackRef+'\n'+
+'      </responseIf>\n'+
+'    </responseCondition>\n'+
+'  </responseProcessing>\n'+
+feedbackXml+'\n'+
+'</assessmentItem>';
+  }
+
+  function buildTextEntryItem(q, idx){
+    var qid = 'q_'+(q.id||idx);
+    var stem = escXml(stripLatex(q.stem||''));
+    var correct = escXml(stripLatex(q.correct||''));
+    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+    var feedbackXml = feedback
+      ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
+      : '';
+
+    return '<!-- Question '+(idx+1)+': fill_in_the_blank -->\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'"\n'+
+'  title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string">\n'+
+'    <correctResponse><value>'+correct+'</value></correctResponse>\n'+
+'  </responseDeclaration>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+(feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '')+
+'  <itemBody>\n'+
+'    <p>'+stem+'</p>\n'+
+'    <textEntryInteraction responseIdentifier="RESPONSE" expectedLength="30"/>\n'+
+'  </itemBody>\n'+
+'  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p1/rptemplates/match_correct"/>\n'+
+feedbackXml+'\n'+
+'</assessmentItem>';
+  }
+
+  function buildExtendedTextItem(q, idx, isShort){
+    var qid = 'q_'+(q.id||idx);
+    var stem = escXml(stripLatex(q.stem||''));
+    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+    var feedbackXml = feedback
+      ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
+      : '';
+    var expectedLines = isShort ? '3' : '10';
+    var expectedChars = isShort ? '200' : '1000';
+
+    return '<!-- Question '+(idx+1)+': '+(isShort?'short_answer':'essay')+' -->\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'"\n'+
+'  title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+(feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '')+
+'  <itemBody>\n'+
+'    <extendedTextInteraction responseIdentifier="RESPONSE"\n'+
+'      expectedLines="'+expectedLines+'" expectedLength="'+expectedChars+'">\n'+
+'      <prompt>'+stem+'</prompt>\n'+
+'    </extendedTextInteraction>\n'+
+'  </itemBody>\n'+
+feedbackXml+'\n'+
+'</assessmentItem>';
+  }
+
+  // Build all items
+  var items = questions.map(function(q, idx){
+    var itype = getInteractionType(q);
+    if(itype === 'textEntry')        return buildTextEntryItem(q, idx);
+    if(itype === 'extendedTextShort') return buildExtendedTextItem(q, idx, true);
+    if(itype === 'extendedText')      return buildExtendedTextItem(q, idx, false);
+    return buildChoiceItem(q, idx);
+  });
+
+  // Wrap in assessmentTest
+  var itemRefs = questions.map(function(q, idx){
+    return '      <assessmentItemRef identifier="q_'+(q.id||idx)+'" href="q_'+(q.id||idx)+'.xml" required="false" fixed="false"/>';
+  }).join('\n');
+
+  // For single-file export, embed all items concatenated with XML declarations
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<!-- D2L Brightspace QTI 2.1 Export -->\n'+
+'<!-- Bank: '+safeName+' | '+questions.length+' questions | Generated: '+now+' -->\n'+
+'<!-- Import via: D2L > Course Admin > Import/Export/Copy Components > Import Components -->\n\n'+
+items.join('\n\n<!-- ─────────────────────────────────────────── -->\n\n');
+}
+
+function buildD2LManifest(questions, bankName){
+  var safeName = escXml(bankName);
+  var now = new Date().toISOString();
+  var resources = questions.map(function(q, idx){
+    var qid = 'q_'+(q.id||idx);
+    return '    <resource identifier="'+qid+'" type="imsqti_item_xmlv2p1" href="'+qid+'.xml">\n'+
+'      <file href="'+qid+'.xml"/>\n'+
+'    </resource>';
+  }).join('\n');
+
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"\n'+
+'  xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_v1p2"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imscp_v1p1 http://www.imsglobal.org/xsd/imscp_v1p1p2.xsd"\n'+
+'  identifier="'+safeName.replace(/\s+/g,'_')+'_manifest">\n'+
+'  <metadata>\n'+
+'    <schema>IMS Content</schema>\n'+
+'    <schemaversion>1.1.3</schemaversion>\n'+
+'    <imsmd:lom>\n'+
+'      <imsmd:general>\n'+
+'        <imsmd:title><imsmd:langstring xml:lang="en">'+safeName+'</imsmd:langstring></imsmd:title>\n'+
+'      </imsmd:general>\n'+
+'    </imsmd:lom>\n'+
+'  </metadata>\n'+
+'  <organizations/>\n'+
+'  <resources>\n'+
+resources+'\n'+
+'  </resources>\n'+
+'</manifest>';
+}
+
+function buildD2LItemXML(q, idx, bankName){
+  var safeName = escXml(bankName);
+  var qid = 'q_'+(q.id||idx);
+  var itype = (function(){
+    var t = (q.type||'').toLowerCase();
+    if(t==='essay'||t==='command_response') return 'extendedText';
+    if(t==='short_answer') return 'extendedTextShort';
+    if(t==='fill_in_the_blank') return 'textEntry';
+    return 'choice';
+  })();
+
+  var stem = escXml(stripLatex(q.stem||''));
+  var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+
+  if(itype === 'choice'){
+    var choices = (q.choices||[]);
+    var correctLetter = (q.correct||'A').toUpperCase();
+    var correctId = 'ch_'+qid+'_'+correctLetter;
+    var choicesXml = choices.map(function(c){
+      return '        <simpleChoice identifier="ch_'+qid+'_'+c.letter.toUpperCase()+'">'+escXml(stripLatex(c.text))+'</simpleChoice>';
+    }).join('\n');
+    var feedbackXml = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
+    var feedbackDecl = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
+    var feedbackRef = feedback ? '\n        <setOutcomeValue identifier="FEEDBACK"><baseValue baseType="identifier">fb_'+qid+'</baseValue></setOutcomeValue>' : '';
+
+    return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">\n'+
+'    <correctResponse><value>'+correctId+'</value></correctResponse>\n'+
+'  </responseDeclaration>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+feedbackDecl+
+'  <itemBody>\n'+
+'    <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1">\n'+
+'      <prompt>'+stem+'</prompt>\n'+
+choicesXml+'\n'+
+'    </choiceInteraction>\n'+
+'  </itemBody>\n'+
+'  <responseProcessing>\n'+
+'    <responseCondition>\n'+
+'      <responseIf>\n'+
+'        <match><variable identifier="RESPONSE"/><correct identifier="RESPONSE"/></match>\n'+
+'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">1</baseValue></setOutcomeValue>'+feedbackRef+'\n'+
+'      </responseIf>\n'+
+'    </responseCondition>\n'+
+'  </responseProcessing>\n'+
+feedbackXml+'\n'+
+'</assessmentItem>';
+  }
+
+  if(itype === 'textEntry'){
+    var correct = escXml(stripLatex(q.correct||''));
+    var feedbackXml2 = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
+    var feedbackDecl2 = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
+    return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string">\n'+
+'    <correctResponse><value>'+correct+'</value></correctResponse>\n'+
+'  </responseDeclaration>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+feedbackDecl2+
+'  <itemBody><p>'+stem+'</p>\n'+
+'    <textEntryInteraction responseIdentifier="RESPONSE" expectedLength="30"/>\n'+
+'  </itemBody>\n'+
+'  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p1/rptemplates/match_correct"/>\n'+
+feedbackXml2+'\n'+
+'</assessmentItem>';
+  }
+
+  // extendedText / extendedTextShort
+  var isShort = itype === 'extendedTextShort';
+  var feedbackXml3 = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
+  var feedbackDecl3 = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
+'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n'+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>\n'+
+'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n'+
+'  </outcomeDeclaration>\n'+
+feedbackDecl3+
+'  <itemBody>\n'+
+'    <extendedTextInteraction responseIdentifier="RESPONSE"\n'+
+'      expectedLines="'+(isShort?'3':'10')+'" expectedLength="'+(isShort?'200':'1000')+'">\n'+
+'      <prompt>'+stem+'</prompt>\n'+
+'    </extendedTextInteraction>\n'+
+'  </itemBody>\n'+
+feedbackXml3+'\n'+
+'</assessmentItem>';
+}
+
+
+// ── Study Guide builder ──────────────────────────────────────────────────
+function generateStudyGuide(questions, bankName, courseTitle){
+  var date = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var items = questions.map(function(q,i){
+    var choices = (q.choices||[]).map(function(c){
+      return '<div class="choice"><span class="choice-letter">'+escH(c.letter)+'.</span>'
+           + '<span class="choice-text">'+renderLatex(c.text)+'</span></div>';
+    }).join('');
+    var typeBadge = (q.type||'').replace(/_/g,' ');
+    var isFR = q.type === 'free_response';
+    return '<div class="question"><div class="q-meta">'
+         + '<span class="q-num">Question '+(i+1)+'</span>'
+         + '<span class="q-type">'+escH(typeBadge)+'</span>'
+         + (q.units ? '<span class="q-type">'+escH(q.units)+'</span>' : '')
+         + '</div>'
+         + '<div class="q-stem">'+renderLatex(q.stem)+'</div>'
+         + (isFR ? '<div class="fr-lines"><div></div><div></div><div></div></div>'
+                 : '<div class="choices">'+choices+'</div>'
+                   +'<div class="answer-blank">Answer: _______</div>')
+         + '</div>';
+  }).join('');
+
+  var objectives = loadObjs();
+  var objSection = objectives.length
+    ? '<div class="obj-list"><strong>Learning Objectives:</strong><ol>'
+      + objectives.map(function(o){ return '<li>'+escH(o)+'</li>'; }).join('')
+      + '</ol></div>'
+    : '';
+
+  return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+    + '<title>'+escH(bankName)+' — Study Guide</title>\n<style>\n'
+    + ':root{--navy:#003366;--teal:#006666;--gold:#CC9900;--gray:#666;--light:#f5f5f0;}\n'
+    + '*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}\n'
+    + 'body{font-family:Georgia,"Times New Roman",serif;color:#222;background:#fff;line-height:1.7;font-size:13pt;}\n'
+    + '.page{max-width:750px;margin:0 auto;padding:40px 32px;}\n'
+    + '.cover{text-align:center;border-bottom:3px solid var(--navy);padding-bottom:24px;margin-bottom:28px;}\n'
+    + '.cover h1{font-size:1.5rem;color:var(--navy);margin-bottom:6px;}\n'
+    + '.cover .sub{font-size:.95rem;color:var(--teal);margin-bottom:4px;}\n'
+    + '.cover .meta{font-size:.8rem;color:var(--gray);}\n'
+    + '.instructions{background:var(--light);border-left:4px solid var(--teal);padding:12px 16px;font-size:.88rem;margin-bottom:28px;border-radius:4px;}\n'
+    + '.obj-list{background:var(--light);border-left:4px solid var(--gold);padding:10px 16px;font-size:.84rem;margin-bottom:24px;border-radius:4px;}\n'
+    + '.obj-list ol{margin:6px 0 0 18px;}\n'
+    + '.question{margin-bottom:26px;padding-bottom:20px;border-bottom:1px solid #ddd;page-break-inside:avoid;}\n'
+    + '.question:last-child{border-bottom:none;}\n'
+    + '.q-meta{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}\n'
+    + '.q-num{font-weight:700;color:var(--navy);font-size:.88rem;}\n'
+    + '.q-type{font-size:.74rem;color:var(--gray);text-transform:uppercase;letter-spacing:.04em;}\n'
+    + '.q-stem{font-weight:600;color:#111;margin-bottom:12px;font-size:1rem;}\n'
+    + '.choices{display:flex;flex-direction:column;gap:6px;margin-left:16px;}\n'
+    + '.choice{display:flex;gap:10px;align-items:flex-start;}\n'
+    + '.choice-letter{font-weight:700;color:var(--navy);min-width:18px;flex-shrink:0;}\n'
+    + '.answer-blank{margin-top:10px;font-size:.84rem;color:var(--gray);border-top:1px dashed #ccc;padding-top:6px;}\n'
+    + '.fr-lines{margin-top:12px;display:flex;flex-direction:column;gap:14px;}\n'
+    + '.fr-lines div{border-bottom:1px solid #bbb;height:20px;}\n'
+    + '@media print{body{font-size:11pt;}.page{padding:20px 16px;}}\n'
+    + '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">'
+    + '</style></head><body><div class="page">'
+    + '<div class="cover">'
+    + '<h1>'+escH(bankName)+'</h1>'
+    + (courseTitle ? '<div class="sub">'+escH(courseTitle)+'</div>' : '')
+    + '<div class="meta">'+questions.length+' questions &nbsp;·&nbsp; '+date+'</div>'
+    + '</div>'
+    + '<div class="instructions">This study guide contains '+questions.length+' practice questions. '
+    + 'Circle or write your answer for each question. Answers are not included — use this to test your knowledge.</div>'
+    + objSection
+    + items
+    + '<scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></scr'+'ipt>'
+    + '<scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></scr'+'ipt>'
+    + '<scr'+'ipt>renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],throwOnError:false});</scr'+'ipt>'
+    + '</div></body></html>';
+}
+
+// ================================================================
+// SNAPSHOTS
+// ================================================================
+const SNAP_KEY = 'qti_quant_snapshots_v1';
+const MAX_SNAPS = 10;
+
+function loadSnaps(){ try{ return JSON.parse(localStorage.getItem(SNAP_KEY)||'[]'); }catch(e){ return []; } }
+function saveSnaps(snaps){ try{ localStorage.setItem(SNAP_KEY, JSON.stringify(snaps)); }catch(e){} }
+
+function openSnapModal(){
+  $('snapshotModal').classList.add('open');
+  $('snapshotName').value = ($('bankName').value.trim()||'Bank') + ' — ' + new Date().toLocaleDateString();
+  renderSnapList();
+  setTimeout(()=>$('snapshotName').focus(), 50);
+}
+function closeSnapModal(){ $('snapshotModal').classList.remove('open'); }
+$('btnSnapshot').addEventListener('click', openSnapModal);
+$('snapshotClose').addEventListener('click', closeSnapModal);
+$('snapshotDone').addEventListener('click', closeSnapModal);
+$('snapshotModal').addEventListener('click', e=>{ if(e.target===$('snapshotModal')) closeSnapModal(); });
+
+$('btnSaveSnap').addEventListener('click',()=>{
+  const qs = getQuestions();
+  if(!qs.length){ toast('No questions to snapshot.','error'); return; }
+  const name = $('snapshotName').value.trim() || 'Snapshot';
+  let snaps = loadSnaps();
+  snaps.unshift({ name, ts: Date.now(), count: qs.length, questions: JSON.parse(JSON.stringify(qs)) });
+  if(snaps.length > MAX_SNAPS) snaps = snaps.slice(0, MAX_SNAPS);
+  saveSnaps(snaps);
+  renderSnapList();
+  toast('✅ Snapshot "'+name+'" saved.','success');
+});
+
+function renderSnapList(){
+  const ul = $('snapList');
+  const snaps = loadSnaps();
+  if(!snaps.length){ ul.innerHTML='<li style="color:var(--gray-mid);font-size:.84rem;padding:8px 0;">No snapshots saved yet.</li>'; return; }
+  ul.innerHTML = snaps.map((s,i)=>`
+    <li class="snap-item">
+      <div class="snap-info">
+        <div class="snap-name">${escapeHtml(s.name)}</div>
+        <div class="snap-meta">${s.count} questions · ${new Date(s.ts).toLocaleString()}</div>
+      </div>
+      <div class="snap-btns">
+        <button class="snap-btn" data-snap-restore="${i}" aria-label="Restore snapshot ${escapeHtml(s.name)}">↩ Restore</button>
+        <button class="snap-btn del" data-snap-del="${i}" aria-label="Delete snapshot ${escapeHtml(s.name)}">🗑</button>
+      </div>
+    </li>`).join('');
+}
+
+document.addEventListener('click', e=>{
+  const rb = e.target.closest('[data-snap-restore]');
+  if(rb){ restoreSnap(parseInt(rb.dataset.snapRestore)); return; }
+  const db = e.target.closest('[data-snap-del]');
+  if(db){ deleteSnap(parseInt(db.dataset.snapDel)); return; }
+  const ob = e.target.closest('[data-obj-del]');
+  if(ob){ deleteObj(parseInt(ob.dataset.objDel)); return; }
+});
+
+function restoreSnap(i){
+  if(!confirm('Restore this snapshot? Your current questions will be replaced.')) return;
+  const snaps = loadSnaps();
+  if(!snaps[i]) return;
+  parsedQuestions = JSON.parse(JSON.stringify(snaps[i].questions));
+  closeSnapModal();
+  // Re-render question cards
+  var list = document.getElementById('qList');
+  if(list){ list.innerHTML=''; parsedQuestions.forEach(function(q,idx){ var el=buildQCard(q,idx); if(el) list.appendChild(el); }); }
+  updateVerifyBar();
+  toast('✅ Restored "'+snaps[i].name+'" — '+parsedQuestions.length+' questions.','success');
+}
+
+function deleteSnap(i){
+  if(!confirm('Delete this snapshot?')) return;
+  const snaps = loadSnaps();
+  snaps.splice(i,1);
+  saveSnaps(snaps);
+  renderSnapList();
+  toast('Snapshot deleted.','');
+}
+
+// ================================================================
+// MERGE BANK
+// ================================================================
+let mergeCandidate = [];
+
+function openMergeModal(){
+  $('mergeModal').classList.add('open');
+  $('mergePreview').style.display='none';
+  $('mergeFileInput').value='';
+  $('btnDoMerge').style.display='none';
+  mergeCandidate=[];
+}
+function closeMergeModal(){ $('mergeModal').classList.remove('open'); mergeCandidate=[]; }
+$('btnMerge').addEventListener('click', openMergeModal);
+$('mergeClose').addEventListener('click', closeMergeModal);
+$('mergeDone').addEventListener('click', closeMergeModal);
+$('mergeModal').addEventListener('click', e=>{ if(e.target===$('mergeModal')) closeMergeModal(); });
+
+function handleMergeFile(file){
+  if(!file||!file.name.endsWith('.json')){ toast('Please select a JSON file exported from this tool.','error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const raw = JSON.parse(e.target.result);
+      const qs = Array.isArray(raw) ? raw : (raw.questions||[]);
+      if(!qs.length) throw new Error('No questions found in file.');
+      const currentStems = parsedQuestions.map(q=>(q.stem||'').toLowerCase().replace(/\s+/g,' ').trim());
+      const dups = [];
+      mergeCandidate = qs.map((q,i)=>{
+        const stem = (q.stem||'').toLowerCase().replace(/\s+/g,' ').trim();
+        const isDup = currentStems.some(s=> s.substring(0,30)===stem.substring(0,30) && s.substring(0,30).length>5);
+        if(isDup) dups.push(i);
+        return {...q, _dup: isDup};
+      });
+      const byDiff={easy:0,medium:0,hard:0};
+      qs.forEach(q=>{ const d=(q.difficulty||'medium').toLowerCase(); byDiff[d in byDiff?d:'medium']++; });
+      $('mergeStats').innerHTML = '<strong>'+qs.length+'</strong> questions found · Easy: '+byDiff.easy+' · Medium: '+byDiff.medium+' · Hard: '+byDiff.hard;
+      if(dups.length){
+        $('mergeDupWarn').style.display='block';
+        $('mergeDupText').innerHTML = '<strong>'+dups.length+' possible duplicate(s)</strong> detected (matching question stems). They will be skipped if "Skip duplicates" is checked.';
+      } else {
+        $('mergeDupWarn').style.display='none';
+      }
+      $('mergePreview').style.display='block';
+      $('btnDoMerge').style.display='';
+    }catch(err){
+      toast('Could not parse file: '+err.message,'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+$('mergeFileInput').addEventListener('change',()=>handleMergeFile($('mergeFileInput').files[0]));
+(function(){
+  var mz=$('mergeDropZone');
+  mz.addEventListener('dragover',e=>{e.preventDefault();mz.classList.add('dragover');});
+  mz.addEventListener('dragleave',()=>mz.classList.remove('dragover'));
+  mz.addEventListener('drop',e=>{e.preventDefault();mz.classList.remove('dragover');handleMergeFile(e.dataTransfer.files[0]);});
+  mz.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('mergeFileInput').click();}});
+})();
+
+$('btnDoMerge').addEventListener('click',()=>{
+  if(!mergeCandidate.length){ toast('No questions to merge.','error'); return; }
+  const skipDups = $('mergeSkipDups').checked;
+  const toAdd = skipDups ? mergeCandidate.filter(q=>!q._dup) : mergeCandidate;
+  const cleaned = toAdd.map(q=>{ const c={...q}; delete c._dup; return c; });
+  parsedQuestions = [...parsedQuestions, ...cleaned];
+  // Re-render
+  var list = document.getElementById('qList');
+  if(list){ list.innerHTML=''; parsedQuestions.forEach(function(q,idx){ var el=buildQCard(q,idx); if(el) list.appendChild(el); }); }
+  updateVerifyBar();
+  closeMergeModal();
+  toast('✅ Merged '+cleaned.length+' questions. Total: '+parsedQuestions.length+'.','success');
+});
+
+// ================================================================
+// LEARNING OBJECTIVES
+// ================================================================
+const OBJ_KEY = 'qti_quant_objectives_v1';
+
+function loadObjs(){ try{ return JSON.parse(localStorage.getItem(OBJ_KEY)||'[]'); }catch(e){ return []; } }
+function saveObjs(o){ try{ localStorage.setItem(OBJ_KEY, JSON.stringify(o)); }catch(e){} }
+
+function openObjModal(){
+  $('objectivesModal').classList.add('open');
+  renderObjList();
+  renderObjCoverage();
+  setTimeout(()=>$('newObjInput').focus(), 50);
+}
+function closeObjModal(){ $('objectivesModal').classList.remove('open'); }
+$('btnObjectives').addEventListener('click', openObjModal);
+$('objectivesClose').addEventListener('click', closeObjModal);
+$('objectivesDone').addEventListener('click', closeObjModal);
+$('objectivesModal').addEventListener('click', e=>{ if(e.target===$('objectivesModal')) closeObjModal(); });
+
+$('btnAddObj').addEventListener('click', addObjective);
+$('newObjInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addObjective(); });
+
+function addObjective(){
+  const val=$('newObjInput').value.trim(); if(!val) return;
+  const objs=loadObjs();
+  if(objs.includes(val)){ toast('Objective already exists.',''); return; }
+  objs.push(val); saveObjs(objs);
+  $('newObjInput').value='';
+  renderObjList(); renderObjCoverage();
+}
+
+function deleteObj(i){
+  const objs=loadObjs();
+  const removed=objs[i];
+  objs.splice(i,1); saveObjs(objs);
+  parsedQuestions.forEach(q=>{ if(q.objective===removed) delete q.objective; });
+  renderObjList(); renderObjCoverage();
+}
+
+function renderObjList(){
+  const objs=loadObjs();
+  const ul=$('objMasterList');
+  if(!objs.length){ ul.innerHTML='<li style="color:var(--gray-mid);font-size:.84rem;padding:8px 0;">No objectives defined yet. Add one above.</li>'; return; }
+  const counts={};
+  parsedQuestions.forEach(q=>{ if(q.objective) counts[q.objective]=(counts[q.objective]||0)+1; });
+  ul.innerHTML=objs.map((o,i)=>`
+    <li class="obj-item">
+      <span class="obj-label">${escapeHtml(o)}</span>
+      <span class="obj-count">${counts[o]||0} q</span>
+      <button class="obj-del" data-obj-del="${i}" aria-label="Delete objective">✕</button>
+    </li>`).join('');
+}
+
+function renderObjCoverage(){
+  const objs=loadObjs();
+  const div=$('objCoverage');
+  if(!objs.length||!parsedQuestions.length){
+    div.innerHTML='<p style="color:var(--gray-mid);font-size:.84rem;">Add objectives and tag questions to see coverage.</p>';
+    return;
+  }
+  const counts={};
+  objs.forEach(o=>counts[o]=0);
+  const untagged=parsedQuestions.filter(q=>!q.objective).length;
+  parsedQuestions.forEach(q=>{ if(q.objective&&counts[q.objective]!==undefined) counts[q.objective]++; });
+  const maxCount=Math.max(1,...Object.values(counts));
+  div.innerHTML=objs.map(o=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="flex:1;font-size:.82rem;color:var(--gray-light);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(o)}">${escapeHtml(o)}</div>
+      <div style="width:120px;height:10px;background:var(--slate);border-radius:5px;flex-shrink:0;">
+        <div style="width:${Math.round(counts[o]/maxCount*100)}%;height:100%;background:var(--cyan);border-radius:5px;"></div>
+      </div>
+      <div style="font-size:.78rem;color:var(--gray-mid);min-width:50px;text-align:right;">${counts[o]} q</div>
+    </div>`).join('')+
+    (untagged?`<div style="display:flex;align-items:center;gap:10px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
+      <div style="flex:1;font-size:.82rem;color:var(--amber);">⚠ Untagged</div>
+      <div style="width:120px;height:10px;background:var(--slate);border-radius:5px;flex-shrink:0;">
+        <div style="width:${Math.round(untagged/parsedQuestions.length*100)}%;height:100%;background:var(--amber);border-radius:5px;"></div>
+      </div>
+      <div style="font-size:.78rem;color:var(--gray-mid);min-width:50px;text-align:right;">${untagged} q</div>
+    </div>`:'');
+}
+
+// ================================================================
+// STUDY GUIDE EXPORT (HTML worksheet, no answers)
+// ================================================================
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function generateStudyGuide(questions, bankName, courseTitle){
+  var date = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  var items = questions.map(function(q,i){
+    var choices = (q.choices||[]).map(function(c){
+      return '<div class="choice"><span class="choice-letter">'+escapeHtml(c.letter)+'.</span><span class="choice-text">'+escapeHtml(c.text)+'</span></div>';
+    }).join('');
+    var domain = q.subject ? '<span class="q-domain">'+escapeHtml(q.subject)+'</span>' : '';
+    var typeBadge = (q.type||'').replace(/_/g,' ');
+    return '<div class="question" aria-label="Question '+(i+1)+'">'+
+      '<div class="q-meta"><span class="q-num">Question '+(i+1)+'</span>'+domain+'<span class="q-type">'+escapeHtml(typeBadge)+'</span></div>'+
+      '<div class="q-stem">'+escapeHtml(q.stem)+'</div>'+
+      (choices ? '<div class="choices">'+choices+'</div>' : '')+
+      '<div class="answer-blank" aria-hidden="true">Answer: _______</div>'+
+      '</div>';
+  }).join('');
+
+  return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>'+escapeHtml(bankName)+' — Study Guide</title>\n<style>\n  :root { --navy:#003366; --teal:#006666; --gold:#CC9900; --gray:#666666; --light:#f5f5f0; }\n  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }\n  body { font-family: Georgia, "Times New Roman", serif; color:#222; background:#fff; line-height:1.7; font-size:13pt; }\n  .page { max-width:750px; margin:0 auto; padding:40px 32px; }\n  .cover { text-align:center; border-bottom:3px solid var(--navy); padding-bottom:24px; margin-bottom:32px; }\n  .cover h1 { font-size:1.6rem; color:var(--navy); margin-bottom:6px; }\n  .cover .subtitle { font-size:1rem; color:var(--teal); margin-bottom:4px; }\n  .cover .meta { font-size:.85rem; color:var(--gray); }\n  .instructions { background:var(--light); border-left:4px solid var(--teal); padding:12px 16px; font-size:.9rem; margin-bottom:28px; border-radius:4px; }\n  .question { margin-bottom:28px; padding-bottom:20px; border-bottom:1px solid #ddd; page-break-inside:avoid; }\n  .question:last-child { border-bottom:none; }\n  .q-meta { display:flex; gap:10px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }\n  .q-num { font-weight:700; color:var(--navy); font-size:.88rem; }\n  .q-domain { font-size:.78rem; background:rgba(204,153,0,.15); color:#7a5500; padding:2px 8px; border-radius:8px; font-style:italic; }\n  .q-type { font-size:.75rem; color:var(--gray); text-transform:uppercase; letter-spacing:.04em; }\n  .q-stem { font-weight:600; color:#111; margin-bottom:12px; font-size:1rem; }\n  .choices { display:flex; flex-direction:column; gap:6px; margin-left:16px; }\n  .choice { display:flex; gap:10px; align-items:flex-start; }\n  .choice-letter { font-weight:700; color:var(--navy); min-width:18px; flex-shrink:0; }\n  .choice-text { color:#222; }\n  .answer-blank { margin-top:10px; font-size:.85rem; color:var(--gray); font-style:italic; }\n  .footer { margin-top:40px; padding-top:16px; border-top:2px solid var(--navy); text-align:center; font-size:.8rem; color:var(--gray); }\n  @media print {\n    body { font-size:11pt; }\n    .page { padding:0; max-width:none; }\n    .question { page-break-inside:avoid; }\n    .cover { page-break-after:avoid; }\n    .no-print { display:none; }\n    @page { margin:1in; }\n  }\n</style>\n</head>\n<body>\n<div class="page">\n  <div class="cover">\n    <h1>'+escapeHtml(bankName)+'</h1>\n    '+(courseTitle?'<div class="subtitle">'+escapeHtml(courseTitle)+'</div>':'')+'\n    <div class="meta">Student Study Guide &nbsp;&middot;&nbsp; '+date+' &nbsp;&middot;&nbsp; '+questions.length+' Questions</div>\n  </div>\n  <div class="instructions">\n    <strong>Instructions:</strong> Answer each question to the best of your ability. For multiple choice, write the letter of the best answer on the answer line. Show all work where applicable.\n  </div>\n  '+items+'\n  <div class="footer">\n    <p>'+escapeHtml(bankName)+' &nbsp;&middot;&nbsp; '+questions.length+' Questions &nbsp;&middot;&nbsp; Generated '+date+'</p>\n    <p style="margin-top:4px;font-style:italic;">This study guide does not include answers. Refer to your course materials for review.</p>\n  </div>\n  <div class="no-print" style="margin-top:32px;padding:16px;background:#f0f8ff;border:1px solid #b0d4f0;border-radius:6px;font-family:sans-serif;font-size:.85rem;">\n    <strong>&#128161; Tip for faculty:</strong> To save as PDF, use File &rarr; Print &rarr; change destination to "Save as PDF" in your browser print dialog.\n  </div>\n</div>\n</body>\n</html>';
+}
+
+
+
+// ================================================================
+// DOMAIN TAB STRIP
+// ================================================================
+var currentDomain = 'stem';
+
+function switchDomain(domain){
+  currentDomain = domain;
+
+  // Update tab active states
+  document.querySelectorAll('.domain-tab').forEach(function(btn){
+    var active = btn.dataset.domain === domain;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+
+  // Show/hide subject optgroups
+  var sel = $('subject');
+  var firstVisible = null;
+  Array.from(sel.options).forEach(function(opt){
+    var grp = opt.parentElement;
+    if(grp && grp.tagName === 'OPTGROUP'){
+      var show = grp.dataset.domain === domain;
+      grp.style.display = show ? '' : 'none';
+      opt.disabled = !show;
+      if(show && !firstVisible) firstVisible = opt;
+    }
+  });
+
+  // Select first visible option
+  if(firstVisible) sel.value = firstVisible.value;
+
+  // Update domain-specific instruction checkboxes
+  updateDomainCheckboxes();
+
+  // Update LaTeX rule hint if present
+  var hint = document.getElementById('latexHint');
+  if(hint){
+    hint.textContent = (domain === 'stem')
+      ? 'LaTeX required for all math and units.'
+      : 'LaTeX for formulas only. Plain text for currency, IP addresses, and units.';
+  }
+}
+
+// Initialize on load — hide non-STEM optgroups
+(function initDomainTabs(){
+  switchDomain('stem');
+})();
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    $('editModal').classList.remove('open');
+    closeSnapModal(); closeMergeModal(); closeObjModal();
+  }
+});
+</script>
+</body>
+</html>
