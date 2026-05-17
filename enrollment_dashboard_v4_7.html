@@ -1,0 +1,3692 @@
+<!DOCTYPE html>
+<!--
+  Enrollment Dashboard — Brookdale Community College
+  ====================================================
+  Version:  v4.7
+  Date:     May 14, 2026
+  Features: Adds Overview tab with college-wide capacity treemap (squarified
+            layout, no dependencies) + Critical Alerts panel for sections
+            with waitlists. Click any tile or alert to drill into that
+            discipline. Built on v4.4 canonical baseline.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enrollment Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --surface: #ffffff;
+    --surface-2: #faf7f0;
+    --ink: #1a1a1a;
+    --ink-soft: #4a4a4a;
+    --ink-mute: #8a8580;
+    --rule: #d9d3c4;
+    --rule-strong: #1a1a1a;
+    --good: #2d5a3d;
+    --warn: #c4452d;
+    --warn-soft: #e8a995;
+    --info: #2c5f8d;
+    --shadow: 0 1px 0 rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+    --up: #2d5a3d;
+    --down: #c4452d;
+    --flat: #8a8580;
+  }
+  /* Crisp white theme — cooler, more dashboard-like, less editorial-paper */
+  [data-theme="white"] {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f5f7fa;
+    --ink: #0f172a;
+    --ink-soft: #475569;
+    --ink-mute: #94a3b8;
+    --rule: #e2e8f0;
+    --rule-strong: #0f172a;
+    --good: #0f766e;
+    --warn: #b91c1c;
+    --warn-soft: #fecaca;
+    --info: #1e40af;
+    --shadow: 0 1px 0 rgba(0,0,0,0.03), 0 4px 14px rgba(15,23,42,0.06);
+    --up: #0f766e;
+    --down: #b91c1c;
+    --flat: #94a3b8;
+  }
+  [data-theme="dark"] {
+    --bg: #1a1814;
+    --surface: #252118;
+    --surface-2: #2c2820;
+    --ink: #f0ead8;
+    --ink-soft: #c4bfb1;
+    --ink-mute: #807a6e;
+    --rule: #3a3528;
+    --rule-strong: #f0ead8;
+    --good: #6ba87f;
+    --warn: #e36849;
+    --warn-soft: #6b3025;
+    --info: #6ea3c9;
+    --shadow: 0 1px 0 rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.4);
+    --up: #6ba87f;
+    --down: #e36849;
+    --flat: #807a6e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+    line-height: 1.5;
+    min-height: 100vh;
+    padding: 24px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .container { max-width: 1400px; margin: 0 auto; }
+
+  /* Masthead */
+  header.masthead {
+    border-top: 6px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule-strong);
+    padding: 16px 0 12px;
+    margin-bottom: 24px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 16px;
+  }
+  .masthead .edition {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-mute);
+  }
+  .masthead h1 {
+    font-family: 'Didot', 'Bodoni 72', 'Bodoni MT', 'Playfair Display', Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(28px, 4vw, 44px);
+    letter-spacing: -0.01em;
+    text-align: center;
+    line-height: 1.05;
+  }
+  .masthead .controls {
+    display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    background: transparent;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink);
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn:hover { background: var(--rule-strong); color: var(--bg); }
+  .btn.primary { background: var(--rule-strong); color: var(--bg); }
+  .btn.primary:hover { opacity: 0.85; }
+  .btn.ghost { border-color: var(--rule); color: var(--ink-mute); }
+  .btn.ghost:hover { border-color: var(--rule-strong); background: transparent; color: var(--ink); }
+  .btn.danger { border-color: var(--warn); color: var(--warn); }
+  .btn.danger:hover { background: var(--warn); color: #fff; }
+  input[type="file"] { display: none; }
+
+  .subline {
+    text-align: center;
+    font-style: italic;
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .subline .pipe { color: var(--ink-mute); margin: 0 10px; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--rule-strong);
+    margin-bottom: 24px;
+  }
+  .tab {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    color: var(--ink-mute);
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active {
+    color: var(--ink);
+    border-bottom-color: var(--rule-strong);
+    font-weight: 700;
+  }
+  .tab .count {
+    display: inline-block;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    padding: 1px 6px;
+    margin-left: 6px;
+    font-size: 10px;
+    border-radius: 8px;
+  }
+
+  /* Welcome / empty state */
+  .welcome {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 60px 40px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    max-width: 720px;
+    margin: 40px auto;
+  }
+  .welcome h2 {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-weight: 400;
+    font-size: 36px;
+    margin-bottom: 16px;
+    line-height: 1.1;
+  }
+  .welcome p {
+    color: var(--ink-soft);
+    margin: 0 auto 16px;
+    max-width: 540px;
+  }
+  .welcome .step {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 16px;
+    text-align: left;
+    max-width: 480px;
+    margin: 24px auto;
+    padding: 12px 0;
+    border-bottom: 1px dotted var(--rule);
+  }
+  .welcome .step:last-of-type { border-bottom: none; }
+  .welcome .step .num {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-size: 24px;
+    color: var(--ink-mute);
+    text-align: center;
+    line-height: 1.2;
+  }
+  .welcome .step .body { font-size: 14px; }
+  .welcome .step .body strong { display: block; margin-bottom: 2px; font-family: 'Helvetica Neue', sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; }
+  .welcome .upload-btn {
+    display: inline-block;
+    background: var(--rule-strong);
+    color: var(--bg);
+    padding: 14px 28px;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    cursor: pointer;
+    margin-top: 16px;
+    border: none;
+  }
+  .welcome .upload-btn:hover { opacity: 0.85; }
+
+  .loader-bar {
+    width: 240px;
+    height: 4px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    margin: 24px auto 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .loader-fill {
+    position: absolute;
+    top: 0; left: -40%;
+    width: 40%;
+    height: 100%;
+    background: var(--rule-strong);
+    animation: loaderSlide 1.4s ease-in-out infinite;
+  }
+  @keyframes loaderSlide {
+    0% { left: -40%; }
+    100% { left: 100%; }
+  }
+
+  /* Discipline picker modal */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    max-width: 720px; width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+  }
+  .modal .modal-head {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--rule);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal .modal-head h2 {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-weight: 400;
+    font-size: 24px;
+  }
+  .modal .modal-body { padding: 20px 24px; }
+  .modal .modal-foot {
+    padding: 16px 24px;
+    border-top: 1px solid var(--rule);
+    display: flex; justify-content: space-between; gap: 8px;
+    background: var(--surface-2);
+  }
+  .modal .close { background: none; border: none; cursor: pointer; color: var(--ink-mute); font-size: 24px; }
+
+  .institute-group {
+    margin-bottom: 18px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+  }
+  .institute-group .ig-head {
+    padding: 8px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .institute-group .ig-head .ig-actions { display: flex; gap: 8px; }
+  .institute-group .ig-head a {
+    font-size: 10px; color: var(--ink-mute); cursor: pointer; text-decoration: underline;
+  }
+  .institute-group .ig-body {
+    padding: 10px 14px;
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .disc-chip {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    padding: 6px 12px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.12s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .disc-chip:hover { border-color: var(--ink); }
+  .disc-chip.selected {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+  .disc-chip .ct {
+    font-size: 10px;
+    opacity: 0.7;
+  }
+
+  .preset-row {
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    margin-bottom: 18px;
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .preset-row .preset-label {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-mute);
+    margin-right: 8px;
+  }
+  .preset-row .preset-chip {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    padding: 5px 10px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+  .preset-row .preset-chip:hover { border-color: var(--ink); color: var(--ink); }
+  .preset-row .preset-chip .x { color: var(--ink-mute); margin-left: 6px; }
+  .preset-row .preset-chip .x:hover { color: var(--warn); }
+
+  /* KPI strip */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: var(--surface);
+    border-top: 1px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule-strong);
+    margin-bottom: 24px;
+  }
+  .kpi-strip.has-fte {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .kpi {
+    padding: 18px 22px;
+    border-right: 1px solid var(--rule);
+  }
+  .kpi:last-child { border-right: none; }
+  .kpi .label {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--ink-mute);
+    margin-bottom: 6px;
+  }
+  .kpi .value {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-size: 34px;
+    font-weight: 400;
+    line-height: 1;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .kpi .delta {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .kpi .delta.up { color: var(--up); }
+  .kpi .delta.down { color: var(--down); }
+  .kpi .delta.flat { color: var(--flat); }
+  .kpi .sub { font-style: italic; color: var(--ink-soft); font-size: 12px; margin-top: 6px; }
+  .kpi .delta { cursor: help; }
+  .kpi .bench {
+    font-style: normal;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-left: 4px;
+    cursor: help;
+  }
+  .bench.up { color: var(--up); }
+  .bench.down { color: var(--down); }
+  .bench.flat { color: var(--flat); font-weight: 400; font-style: italic; }
+  .panel .stat-row .d { cursor: help; }
+
+  /* Filter bar */
+  .filter-bar {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+  }
+  .filter-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .filter-group .lbl {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--ink-mute); margin-right: 4px;
+  }
+  .chip {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    padding: 5px 11px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-soft);
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 0.12s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .chip:hover { border-color: var(--ink); color: var(--ink); }
+  .chip.active {
+    background: var(--rule-strong);
+    color: var(--bg);
+    border-color: var(--rule-strong);
+  }
+  .chip .swatch {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  }
+  .filter-bar .reset {
+    margin-left: auto;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em;
+    background: transparent; border: none; color: var(--ink-mute);
+    cursor: pointer; text-decoration: underline;
+  }
+  .filter-bar .reset:hover { color: var(--ink); }
+
+  /* Section title */
+  .section-title {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-size: 22px;
+    font-weight: 400;
+    margin: 28px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--rule-strong);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .section-title .meta {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    font-style: normal;
+  }
+
+  .grid-auto {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  /* Compact discipline comparison table (replaces card grid in v4.5) */
+  .discipline-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+    overflow-x: auto;
+  }
+  .discipline-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+  }
+  .discipline-table thead th {
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--rule-strong);
+    padding: 8px 12px;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 10px;
+    color: var(--ink-mute);
+    font-weight: 600;
+  }
+  .discipline-table thead th.right { text-align: right; }
+  .discipline-table tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: middle;
+  }
+  .discipline-table tbody td.right { text-align: right; }
+  .discipline-table tbody tr:last-child td { border-bottom: none; }
+  .discipline-table tbody tr:hover { background: var(--surface-2); }
+  .discipline-table .ds-disc {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .discipline-table .ds-disc .swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--rule);
+  }
+  .discipline-table .ds-trend {
+    width: 110px;
+    padding-right: 14px;
+  }
+  .discipline-table .ds-bench {
+    font-size: 11px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--rule);
+    padding: 16px 18px 14px;
+    box-shadow: var(--shadow);
+  }
+  .panel h3 {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-weight: 400;
+    font-size: 18px;
+    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .panel h3 .swatch { width: 12px; height: 12px; display: inline-block; }
+  .panel .panel-sub {
+    font-style: italic; color: var(--ink-mute); font-size: 12px; margin-bottom: 12px;
+  }
+  .panel .stat-row {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 10px;
+    padding: 5px 0;
+    border-bottom: 1px dotted var(--rule);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    align-items: center;
+  }
+  .panel .stat-row:last-child { border-bottom: none; }
+  .panel .stat-row .k { color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; }
+  .panel .stat-row .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .panel .stat-row .d {
+    font-size: 10px; font-weight: 600;
+    min-width: 40px; text-align: right;
+  }
+  .panel .stat-row .d.up { color: var(--up); }
+  .panel .stat-row .d.down { color: var(--down); }
+  .panel .stat-row .d.flat { color: var(--flat); }
+  .panel .panel-sparkline { margin-top: 10px; }
+
+  /* Course cards */
+  .discipline-group {
+    margin-bottom: 16px;
+  }
+  .discipline-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--rule);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    font-family: 'Helvetica Neue', sans-serif;
+    text-align: left;
+    transition: background 0.15s;
+    margin-bottom: 10px;
+  }
+  .discipline-header:hover { background: var(--surface-2); }
+  .discipline-header .dh-arrow {
+    font-size: 10px;
+    color: var(--ink-mute);
+    width: 12px;
+    display: inline-block;
+  }
+  .discipline-header .dh-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--rule);
+  }
+  .discipline-header .dh-label {
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+  }
+  .discipline-header .discipline-meta {
+    font-size: 11px;
+    color: var(--ink-mute);
+    margin-left: auto;
+    font-weight: 400;
+  }
+  .discipline-header .collapsed-trace {
+    font-style: italic;
+  }
+
+  .course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .course-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--rule);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s;
+  }
+  .course-card:hover { transform: translateY(-2px); }
+  .course-card .cc-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 6px; gap: 8px;
+  }
+  .course-card .code {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-weight: 700; font-size: 13px; letter-spacing: 0.04em;
+  }
+  .course-card .loc {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    border: 1px solid var(--rule);
+    padding: 2px 6px;
+  }
+  .course-card .title {
+    font-style: italic; color: var(--ink-soft);
+    font-size: 13px; margin-bottom: 10px; min-height: 2.6em;
+  }
+  .course-card .meter {
+    height: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    position: relative;
+    margin-bottom: 6px;
+    overflow: hidden;
+  }
+  .course-card .meter .fill {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    background: var(--ink);
+    transition: width 0.4s ease;
+  }
+  .course-card .num-row {
+    display: flex; justify-content: space-between;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px; color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .course-card .num-row strong { color: var(--ink); }
+  .course-card .delta-row {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .course-card .delta-row .v-up { color: var(--up); font-weight: 700; }
+  .course-card .delta-row .v-down { color: var(--down); font-weight: 700; }
+  .course-card .delta-row .v-flat { color: var(--flat); }
+  .course-card .meta-row {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-top: 1px dotted var(--rule);
+    padding-top: 8px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+  }
+  .course-card .meta-row .tag.full { color: var(--good); font-weight: 700; }
+  .course-card .meta-row .tag.empty { color: var(--warn); font-weight: 700; }
+  .course-card .meta-row .tag.wait { color: var(--warn); font-weight: 700; }
+
+  /* Sparklines */
+  .spark { display: inline-block; vertical-align: middle; }
+
+  /* Table */
+  .table-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 10px;
+  }
+  .table-search {
+    flex: 1;
+    max-width: 480px;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .table-search .search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink-mute);
+    font-size: 14px;
+    pointer-events: none;
+  }
+  .search-input {
+    width: 100%;
+    padding: 9px 36px 9px 32px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus {
+    outline: none;
+    border-color: var(--rule-strong);
+  }
+  .search-input::placeholder {
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+  .search-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--ink-mute);
+    font-size: 18px;
+    line-height: 1;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .search-clear:hover { color: var(--ink); }
+  .search-count {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-mute);
+    white-space: nowrap;
+  }
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-family: 'Helvetica Neue', sans-serif; font-size: 12px; }
+  thead th {
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--rule-strong);
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  thead th:hover { background: var(--rule); }
+  thead th .arrow { color: var(--ink-mute); margin-left: 4px; }
+  tbody td { padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+  tbody tr:hover { background: var(--surface-2); }
+  td.right { text-align: right; font-variant-numeric: tabular-nums; }
+  td.center { text-align: center; }
+  td .mini-meter {
+    width: 70px; height: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    display: inline-block; position: relative; vertical-align: middle; margin-right: 8px;
+  }
+  td .mini-meter .mf { position: absolute; top: 0; left: 0; bottom: 0; background: var(--ink); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-soft);
+  }
+  .badge.full { background: var(--good); color: #fff; border-color: var(--good); }
+  .badge.high { background: var(--info); color: #fff; border-color: var(--info); }
+  .badge.low { background: transparent; color: var(--warn); border-color: var(--warn); }
+  .badge.zero { background: var(--warn); color: #fff; border-color: var(--warn); }
+
+  /* Sibling section indicator — shown beneath section codes when a
+     fill-status filter is active, to surface context the filter hides */
+  .sibling-row {
+    display: block;
+    margin-top: 5px;
+    padding-top: 5px;
+    border-top: 1px dotted var(--rule);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--ink-mute);
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+  }
+  .sibling-row.warn { color: var(--warn); font-weight: 600; }
+  .sibling-row .sib {
+    display: inline-block;
+    margin-right: 10px;
+    padding: 1px 6px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    border-radius: 2px;
+  }
+  .sibling-row .sib strong { color: var(--ink); font-weight: 700; }
+  .sibling-row .sib em { font-style: normal; }
+  .sibling-row .sib.sib-full strong { color: var(--good); }
+  .sibling-row .sib.sib-empty strong { color: var(--warn); }
+  .sibling-row .sib.sib-available em { color: var(--good); font-weight: 600; }
+  .sibling-row .sib .sib-scope {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 4px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid var(--rule);
+    color: var(--ink-mute);
+  }
+  .sibling-row .sib-note {
+    color: var(--ink-mute);
+    font-style: italic;
+    font-size: 10px;
+    margin-left: 4px;
+  }
+
+  .delta-cell {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .delta-cell.up { color: var(--up); }
+  .delta-cell.down { color: var(--down); }
+  .delta-cell.flat { color: var(--flat); }
+
+  /* Overview tab — college-wide treemap + alerts */
+  .overview-summary {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 1px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule-strong);
+    margin-bottom: 22px;
+    box-shadow: var(--shadow);
+  }
+  .overview-summary .ov-stat {
+    padding: 14px 16px;
+    border-right: 1px solid var(--rule);
+    text-align: left;
+  }
+  .overview-summary .ov-stat:last-child { border-right: none; }
+  .overview-summary .ov-label {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    margin-bottom: 6px;
+  }
+  .overview-summary .ov-value {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--ink);
+  }
+
+  .overview-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .overview-treemap-wrap,
+  .overview-alerts-wrap {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 18px 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .overview-head {
+    margin-bottom: 14px;
+  }
+  .overview-head h3 {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--ink);
+    margin: 0 0 4px 0;
+    letter-spacing: 0.01em;
+  }
+  .overview-head .overview-meta {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+
+  .overview-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .overview-legend .lg-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .overview-legend .lg-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+  }
+
+  .treemap-container {
+    width: 100%;
+    aspect-ratio: 1000 / 550;
+    background: var(--bg);
+  }
+  .treemap-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .tm-tile {
+    transition: opacity 0.15s;
+  }
+  .tm-tile:hover {
+    opacity: 0.82;
+  }
+  .tm-tile:hover rect {
+    stroke-width: 3;
+    stroke: var(--ink);
+  }
+
+  .alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 580px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .alert-card {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--warn);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .alert-card:hover {
+    background: var(--surface);
+    transform: translateX(2px);
+  }
+  .alert-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .alert-icon {
+    color: var(--warn);
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .alert-code {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.04em;
+  }
+  .alert-title {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+  .alert-meta {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .overview-empty {
+    color: var(--ink-mute);
+    font-style: italic;
+    padding: 24px 8px;
+    text-align: center;
+  }
+
+  .overview-badge {
+    background: transparent !important;
+    color: var(--ink-mute) !important;
+  }
+
+  /* Responsive: stack treemap and alerts on narrow screens */
+  @media (max-width: 1000px) {
+    .overview-grid { grid-template-columns: 1fr; }
+    .overview-summary { grid-template-columns: repeat(3, 1fr); }
+    .overview-summary .ov-stat:nth-child(3n) { border-right: none; }
+  }
+
+  /* Snapshot management */
+  .snapshot-list {
+    border: 1px solid var(--rule);
+    background: var(--surface);
+  }
+  .snap-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto auto;
+    gap: 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
+    align-items: center;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+  }
+  .snap-row:last-child { border-bottom: none; }
+  .snap-row.current { background: var(--surface-2); }
+  .snap-row .date {
+    font-family: 'Didot', Georgia, serif;
+    font-size: 18px;
+    min-width: 100px;
+  }
+  .snap-row .name { color: var(--ink-soft); font-style: italic; }
+  .snap-row .stats { font-size: 11px; color: var(--ink-mute); white-space: nowrap; }
+  .snap-row .badge.cur { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--ink);
+    color: var(--bg);
+    padding: 14px 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+    z-index: 200;
+    max-width: 380px;
+    animation: toastIn 0.25s ease;
+  }
+  @keyframes toastIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .toast .toast-actions { margin-top: 8px; display: flex; gap: 10px; }
+  .toast button {
+    background: transparent;
+    border: 1px solid var(--bg);
+    color: var(--bg);
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+  }
+  .toast button:hover { background: var(--bg); color: var(--ink); }
+
+  /* Trend chart */
+  .trend-chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+  .trend-chart-wrap h4 {
+    font-family: 'Didot', Georgia, serif;
+    font-weight: 400;
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+  .trend-chart-wrap .legend {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+  .trend-chart-wrap .legend span {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .trend-chart-wrap .legend .sw {
+    display: inline-block; width: 16px; height: 3px;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+
+  @media (max-width: 880px) {
+    .kpi-strip,
+    .kpi-strip.has-fte { grid-template-columns: repeat(2, 1fr); }
+    .kpi { border-bottom: 1px solid var(--rule); }
+    .kpi:nth-child(2n) { border-right: none; }
+    .masthead { grid-template-columns: 1fr; text-align: center; }
+    .masthead .controls { justify-content: center; }
+    .masthead .edition { text-align: center; }
+  }
+
+  @media print {
+    body { padding: 0; background: #fff; color: #000; }
+    .masthead .controls, .filter-bar .reset, .welcome, .modal-overlay, .toast, .tabs { display: none; }
+    .panel, .course-card, .table-wrap { box-shadow: none; break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="masthead">
+    <div class="edition">
+      <div id="editionLeft">Faculty Edition</div>
+      <div id="editionLeftSub">Fall 2026</div>
+    </div>
+    <h1>Enrollment Dashboard</h1>
+    <div class="controls">
+      <button class="btn" id="disciplineBtn" type="button" style="display:none">≡ Disciplines</button>
+      <button class="btn" id="refreshBtn" type="button" title="Reload latest data from GitHub">↻ Refresh</button>
+      <button class="btn" id="themeBtn" type="button">◐ Theme</button>
+      <button class="btn ghost" id="printBtn" type="button">⎙ Print</button>
+    </div>
+  </header>
+
+  <div class="subline" id="subline">
+    <span id="reportDate">No data loaded</span>
+    <span class="pipe">|</span>
+    <span id="disciplineSummary">No disciplines selected</span>
+    <span class="pipe">|</span>
+    <span id="snapshotCount">0 snapshots</span>
+  </div>
+
+  <main id="dashboard"></main>
+
+  <footer>
+    <span>Enrollment Dashboard · Generic faculty tool · v4.7</span>
+    <span id="footerStamp"></span>
+  </footer>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================================
+   * CONFIGURATION
+   * =========================================================================
+   * The dashboard loads enrollment reports from a GitHub-hosted data folder.
+   * To track a different semester, change DATA_PATH and update the manifest.
+   * To work locally with files instead, leave as-is and serve the directory
+   * with a static server (python3 -m http.server, etc.) — fetch() respects
+   * relative paths.
+   */
+  const DATA_PATH = 'data/26FA/';
+  const MANIFEST_FILE = 'manifest.json';
+
+  /* =========================================================================
+   * STATE & STORAGE
+   * ========================================================================= */
+
+  const STORAGE = {
+    THEME: 'enroll-theme',
+    DISCIPLINES: 'enroll-disciplines',
+    PRESETS: 'enroll-presets',
+    SNAPSHOTS: 'enroll-snapshots',
+    INSTITUTE_INDEX: 'enroll-inst-idx',
+    BENCHMARKS: 'enroll-benchmarks',
+    CARD_EXPANSION: 'enroll-card-expansion',
+  };
+
+  const state = {
+    // Data
+    snapshots: [],          // [{ id, date, label, filename, rows: [...] }] sorted ASC by date
+    currentSnapshotId: null,
+    instituteIndex: {},     // { 'BUSS': ['CULA','ACCT',...], ... }
+    allDisciplines: [],     // [{ code, institute, count }]
+
+    // User selections
+    selectedDisciplines: new Set(),
+    presets: [],            // [{ name, disciplines: [] }]
+
+    // View / filters
+    activeTab: 'snapshot',  // 'snapshot' | 'trends' | 'snapshots'
+    activeLocations: new Set(),
+    activeDisciplineFilter: new Set(), // sub-filter within selected
+    sortKey: 'Section',
+    sortDir: 1,
+    showBenchmarks: true,
+    tableSearch: '',        // search box content for full section detail table
+    fillBucket: 'all',      // 'all' | 'full' | 'almost' | 'under' | 'empty'
+    cardExpansion: {},      // explicit per-discipline overrides: { ELEC: true, MATH: false }
+                            //   missing key => use smart default (expand if <20 sections)
+
+    // Loading state for GitHub-hosted data
+    loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
+    loadError: null,
+    loadedAt: null,         // when manifest was fetched
+    manifestUpdatedAt: null,// "updated" field from manifest if present
+    goals: null,            // { fte: 2953.0 } from manifest, or null
+  };
+
+  /* =========================================================================
+   * UTILITIES
+   * ========================================================================= */
+
+  function uid() { return 'id-' + Math.random().toString(36).slice(2, 10); }
+  function sum(arr, key) { return arr.reduce((a, r) => a + (Number(r[key]) || 0), 0); }
+  function el(id) { return document.getElementById(id); }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // Deterministic color from string (used for discipline accent)
+  function colorFor(code) {
+    let h = 0;
+    for (let i = 0; i < code.length; i++) h = (h * 31 + code.charCodeAt(i)) >>> 0;
+    const hue = h % 360;
+    // Avoid clashing with backgrounds: medium saturation/lightness
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return `hsl(${hue} ${isDark ? '55%' : '55%'} ${isDark ? '60%' : '42%'})`;
+  }
+
+  // Parse date from filename: looks for MMDDYY or YYYYMMDD or _DDMMM patterns
+  function parseDateFromFilename(name) {
+    const noExt = name.replace(/\.[^.]+$/, '');
+    // Pattern 1: MMDDYY (six trailing digits)
+    let m = noExt.match(/(\d{2})(\d{2})(\d{2})(?!\d)/);
+    if (m) {
+      const [, mm, dd, yy] = m;
+      const year = 2000 + parseInt(yy, 10);
+      const date = new Date(year, parseInt(mm, 10) - 1, parseInt(dd, 10));
+      if (!isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+    }
+    // Pattern 2: YYYY-MM-DD or YYYYMMDD
+    m = noExt.match(/(\d{4})[-_]?(\d{2})[-_]?(\d{2})/);
+    if (m) {
+      const date = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+      if (!isNaN(date.getTime())) return date.toISOString().slice(0, 10);
+    }
+    return null;
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function fmtDateShort(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function loadStorage() {
+    try {
+      const t = localStorage.getItem(STORAGE.THEME);
+      if (t === 'dark' || t === 'white') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+      // 'cream' / 'light' / null all mean default (no attribute)
+
+      const d = localStorage.getItem(STORAGE.DISCIPLINES);
+      if (d) state.selectedDisciplines = new Set(JSON.parse(d));
+
+      const p = localStorage.getItem(STORAGE.PRESETS);
+      if (p) state.presets = JSON.parse(p);
+
+      // Snapshots now come from GitHub via loadFromManifest(); we do not
+      // restore them from localStorage anymore.
+
+      const ii = localStorage.getItem(STORAGE.INSTITUTE_INDEX);
+      if (ii) state.instituteIndex = JSON.parse(ii);
+
+      const bm = localStorage.getItem(STORAGE.BENCHMARKS);
+      if (bm !== null) state.showBenchmarks = bm === 'true';
+
+      const ce = localStorage.getItem(STORAGE.CARD_EXPANSION);
+      if (ce) state.cardExpansion = JSON.parse(ce);
+    } catch (err) {
+      console.error('Storage load error:', err);
+    }
+  }
+
+  function saveStorage() {
+    try {
+      localStorage.setItem(STORAGE.DISCIPLINES, JSON.stringify([...state.selectedDisciplines]));
+      localStorage.setItem(STORAGE.PRESETS, JSON.stringify(state.presets));
+      localStorage.setItem(STORAGE.INSTITUTE_INDEX, JSON.stringify(state.instituteIndex));
+      localStorage.setItem(STORAGE.BENCHMARKS, String(state.showBenchmarks));
+      localStorage.setItem(STORAGE.CARD_EXPANSION, JSON.stringify(state.cardExpansion));
+    } catch (err) {
+      console.error('Storage save error (likely quota):', err);
+    }
+  }
+
+  /* =========================================================================
+   * DATA INGEST
+   * ========================================================================= */
+
+  function getCoursePrefix(course) {
+    if (!course) return '';
+    const m = String(course).trim().toUpperCase().match(/^([A-Z]{2,5})/);
+    return m ? m[1] : '';
+  }
+
+  // Returns explicit session length from the spreadsheet if a column carries it;
+  // otherwise null (we don't guess — too many co-op/internship/lab courses
+  // would be mislabeled). When Brookdale adds an explicit session/part-of-term
+  // column, this just starts working.
+  function getSessionLength(row) {
+    const candidates = ['Session', 'Part of Term', 'Session Length', 'Session Code'];
+    for (const c of candidates) {
+      if (row[c]) {
+        const s = String(row[c]).toUpperCase();
+        if (s.includes('11')) return '11';
+        if (s.includes('15')) return '15';
+        return s;
+      }
+    }
+    return null;
+  }
+
+  function ingestFile(file) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const sheetName = wb.SheetNames.find(n => /individual\s*sect/i.test(n)) || wb.SheetNames[0];
+        const sheet = wb.Sheets[sheetName];
+        const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+        ingestRows(rawRows, file.name);
+      } catch (err) {
+        console.error(err);
+        toast('⚠ Could not read this spreadsheet. Make sure it is the standard "Individual Sects All" report.', 6000);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // Fetch manifest + all listed spreadsheets from the configured DATA_PATH.
+  // Manifest format:
+  //   {
+  //     "updated": "2026-05-03T14:00:00Z",   // optional, ISO timestamp
+  //     "term": "26FA",                       // optional, display label
+  //     "snapshots": [
+  //       { "date": "2026-04-28", "file": "26FA_Course_Enrollment_Report_042826.xlsx" },
+  //       ...
+  //     ]
+  //   }
+  async function loadFromManifest() {
+    state.loadStatus = 'loading';
+    render();
+
+    const manifestUrl = DATA_PATH + MANIFEST_FILE;
+    try {
+      // Cache-bust to ensure freshly-pushed data shows up without hard refresh
+      const manifestResp = await fetch(manifestUrl + '?t=' + Date.now());
+      if (!manifestResp.ok) {
+        throw new Error(`Manifest not found (HTTP ${manifestResp.status} at ${manifestUrl})`);
+      }
+      const manifest = await manifestResp.json();
+
+      if (!manifest.snapshots || !Array.isArray(manifest.snapshots) || manifest.snapshots.length === 0) {
+        throw new Error('Manifest contains no snapshots.');
+      }
+
+      state.manifestUpdatedAt = manifest.updated || null;
+      state.goals = manifest.goals || null;  // e.g., { fte: 2953.0 } or null if not set
+
+      // Fetch all spreadsheets in parallel
+      const fetches = manifest.snapshots.map(async entry => {
+        const fileUrl = DATA_PATH + entry.file;
+        const resp = await fetch(fileUrl);
+        if (!resp.ok) throw new Error(`Failed to fetch ${entry.file} (HTTP ${resp.status})`);
+        const buf = await resp.arrayBuffer();
+        return { entry, buf };
+      });
+
+      const results = await Promise.all(fetches);
+
+      // Reset snapshots and rebuild from manifest order
+      state.snapshots = [];
+
+      for (const { entry, buf } of results) {
+        try {
+          const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+          const sheetName = wb.SheetNames.find(n => /individual\s*sect/i.test(n)) || wb.SheetNames[0];
+          const sheet = wb.Sheets[sheetName];
+          const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+          ingestRowsSilent(rawRows, entry.file, entry.date);
+        } catch (err) {
+          console.error(`Failed to parse ${entry.file}:`, err);
+        }
+      }
+
+      if (state.snapshots.length === 0) {
+        throw new Error('No snapshots could be parsed from manifest entries.');
+      }
+
+      state.snapshots.sort((a, b) => a.date.localeCompare(b.date));
+      state.currentSnapshotId = state.snapshots[state.snapshots.length - 1].id;
+      recomputeAllDisciplines();
+
+      state.loadStatus = 'loaded';
+      state.loadError = null;
+      state.loadedAt = new Date().toISOString();
+
+      // First-time visitors: open the discipline picker since they haven't
+      // chosen yet. Returning visitors keep their saved disciplines.
+      const isFirstVisit = state.selectedDisciplines.size === 0;
+      render();
+      if (isFirstVisit) {
+        openDisciplineModal();
+      }
+    } catch (err) {
+      console.error('Failed to load enrollment data:', err);
+      state.loadStatus = 'error';
+      state.loadError = err.message || String(err);
+      render();
+    }
+  }
+
+  // Like ingestRows, but used during manifest load — does not toast or modify
+  // currentSnapshotId (the caller decides). Uses the manifest-provided date
+  // rather than re-parsing it from the filename.
+  function ingestRowsSilent(rawRows, filename, manifestDate) {
+    const fall = rawRows.filter(r => {
+      const term = String(r.Term || '').toUpperCase();
+      return r.Course && term.includes('FA');
+    }).map(r => {
+      const prefix = getCoursePrefix(r.Course);
+      return {
+        Section: r.Section,
+        Course: r.Course,
+        'Course Title': r['Course Title'],
+        Institute: String(r.Institute || '').trim(),
+        Location: String(r.Location || '').trim(),
+        Capacity: Number(r.Capacity) || 0,
+        'Enrolled Students': Number(r['Enrolled Students']) || 0,
+        'Avail Seats': Number(r['Avail Seats']) || 0,
+        'Section Fill %': Number(String(r['Section Fill %']).replace('%', '')) || 0,
+        'Wait List': Number(r['Wait List']) || 0,
+        'Course Credit': Number(r['Course Credit']) || 0,
+        'Total Student Credit Hours': Number(r['Total Student Credit Hours']) || 0,
+        'Maximum Course SCH': Number(r['Maximum Course SCH']) || 0,
+        'Section Start Time': r['Section Start Time'],
+        'Meeting Days': r['Meeting Days'],
+        Instructor: r.Instructor,
+        Term: r.Term,
+        _prefix: prefix,
+        _session: getSessionLength(r),
+      };
+    }).filter(r => r._prefix);
+
+    if (fall.length === 0) return;
+
+    fall.forEach(r => {
+      if (!r.Institute) return;
+      if (!state.instituteIndex[r.Institute]) state.instituteIndex[r.Institute] = [];
+      if (!state.instituteIndex[r.Institute].includes(r._prefix)) {
+        state.instituteIndex[r.Institute].push(r._prefix);
+      }
+    });
+    Object.keys(state.instituteIndex).forEach(k => state.instituteIndex[k].sort());
+
+    const date = manifestDate || parseDateFromFilename(filename) || new Date().toISOString().slice(0, 10);
+
+    state.snapshots.push({
+      id: uid(),
+      date,
+      label: fmtDate(date),
+      filename,
+      rows: fall,
+      uploadedAt: new Date().toISOString(),
+    });
+  }
+
+  function ingestRows(rawRows, filename) {
+    const fall = rawRows.filter(r => {
+      const term = String(r.Term || '').toUpperCase();
+      return r.Course && term.includes('FA');
+    }).map(r => {
+      const prefix = getCoursePrefix(r.Course);
+      return {
+        // Carry only what we need to keep storage small
+        Section: r.Section,
+        Course: r.Course,
+        'Course Title': r['Course Title'],
+        Institute: String(r.Institute || '').trim(),
+        Location: String(r.Location || '').trim(),
+        Capacity: Number(r.Capacity) || 0,
+        'Enrolled Students': Number(r['Enrolled Students']) || 0,
+        'Avail Seats': Number(r['Avail Seats']) || 0,
+        'Section Fill %': Number(String(r['Section Fill %']).replace('%', '')) || 0,
+        'Wait List': Number(r['Wait List']) || 0,
+        'Course Credit': Number(r['Course Credit']) || 0,
+        'Total Student Credit Hours': Number(r['Total Student Credit Hours']) || 0,
+        'Maximum Course SCH': Number(r['Maximum Course SCH']) || 0,
+        'Section Start Time': r['Section Start Time'],
+        'Meeting Days': r['Meeting Days'],
+        Instructor: r.Instructor,
+        Term: r.Term,
+        _prefix: prefix,
+        _session: getSessionLength(r),
+      };
+    }).filter(r => r._prefix);
+
+    if (fall.length === 0) {
+      toast('⚠ No fall sections found in this spreadsheet.', 5000);
+      return;
+    }
+
+    // Build/refresh institute index
+    fall.forEach(r => {
+      if (!r.Institute) return;
+      if (!state.instituteIndex[r.Institute]) state.instituteIndex[r.Institute] = [];
+      if (!state.instituteIndex[r.Institute].includes(r._prefix)) {
+        state.instituteIndex[r.Institute].push(r._prefix);
+      }
+    });
+    Object.keys(state.instituteIndex).forEach(k => state.instituteIndex[k].sort());
+
+    // Determine snapshot date
+    let date = parseDateFromFilename(filename);
+    if (!date) date = new Date().toISOString().slice(0, 10);
+
+    // Check for duplicate date — if so, replace
+    const existingIdx = state.snapshots.findIndex(s => s.date === date);
+    const snapshot = {
+      id: uid(),
+      date,
+      label: fmtDate(date),
+      filename,
+      rows: fall,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    let isFirstSnapshot = state.snapshots.length === 0;
+    let replaced = false;
+
+    if (existingIdx >= 0) {
+      state.snapshots[existingIdx] = snapshot;
+      replaced = true;
+    } else {
+      state.snapshots.push(snapshot);
+    }
+    state.snapshots.sort((a, b) => a.date.localeCompare(b.date));
+    state.currentSnapshotId = snapshot.id;
+
+    recomputeAllDisciplines();
+    saveStorage();
+
+    if (isFirstSnapshot && state.selectedDisciplines.size === 0) {
+      // First-ever upload — show discipline picker
+      render();
+      openDisciplineModal();
+      toast(`Loaded ${fall.length} sections from ${fmtDate(date)}. Pick the disciplines you want to track.`, 4000);
+    } else {
+      render();
+      toast(replaced
+        ? `Replaced snapshot for ${fmtDate(date)} (${fall.length} sections).`
+        : `Snapshot added: ${fmtDate(date)} (${fall.length} sections, ${state.snapshots.length} total).`,
+        4000);
+    }
+  }
+
+  function recomputeAllDisciplines() {
+    // Aggregate across ALL snapshots so a discipline that disappears from a
+    // later report still shows up in the picker.
+    const counts = {};
+    const institutes = {};
+    state.snapshots.forEach(snap => {
+      snap.rows.forEach(r => {
+        if (!r._prefix) return;
+        counts[r._prefix] = (counts[r._prefix] || 0) + 1;
+        institutes[r._prefix] = r.Institute || '(unspecified)';
+      });
+    });
+    state.allDisciplines = Object.keys(counts).sort().map(code => ({
+      code,
+      institute: institutes[code],
+      count: counts[code],
+    }));
+  }
+
+  /* =========================================================================
+   * SNAPSHOT ACCESSORS
+   * ========================================================================= */
+
+  function currentSnapshot() {
+    return state.snapshots.find(s => s.id === state.currentSnapshotId) || state.snapshots[state.snapshots.length - 1];
+  }
+
+  function previousSnapshot() {
+    const cur = currentSnapshot();
+    if (!cur) return null;
+    const idx = state.snapshots.findIndex(s => s.id === cur.id);
+    return idx > 0 ? state.snapshots[idx - 1] : null;
+  }
+
+  // Filtered current rows by selected disciplines + sub-filters
+  // Returns true if a row matches the active fill-status bucket.
+  // Buckets match the same thresholds the dashboard uses for badge colors:
+  //   full     fill >= 100%
+  //   almost   75% <= fill < 100%
+  //   under    0 < fill < 50% (i.e., has some enrollment but under-filled)
+  //   empty    enrolled === 0
+  function rowInFillBucket(r, bucket) {
+    if (bucket === 'all') return true;
+    const fill = Number(r['Section Fill %']) || 0;
+    const enrolled = Number(r['Enrolled Students']) || 0;
+    if (bucket === 'full')   return fill >= 100;
+    if (bucket === 'almost') return fill >= 75 && fill < 100;
+    if (bucket === 'under')  return enrolled > 0 && fill < 50;
+    if (bucket === 'empty')  return enrolled === 0;
+    return true;
+  }
+
+  function filteredRows() {
+    const snap = currentSnapshot();
+    if (!snap) return [];
+    return snap.rows.filter(r => {
+      if (!state.selectedDisciplines.has(r._prefix)) return false;
+      if (state.activeDisciplineFilter.size > 0 && !state.activeDisciplineFilter.has(r._prefix)) return false;
+      if (state.activeLocations.size > 0 && !state.activeLocations.has(r.Location)) return false;
+      if (!rowInFillBucket(r, state.fillBucket)) return false;
+      return true;
+    });
+  }
+
+  // College-wide stats for a snapshot — every fall section, all disciplines.
+  // Returns { sections, enrolled, capacity, fill, sch }.
+  function collegeWideStats(snap) {
+    if (!snap) return { sections: 0, enrolled: 0, capacity: 0, fill: 0, sch: 0 };
+    const rows = snap.rows;
+    const enrolled = sum(rows, 'Enrolled Students');
+    const capacity = sum(rows, 'Capacity');
+    return {
+      sections: rows.length,
+      enrolled,
+      capacity,
+      fill: capacity > 0 ? (enrolled / capacity * 100) : 0,
+      sch: sum(rows, 'Total Student Credit Hours'),
+    };
+  }
+
+  // FTE (Full-Time Equivalent) = Total Student Credit Hours / 30.
+  // This is the institutional planning metric, used here to track progress
+  // toward a college-wide FTE goal (set in manifest.json as goals.fte).
+  const FTE_DIVISOR = 30;
+
+  function fteFromRows(rows) {
+    return sum(rows, 'Total Student Credit Hours') / FTE_DIVISOR;
+  }
+
+  function collegeWideFTE(snap) {
+    if (!snap) return 0;
+    return fteFromRows(snap.rows);
+  }
+
+  function fteGoal() {
+    return state.goals && state.goals.fte ? Number(state.goals.fte) : null;
+  }
+
+  function pctOfGoal(fte) {
+    const g = fteGoal();
+    return g ? (fte / g * 100) : null;
+  }
+
+  // True if comparison to college-wide is meaningful — i.e., user is looking
+  // at a real subset, not (effectively) the whole college.
+  function comparisonMeaningful() {
+    if (!state.showBenchmarks) return false;
+    const snap = currentSnapshot();
+    if (!snap) return false;
+    const totalDisciplines = state.allDisciplines.length;
+    if (totalDisciplines === 0) return false;
+    // Selected fewer than all disciplines OR has location/sub-filter narrowing
+    if (state.selectedDisciplines.size < totalDisciplines) return true;
+    if (state.activeDisciplineFilter.size > 0) return true;
+    if (state.activeLocations.size > 0) return true;
+    return false;
+  }
+
+  /* =========================================================================
+   * RENDER ROOT
+   * ========================================================================= */
+
+  function render() {
+    updateHeader();
+    const dash = el('dashboard');
+
+    // Loading or error → show welcome panel which handles those states
+    if (state.loadStatus === 'loading' || state.loadStatus === 'error' || state.snapshots.length === 0) {
+      dash.innerHTML = renderWelcome();
+      el('disciplineBtn').style.display = 'none';
+      bindBasic();
+      return;
+    }
+
+    if (state.selectedDisciplines.size === 0) {
+      dash.innerHTML = renderNoDisciplines();
+      el('disciplineBtn').style.display = '';
+      bindBasic();
+      return;
+    }
+
+    el('disciplineBtn').style.display = '';
+
+    let body = renderTabs();
+    if (state.activeTab === 'snapshot') {
+      body += renderKPIs();
+      body += renderFilters();
+      body += renderDisciplineSummaries();
+      body += renderCourseGrid();
+      body += renderTable();
+    } else if (state.activeTab === 'trends') {
+      body += renderTrendsView();
+    } else if (state.activeTab === 'snapshots') {
+      body += renderSnapshotManager();
+    } else if (state.activeTab === 'overview') {
+      body += renderOverview();
+    }
+
+    dash.innerHTML = body;
+    bindAllEvents();
+  }
+
+  function updateHeader() {
+    const snap = currentSnapshot();
+    if (state.loadStatus === 'loading') {
+      el('reportDate').textContent = 'Loading…';
+    } else if (state.loadStatus === 'error') {
+      el('reportDate').textContent = 'Load failed';
+    } else if (snap) {
+      el('reportDate').textContent = `Latest report: ${fmtDate(snap.date)}`;
+    } else {
+      el('reportDate').textContent = 'No data loaded';
+    }
+
+    if (state.selectedDisciplines.size === 0) {
+      el('disciplineSummary').textContent = 'No disciplines selected';
+    } else {
+      const list = [...state.selectedDisciplines].sort();
+      const display = list.length <= 4 ? list.join(' · ') : `${list.slice(0, 3).join(' · ')} +${list.length - 3} more`;
+      el('disciplineSummary').textContent = display;
+    }
+
+    el('snapshotCount').textContent =
+      state.snapshots.length === 0 ? '0 snapshots'
+      : state.snapshots.length === 1 ? '1 snapshot'
+      : `${state.snapshots.length} snapshots`;
+
+    if (snap) {
+      const updated = state.manifestUpdatedAt
+        ? `Data updated ${fmtDate(state.manifestUpdatedAt.slice(0, 10))}`
+        : `Loaded ${state.loadedAt ? new Date(state.loadedAt).toLocaleString() : ''}`;
+      el('footerStamp').textContent = `${updated} · ${snap.rows.length} sections in latest`;
+    }
+  }
+
+  /* =========================================================================
+   * WELCOME / EMPTY STATES
+   * ========================================================================= */
+
+  function renderWelcome() {
+    if (state.loadStatus === 'loading') {
+      return `
+        <div class="welcome">
+          <h2>Loading enrollment data…</h2>
+          <p>Fetching the latest reports from the data folder. This usually takes a couple of seconds.</p>
+          <div class="loader-bar"><div class="loader-fill"></div></div>
+        </div>
+      `;
+    }
+
+    if (state.loadStatus === 'error') {
+      return `
+        <div class="welcome">
+          <h2>Couldn't load enrollment data.</h2>
+          <p>${escapeHtml(state.loadError || 'Unknown error.')}</p>
+          <p style="font-size:12px;color:var(--ink-mute);margin-top:16px">
+            This dashboard reads from <code>${escapeHtml(DATA_PATH + MANIFEST_FILE)}</code> in the same folder as this page.
+            If you're testing locally, make sure you're serving the directory through a web server (open files via <code>file://</code> won't work — browsers block fetch from local files).
+          </p>
+          <button class="upload-btn" id="retryBtn" type="button">Retry</button>
+        </div>
+      `;
+    }
+
+    // idle, no data — shouldn't normally hit this since init triggers a load
+    return `
+      <div class="welcome">
+        <h2>Enrollment Dashboard</h2>
+        <p>This dashboard tracks Fall enrollment for the disciplines you select. Data updates automatically as new reports are published.</p>
+        <button class="upload-btn" id="loadDataBtn" type="button">Load Data</button>
+      </div>
+    `;
+  }
+
+  function renderNoDisciplines() {
+    return `
+      <div class="welcome">
+        <h2>Choose the disciplines you teach.</h2>
+        <p>Your data is loaded. Now tell the dashboard which course prefixes to focus on.</p>
+        <button class="upload-btn" id="openDiscBtn" type="button">Choose Disciplines</button>
+      </div>
+    `;
+  }
+
+  function bindBasic() {
+    const b = el('openDiscBtn');
+    if (b) b.addEventListener('click', openDisciplineModal);
+    const r = el('retryBtn');
+    if (r) r.addEventListener('click', loadFromManifest);
+    const l = el('loadDataBtn');
+    if (l) l.addEventListener('click', loadFromManifest);
+  }
+
+  /* =========================================================================
+   * TABS
+   * ========================================================================= */
+
+  function renderTabs() {
+    const sections = filteredRows().length;
+    return `
+      <div class="tabs">
+        <button class="tab ${state.activeTab === 'snapshot' ? 'active' : ''}" data-tab="snapshot">Current Snapshot <span class="count">${sections}</span></button>
+        <button class="tab ${state.activeTab === 'trends' ? 'active' : ''}" data-tab="trends">Trends <span class="count">${state.snapshots.length}</span></button>
+        <button class="tab ${state.activeTab === 'snapshots' ? 'active' : ''}" data-tab="snapshots">Snapshots</button>
+        <button class="tab ${state.activeTab === 'overview' ? 'active' : ''}" data-tab="overview">Overview <span class="count overview-badge" title="College-wide capacity heatmap">∷</span></button>
+      </div>
+    `;
+  }
+
+  /* =========================================================================
+   * KPI STRIP — with delta vs. previous snapshot
+   * ========================================================================= */
+
+  function renderKPIs() {
+    const cur = filteredRows();
+    const prevSnap = previousSnapshot();
+    const prev = prevSnap
+      ? prevSnap.rows.filter(r =>
+          state.selectedDisciplines.has(r._prefix) &&
+          (state.activeDisciplineFilter.size === 0 || state.activeDisciplineFilter.has(r._prefix)) &&
+          (state.activeLocations.size === 0 || state.activeLocations.has(r.Location)) &&
+          rowInFillBucket(r, state.fillBucket)
+        )
+      : null;
+
+    const sectionsNow = cur.length;
+    const enrolledNow = sum(cur, 'Enrolled Students');
+    const capacityNow = sum(cur, 'Capacity');
+    const fillNow = capacityNow > 0 ? (enrolledNow / capacityNow * 100) : 0;
+    const schNow = sum(cur, 'Total Student Credit Hours');
+
+    let dEnrolled = '', dFill = '', dSCH = '', dSections = '';
+    if (prev) {
+      const enrolledPrev = sum(prev, 'Enrolled Students');
+      const capacityPrev = sum(prev, 'Capacity');
+      const fillPrev = capacityPrev > 0 ? (enrolledPrev / capacityPrev * 100) : 0;
+      const schPrev = sum(prev, 'Total Student Credit Hours');
+      dSections = renderDelta(sectionsNow - prev.length, '');
+      dEnrolled = renderDelta(enrolledNow - enrolledPrev, '');
+      dFill = renderDelta(fillNow - fillPrev, 'pp', 1);
+      dSCH = renderDelta(schNow - schPrev, '');
+    }
+
+    const fullCount = cur.filter(r => r['Section Fill %'] >= 100).length;
+    const emptyCount = cur.filter(r => r['Enrolled Students'] === 0).length;
+    const waitlistTotal = sum(cur, 'Wait List');
+
+    // College-wide benchmark for fill comparison
+    const showBench = comparisonMeaningful();
+    const cw = showBench ? collegeWideStats(currentSnapshot()) : null;
+    const fillVsCollege = cw ? (fillNow - cw.fill) : null;
+    const fillSubtext = cw
+      ? `${(capacityNow - enrolledNow).toLocaleString()} seats remaining · College: ${cw.fill.toFixed(1)}% ${benchDelta(fillVsCollege, 'pp', 1)}`
+      : `${(capacityNow - enrolledNow).toLocaleString()} seats remaining`;
+
+    // Fifth KPI: FTE Progress (only renders if a goal is set)
+    const goal = fteGoal();
+    const snap = currentSnapshot();
+    let fteCard = '';
+    if (goal && snap) {
+      const collegeFTE = collegeWideFTE(snap);
+      const collegePct = pctOfGoal(collegeFTE);
+      const prevFTE = prevSnap ? collegeWideFTE(prevSnap) : null;
+      const dFTE = prevFTE !== null ? collegeFTE - prevFTE : null;
+      const dStr = dFTE !== null && Math.abs(dFTE) >= 0.05
+        ? `<span class="delta ${dFTE > 0 ? 'up' : 'down'}" title="Change in college-wide FTE since the previous snapshot">${dFTE > 0 ? '+' : ''}${dFTE.toFixed(1)}</span>`
+        : '';
+
+      // Your selection's contribution
+      const yourFTE = fteFromRows(cur);
+      const yourPct = goal > 0 ? (yourFTE / goal * 100) : 0;
+      const totalDisciplines = state.allDisciplines.length;
+      const showYourSelection =
+        state.selectedDisciplines.size > 0 &&
+        state.selectedDisciplines.size < totalDisciplines;
+
+      const sub = showYourSelection
+        ? `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · You: ${yourFTE.toFixed(1)} (${yourPct.toFixed(1)}%)`
+        : `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} FTE goal`;
+
+      fteCard = `
+        <div class="kpi" title="Full-Time Equivalent (FTE) = Total Student Credit Hours ÷ 30. Compared against the college-wide goal for this term.">
+          <div class="label">FTE Progress</div>
+          <div class="value">${collegeFTE.toFixed(1)} ${dStr}</div>
+          <div class="sub">${sub}</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="kpi-strip${goal ? ' has-fte' : ''}">
+        <div class="kpi">
+          <div class="label">Sections</div>
+          <div class="value">${sectionsNow} ${dSections}</div>
+          <div class="sub">${fullCount} at capacity · ${emptyCount} with zero enrolled</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Students Enrolled</div>
+          <div class="value">${enrolledNow} ${dEnrolled}</div>
+          <div class="sub">of ${capacityNow} total seats</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Overall Fill</div>
+          <div class="value">${fillNow.toFixed(1)}% ${dFill}</div>
+          <div class="sub">${fillSubtext}</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Student Credit Hrs</div>
+          <div class="value">${schNow} ${dSCH}</div>
+          <div class="sub">${waitlistTotal > 0 ? waitlistTotal + ' on waitlist' : 'no waitlist activity'}</div>
+        </div>
+        ${fteCard}
+      </div>
+    `;
+  }
+
+  // Inline benchmark delta, used in KPI subtexts and panel rows.
+  // Distinct from time-delta: shows "+X.Xpp ahead" / "-X.Xpp behind".
+  function benchDelta(n, unit, decimals) {
+    if (n === null || n === undefined || isNaN(n)) return '';
+    const tt = 'Compared to the college-wide fill rate right now (across every fall section). "pp" = percentage points.';
+    if (Math.abs(n) < 0.05) return `<span class="bench flat" title="${escapeHtml(tt)}">at college avg</span>`;
+    const sign = n > 0 ? '+' : '';
+    const cls = n > 0 ? 'up' : 'down';
+    const v = decimals ? n.toFixed(decimals) : n.toLocaleString();
+    return `<span class="bench ${cls}" title="${escapeHtml(tt)}">${sign}${v}${unit || ''}</span>`;
+  }
+
+  function renderDelta(n, unit, decimals, title) {
+    if (n === 0 || n === undefined || isNaN(n)) return `<span class="delta flat" title="No change since the previous snapshot">—</span>`;
+    const sign = n > 0 ? '+' : '';
+    const cls = n > 0 ? 'up' : 'down';
+    const v = decimals ? n.toFixed(decimals) : n.toLocaleString();
+    const tt = title || (unit === 'pp'
+      ? 'Change since the previous snapshot. "pp" = percentage points (a simple subtraction between two percentages).'
+      : 'Change since the previous snapshot.');
+    return `<span class="delta ${cls}" title="${escapeHtml(tt)}">${sign}${v}${unit || ''}</span>`;
+  }
+
+  /* =========================================================================
+   * FILTERS
+   * ========================================================================= */
+
+  function renderFilters() {
+    const snap = currentSnapshot();
+    if (!snap) return '';
+    // Limit filter chips to selected disciplines that are present in current snapshot
+    const present = [...state.selectedDisciplines].filter(p =>
+      snap.rows.some(r => r._prefix === p)
+    ).sort();
+    const locations = [...new Set(snap.rows
+      .filter(r => state.selectedDisciplines.has(r._prefix))
+      .map(r => r.Location)
+      .filter(Boolean))].sort();
+
+    const buckets = [
+      { id: 'all',    label: 'All',         title: 'Show every section' },
+      { id: 'full',   label: 'Full',        title: 'Sections at 100% capacity' },
+      { id: 'almost', label: 'Almost full', title: 'Sections at 75-99% fill — likely to fill before classes start' },
+      { id: 'under',  label: 'Underfilled', title: 'Sections under 50% fill with at least one student' },
+      { id: 'empty',  label: 'Empty',       title: 'Sections with zero enrolled students' },
+    ];
+
+    return `
+      <div class="filter-bar">
+        ${present.length > 1 ? `
+          <div class="filter-group">
+            <span class="lbl">Discipline</span>
+            ${present.map(p => `
+              <button class="chip ${state.activeDisciplineFilter.has(p) ? 'active' : ''}" data-disc-filter="${p}">
+                <span class="swatch" style="background:${colorFor(p)}"></span>${p}
+              </button>
+            `).join('')}
+          </div>
+        ` : ''}
+        ${locations.length > 1 ? `
+          <div class="filter-group">
+            <span class="lbl">Location</span>
+            ${locations.map(l => `
+              <button class="chip ${state.activeLocations.has(l) ? 'active' : ''}" data-location="${escapeHtml(l)}">${escapeHtml(l)}</button>
+            `).join('')}
+          </div>
+        ` : ''}
+        <div class="filter-group">
+          <span class="lbl">Fill</span>
+          ${buckets.map(b => `
+            <button class="chip ${state.fillBucket === b.id ? 'active' : ''}" data-bucket="${b.id}" title="${escapeHtml(b.title)}">${escapeHtml(b.label)}</button>
+          `).join('')}
+        </div>
+        <div class="filter-group">
+          <span class="lbl">Compare</span>
+          <button class="chip ${state.showBenchmarks ? 'active' : ''}" id="benchToggle" type="button" title="Compare against college-wide fall enrollment">
+            ⊕ vs. College
+          </button>
+        </div>
+        <button class="reset" id="resetFilters">Reset filters</button>
+      </div>
+    `;
+  }
+
+  /* =========================================================================
+   * DISCIPLINE SUMMARY PANELS
+   * ========================================================================= */
+
+  function renderDisciplineSummaries() {
+    const snap = currentSnapshot();
+    const prevSnap = previousSnapshot();
+    let present = [...state.selectedDisciplines]
+      .filter(p => snap.rows.some(r => r._prefix === p))
+      .sort();
+
+    // If the user has narrowed via the discipline filter chips, only show
+    // panels for those disciplines.
+    if (state.activeDisciplineFilter.size > 0) {
+      present = present.filter(p => state.activeDisciplineFilter.has(p));
+    }
+
+    if (present.length === 0) {
+      return `<div class="section-title">By Discipline</div>
+        <p style="color:var(--ink-mute);font-style:italic;padding:14px 0">None of your selected disciplines appear in this snapshot.</p>`;
+    }
+
+    // Auto-hide: with only one discipline in view, the KPI strip above already
+    // shows everything this section would. Skipping it removes redundant noise.
+    if (present.length === 1) {
+      return '';
+    }
+
+    const inFilter = (r) =>
+      (state.activeDisciplineFilter.size === 0 || state.activeDisciplineFilter.has(r._prefix)) &&
+      (state.activeLocations.size === 0 || state.activeLocations.has(r.Location)) &&
+      rowInFillBucket(r, state.fillBucket);
+
+    const showBench = state.showBenchmarks;
+    const cw = showBench ? collegeWideStats(snap) : null;
+
+    const tableRows = present.map(p => {
+      const rows = snap.rows.filter(r => r._prefix === p && inFilter(r));
+      const prevRows = prevSnap ? prevSnap.rows.filter(r => r._prefix === p && inFilter(r)) : null;
+
+      const sections = rows.length;
+      const enrolled = sum(rows, 'Enrolled Students');
+      const capacity = sum(rows, 'Capacity');
+      const fill = capacity > 0 ? (enrolled / capacity * 100) : 0;
+
+      let dFill = '';
+      if (prevRows && prevRows.length > 0) {
+        const ePrev = sum(prevRows, 'Enrolled Students');
+        const cPrev = sum(prevRows, 'Capacity');
+        const fPrev = cPrev > 0 ? (ePrev / cPrev * 100) : 0;
+        dFill = miniDelta(fill - fPrev, 'pp', 1);
+      }
+
+      const vsCollegeCell = cw
+        ? `<span class="ds-bench">${miniDelta(fill - cw.fill, 'pp', 1, 'Compared to the college-wide fill rate right now.')}</span>`
+        : '<span style="color:var(--ink-mute)">—</span>';
+
+      // Sparkline of total enrollment for this discipline across snapshots
+      const enrSeries = state.snapshots.map(s =>
+        sum(s.rows.filter(r => r._prefix === p && inFilter(r)), 'Enrolled Students')
+      );
+      const sparkCell = state.snapshots.length > 1
+        ? renderSparkline(enrSeries, colorFor(p), 100, 22)
+        : '<span style="color:var(--ink-mute)">—</span>';
+
+      return `
+        <tr>
+          <td class="ds-disc"><span class="swatch" style="background:${colorFor(p)}"></span><strong>${escapeHtml(p)}</strong></td>
+          <td class="right">${sections}</td>
+          <td class="right">${enrolled} / ${capacity}</td>
+          <td class="right"><strong>${fill.toFixed(1)}%</strong> ${dFill}</td>
+          <td class="right">${vsCollegeCell}</td>
+          <td class="ds-trend">${sparkCell}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="section-title">By Discipline <span class="meta">${filteredRows().length} sections in view</span></div>
+      <div class="discipline-table-wrap">
+        <table class="discipline-table">
+          <thead>
+            <tr>
+              <th>Discipline</th>
+              <th class="right">Sections</th>
+              <th class="right">Enrolled</th>
+              <th class="right">Fill</th>
+              <th class="right">vs. College</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function miniDelta(n, unit, dec, title) {
+    const tt = title || (unit === 'pp'
+      ? 'Change since the previous snapshot. "pp" = percentage points.'
+      : 'Change since the previous snapshot.');
+    if (n === 0 || isNaN(n)) return `<span class="flat" title="${escapeHtml(tt)}">—</span>`;
+    const cls = n > 0 ? 'up' : 'down';
+    const sign = n > 0 ? '+' : '';
+    const v = dec ? n.toFixed(dec) : n.toLocaleString();
+    return `<span class="${cls}" title="${escapeHtml(tt)}">${sign}${v}${unit || ''}</span>`;
+  }
+
+  /* =========================================================================
+   * SPARKLINES (inline SVG)
+   * ========================================================================= */
+
+  function renderSparkline(series, color, w, h) {
+    if (!series || series.length === 0) return '';
+    if (series.length === 1) {
+      return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <circle cx="${w/2}" cy="${h/2}" r="2.5" fill="${color}"/>
+      </svg>`;
+    }
+    const max = Math.max(...series, 1);
+    const min = Math.min(...series, 0);
+    const pad = 4;
+    const range = max - min || 1;
+    const step = (w - 2 * pad) / (series.length - 1);
+    const points = series.map((v, i) => {
+      const x = pad + i * step;
+      const y = pad + (h - 2 * pad) * (1 - (v - min) / range);
+      return [x, y];
+    });
+    const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+    const lastPt = points[points.length - 1];
+    // Light area fill
+    const areaPath = path + ` L${lastPt[0]},${h - pad} L${pad},${h - pad} Z`;
+    return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <path d="${areaPath}" fill="${color}" opacity="0.12"/>
+      <path d="${path}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="2.5" fill="${color}"/>
+    </svg>`;
+  }
+
+  /* =========================================================================
+   * COURSE CARDS
+   * ========================================================================= */
+
+  // Smart default for whether a discipline's cards should be expanded:
+  // small disciplines (<20 sections) auto-expand; large ones auto-collapse.
+  // An explicit user choice in state.cardExpansion overrides the default.
+  const SMART_EXPAND_THRESHOLD = 20;
+  function isDisciplineExpanded(prefix, sectionCount) {
+    if (Object.prototype.hasOwnProperty.call(state.cardExpansion, prefix)) {
+      return state.cardExpansion[prefix];
+    }
+    return sectionCount < SMART_EXPAND_THRESHOLD;
+  }
+
+  // Render a single section card. Extracted so we can call it per-discipline.
+  function renderSectionCard(r) {
+    const fill = r['Section Fill %'];
+    const fillCapped = Math.min(100, fill);
+    const tags = [];
+    if (fill >= 100) tags.push('<span class="tag full">● At Capacity</span>');
+    else if (r['Enrolled Students'] === 0) tags.push('<span class="tag empty">● Empty</span>');
+    if (r['Wait List'] > 0) tags.push(`<span class="tag wait">+${r['Wait List']} waitlist</span>`);
+
+    const days = cleanCell(r['Meeting Days'], '—');
+    const time = cleanCell(r['Section Start Time'], 'TBA');
+    const instructor = cleanCell(r.Instructor, 'TBA');
+    const color = colorFor(r._prefix);
+
+    const hist = sectionHistory(r.Section);
+    const enrSeries = hist.map(h => h.row ? h.row['Enrolled Students'] : null).filter(v => v !== null);
+    const showSpark = enrSeries.length >= 2;
+
+    const prevSnap = previousSnapshot();
+    let velocity = '';
+    if (prevSnap) {
+      const prevRow = prevSnap.rows.find(x => x.Section === r.Section);
+      if (prevRow) {
+        const diff = r['Enrolled Students'] - prevRow['Enrolled Students'];
+        velocity = diff === 0
+          ? '<span class="v-flat">no change</span>'
+          : diff > 0
+            ? `<span class="v-up">+${diff} since ${fmtDateShort(prevSnap.date)}</span>`
+            : `<span class="v-down">${diff} since ${fmtDateShort(prevSnap.date)}</span>`;
+      } else {
+        velocity = '<span class="v-flat">new section</span>';
+      }
+    }
+
+    return `
+      <div class="course-card" style="border-left-color:${color}">
+        <div class="cc-head">
+          <span class="code">${escapeHtml(r.Section)}</span>
+          <span class="loc">${escapeHtml(r.Location || '—')}</span>
+        </div>
+        <div class="title">${escapeHtml(r['Course Title'] || '')}</div>
+        <div class="meter"><div class="fill" style="width:${fillCapped}%;background:${color}"></div></div>
+        <div class="num-row">
+          <span><strong>${r['Enrolled Students']}</strong> / ${r.Capacity} enrolled</span>
+          <span><strong>${fill.toFixed(0)}%</strong></span>
+        </div>
+        <div class="delta-row">
+          <span>${velocity}</span>
+          ${showSpark ? renderSparkline(enrSeries, color, 90, 22) : ''}
+        </div>
+        <div class="meta-row">
+          <span>${escapeHtml(days)} · ${escapeHtml(time)}</span>
+          <span>${escapeHtml(instructor)}</span>
+          ${tags.length ? '<span style="flex-basis:100%;margin-top:4px">' + tags.join(' &nbsp; ') + '</span>' : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCourseGrid() {
+    const allRows = filteredRows();
+
+    if (allRows.length === 0) {
+      return `<div class="section-title">Sections at a Glance</div>
+        <p style="color:var(--ink-mute);font-style:italic;padding:14px 0">No sections match the current filters.</p>`;
+    }
+
+    // Group rows by discipline prefix
+    const byPrefix = {};
+    allRows.forEach(r => {
+      if (!byPrefix[r._prefix]) byPrefix[r._prefix] = [];
+      byPrefix[r._prefix].push(r);
+    });
+
+    // Sort prefixes alphabetically; sort rows within each group by section code
+    const prefixes = Object.keys(byPrefix).sort();
+    prefixes.forEach(p => byPrefix[p].sort((a, b) => String(a.Section).localeCompare(String(b.Section))));
+
+    // Render one section per discipline with a collapsible header
+    const groups = prefixes.map(prefix => {
+      const sections = byPrefix[prefix];
+      const expanded = isDisciplineExpanded(prefix, sections.length);
+      const color = colorFor(prefix);
+      const totalEnrolled = sum(sections, 'Enrolled Students');
+      const totalCapacity = sum(sections, 'Capacity');
+      const groupFill = totalCapacity > 0 ? (totalEnrolled / totalCapacity * 100) : 0;
+
+      // Trace shows summary even when collapsed
+      const arrow = expanded ? '▼' : '▶';
+      const trace = expanded
+        ? `<span class="discipline-meta">${sections.length} section${sections.length === 1 ? '' : 's'} · ${totalEnrolled} / ${totalCapacity} enrolled · ${groupFill.toFixed(0)}% fill</span>`
+        : `<span class="discipline-meta collapsed-trace">${sections.length} section card${sections.length === 1 ? '' : 's'} (click to show) · ${totalEnrolled} / ${totalCapacity} enrolled · ${groupFill.toFixed(0)}% fill</span>`;
+
+      const cardsHtml = expanded
+        ? `<div class="course-grid">${sections.map(renderSectionCard).join('')}</div>`
+        : '';
+
+      return `
+        <div class="discipline-group">
+          <button class="discipline-header" data-toggle-discipline="${escapeHtml(prefix)}" aria-expanded="${expanded}">
+            <span class="dh-arrow">${arrow}</span>
+            <span class="dh-swatch" style="background:${color}"></span>
+            <span class="dh-label">${escapeHtml(prefix)}</span>
+            ${trace}
+          </button>
+          ${cardsHtml}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="section-title">Sections at a Glance <span class="meta">click a discipline to expand or collapse its cards</span></div>
+      ${groups}
+    `;
+  }
+
+  function cleanCell(v, fallback) {
+    if (v == null) return fallback;
+    const s = String(v).trim();
+    if (!s || s === ',' || s === ',,') return fallback;
+    return s;
+  }
+
+  function sectionHistory(sectionCode) {
+    return state.snapshots.map(s => ({
+      date: s.date,
+      row: s.rows.find(r => r.Section === sectionCode) || null,
+    }));
+  }
+
+  /* =========================================================================
+   * TABLE
+   * ========================================================================= */
+
+  function renderTable() {
+    const headers = [
+      { k: 'Section', label: 'Section' },
+      { k: 'Course Title', label: 'Title' },
+      { k: 'Location', label: 'Loc' },
+      { k: 'Capacity', label: 'Cap', right: true },
+      { k: 'Enrolled Students', label: 'Enr', right: true },
+      { k: '_delta', label: 'Δ Enr', right: true },
+      { k: 'Section Fill %', label: 'Fill %', right: true },
+      { k: 'Wait List', label: 'Wait', right: true },
+      { k: 'Course Credit', label: 'Cr', right: true },
+      { k: 'Total Student Credit Hours', label: 'SCH', right: true },
+      { k: 'Meeting Days', label: 'Days' },
+      { k: 'Section Start Time', label: 'Time' },
+      { k: 'Instructor', label: 'Instructor' },
+    ];
+
+    const prevSnap = previousSnapshot();
+    const prevByCode = {};
+    if (prevSnap) prevSnap.rows.forEach(r => { prevByCode[r.Section] = r; });
+
+    const enriched = filteredRows().map(r => ({
+      ...r,
+      _delta: prevByCode[r.Section] != null
+        ? (r['Enrolled Students'] - prevByCode[r.Section]['Enrolled Students'])
+        : null,
+    }));
+
+    // Apply free-text search across text-bearing columns.
+    //
+    // Semantics:
+    //   1. Each whitespace-separated word is its own ANDed search term.
+    //      "ENGI 101 LINC" => find rows containing "engi" AND "101" AND "linc".
+    //   2. Quoted phrases are treated as a single term, preserving any spaces.
+    //      'powell "Calculus I"' => name "powell" AND literal phrase "calculus i".
+    //   3. Both the query and the haystack are normalized by lowercasing and
+    //      collapsing all whitespace/punctuation to nothing for compact matching.
+    //      So "M,W" in the data is matched as "mw"; the user typing "MW" finds it.
+    //      The section code "ENGI-101-001RL" is matched as "engi101001rl", and
+    //      a search for "engi 101" splits into "engi" + "101", both of which
+    //      appear in the normalized haystack.
+    //   4. Inside quoted phrases, internal spaces ARE preserved (other
+    //      separators still get collapsed). So "Calculus I" matches "Calculus I"
+    //      and "Calculus-I" but treats the space between Calculus and I as
+    //      a single space.
+    //   5. Day code tokens (M, T, W, TH, F, S, and R as alias for TH) are
+    //      treated specially: they match only against the Meeting Days field,
+    //      so "M W" means "section meets on both Monday AND Wednesday" rather
+    //      than "row contains the letter m AND the letter w somewhere."
+
+    // Brookdale day codes. R is an alias for TH (some academic conventions
+    // use R for Thursday); we normalize both to "TH" internally.
+    const DAY_CODES = new Set(['M', 'T', 'W', 'TH', 'F', 'S']);
+    const isDayToken = (raw) => {
+      const upper = String(raw).toUpperCase();
+      if (upper === 'R') return 'TH';
+      return DAY_CODES.has(upper) ? upper : null;
+    };
+
+    // Parse a Meeting Days string into a Set of canonical day codes.
+    // Examples: "M,W"        -> {M, W}
+    //           "T TH"       -> {T, TH}
+    //           "M T W TH"   -> {M, T, W, TH}
+    //           "W F, F"     -> {W, F}     (de-duplicated)
+    function parseDays(raw) {
+      const codes = new Set();
+      if (!raw) return codes;
+      // TH is two letters and must be recognized before T to avoid the H
+      // splitting off into nothing. We do this by tokenizing on non-letter
+      // boundaries, then matching each token against the day set.
+      const tokens = String(raw).toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+      for (const tok of tokens) {
+        if (DAY_CODES.has(tok)) codes.add(tok);
+        else if (tok === 'R') codes.add('TH');
+        // For tokens like "MWF" (compact, no separators) we walk them
+        else {
+          let i = 0;
+          while (i < tok.length) {
+            // Try TH first (two chars)
+            if (tok.slice(i, i + 2) === 'TH') { codes.add('TH'); i += 2; continue; }
+            const c = tok[i];
+            if (DAY_CODES.has(c)) codes.add(c);
+            else if (c === 'R') codes.add('TH');
+            i += 1;
+          }
+        }
+      }
+      return codes;
+    }
+
+    // Compact normalize: lowercase, strip all whitespace/punctuation
+    const normCompact = (s) =>
+      String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, '');
+
+    // Phrase normalize (for quoted terms): lowercase, collapse separators to
+    // a single space so internal word boundaries are preserved
+    const normPhrase = (s) =>
+      String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, ' ').trim();
+
+    // Tokenize the search input into a list of search terms. Quoted strings
+    // become single phrase tokens; unquoted whitespace splits into multiple.
+    // Day codes (M, T, W, TH, F, S, R) become 'day' tokens.
+    function tokenizeSearch(input) {
+      const tokens = [];
+      const re = /"([^"]*)"|(\S+)/g;
+      let m;
+      while ((m = re.exec(input)) !== null) {
+        if (m[1] !== undefined) {
+          // Quoted phrase — always a phrase token, never reinterpreted
+          const phrase = normPhrase(m[1]);
+          if (phrase) tokens.push({ kind: 'phrase', value: phrase });
+        } else if (m[2] !== undefined) {
+          // Unquoted word — check if it's a day code
+          const dayCode = isDayToken(m[2]);
+          if (dayCode) {
+            tokens.push({ kind: 'day', value: dayCode });
+          } else {
+            const word = normCompact(m[2]);
+            if (word) tokens.push({ kind: 'word', value: word });
+          }
+        }
+      }
+      return tokens;
+    }
+
+    const tokens = tokenizeSearch(state.tableSearch);
+
+    // Build the haystacks for each row, including parsed day codes
+    const haystack = (r) => {
+      const raw = [
+        r.Section, r['Course Title'], r.Location, r['Meeting Days'],
+        r['Section Start Time'], r.Instructor, r.Course,
+      ].join(' ');
+      return {
+        compact: normCompact(raw),
+        phrase: normPhrase(raw),
+        days: parseDays(r['Meeting Days']),
+      };
+    };
+
+    const searched = tokens.length === 0
+      ? enriched
+      : enriched.filter(r => {
+          const h = haystack(r);
+          return tokens.every(t => {
+            if (t.kind === 'phrase') return h.phrase.includes(t.value);
+            if (t.kind === 'day') return h.days.has(t.value);
+            return h.compact.includes(t.value);
+          });
+        });
+
+    const sorted = searched.slice().sort((a, b) => {
+      let av = a[state.sortKey], bv = b[state.sortKey];
+      if (av === null) av = -Infinity; if (bv === null) bv = -Infinity;
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * state.sortDir;
+      av = String(av || ''); bv = String(bv || '');
+      return av.localeCompare(bv) * state.sortDir;
+    });
+
+    // Sibling map: Course code -> all sections of that course (in current snapshot).
+    // Used when a fill-status bucket is active to surface context the filter hides:
+    // "this section is full — are there alternative sections?" or
+    // "this section is empty — is it the only one, or can students go elsewhere?"
+    const showSiblings = state.fillBucket !== 'all';
+    const snapNow = currentSnapshot();
+    const siblingsByCourse = {};
+    if (showSiblings && snapNow) {
+      snapNow.rows.forEach(row => {
+        if (!siblingsByCourse[row.Course]) siblingsByCourse[row.Course] = [];
+        siblingsByCourse[row.Course].push(row);
+      });
+    }
+
+    // Test whether a sibling row would have been visible under the user's
+    // current scope (selected disciplines, sub-filters, location). If not,
+    // we tag it as "outside scope" in the display.
+    const isInScope = (r) => {
+      if (!state.selectedDisciplines.has(r._prefix)) return false;
+      if (state.activeDisciplineFilter.size > 0 && !state.activeDisciplineFilter.has(r._prefix)) return false;
+      if (state.activeLocations.size > 0 && !state.activeLocations.has(r.Location)) return false;
+      return true;
+    };
+
+    // Build the sibling indicator HTML for a given row, or '' if none
+    function renderSiblingIndicator(row) {
+      const allSections = siblingsByCourse[row.Course] || [];
+      const allSiblings = allSections.filter(s => s.Section !== row.Section);
+      const totalSectionsOfCourse = allSections.length;
+
+      // No other sections at all — high-stakes flag (especially for "empty" view,
+      // where cancelling this section would kill the course for the term)
+      if (allSiblings.length === 0) {
+        return `<div class="sibling-row warn" title="No other sections of this course exist in this snapshot">⚠ Only section of ${escapeHtml(row.Course)}</div>`;
+      }
+
+      // Filter to "useful" siblings based on the active bucket.
+      // The principle: show alternatives, summarize non-alternatives.
+      //
+      //   Full bucket   -> useful sibling = one with available seats
+      //                    (a full sibling isn't an answer to "where do extras go")
+      //   Empty bucket  -> useful sibling = one with any enrollment
+      //                    (an empty sibling doesn't help absorb students;
+      //                     it's just another section in trouble)
+      //   Almost/Under  -> useful sibling = one with seats
+      //                    (people viewing these are still capacity-planning)
+      //   All bucket    -> shouldn't reach here (siblings hidden in 'all' view)
+      const bucket = state.fillBucket;
+      let isUseful;
+      let principle;
+      if (bucket === 'empty') {
+        isUseful = (s) => (Number(s['Enrolled Students']) || 0) > 0;
+        principle = 'with enrollment';
+      } else {
+        // full, almost, under: show siblings that can absorb students
+        isUseful = (s) => {
+          const cap = Number(s.Capacity) || 0;
+          const enr = Number(s['Enrolled Students']) || 0;
+          return cap > enr;
+        };
+        principle = 'with available seats';
+      }
+
+      const useful = allSiblings.filter(isUseful);
+      const uselessCount = allSiblings.length - useful.length;
+
+      // No useful alternatives — flag it prominently
+      if (useful.length === 0) {
+        const tot = totalSectionsOfCourse;
+        let warningText;
+        if (bucket === 'empty') {
+          warningText = `⚠ All ${tot} sections of ${escapeHtml(row.Course)} are empty`;
+        } else {
+          warningText = `⚠ No alternatives — all ${tot} sections of ${escapeHtml(row.Course)} are full`;
+        }
+        return `<div class="sibling-row warn">${warningText}</div>`;
+      }
+
+      // Render useful siblings; show a small note about hidden non-alternatives
+      const items = useful.map(s => {
+        const sEnr = Number(s['Enrolled Students']) || 0;
+        const sCap = Number(s.Capacity) || 0;
+        const seats = Math.max(0, sCap - sEnr);
+        const outOfScope = !isInScope(s);
+        // Pick a CSS class based on the sibling's own state
+        const sFill = Number(s['Section Fill %']) || 0;
+        const cls = sEnr === 0 ? 'sib-empty' : sFill >= 100 ? 'sib-full' : 'sib-available';
+        const scopeTag = outOfScope ? ` <span class="sib-scope">${escapeHtml(s.Location || '?')}</span>` : '';
+        const seatsHtml = bucket === 'empty'
+          ? ` <em>(${sEnr} enrolled)</em>`
+          : seats > 0 ? ` <em>(${seats} open)</em>` : '';
+        return `<span class="sib ${cls}"><strong>${escapeHtml(s.Section.split('-').slice(-1)[0] || s.Section)}</strong> ${sEnr}/${sCap}${seatsHtml}${scopeTag}</span>`;
+      }).join(' ');
+
+      const usefulNoun = useful.length === 1 ? 'alternative' : 'alternatives';
+      let label = `${useful.length} ${usefulNoun} of ${escapeHtml(row.Course)} ${principle}:`;
+      if (uselessCount > 0) {
+        const otherWord = bucket === 'empty' ? 'also empty' : 'also full';
+        label += ` <span class="sib-note">(${uselessCount} other section${uselessCount === 1 ? '' : 's'} ${otherWord})</span>`;
+      }
+
+      return `<div class="sibling-row">${label} ${items}</div>`;
+    }
+
+    const rows = sorted.map(r => {
+      const fill = r['Section Fill %'];
+      const fillBadge =
+        fill >= 100 ? `<span class="badge full">FULL</span>` :
+        fill >= 75 ? `<span class="badge high">${fill.toFixed(0)}%</span>` :
+        r['Enrolled Students'] === 0 ? `<span class="badge zero">0%</span>` :
+        `<span class="badge low">${fill.toFixed(0)}%</span>`;
+      const days = cleanCell(r['Meeting Days'], '—');
+      const time = cleanCell(r['Section Start Time'], '—');
+      const instructor = cleanCell(r.Instructor, '');
+      const fillCapped = Math.min(100, fill);
+      const color = colorFor(r._prefix);
+
+      let deltaCell = '<span style="color:var(--ink-mute)">—</span>';
+      if (r._delta != null) {
+        if (r._delta === 0) deltaCell = '<span class="delta-cell flat">0</span>';
+        else if (r._delta > 0) deltaCell = `<span class="delta-cell up">+${r._delta}</span>`;
+        else deltaCell = `<span class="delta-cell down">${r._delta}</span>`;
+      } else if (prevSnap) {
+        deltaCell = '<span style="color:var(--ink-mute);font-style:italic">new</span>';
+      }
+
+      const siblingHTML = showSiblings ? renderSiblingIndicator(r) : '';
+
+      return `
+        <tr>
+          <td style="border-left:3px solid ${color}"><strong>${escapeHtml(r.Section)}</strong>${siblingHTML}</td>
+          <td>${escapeHtml(r['Course Title'] || '')}</td>
+          <td>${escapeHtml(r.Location || '')}</td>
+          <td class="right">${r.Capacity}</td>
+          <td class="right">${r['Enrolled Students']}</td>
+          <td class="right">${deltaCell}</td>
+          <td class="right"><span class="mini-meter"><span class="mf" style="width:${fillCapped}%;background:${color}"></span></span>${fillBadge}</td>
+          <td class="right">${r['Wait List'] || ''}</td>
+          <td class="right">${r['Course Credit']}</td>
+          <td class="right">${r['Total Student Credit Hours']}</td>
+          <td>${escapeHtml(days)}</td>
+          <td>${escapeHtml(time)}</td>
+          <td>${escapeHtml(instructor) || '<em style="color:var(--ink-mute)">TBA</em>'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const arrow = (k) => state.sortKey === k ? `<span class="arrow">${state.sortDir === 1 ? '▲' : '▼'}</span>` : '';
+
+    // Whether the user has typed something into the search box (active search)
+    const hasActiveSearch = tokens.length > 0;
+
+    // Choose an appropriate empty-state message based on cause
+    const emptyMessage = searched.length === 0
+      ? (hasActiveSearch
+          ? `No sections match "${escapeHtml(state.tableSearch)}".`
+          : 'No sections match the current filters.')
+      : null;
+
+    // Match count display: only shown when searching
+    const matchCount = hasActiveSearch
+      ? `<span class="search-count">${searched.length} of ${enriched.length}</span>`
+      : '';
+
+    return `
+      <div class="section-title">Full Section Detail <span class="meta">click any column to sort</span></div>
+      <div class="table-toolbar">
+        <div class="table-search">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input
+            type="text"
+            id="tableSearchInput"
+            class="search-input"
+            placeholder='Search — try "ENGI 101 LINC" or "Powell M W" or "MATH T TH"'
+            value="${escapeHtml(state.tableSearch)}"
+            autocomplete="off"
+            spellcheck="false">
+          ${state.tableSearch ? '<button class="search-clear" id="tableSearchClear" type="button" aria-label="Clear search">×</button>' : ''}
+        </div>
+        ${matchCount}
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              ${headers.map(h => `<th data-sort="${h.k}" class="${h.right ? 'right' : ''}">${h.label}${arrow(h.k)}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>${rows || `<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--ink-mute);font-style:italic">${emptyMessage}</td></tr>`}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  /* =========================================================================
+   * TRENDS VIEW
+   * ========================================================================= */
+
+  function renderTrendsView() {
+    if (state.snapshots.length < 2) {
+      return `
+        <div class="welcome" style="margin-top:32px">
+          <h2>One snapshot so far.</h2>
+          <p>Trends become visible once you've uploaded a second report. Each new release adds a point to the timeline.</p>
+        </div>
+      `;
+    }
+
+    let present = [...state.selectedDisciplines]
+      .filter(p => state.snapshots.some(s => s.rows.some(r => r._prefix === p)))
+      .sort();
+
+    // Honor the discipline filter chips here too, so the trends chart focuses
+    // on what the user has narrowed to.
+    if (state.activeDisciplineFilter.size > 0) {
+      present = present.filter(p => state.activeDisciplineFilter.has(p));
+    }
+
+    // Build series per discipline
+    const series = present.map(p => {
+      const enr = state.snapshots.map(s => sum(s.rows.filter(r => r._prefix === p), 'Enrolled Students'));
+      const fill = state.snapshots.map(s => {
+        const rows = s.rows.filter(r => r._prefix === p);
+        const cap = sum(rows, 'Capacity');
+        const en = sum(rows, 'Enrolled Students');
+        return cap > 0 ? (en / cap * 100) : 0;
+      });
+      return { code: p, color: colorFor(p), enr, fill };
+    });
+
+    // College-wide reference series (rendered as dashed line on charts when toggle is on)
+    const cwSeries = state.showBenchmarks ? {
+      code: 'College',
+      color: 'var(--flat)',
+      dashed: true,
+      enr: state.snapshots.map(s => sum(s.rows, 'Enrolled Students')),
+      fill: state.snapshots.map(s => {
+        const cap = sum(s.rows, 'Capacity');
+        const en = sum(s.rows, 'Enrolled Students');
+        return cap > 0 ? (en / cap * 100) : 0;
+      }),
+    } : null;
+
+    const dates = state.snapshots.map(s => fmtDateShort(s.date));
+
+    // Movers — biggest enrollment changes between first and last snapshot
+    const firstSnap = state.snapshots[0];
+    const lastSnap = state.snapshots[state.snapshots.length - 1];
+    const allSections = new Set();
+    state.snapshots.forEach(s => s.rows.forEach(r => {
+      if (state.selectedDisciplines.has(r._prefix)) allSections.add(r.Section);
+    }));
+
+    const movers = [...allSections].map(sec => {
+      const fr = firstSnap.rows.find(r => r.Section === sec);
+      const lr = lastSnap.rows.find(r => r.Section === sec);
+      if (!lr) return null;
+      const startEnr = fr ? fr['Enrolled Students'] : 0;
+      const endEnr = lr['Enrolled Students'];
+      return {
+        section: sec,
+        title: lr['Course Title'],
+        prefix: lr._prefix,
+        location: lr.Location,
+        capacity: lr.Capacity,
+        startEnr, endEnr,
+        diff: endEnr - startEnr,
+        startFill: fr ? fr['Section Fill %'] : 0,
+        endFill: lr['Section Fill %'],
+        isNew: !fr,
+      };
+    }).filter(Boolean);
+
+    const gainers = movers.filter(m => m.diff > 0).sort((a, b) => b.diff - a.diff).slice(0, 8);
+    const stalled = movers.filter(m => m.diff === 0 && m.endFill < 50).sort((a, b) => a.endEnr - b.endEnr).slice(0, 8);
+    const losers = movers.filter(m => m.diff < 0).sort((a, b) => a.diff - b.diff).slice(0, 8);
+
+    return `
+      <div class="section-title">Enrollment Over Time <span class="meta">${state.snapshots.length} snapshots · ${fmtDate(firstSnap.date)} → ${fmtDate(lastSnap.date)}</span></div>
+      ${renderMultiSeriesChart(series, dates, 'enr', 'Enrolled Students', null)}
+      ${renderMultiSeriesChart(series, dates, 'fill', 'Fill Rate (%)', cwSeries)}
+
+      <div class="section-title">Movers</div>
+      <div class="grid-auto">
+        ${renderMoverPanel('Biggest Gainers', gainers, 'up')}
+        ${renderMoverPanel('Stalled (no growth, under-filled)', stalled, 'flat')}
+        ${renderMoverPanel('Lost Enrollment', losers, 'down')}
+      </div>
+    `;
+  }
+
+  function renderMultiSeriesChart(series, dates, key, title, refSeries) {
+    const W = 1100, H = 280, padL = 60, padR = 20, padT = 30, padB = 50;
+    const innerW = W - padL - padR;
+    const innerH = H - padT - padB;
+    if (series.length === 0 || dates.length === 0) return '';
+
+    const allSeries = refSeries ? [...series, refSeries] : series;
+    const allVals = allSeries.flatMap(s => s[key]);
+    const max = Math.max(...allVals, key === 'fill' ? 100 : 1);
+    const min = 0;
+    const xStep = dates.length > 1 ? innerW / (dates.length - 1) : 0;
+
+    const xCoord = (i) => padL + i * xStep;
+    const yCoord = (v) => padT + innerH * (1 - (v - min) / (max - min || 1));
+
+    // Y axis ticks (5)
+    const ticks = 5;
+    const yTicks = [];
+    for (let i = 0; i <= ticks; i++) {
+      const v = min + (max - min) * (i / ticks);
+      yTicks.push({ v, y: yCoord(v) });
+    }
+
+    const renderLine = (s) => {
+      const path = s[key].map((v, i) => `${i === 0 ? 'M' : 'L'}${xCoord(i)},${yCoord(v)}`).join(' ');
+      const dots = s[key].map((v, i) => `<circle cx="${xCoord(i)}" cy="${yCoord(v)}" r="${s.dashed ? 2 : 3}" fill="${s.color}" opacity="${s.dashed ? 0.6 : 1}"/>`).join('');
+      const dash = s.dashed ? 'stroke-dasharray="5,4"' : '';
+      const opacity = s.dashed ? '0.6' : '1';
+      return `
+        <path d="${path}" fill="none" stroke="${s.color}" stroke-width="${s.dashed ? 1.5 : 2}" ${dash} stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>
+        ${dots}
+      `;
+    };
+
+    const lines = series.map(renderLine).join('') + (refSeries ? renderLine(refSeries) : '');
+
+    const xLabels = dates.map((d, i) =>
+      `<text x="${xCoord(i)}" y="${H - padB + 18}" text-anchor="middle" font-size="11" fill="var(--ink-mute)" font-family="Helvetica Neue, sans-serif">${escapeHtml(d)}</text>`
+    ).join('');
+
+    const yLabels = yTicks.map(t =>
+      `<line x1="${padL}" x2="${W - padR}" y1="${t.y}" y2="${t.y}" stroke="var(--rule)" stroke-width="0.5"/>
+       <text x="${padL - 8}" y="${t.y + 3}" text-anchor="end" font-size="10" fill="var(--ink-mute)" font-family="Helvetica Neue, sans-serif">${key === 'fill' ? t.v.toFixed(0) + '%' : t.v.toFixed(0)}</text>`
+    ).join('');
+
+    const legendItems = series.map(s =>
+      `<span><span class="sw" style="background:${s.color}"></span>${escapeHtml(s.code)}</span>`
+    );
+    if (refSeries) {
+      legendItems.push(`<span><span class="sw" style="background:${refSeries.color};opacity:0.6;background-image:repeating-linear-gradient(90deg, ${refSeries.color} 0 4px, transparent 4px 7px)"></span>${escapeHtml(refSeries.code)} <em style="color:var(--ink-mute)">(reference)</em></span>`);
+    }
+    const legend = legendItems.join('');
+
+    return `
+      <div class="trend-chart-wrap">
+        <h4>${escapeHtml(title)}</h4>
+        <div class="legend">${legend}</div>
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+          ${yLabels}
+          ${lines}
+          ${xLabels}
+        </svg>
+      </div>
+    `;
+  }
+
+  function renderMoverPanel(title, items, kind) {
+    if (items.length === 0) {
+      return `<div class="panel">
+        <h3>${escapeHtml(title)}</h3>
+        <div class="panel-sub">None in current view.</div>
+      </div>`;
+    }
+    const rows = items.map(m => {
+      const cls = kind === 'up' ? 'up' : kind === 'down' ? 'down' : 'flat';
+      const sign = m.diff > 0 ? '+' : m.diff < 0 ? '' : '';
+      const color = colorFor(m.prefix);
+      return `
+        <div class="stat-row">
+          <span class="k" style="text-transform:none;letter-spacing:0;font-size:11px">
+            <strong style="color:var(--ink);font-family:Helvetica Neue, sans-serif">${escapeHtml(m.section)}</strong>
+            <span style="color:var(--ink-mute)"> · ${escapeHtml(m.location || '')}</span>
+          </span>
+          <span class="v" style="font-size:11px">${m.endEnr}/${m.capacity}</span>
+          <span class="d ${cls}" style="font-weight:700">${m.isNew ? 'NEW' : sign + m.diff}</span>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="panel">
+        <h3>${escapeHtml(title)}</h3>
+        <div class="panel-sub">${items.length} section${items.length !== 1 ? 's' : ''}</div>
+        ${rows}
+      </div>
+    `;
+  }
+
+  /* =========================================================================
+   * OVERVIEW TAB — college-wide capacity heatmap + critical alerts
+   * ========================================================================= */
+
+  // Squarified treemap algorithm (Bruls, Huijsen, van Wijk 2000).
+  // Takes a list of items with .value, packs them into a rectangle, returns
+  // items annotated with {x, y, w, h} for rendering.
+  //
+  // The algorithm packs items into rows (or columns, whichever direction is
+  // shorter at the moment), choosing greedily to keep aspect ratios close
+  // to 1 (square-ish). This produces visually balanced layouts where you
+  // can compare sizes by eye without needing axes.
+  function squarifyTreemap(items, x, y, w, h) {
+    // Sort by value descending — biggest items first
+    items = items.slice().sort((a, b) => b.value - a.value);
+    const total = items.reduce((s, i) => s + i.value, 0);
+    if (total <= 0 || items.length === 0) return [];
+
+    // Scale all values so they fit the rectangle's area exactly
+    const area = w * h;
+    const scaled = items.map(i => ({ ...i, scaledValue: (i.value / total) * area }));
+
+    const results = [];
+
+    // Layout cursor — tracks the remaining rectangle as we consume it
+    let rx = x, ry = y, rw = w, rh = h;
+
+    function layoutRow(row, shortSide) {
+      // Lay out a row of items along the shorter side of the remaining rect.
+      // 'shortSide' is the side perpendicular to the row's direction.
+      const rowTotal = row.reduce((s, i) => s + i.scaledValue, 0);
+      const rowDepth = rowTotal / shortSide;
+
+      if (rw < rh) {
+        // Layout horizontally: row goes left-to-right at the top
+        let cursorX = rx;
+        for (const item of row) {
+          const itemW = item.scaledValue / rowDepth;
+          results.push({ ...item, x: cursorX, y: ry, w: itemW, h: rowDepth });
+          cursorX += itemW;
+        }
+        ry += rowDepth;
+        rh -= rowDepth;
+      } else {
+        // Layout vertically: row goes top-to-bottom on the left
+        let cursorY = ry;
+        for (const item of row) {
+          const itemH = item.scaledValue / rowDepth;
+          results.push({ ...item, x: rx, y: cursorY, w: rowDepth, h: itemH });
+          cursorY += itemH;
+        }
+        rx += rowDepth;
+        rw -= rowDepth;
+      }
+    }
+
+    // Worst aspect ratio in a candidate row (closer to 1 is better)
+    function worstRatio(row, shortSide) {
+      const sum = row.reduce((s, i) => s + i.scaledValue, 0);
+      const rMax = Math.max(...row.map(i => i.scaledValue));
+      const rMin = Math.min(...row.map(i => i.scaledValue));
+      const s2 = shortSide * shortSide;
+      const sum2 = sum * sum;
+      return Math.max((s2 * rMax) / sum2, sum2 / (s2 * rMin));
+    }
+
+    let queue = scaled.slice();
+    let currentRow = [];
+
+    while (queue.length > 0) {
+      const shortSide = Math.min(rw, rh);
+      const candidate = queue[0];
+      const trialRow = currentRow.concat([candidate]);
+
+      if (currentRow.length === 0 ||
+          worstRatio(trialRow, shortSide) <= worstRatio(currentRow, shortSide)) {
+        // Adding this item improves or keeps the row's aspect — accept it
+        currentRow.push(candidate);
+        queue.shift();
+      } else {
+        // Adding this item would make ratios worse — commit current row and start fresh
+        layoutRow(currentRow, shortSide);
+        currentRow = [];
+      }
+    }
+    if (currentRow.length > 0) layoutRow(currentRow, Math.min(rw, rh));
+
+    return results;
+  }
+
+  // Determine fill bucket for a discipline (aggregated stats).
+  // Uses the same thresholds as the existing fill-status filter so the
+  // dashboard speaks one language.
+  function disciplineBucket(enrolled, capacity) {
+    if (capacity <= 0) return 'empty';
+    const fill = (enrolled / capacity) * 100;
+    if (fill >= 100) return 'full';
+    if (fill >= 75) return 'almost';
+    if (enrolled === 0) return 'empty';
+    if (fill < 50) return 'under';
+    return 'mid';  // 50–74%, between bucket boundaries
+  }
+
+  const BUCKET_COLORS = {
+    full:   { fill: 'var(--info)',    stroke: 'var(--info)',    text: '#fff' },
+    almost: { fill: 'var(--good)',    stroke: 'var(--good)',    text: '#fff' },
+    mid:    { fill: 'var(--surface-2)', stroke: 'var(--rule)',  text: 'var(--ink)' },
+    under:  { fill: 'var(--warn)',    stroke: 'var(--warn)',    text: '#fff' },
+    empty:  { fill: 'var(--warn)',    stroke: 'var(--warn)',    text: '#fff' },
+  };
+
+  function renderOverview() {
+    const snap = currentSnapshot();
+    if (!snap) {
+      return `<p style="color:var(--ink-mute);padding:24px;font-style:italic">No snapshot loaded.</p>`;
+    }
+
+    // Aggregate stats per discipline prefix (college-wide, ignores selection)
+    const byPrefix = {};
+    snap.rows.forEach(r => {
+      const p = r._prefix;
+      if (!byPrefix[p]) byPrefix[p] = { prefix: p, sections: 0, enrolled: 0, capacity: 0, waitlist: 0 };
+      byPrefix[p].sections += 1;
+      byPrefix[p].enrolled += Number(r['Enrolled Students']) || 0;
+      byPrefix[p].capacity += Number(r.Capacity) || 0;
+      byPrefix[p].waitlist += Number(r['Wait List']) || 0;
+    });
+
+    const disciplines = Object.values(byPrefix);
+
+    // Compute treemap layout — 1000x550 viewBox, scaled responsively via CSS
+    const tmW = 1000, tmH = 550;
+    const items = disciplines.map(d => ({
+      ...d,
+      value: d.sections,  // rectangle area proportional to section count
+      bucket: disciplineBucket(d.enrolled, d.capacity),
+      fill: d.capacity > 0 ? (d.enrolled / d.capacity * 100) : 0,
+    }));
+    const laidOut = squarifyTreemap(items, 0, 0, tmW, tmH);
+
+    const tiles = laidOut.map(item => {
+      const colors = BUCKET_COLORS[item.bucket];
+      // Show label only if tile is big enough to fit readable text
+      const showLabel = item.w >= 50 && item.h >= 30;
+      const showFill = item.w >= 60 && item.h >= 45;
+      const labelFontSize = Math.min(14, Math.max(9, Math.sqrt(item.w * item.h) / 8));
+
+      return `
+        <g class="tm-tile" data-overview-drill="${escapeHtml(item.prefix)}"
+           style="cursor:pointer">
+          <rect x="${item.x.toFixed(1)}" y="${item.y.toFixed(1)}"
+                width="${item.w.toFixed(1)}" height="${item.h.toFixed(1)}"
+                fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="2"/>
+          ${showLabel ? `
+            <text x="${(item.x + item.w/2).toFixed(1)}" y="${(item.y + item.h/2 - (showFill ? 8 : 0)).toFixed(1)}"
+                  text-anchor="middle" dominant-baseline="middle"
+                  fill="${colors.text}" font-family="Helvetica Neue, sans-serif"
+                  font-size="${labelFontSize.toFixed(1)}" font-weight="700">
+              ${escapeHtml(item.prefix)}
+            </text>
+            ${showFill ? `
+              <text x="${(item.x + item.w/2).toFixed(1)}" y="${(item.y + item.h/2 + labelFontSize - 2).toFixed(1)}"
+                    text-anchor="middle" dominant-baseline="middle"
+                    fill="${colors.text}" font-family="Helvetica Neue, sans-serif"
+                    font-size="${(labelFontSize * 0.85).toFixed(1)}" font-weight="500" opacity="0.95">
+                ${item.fill.toFixed(0)}%
+              </text>
+            ` : ''}
+          ` : ''}
+          <title>${escapeHtml(item.prefix)} — ${item.sections} section${item.sections === 1 ? '' : 's'} · ${item.enrolled}/${item.capacity} enrolled · ${item.fill.toFixed(1)}% fill${item.waitlist > 0 ? ` · ${item.waitlist} waitlisted` : ''}</title>
+        </g>
+      `;
+    }).join('');
+
+    // Legend matches the existing fill-status filter buckets
+    const legend = `
+      <div class="overview-legend">
+        <span class="lg-item"><span class="lg-swatch" style="background:var(--warn)"></span>Underfilled / Empty (<50%)</span>
+        <span class="lg-item"><span class="lg-swatch" style="background:var(--surface-2);border:1px solid var(--rule)"></span>Mid (50–74%)</span>
+        <span class="lg-item"><span class="lg-swatch" style="background:var(--good)"></span>Almost full (75–99%)</span>
+        <span class="lg-item"><span class="lg-swatch" style="background:var(--info)"></span>Full (100%+)</span>
+      </div>
+    `;
+
+    // Critical Alerts panel — top sections by waitlist size
+    // Waitlist > 0 means there's unmet demand: students want in but can't enroll.
+    const alertRows = snap.rows
+      .filter(r => (Number(r['Wait List']) || 0) > 0)
+      .sort((a, b) => (Number(b['Wait List']) || 0) - (Number(a['Wait List']) || 0))
+      .slice(0, 12);
+
+    const alertsHtml = alertRows.length === 0
+      ? `<p class="overview-empty">No sections currently have a waitlist.</p>`
+      : alertRows.map(r => `
+          <div class="alert-card" data-overview-drill="${escapeHtml(r._prefix)}" title="Click to view ${escapeHtml(r._prefix)} in detail">
+            <div class="alert-head">
+              <span class="alert-icon">⚠</span>
+              <span class="alert-code">${escapeHtml(r.Section)}</span>
+            </div>
+            <div class="alert-title">${escapeHtml(r['Course Title'] || '')}</div>
+            <div class="alert-meta">${Number(r['Wait List'])} waitlisted · ${r['Enrolled Students']}/${r.Capacity} enrolled</div>
+          </div>
+        `).join('');
+
+    // Total stats summary
+    const totalSections = snap.rows.length;
+    const totalEnrolled = sum(snap.rows, 'Enrolled Students');
+    const totalCapacity = sum(snap.rows, 'Capacity');
+    const totalFill = totalCapacity > 0 ? (totalEnrolled / totalCapacity * 100) : 0;
+    const totalWaitlist = sum(snap.rows, 'Wait List');
+
+    return `
+      <div class="overview-summary">
+        <div class="ov-stat"><div class="ov-label">As of</div><div class="ov-value">${fmtDate(snap.date)}</div></div>
+        <div class="ov-stat"><div class="ov-label">Disciplines</div><div class="ov-value">${disciplines.length}</div></div>
+        <div class="ov-stat"><div class="ov-label">Sections</div><div class="ov-value">${totalSections.toLocaleString()}</div></div>
+        <div class="ov-stat"><div class="ov-label">Enrolled</div><div class="ov-value">${totalEnrolled.toLocaleString()} / ${totalCapacity.toLocaleString()}</div></div>
+        <div class="ov-stat"><div class="ov-label">College Fill</div><div class="ov-value">${totalFill.toFixed(1)}%</div></div>
+        <div class="ov-stat"><div class="ov-label">Waitlisted</div><div class="ov-value">${totalWaitlist}</div></div>
+      </div>
+
+      <div class="overview-grid">
+        <div class="overview-treemap-wrap">
+          <div class="overview-head">
+            <h3>Department Capacity Map</h3>
+            <span class="overview-meta">Rectangle size = section count · Color = fill rate · Click any tile to drill in</span>
+          </div>
+          ${legend}
+          <div class="treemap-container">
+            <svg viewBox="0 0 ${tmW} ${tmH}" preserveAspectRatio="none" class="treemap-svg">
+              ${tiles}
+            </svg>
+          </div>
+        </div>
+
+        <div class="overview-alerts-wrap">
+          <div class="overview-head">
+            <h3>Critical Alerts</h3>
+            <span class="overview-meta">Top sections by waitlist size</span>
+          </div>
+          <div class="alerts-list">
+            ${alertsHtml}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /* =========================================================================
+   * SNAPSHOT MANAGER
+   * ========================================================================= */
+
+  function renderSnapshotManager() {
+    const rows = state.snapshots.slice().reverse().map(s => {
+      const isCurrent = s.id === state.currentSnapshotId;
+      const totalSections = s.rows.length;
+      const totalEnr = sum(s.rows, 'Enrolled Students');
+      return `
+        <div class="snap-row ${isCurrent ? 'current' : ''}">
+          <div class="date">${fmtDateShort(s.date)}</div>
+          <div>
+            <div style="font-weight:600">${escapeHtml(s.label)}</div>
+            <div class="name">${escapeHtml(s.filename)}</div>
+          </div>
+          <div class="stats">${totalSections} sections · ${totalEnr} enrolled</div>
+          ${isCurrent ? '<span class="badge cur">VIEWING</span>' : `<button class="btn ghost" data-set-current="${s.id}">View</button>`}
+          <span></span>
+        </div>
+      `;
+    }).join('');
+
+    const updatedNote = state.manifestUpdatedAt
+      ? `Data last updated ${fmtDate(state.manifestUpdatedAt.slice(0, 10))}`
+      : `Loaded ${state.loadedAt ? new Date(state.loadedAt).toLocaleString() : ''}`;
+
+    return `
+      <div class="section-title">Snapshot Library <span class="meta">${state.snapshots.length} snapshots from data folder</span></div>
+
+      <div style="background:var(--surface-2);border:1px solid var(--rule);padding:14px 18px;margin-bottom:18px;font-size:13px;color:var(--ink-soft)">
+        <strong style="font-family:Helvetica Neue, sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink)">Data Source</strong><br>
+        Reports load automatically from the <code>${escapeHtml(DATA_PATH)}</code> folder. New reports appear here as they're added. ${updatedNote}.
+        <div style="margin-top:10px">
+          <button class="btn" id="refreshBtn2" type="button">↻ Refresh from source</button>
+        </div>
+      </div>
+
+      <div class="snapshot-list">${rows || '<div style="padding:20px;color:var(--ink-mute);font-style:italic">No snapshots yet.</div>'}</div>
+    `;
+  }
+
+  /* =========================================================================
+   * DISCIPLINE PICKER MODAL
+   * ========================================================================= */
+
+  function openDisciplineModal() {
+    const root = el('modalRoot');
+    root.innerHTML = renderDisciplineModal();
+    bindDisciplineModal();
+  }
+
+  function closeModal() {
+    el('modalRoot').innerHTML = '';
+  }
+
+  function renderDisciplineModal() {
+    const grouped = {};
+    state.allDisciplines.forEach(d => {
+      const inst = d.institute || '(unspecified)';
+      if (!grouped[inst]) grouped[inst] = [];
+      grouped[inst].push(d);
+    });
+    const institutes = Object.keys(grouped).sort();
+
+    const presetChips = state.presets.map((p, i) => `
+      <button class="preset-chip" data-load-preset="${i}">
+        ${escapeHtml(p.name)} <span style="color:var(--ink-mute)">(${p.disciplines.length})</span>
+        <span class="x" data-delete-preset="${i}" title="Delete preset">×</span>
+      </button>
+    `).join('');
+
+    const groups = institutes.map(inst => `
+      <div class="institute-group">
+        <div class="ig-head">
+          <span>${escapeHtml(inst)} <span style="color:var(--ink-mute);font-weight:400">· ${grouped[inst].length} disciplines</span></span>
+          <span class="ig-actions">
+            <a data-select-inst="${escapeHtml(inst)}">Select all</a>
+            <a data-deselect-inst="${escapeHtml(inst)}">Clear</a>
+          </span>
+        </div>
+        <div class="ig-body">
+          ${grouped[inst].map(d => `
+            <span class="disc-chip ${state.selectedDisciplines.has(d.code) ? 'selected' : ''}" data-discipline="${d.code}">
+              <span class="swatch" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colorFor(d.code)}"></span>
+              ${d.code}
+              <span class="ct">${d.count}</span>
+            </span>
+          `).join('')}
+        </div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modalCard">
+          <div class="modal-head">
+            <h2>Choose Your Disciplines</h2>
+            <button class="close" id="modalClose">×</button>
+          </div>
+          <div class="modal-body">
+            <p style="color:var(--ink-soft);font-size:13px;margin-bottom:18px">Select any course prefixes you want to track. Counts shown reflect sections across all your snapshots.</p>
+
+            ${state.presets.length > 0 ? `
+              <div class="preset-row">
+                <span class="preset-label">Presets</span>
+                ${presetChips}
+              </div>
+            ` : ''}
+
+            ${groups || '<p style="color:var(--ink-mute);font-style:italic">No disciplines found. Upload a report first.</p>'}
+
+            <div style="margin-top:18px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--rule)">
+              <div style="font-family:Helvetica Neue, sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-mute);margin-bottom:6px">Save current selection as preset</div>
+              <div style="display:flex;gap:8px">
+                <input type="text" id="presetName" placeholder="e.g., Engineering & Tech Chair" style="flex:1;padding:8px 10px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);font-family:inherit;font-size:13px">
+                <button class="btn" id="savePresetBtn" type="button">Save</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <span style="color:var(--ink-mute);font-size:12px;align-self:center" id="selectedCount">${state.selectedDisciplines.size} selected</span>
+            <div style="display:flex;gap:8px">
+              <button class="btn ghost" id="clearAllDisc" type="button">Clear All</button>
+              <button class="btn primary" id="applyDisc" type="button">Apply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindDisciplineModal() {
+    el('modalClose').addEventListener('click', closeModal);
+    el('modalOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'modalOverlay') closeModal();
+    });
+
+    document.querySelectorAll('[data-discipline]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const code = chip.dataset.discipline;
+        if (state.selectedDisciplines.has(code)) state.selectedDisciplines.delete(code);
+        else state.selectedDisciplines.add(code);
+        chip.classList.toggle('selected');
+        el('selectedCount').textContent = state.selectedDisciplines.size + ' selected';
+      });
+    });
+
+    document.querySelectorAll('[data-select-inst]').forEach(a => {
+      a.addEventListener('click', () => {
+        const inst = a.dataset.selectInst;
+        state.allDisciplines.filter(d => (d.institute || '(unspecified)') === inst)
+          .forEach(d => state.selectedDisciplines.add(d.code));
+        openDisciplineModal();
+      });
+    });
+    document.querySelectorAll('[data-deselect-inst]').forEach(a => {
+      a.addEventListener('click', () => {
+        const inst = a.dataset.deselectInst;
+        state.allDisciplines.filter(d => (d.institute || '(unspecified)') === inst)
+          .forEach(d => state.selectedDisciplines.delete(d.code));
+        openDisciplineModal();
+      });
+    });
+
+    document.querySelectorAll('[data-load-preset]').forEach(b => {
+      b.addEventListener('click', (e) => {
+        if (e.target.dataset.deletePreset != null) return; // delete handler will fire
+        const idx = parseInt(b.dataset.loadPreset, 10);
+        const preset = state.presets[idx];
+        if (preset) {
+          state.selectedDisciplines = new Set(preset.disciplines);
+          openDisciplineModal();
+        }
+      });
+    });
+    document.querySelectorAll('[data-delete-preset]').forEach(x => {
+      x.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(x.dataset.deletePreset, 10);
+        if (confirm(`Delete preset "${state.presets[idx].name}"?`)) {
+          state.presets.splice(idx, 1);
+          saveStorage();
+          openDisciplineModal();
+        }
+      });
+    });
+
+    el('savePresetBtn').addEventListener('click', () => {
+      const name = el('presetName').value.trim();
+      if (!name) { toast('Give the preset a name.', 3000); return; }
+      if (state.selectedDisciplines.size === 0) { toast('Select at least one discipline.', 3000); return; }
+      // Replace if name exists
+      const idx = state.presets.findIndex(p => p.name === name);
+      const preset = { name, disciplines: [...state.selectedDisciplines] };
+      if (idx >= 0) state.presets[idx] = preset;
+      else state.presets.push(preset);
+      saveStorage();
+      toast(`Saved preset "${name}".`, 3000);
+      openDisciplineModal();
+    });
+
+    el('clearAllDisc').addEventListener('click', () => {
+      state.selectedDisciplines.clear();
+      openDisciplineModal();
+    });
+
+    el('applyDisc').addEventListener('click', () => {
+      saveStorage();
+      closeModal();
+      // Reset sub-filters that no longer apply
+      state.activeDisciplineFilter = new Set(
+        [...state.activeDisciplineFilter].filter(p => state.selectedDisciplines.has(p))
+      );
+      render();
+    });
+  }
+
+  /* =========================================================================
+   * EVENT BINDING (DASHBOARD)
+   * ========================================================================= */
+
+  function bindAllEvents() {
+    // Tabs
+    document.querySelectorAll('[data-tab]').forEach(t => {
+      t.addEventListener('click', () => {
+        state.activeTab = t.dataset.tab;
+        render();
+      });
+    });
+
+    // Overview drill-in: click a tile or alert card to view that discipline
+    // in detail on the Snapshot tab. Adds to existing selection rather than
+    // replacing it, so the user can build up a multi-discipline view by
+    // clicking around.
+    document.querySelectorAll('[data-overview-drill]').forEach(t => {
+      t.addEventListener('click', () => {
+        const prefix = t.dataset.overviewDrill;
+        if (!state.selectedDisciplines.has(prefix)) {
+          state.selectedDisciplines.add(prefix);
+          saveStorage();
+        }
+        state.activeTab = 'snapshot';
+        toast(`Viewing ${prefix} in detail`, 2200);
+        render();
+      });
+    });
+
+    // Discipline sub-filters
+    document.querySelectorAll('[data-disc-filter]').forEach(b => {
+      b.addEventListener('click', () => {
+        const code = b.dataset.discFilter;
+        if (state.activeDisciplineFilter.has(code)) state.activeDisciplineFilter.delete(code);
+        else state.activeDisciplineFilter.add(code);
+        render();
+      });
+    });
+
+    // Location filters
+    document.querySelectorAll('[data-location]').forEach(b => {
+      b.addEventListener('click', () => {
+        const l = b.dataset.location;
+        if (state.activeLocations.has(l)) state.activeLocations.delete(l);
+        else state.activeLocations.add(l);
+        render();
+      });
+    });
+
+    // Fill-status bucket filter (mutually exclusive)
+    document.querySelectorAll('[data-bucket]').forEach(b => {
+      b.addEventListener('click', () => {
+        state.fillBucket = b.dataset.bucket;
+        render();
+      });
+    });
+
+    // Per-discipline card collapse/expand toggle
+    document.querySelectorAll('[data-toggle-discipline]').forEach(b => {
+      b.addEventListener('click', () => {
+        const prefix = b.dataset.toggleDiscipline;
+        // Read the current effective state (smart default if no override)
+        const snap = currentSnapshot();
+        const count = snap
+          ? snap.rows.filter(r => r._prefix === prefix && state.selectedDisciplines.has(r._prefix)).length
+          : 0;
+        const wasExpanded = isDisciplineExpanded(prefix, count);
+        // Store explicit user choice (the opposite of current state)
+        state.cardExpansion[prefix] = !wasExpanded;
+        saveStorage();
+        render();
+      });
+    });
+
+    const reset = el('resetFilters');
+    if (reset) reset.addEventListener('click', () => {
+      state.activeDisciplineFilter.clear();
+      state.activeLocations.clear();
+      state.fillBucket = 'all';
+      render();
+    });
+
+    const benchT = el('benchToggle');
+    if (benchT) benchT.addEventListener('click', () => {
+      state.showBenchmarks = !state.showBenchmarks;
+      saveStorage();
+      render();
+    });
+
+    // Sort
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const k = th.dataset.sort;
+        if (state.sortKey === k) state.sortDir *= -1;
+        else { state.sortKey = k; state.sortDir = 1; }
+        render();
+      });
+    });
+
+    // Table search input
+    const searchInput = el('tableSearchInput');
+    if (searchInput) {
+      // Re-render on each keystroke; restore focus/cursor after re-render
+      // since render() replaces the input element.
+      searchInput.addEventListener('input', (e) => {
+        const newValue = e.target.value;
+        const cursorPos = e.target.selectionStart;
+        state.tableSearch = newValue;
+        render();
+        const restored = el('tableSearchInput');
+        if (restored) {
+          restored.focus();
+          // Restore cursor to the spot the user was typing
+          try { restored.setSelectionRange(cursorPos, cursorPos); } catch (_) {}
+        }
+      });
+    }
+
+    const searchClear = el('tableSearchClear');
+    if (searchClear) {
+      searchClear.addEventListener('click', () => {
+        state.tableSearch = '';
+        render();
+        const restored = el('tableSearchInput');
+        if (restored) restored.focus();
+      });
+    }
+
+    // Snapshot manager actions (view-only since data comes from GitHub)
+    document.querySelectorAll('[data-set-current]').forEach(b => {
+      b.addEventListener('click', () => {
+        state.currentSnapshotId = b.dataset.setCurrent;
+        toast('Switched to snapshot ' + fmtDate(currentSnapshot().date), 2500);
+        state.activeTab = 'snapshot';
+        render();
+      });
+    });
+
+    const refreshBtn2 = el('refreshBtn2');
+    if (refreshBtn2) refreshBtn2.addEventListener('click', loadFromManifest);
+  }
+
+  /* =========================================================================
+   * IMPORT / EXPORT
+   * ========================================================================= */
+
+  function exportSnapshots() {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      snapshots: state.snapshots,
+      presets: state.presets,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `enrollment-snapshots-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`Exported ${state.snapshots.length} snapshots.`, 3000);
+  }
+
+  function importSnapshots(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.snapshots || !Array.isArray(data.snapshots)) throw new Error('Invalid file format');
+
+        const action = state.snapshots.length > 0
+          ? prompt(`You have ${state.snapshots.length} existing snapshots. Type "merge" to combine, "replace" to overwrite, or cancel:`, 'merge')
+          : 'replace';
+
+        if (!action) return;
+        if (action === 'replace') {
+          state.snapshots = data.snapshots;
+        } else if (action === 'merge') {
+          // Replace by date, add new
+          data.snapshots.forEach(s => {
+            const idx = state.snapshots.findIndex(x => x.date === s.date);
+            if (idx >= 0) state.snapshots[idx] = s;
+            else state.snapshots.push(s);
+          });
+          state.snapshots.sort((a, b) => a.date.localeCompare(b.date));
+        } else {
+          toast('Import canceled.', 2500);
+          return;
+        }
+
+        if (data.presets && Array.isArray(data.presets)) {
+          // Merge presets by name
+          data.presets.forEach(p => {
+            const idx = state.presets.findIndex(x => x.name === p.name);
+            if (idx >= 0) state.presets[idx] = p;
+            else state.presets.push(p);
+          });
+        }
+
+        if (state.snapshots.length > 0) {
+          state.currentSnapshotId = state.snapshots[state.snapshots.length - 1].id;
+        }
+        recomputeAllDisciplines();
+        saveStorage();
+        render();
+        toast(`Imported. Now have ${state.snapshots.length} snapshots.`, 3000);
+      } catch (err) {
+        console.error(err);
+        toast('⚠ Could not import: ' + err.message, 5000);
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  }
+
+  /* =========================================================================
+   * TOAST
+   * ========================================================================= */
+
+  let toastTimer = null;
+  function toast(msg, ms) {
+    const root = el('toastRoot');
+    root.innerHTML = `<div class="toast">${msg}</div>`;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { root.innerHTML = ''; }, ms || 4000);
+  }
+
+  /* =========================================================================
+   * STATIC EVENT BINDING
+   * ========================================================================= */
+
+  el('refreshBtn').addEventListener('click', loadFromManifest);
+  el('disciplineBtn').addEventListener('click', openDisciplineModal);
+  el('themeBtn').addEventListener('click', () => {
+    // Cycle: cream (no attribute) -> white -> dark -> cream
+    const cur = document.documentElement.getAttribute('data-theme') || 'cream';
+    let next;
+    if (cur === 'cream') next = 'white';
+    else if (cur === 'white') next = 'dark';
+    else next = 'cream';
+
+    if (next === 'cream') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', next);
+    }
+    localStorage.setItem(STORAGE.THEME, next);
+    updateThemeButtonLabel();
+    render();
+  });
+
+  // Reflect current theme in the button label so the user knows what's active
+  // and what they'll get next
+  function updateThemeButtonLabel() {
+    const btn = el('themeBtn');
+    if (!btn) return;
+    const cur = document.documentElement.getAttribute('data-theme') || 'cream';
+    const label = cur === 'cream' ? 'Cream' : cur === 'white' ? 'White' : 'Dark';
+    btn.textContent = '◐ Theme · ' + label;
+    btn.title = 'Click to cycle through Cream, White, and Dark themes';
+  }
+  el('printBtn').addEventListener('click', () => window.print());
+
+  /* =========================================================================
+   * INIT
+   * ========================================================================= */
+
+  loadStorage();
+  updateThemeButtonLabel();
+  // Snapshots now come from GitHub, not localStorage. Clear any leftovers.
+  state.snapshots = [];
+  state.currentSnapshotId = null;
+  loadFromManifest();
+})();
+</script>
+</body>
+</html>
