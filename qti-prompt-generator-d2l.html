@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Quantitative Question Bank Generator [Alpha]</title>
+<title>Brightspace Question Bank Generator</title>
 <!-- KaTeX for LaTeX rendering -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <!-- JSZip for export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" onerror="this.remove();var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';document.head.appendChild(s);"></script>
 <style>
 /* ── Design: Scientific / Instrument-grade aesthetic ─────────────────────
    Monospace accents, precise grid, deep slate + electric cyan + amber.
@@ -45,6 +45,47 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { scroll-behavior: smooth; }
+
+
+
+/* ── Non-quantitative discipline collapse ────────────────────────── */
+.quant-section {
+  transition: opacity .25s ease, max-height .3s ease;
+  overflow: hidden;
+  max-height: 1200px;
+}
+.quant-section.quant-hidden {
+  max-height: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+}
+.non-quant-notice {
+  display: none;
+  font-size: .82rem;
+  color: #888;
+  font-style: italic;
+  padding: 6px 0 2px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.non-quant-notice.visible { display: block; }
+
+/* ── Domain Tab Strip ─────────────────────────────────────────────── */
+.domain-tabs {
+  display: flex; gap: 0; background: var(--slate); border-bottom: 2px solid var(--border);
+  padding: 0 24px; flex-wrap: wrap;
+}
+.domain-tab {
+  padding: 10px 20px; border: none; background: transparent; cursor: pointer;
+  font-size: .85rem; font-weight: 600; color: var(--gray-mid); border-bottom: 3px solid transparent;
+  margin-bottom: -2px; transition: color .15s, border-color .15s; font-family: var(--font-body);
+  white-space: nowrap;
+}
+.domain-tab:hover  { color: var(--cyan); }
+.domain-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); background: transparent; }
+.domain-tab:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
 
 body {
   font-family: var(--font-body);
@@ -1303,10 +1344,21 @@ input[type=range] { accent-color: #005f80; }
 
 <!-- ── Header ─────────────────────────────────────────────────────────── -->
 <header class="site-header" role="banner">
-  <div class="logo">Quantitative <span>Question Bank</span> Generator</div>
-  <div class="tagline">STEM · Business &amp; Economics · Health Sciences · Technology</div>
-  <span class="header-badge">No API Key Required</span><span class="beta-tag">α Alpha</span>
+  <div class="logo">Brightspace <span style="color:var(--cyan)">Question Bank</span> Generator
+    <div class="logo-sub">No API Key Required · Works with Any LLM · D2L Brightspace Ready</div>
+  </div>
+  <span class="header-badge">Faculty Tool — Free</span>
 </header>
+
+<!-- ── Domain Tab Strip ──────────────────────────────────────────── -->
+<div class="domain-tabs" role="tablist" aria-label="Subject domain">
+  <button class="domain-tab active" role="tab" aria-selected="true"  data-domain="stem"   onclick="switchDomain('stem')">🔬 STEM</button>
+  <button class="domain-tab"        role="tab" aria-selected="false" data-domain="biz"    onclick="switchDomain('biz')">📊 Business &amp; Economics</button>
+  <button class="domain-tab"        role="tab" aria-selected="false" data-domain="health" onclick="switchDomain('health')">🩺 Health Sciences</button>
+  <button class="domain-tab"        role="tab" aria-selected="false" data-domain="tech"   onclick="switchDomain('tech')">💻 Technology</button>
+  <button class="domain-tab"        role="tab" aria-selected="false" data-domain="hum"    onclick="switchDomain('hum')">📚 Humanities &amp; Social Sciences</button>
+</div>
+
 
 <!-- ── Warning banner ─────────────────────────────────────────────────── -->
 <div class="warn-banner" role="alert">
@@ -1339,22 +1391,23 @@ input[type=range] { accent-color: #005f80; }
     <div class="form-grid">
       <div class="field">
         <label class="field-label" for="courseTitle">Course Title</label>
-        <input type="text" id="courseTitle" placeholder="e.g. Engineering Statics, Calculus II">
+        <input type="text" id="courseTitle" placeholder="e.g. NETW 101, Pharmacology I, BUSN 210">
       </div>
       <div class="field">
         <label class="field-label" for="bankName">Question Bank Name</label>
-        <input type="text" id="bankName" placeholder="e.g. Unit 3 — Equilibrium">
+        <input type="text" id="bankName" placeholder="e.g. Unit 3 — Networking Fundamentals">
       </div>
       <div class="field">
         <label class="field-label" for="subject">Subject Area</label>
         <select id="subject" onchange="updateDomainCheckboxes()">
-          <optgroup label="Physics">
+          <!-- STEM -->
+          <optgroup label="Physics" data-domain="stem">
             <option value="physics-mechanics">Physics — Mechanics (Kinematics, Newton's Laws, Energy)</option>
             <option value="physics-em">Physics — Electricity &amp; Magnetism</option>
             <option value="physics-thermo">Physics — Thermodynamics &amp; Statistical Mechanics</option>
             <option value="physics-waves">Physics — Waves, Optics &amp; Modern Physics</option>
           </optgroup>
-          <optgroup label="Engineering">
+          <optgroup label="Engineering" data-domain="stem">
             <option value="eng-statics">Engineering — Statics</option>
             <option value="eng-dynamics">Engineering — Dynamics</option>
             <option value="eng-circuits">Engineering — Electric Circuits</option>
@@ -1362,7 +1415,7 @@ input[type=range] { accent-color: #005f80; }
             <option value="eng-fluids">Engineering — Fluid Mechanics</option>
             <option value="eng-materials">Engineering — Mechanics of Materials</option>
           </optgroup>
-          <optgroup label="Mathematics">
+          <optgroup label="Mathematics" data-domain="stem">
             <option value="math-calc1">Mathematics — Calculus I (Limits, Derivatives)</option>
             <option value="math-calc2">Mathematics — Calculus II (Integration, Series)</option>
             <option value="math-calc3">Mathematics — Calculus III (Multivariable)</option>
@@ -1371,29 +1424,59 @@ input[type=range] { accent-color: #005f80; }
             <option value="math-stats">Mathematics — Statistics &amp; Probability</option>
             <option value="math-algebra">Mathematics — College Algebra &amp; Precalculus</option>
           </optgroup>
-          <optgroup label="Chemistry">
-            <option value="chem-gen1">Chemistry — General Chemistry I (Stoichiometry, Atomic Structure)</option>
-            <option value="chem-gen2">Chemistry — General Chemistry II (Equilibrium, Electrochemistry)</option>
+          <optgroup label="Chemistry" data-domain="stem">
+            <option value="chem-gen1">Chemistry — General Chemistry I</option>
+            <option value="chem-gen2">Chemistry — General Chemistry II</option>
             <option value="chem-organic">Chemistry — Organic Chemistry</option>
             <option value="chem-pchem">Chemistry — Physical Chemistry</option>
             <option value="chem-analytical">Chemistry — Analytical Chemistry</option>
           </optgroup>
-          <optgroup label="Business &amp; Economics">
+          <!-- BUSINESS & ECONOMICS -->
+          <optgroup label="Finance &amp; Accounting" data-domain="biz">
             <option value="biz-finance">Finance (TVM, NPV, IRR, CAPM, Bond Pricing)</option>
             <option value="biz-accounting">Accounting (Break-even, Ratios, Depreciation)</option>
-            <option value="biz-economics">Economics (Elasticity, Equilibrium, Surplus)</option>
-            <option value="biz-stats">Business Statistics (z-scores, Confidence Intervals, Regression)</option>
             <option value="biz-cost">Managerial / Cost Accounting (Variance Analysis, Overhead)</option>
           </optgroup>
-          <optgroup label="Health Sciences">
+          <optgroup label="Economics &amp; Statistics" data-domain="biz">
+            <option value="biz-economics">Economics (Elasticity, Equilibrium, Surplus)</option>
+            <option value="biz-stats">Business Statistics (z-scores, Confidence Intervals, Regression)</option>
+          </optgroup>
+          <!-- HEALTH SCIENCES -->
+          <optgroup label="Nursing &amp; Pharmacology" data-domain="health">
             <option value="health-nursing">Nursing — Dosage Calculations</option>
             <option value="health-pharm">Pharmacology (Drug Concentration, Half-life)</option>
+          </optgroup>
+          <optgroup label="Allied Health &amp; Nutrition" data-domain="health">
             <option value="health-nutrition">Nutrition (Caloric Calculations, Macronutrients)</option>
             <option value="health-allied">Allied Health (BMI, BSA, Unit Conversions)</option>
           </optgroup>
-          <optgroup label="Technology">
+          <!-- HUMANITIES & SOCIAL SCIENCES -->
+          <optgroup label="History &amp; Political Science" data-domain="hum">
+            <option value="hum-history">History (US, World, Regional)</option>
+            <option value="hum-polisci">Political Science &amp; Government</option>
+            <option value="hum-intlrel">International Relations</option>
+          </optgroup>
+          <optgroup label="Communications &amp; Media" data-domain="hum">
+            <option value="hum-comm">Communications &amp; Media Studies</option>
+            <option value="hum-writing">Writing &amp; Rhetoric</option>
+            <option value="hum-journalism">Journalism &amp; Digital Media</option>
+          </optgroup>
+          <optgroup label="Social Sciences" data-domain="hum">
+            <option value="hum-psych">Psychology</option>
+            <option value="hum-sociology">Sociology &amp; Anthropology</option>
+            <option value="hum-education">Education &amp; Pedagogy</option>
+          </optgroup>
+          <optgroup label="Arts &amp; Literature" data-domain="hum">
+            <option value="hum-english">English &amp; Literature</option>
+            <option value="hum-philosophy">Philosophy &amp; Ethics</option>
+            <option value="hum-arts">Art History &amp; Visual Arts</option>
+          </optgroup>
+          <!-- TECHNOLOGY -->
+          <optgroup label="Networking &amp; Security" data-domain="tech">
             <option value="tech-networking">Computer Networking (Subnetting, Bandwidth)</option>
             <option value="tech-security">Cybersecurity (Key Space, Entropy Calculations)</option>
+          </optgroup>
+          <optgroup label="Data &amp; Signals" data-domain="tech">
             <option value="tech-signals">Data &amp; Signals (Sampling Rates, Bandwidth-Frequency)</option>
           </optgroup>
         </select>
@@ -1457,10 +1540,16 @@ input[type=range] { accent-color: #005f80; }
       <!-- Custom checkboxes — shown only when Custom is selected -->
       <div id="qtypeCustom" style="display:none; margin-top:10px;">
         <div class="check-grid" role="group" aria-label="Question types">
-          <label class="check-item checked"><input type="checkbox" name="qtype" value="numerical_mc" checked> 🔢 Numerical MC</label>
-          <label class="check-item checked"><input type="checkbox" name="qtype" value="symbolic" checked> 🔣 Symbolic / Formula</label>
+          <label class="check-item checked"><input type="checkbox" name="qtype" value="multiple_choice" checked> ☑ Multiple Choice</label>
           <label class="check-item checked"><input type="checkbox" name="qtype" value="conceptual" checked> 💡 Conceptual</label>
-          <label class="check-item"><input type="checkbox" name="qtype" value="free_response"> ✏ Free Response</label>
+          <label class="check-item checked"><input type="checkbox" name="qtype" value="scenario" checked> 🎬 Scenario-Based</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="numerical_mc"> 🔢 Numerical MC</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="symbolic"> 🔣 Symbolic / Formula</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="true_false"> ✔✘ True / False</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="analysis"> 🔍 Analysis / Application</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="fill_in_the_blank"> ✏ Fill in the Blank</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="short_answer"> 📝 Short Answer</label>
+          <label class="check-item"><input type="checkbox" name="qtype" value="essay"> 📄 Essay</label>
         </div>
       </div>
     </div>
@@ -1489,7 +1578,7 @@ input[type=range] { accent-color: #005f80; }
   </div>
 
   <!-- Numerical settings -->
-  <div class="section-card">
+  <div class="section-card quant-section" id="notationSection">
     <h3>🔢 Numerical &amp; Notation Settings</h3>
     <div class="form-grid">
       <div class="field">
@@ -1523,7 +1612,7 @@ input[type=range] { accent-color: #005f80; }
       </div>
     </div>
     <!-- Additional Instructions: checkboxes + free text -->
-    <div class="field" style="margin-top:14px;">
+    <div class="field quant-section" id="additionalInstrSection" style="margin-top:14px;">
       <div class="field-label" style="margin-bottom:10px;">Additional Instructions (optional)</div>
 
       <!-- Problem Style — always shown -->
@@ -1589,6 +1678,16 @@ input[type=range] { accent-color: #005f80; }
           <label class="check-item"><input type="checkbox" name="instrDomain" value="Show binary conversion steps in all networking and subnetting worked solutions"> Show binary conversion steps</label>
           <label class="check-item"><input type="checkbox" name="instrDomain" value="Assume IPv4 addressing for all networking problems unless IPv6 is explicitly requested"> Assume IPv4</label>
           <label class="check-item"><input type="checkbox" name="instrDomain" value="Use realistic network topologies and industry-standard values in problem stems"> Use realistic network values</label>
+        </div>
+      </div>
+
+      <div id="instrGroupHum" style="margin-top:10px;display:none;">
+        <div class="instr-group-label">Humanities &amp; Social Sciences Options</div>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Ground all questions in specific historical periods, events, or named theorists"> Ground in specific contexts</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Include primary source references or document excerpts where relevant"> Reference primary sources</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Use Socratic / analytical question style rather than recall-only"> Analytical over recall</label>
+          <label class="check-item"><input type="checkbox" name="instrDomain" value="Avoid culturally biased framing; use inclusive and globally representative examples"> Inclusive examples</label>
         </div>
       </div>
 
@@ -1772,26 +1871,23 @@ Tip: LLMs with web access (Claude, GPT-4o, Gemini) will fetch URLs automatically
 
   <!-- Export section (shown after validation) -->
   <div class="section-card" id="exportCard" style="display:none;">
-    <h3>⬇ Export</h3>
-    <div class="export-verify-bar" id="verifyBar" role="status" aria-live="polite">
+    <h3>⬇ Export to Brightspace</h3>
+    <div class="quant-section" id="verifySection">
+<div class="export-verify-bar" id="verifyBar" role="status" aria-live="polite">
       <span class="verify-count-pill" id="verifyPill">0/0 verified</span>
       <span id="verifyMsg">Please verify each question's calculation before exporting.</span>
       <button class="btn btn-ghost" id="btnVerifyAll" onclick="verifyAll()" style="padding:4px 12px;font-size:.68rem;margin-left:auto;flex-shrink:0;" title="Mark all questions as verified">✓ Verify All</button>
     </div>
+</div><!-- /verifySection -->
     <div class="export-grid">
       <div class="field">
         <label class="field-label" for="expFormat">Format</label>
         <select id="expFormat">
-          <option value="qti-calc">Canvas QTI — calculated_question (numerical)</option>
-          <option value="qti-sa">Canvas QTI — short_answer_question (free response)</option>
-          <option value="qti-mixed">Canvas QTI — mixed (auto per type)</option>
-          <option value="gift">🎓 Moodle GIFT — single category</option>
-          <option value="gift-diff">🎓 Moodle GIFT — split by difficulty</option>
+          <option value="d2l-qti21-zip" selected>📗 D2L Brightspace QTI 2.1 — ZIP package (recommended)</option>
+          <option value="d2l-qti21-xml">📗 D2L Brightspace QTI 2.1 — Single XML file</option>
           <option value="json">JSON (backup / import)</option>
           <option value="csv">CSV (spreadsheet review)</option>
           <option value="study-guide">📄 Student Study Guide (printable HTML — no answers)</option>
-          <option value="d2l-qti21-zip">📗 D2L Brightspace QTI 2.1 — ZIP package</option>
-          <option value="d2l-qti21-xml">📗 D2L Brightspace QTI 2.1 — Single XML file</option>
         </select>
       </div>
       <div class="field">
@@ -2087,6 +2183,10 @@ var DOMAIN_MAP = {
   'health-nursing':'health','health-pharm':'health',
   'health-nutrition':'health','health-allied':'health',
   'tech-networking':'tech','tech-security':'tech','tech-signals':'tech',
+  'hum-history':'hum','hum-polisci':'hum','hum-intlrel':'hum',
+  'hum-comm':'hum','hum-writing':'hum','hum-journalism':'hum',
+  'hum-psych':'hum','hum-sociology':'hum','hum-education':'hum',
+  'hum-english':'hum','hum-philosophy':'hum','hum-arts':'hum'
 };
 
 var DOMAIN_PANEL = {
@@ -2094,6 +2194,7 @@ var DOMAIN_PANEL = {
   'biz':'instrGroupBiz',
   'health':'instrGroupHealth',
   'tech':'instrGroupTech',
+  'hum':'instrGroupHum',
 };
 
 function updateDomainCheckboxes(){
@@ -2110,6 +2211,8 @@ function updateDomainCheckboxes(){
     var panel = cb.closest('.instr-group');
     if(panel && panel.style.display === 'none') cb.checked = false;
   });
+  // Sync quantitative control visibility
+  updateQuantitativeControls();
 }
 
 function getInstrCheckboxText(){
@@ -2318,7 +2421,9 @@ function buildPrompt(){
   const notationNote = notation==='latex'
     ? (domain === 'stem'
         ? 'All mathematical expressions, equations, variables, and units MUST use LaTeX notation with $...$ for inline and $$...$$ for display equations. Every variable (e.g. $F$, $m$, $v$) must be in math mode. Never write math in plain text. IMPORTANT: Never use $ as a currency symbol — $ is reserved as a math delimiter. If a physics or engineering problem involves a dollar amount, write it as plain text (e.g. "500 dollars" or "USD 500").'
-        : 'Use LaTeX notation ($...$) for mathematical formulas and equations ONLY. CRITICAL — items that must NEVER be wrapped in $...$: (1) Currency — write "40,000 dollars" or "USD 40,000", never "$40,000". (2) IP addresses — write 192.168.10.0 not $192.168.10.0$. (3) CIDR prefix lengths — write /24 or prefix-length 24, never $/24$. (4) Subnet masks like 255.255.255.0 — plain text only. (5) Percentages like 5%, unit labels like mg/kg or mL — plain text only. The $ character is a math delimiter; using it around non-math text causes broken rendering.')
+        : domain === 'hum'
+          ? 'Do NOT use LaTeX. Write all questions in plain text. No $...$ delimiters. Focus on analytical reasoning and discipline-specific vocabulary.'
+          : 'Use LaTeX notation ($...$) for mathematical formulas and equations ONLY. CRITICAL — items that must NEVER be wrapped in $...$: (1) Currency — write "40,000 dollars" or "USD 40,000", never "$40,000". (2) IP addresses — write 192.168.10.0 not $192.168.10.0$. (3) CIDR prefix lengths — write /24 or prefix-length 24, never $/24$. (4) Subnet masks like 255.255.255.0 — plain text only. (5) Percentages like 5%, unit labels like mg/kg or mL — plain text only. The $ character is a math delimiter; using it around non-math text causes broken rendering.')
     : 'Use plain text for all mathematical notation. Avoid special symbols.';
 
   const qtypeInstructions = [];
@@ -2328,6 +2433,14 @@ function buildPrompt(){
     qtypeInstructions.push('- "symbolic": A formula identification or algebraic manipulation question. Choices are different mathematical expressions. No floating-point arithmetic required  --  correct answer is an exact symbolic form.');
   if(qtypes.includes('conceptual'))
     qtypeInstructions.push('- "conceptual": A qualitative understanding question. No calculation required. Tests physical intuition, principle identification, or interpretation of results.');
+  if(qtypes.includes('multiple_choice'))
+    qtypeInstructions.push('- "multiple_choice": A standard 4-option multiple choice question. One clearly correct answer, three plausible distractors based on common misconceptions.');
+  if(qtypes.includes('scenario'))
+    qtypeInstructions.push('- "scenario": A situation-based question presenting a realistic context or case. Student selects the best response or analysis from 4 options.');
+  if(qtypes.includes('true_false'))
+    qtypeInstructions.push('- "true_false": A statement the student marks True or False. Use type: "conceptual" in the JSON output with only two choices: A. True and B. False.');
+  if(qtypes.includes('analysis'))
+    qtypeInstructions.push('- "analysis": A higher-order question requiring evaluation, comparison, or application of concepts (Bloom\'s Analyze/Evaluate). Works for all disciplines.');
   if(qtypes.includes('free_response'))
     qtypeInstructions.push('- "free_response": An open-ended show-your-work problem. choices must be an empty array []. The correct field must contain a complete model answer (3-8 sentences covering all required steps). The worked_solution must be a full step-by-step solution.');
 
@@ -3096,8 +3209,7 @@ function dlBlob(blob, fname){
 $('btnExport').addEventListener('click', async()=>{
   if(!parsedQuestions.length){ toast('Validate questions first.','error'); return; }
   const fmt=$('expFormat').value;
-  const pts=parseFloat($('ptsPerQ').value)||1;
-  const bankName=$('bankName').value.trim()||'STEM_Question_Bank';
+  const bankName=$('bankName').value.trim()||'Question_Bank';
   const courseTitle=($('courseTitle')||{value:''}).value.trim();
   const qs=parsedQuestions;
   const msg=$('exportMsg');
@@ -3117,74 +3229,30 @@ $('btnExport').addEventListener('click', async()=>{
       msg.textContent='✓ CSV exported — '+qs.length+' questions.';
       toast('CSV exported!','success');
 
-    } else if(fmt==='gift'){
-      const lines=[];
-      qs.forEach((q,i)=>{
-        lines.push('// Question '+(i+1));
-        lines.push('::Q'+(i+1)+'::'+q.stem.replace(/[{}~=#]/g,s=>'\\'+s)+'{');
-        (q.choices||[]).forEach(c=>{ lines.push((c.letter===q.correct?'=':'~')+c.text.replace(/[{}~=#]/g,s=>'\\'+s)); });
-        lines.push('}'); lines.push('');
-      });
-      dlBlob(new Blob([lines.join('\n')],{type:'text/plain'}), bankName.replace(/\s+/g,'_')+'_GIFT.txt');
-      msg.className='status-msg ok show'; msg.style.display='';
-      msg.textContent='✓ Moodle GIFT exported — '+qs.length+' questions.';
-      toast('Moodle GIFT downloaded!','success');
-
-    } else if(fmt==='gift-diff'){
-      const grps={easy:[],medium:[],hard:[]};
-      qs.forEach(q=>(grps[q.difficulty]||grps.medium).push(q));
-      const parts=Object.entries(grps).filter(([,v])=>v.length).map(([d,v])=>{
-        const lines=['$CATEGORY: '+bankName+'/'+d,''];
-        v.forEach((q,i)=>{
-          lines.push('// '+d+' Q'+(i+1));
-          lines.push('::'+d+'_Q'+(i+1)+'::'+q.stem.replace(/[{}~=#]/g,s=>'\\'+s)+'{');
-          (q.choices||[]).forEach(c=>{ lines.push((c.letter===q.correct?'=':'~')+c.text.replace(/[{}~=#]/g,s=>'\\'+s)); });
-          lines.push('}'); lines.push('');
-        });
-        return lines.join('\n');
-      });
-      const exp=parts.join('\n');
-      dlBlob(new Blob([exp],{type:'text/plain'}), bankName.replace(/\s+/g,'_')+'_GIFT_by-difficulty.txt');
-      msg.className='status-msg ok show'; msg.style.display='';
-      msg.textContent='✓ Moodle GIFT (by difficulty) — '+qs.length+' questions.';
-      toast('Moodle GIFT (by difficulty) downloaded!','success');
-
     } else if(fmt==='study-guide'){
       const html=generateStudyGuide(qs, bankName, courseTitle);
       dlBlob(new Blob([html],{type:'text/html'}), bankName.replace(/\s+/g,'_')+'_StudyGuide.html');
       msg.className='status-msg ok show'; msg.style.display='';
-      msg.textContent='✓ Student study guide exported — '+qs.length+' questions, no answers. Open in browser and print to PDF.';
+      msg.textContent='✓ Student study guide exported — '+qs.length+' questions, no answers.';
       toast('Study guide downloaded!','success');
 
     } else if(fmt==='d2l-qti21-xml'){
-      const xml = buildD2LQTI21XML(qs, bankName);
+      const xml=buildD2LQTI21XML(qs,bankName);
       dlBlob(new Blob([xml],{type:'application/xml'}), bankName.replace(/\s+/g,'_')+'_D2L_QTI21.xml');
       msg.className='status-msg ok show'; msg.style.display='';
       msg.textContent='✓ D2L QTI 2.1 XML exported — '+qs.length+' questions. Import via: Course Admin → Import/Export/Copy Components.';
       toast('D2L QTI 2.1 XML downloaded!','success');
 
-    } else if(fmt==='d2l-qti21-zip'){
-      const zip = new JSZip();
-      zip.file('imsmanifest.xml', buildD2LManifest(qs, bankName));
-      qs.forEach(function(q,idx){
-        var qid = 'q_'+(q.id||idx);
-        zip.file(qid+'.xml', buildD2LItemXML(q, idx, bankName));
-      });
-      const blob = await zip.generateAsync({type:'blob'});
+    } else {
+      // d2l-qti21-zip (default)
+      const zip=new JSZip();
+      zip.file('imsmanifest.xml',buildD2LManifest(qs,bankName));
+      qs.forEach(function(q,i){ var qid='q_'+(q.id||i); zip.file(qid+'.xml',buildD2LItemXML(q,i,bankName)); });
+      const blob=await zip.generateAsync({type:'blob'});
       dlBlob(blob, bankName.replace(/\s+/g,'_')+'_D2L_QTI21.zip');
       msg.className='status-msg ok show'; msg.style.display='';
       msg.textContent='✓ D2L QTI 2.1 ZIP exported — '+qs.length+' questions + manifest. Import via: Course Admin → Import/Export/Copy Components.';
       toast('D2L QTI 2.1 ZIP downloaded!','success');
-
-    } else {
-      // QTI variants (qti-calc, qti-sa, qti-mixed)
-      let banks = [{name:bankName, questions:qs}];
-      const blob = await makeZip(banks, pts);
-      const numQ=qs.filter(q=>q.type==='numerical_mc').length;
-      dlBlob(blob, bankName.replace(/\s+/g,'_')+'_STEM_QTI.zip');
-      msg.className='status-msg ok show'; msg.style.display='';
-      msg.textContent='✓ Canvas QTI exported — '+qs.length+' questions ('+numQ+' as calculated_question with tolerance).';
-      toast('QTI ZIP downloaded!','success');
     }
   } catch(e){
     msg.className='status-msg err show'; msg.style.display='';
@@ -3193,7 +3261,8 @@ $('btnExport').addEventListener('click', async()=>{
   }
   $('btnExport').disabled=false;
   $('btnExport').textContent='⬇ Download';
-});
+})
+;
 
 
 // ================================================================
@@ -3866,6 +3935,110 @@ function generateStudyGuide(questions, bankName, courseTitle){
   return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>'+escapeHtml(bankName)+' — Study Guide</title>\n<style>\n  :root { --navy:#003366; --teal:#006666; --gold:#CC9900; --gray:#666666; --light:#f5f5f0; }\n  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }\n  body { font-family: Georgia, "Times New Roman", serif; color:#222; background:#fff; line-height:1.7; font-size:13pt; }\n  .page { max-width:750px; margin:0 auto; padding:40px 32px; }\n  .cover { text-align:center; border-bottom:3px solid var(--navy); padding-bottom:24px; margin-bottom:32px; }\n  .cover h1 { font-size:1.6rem; color:var(--navy); margin-bottom:6px; }\n  .cover .subtitle { font-size:1rem; color:var(--teal); margin-bottom:4px; }\n  .cover .meta { font-size:.85rem; color:var(--gray); }\n  .instructions { background:var(--light); border-left:4px solid var(--teal); padding:12px 16px; font-size:.9rem; margin-bottom:28px; border-radius:4px; }\n  .question { margin-bottom:28px; padding-bottom:20px; border-bottom:1px solid #ddd; page-break-inside:avoid; }\n  .question:last-child { border-bottom:none; }\n  .q-meta { display:flex; gap:10px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }\n  .q-num { font-weight:700; color:var(--navy); font-size:.88rem; }\n  .q-domain { font-size:.78rem; background:rgba(204,153,0,.15); color:#7a5500; padding:2px 8px; border-radius:8px; font-style:italic; }\n  .q-type { font-size:.75rem; color:var(--gray); text-transform:uppercase; letter-spacing:.04em; }\n  .q-stem { font-weight:600; color:#111; margin-bottom:12px; font-size:1rem; }\n  .choices { display:flex; flex-direction:column; gap:6px; margin-left:16px; }\n  .choice { display:flex; gap:10px; align-items:flex-start; }\n  .choice-letter { font-weight:700; color:var(--navy); min-width:18px; flex-shrink:0; }\n  .choice-text { color:#222; }\n  .answer-blank { margin-top:10px; font-size:.85rem; color:var(--gray); font-style:italic; }\n  .footer { margin-top:40px; padding-top:16px; border-top:2px solid var(--navy); text-align:center; font-size:.8rem; color:var(--gray); }\n  @media print {\n    body { font-size:11pt; }\n    .page { padding:0; max-width:none; }\n    .question { page-break-inside:avoid; }\n    .cover { page-break-after:avoid; }\n    .no-print { display:none; }\n    @page { margin:1in; }\n  }\n</style>\n</head>\n<body>\n<div class="page">\n  <div class="cover">\n    <h1>'+escapeHtml(bankName)+'</h1>\n    '+(courseTitle?'<div class="subtitle">'+escapeHtml(courseTitle)+'</div>':'')+'\n    <div class="meta">Student Study Guide &nbsp;&middot;&nbsp; '+date+' &nbsp;&middot;&nbsp; '+questions.length+' Questions</div>\n  </div>\n  <div class="instructions">\n    <strong>Instructions:</strong> Answer each question to the best of your ability. For multiple choice, write the letter of the best answer on the answer line. Show all work where applicable.\n  </div>\n  '+items+'\n  <div class="footer">\n    <p>'+escapeHtml(bankName)+' &nbsp;&middot;&nbsp; '+questions.length+' Questions &nbsp;&middot;&nbsp; Generated '+date+'</p>\n    <p style="margin-top:4px;font-style:italic;">This study guide does not include answers. Refer to your course materials for review.</p>\n  </div>\n  <div class="no-print" style="margin-top:32px;padding:16px;background:#f0f8ff;border:1px solid #b0d4f0;border-radius:6px;font-family:sans-serif;font-size:.85rem;">\n    <strong>&#128161; Tip for faculty:</strong> To save as PDF, use File &rarr; Print &rarr; change destination to "Save as PDF" in your browser print dialog.\n  </div>\n</div>\n</body>\n</html>';
 }
 
+
+
+
+// ================================================================
+// NON-QUANTITATIVE DISCIPLINE CONTROLS
+// ================================================================
+var NON_QUANT_SUBJECTS = new Set([
+  'hum-history','hum-polisci','hum-intlrel',
+  'hum-comm','hum-writing','hum-journalism',
+  'hum-psych','hum-sociology','hum-education',
+  'hum-english','hum-philosophy','hum-arts'
+]);
+
+function isNonQuantitative(){
+  if(currentDomain === 'hum') return true;
+  var subj = $('subject') ? $('subject').value : '';
+  return NON_QUANT_SUBJECTS.has(subj);
+}
+
+function updateQuantitativeControls(){
+  var hide = isNonQuantitative();
+  var sections = ['notationSection','additionalInstrSection','verifySection'];
+  sections.forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    if(hide){
+      el.classList.add('quant-hidden');
+      // Add or show the notice
+      var notice = el.querySelector('[data-quant-notice]');
+      if(!notice){
+        notice = document.createElement('p');
+        notice.setAttribute('data-quant-notice','');
+        notice.className = 'non-quant-notice';
+        notice.textContent = 'Not applicable for non-quantitative disciplines.';
+        el.parentNode.insertBefore(notice, el.nextSibling);
+      }
+      notice.classList.add('visible');
+    } else {
+      el.classList.remove('quant-hidden');
+      var notice = el.parentNode ? el.parentNode.querySelector('[data-quant-notice]') : null;
+      if(notice) notice.classList.remove('visible');
+    }
+  });
+
+  // Also uncheck numerical_mc and symbolic qtypes when non-quantitative
+  // and re-check multiple_choice + conceptual + scenario as defaults
+  if(hide){
+    ['numerical_mc','symbolic','free_response'].forEach(function(v){
+      var cb = document.querySelector('input[name="qtype"][value="'+v+'"]');
+      if(cb){ cb.checked = false; cb.closest('label').classList.remove('checked'); }
+    });
+  }
+}
+
+// ================================================================
+// DOMAIN TAB STRIP
+// ================================================================
+var currentDomain = 'stem';
+
+function switchDomain(domain){
+  currentDomain = domain;
+
+  // Update tab active states
+  document.querySelectorAll('.domain-tab').forEach(function(btn){
+    var active = btn.dataset.domain === domain;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+
+  // Show/hide subject optgroups
+  var sel = $('subject');
+  var firstVisible = null;
+  Array.from(sel.options).forEach(function(opt){
+    var grp = opt.parentElement;
+    if(grp && grp.tagName === 'OPTGROUP'){
+      var show = grp.dataset.domain === domain;
+      grp.style.display = show ? '' : 'none';
+      opt.disabled = !show;
+      if(show && !firstVisible) firstVisible = opt;
+    }
+  });
+
+  // Select first visible option
+  if(firstVisible) sel.value = firstVisible.value;
+
+  // Update domain-specific instruction checkboxes
+  updateDomainCheckboxes();
+
+  // Update LaTeX rule hint if present
+  var hint = document.getElementById('latexHint');
+  if(hint){
+    hint.textContent = (domain === 'stem')
+      ? 'LaTeX required for all math and units.'
+      : 'LaTeX for formulas only. Plain text for currency, IP addresses, and units.';
+  }
+
+  // Show/hide quantitative controls
+  updateQuantitativeControls();
+}
+
+// Initialize on load — hide non-STEM optgroups
+(function initDomainTabs(){
+  switchDomain('stem');
+})();
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){

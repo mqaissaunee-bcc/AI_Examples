@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zero Trust for OT — Faculty Workshop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4efe6;
+    --bg-2: #ebe3d3;
+    --ink: #1a1a1a;
+    --ink-soft: #4a4a4a;
+    --rule: #1a1a1a;
+    --paper: #fbf7ee;
+    --accent: #c2410c;       /* burnt orange  */
+    --accent-2: #1e3a5f;     /* blueprint navy */
+    --ok: #2d6a4f;
+    --warn: #b45309;
+    --danger: #991b1b;
+    --grid: rgba(30,58,95,0.08);
+    --shadow: 0 1px 0 rgba(0,0,0,0.08), 0 12px 24px -12px rgba(30,58,95,0.18);
+  }
+  [data-theme="dark"] {
+    --bg: #0f1419;
+    --bg-2: #161c24;
+    --ink: #e8e3d6;
+    --ink-soft: #a8a293;
+    --rule: #d4a574;
+    --paper: #1a2028;
+    --accent: #f97316;
+    --accent-2: #60a5fa;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --grid: rgba(96,165,250,0.10);
+    --shadow: 0 1px 0 rgba(0,0,0,0.4), 0 12px 24px -12px rgba(0,0,0,0.6);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter Tight', system-ui, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+    min-height: 100vh;
+  }
+
+  /* ---------- Header ---------- */
+  header.masthead {
+    border-bottom: 2px solid var(--rule);
+    background: var(--bg-2);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(6px);
+  }
+  .stamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    border: 1.5px solid var(--accent);
+    padding: 4px 10px;
+    border-radius: 2px;
+    transform: rotate(-1.5deg);
+    display: inline-block;
+  }
+  .masthead h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 800;
+    font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+    margin: 0;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+  .masthead .left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .masthead .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  .controls { display: flex; gap: 8px; align-items: center; }
+  .icon-btn {
+    background: transparent;
+    border: 1.5px solid var(--rule);
+    color: var(--ink);
+    width: 36px; height: 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .icon-btn:hover { background: var(--bg); transform: translateY(-1px); }
+  .icon-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- Progress rail ---------- */
+  .progress-rail {
+    display: flex;
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+    overflow-x: auto;
+  }
+  .rail-step {
+    flex: 1;
+    min-width: 140px;
+    padding: 10px 16px;
+    border-right: 1px solid var(--rule);
+    cursor: pointer;
+    background: transparent;
+    border-top: none; border-bottom: none; border-left: none;
+    text-align: left;
+    color: var(--ink-soft);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: background 0.2s, color 0.2s;
+    position: relative;
+  }
+  .rail-step:last-child { border-right: none; }
+  .rail-step:hover { background: var(--bg-2); color: var(--ink); }
+  .rail-step[aria-current="step"] {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .rail-step[aria-current="step"] .rail-num { color: var(--accent); }
+  .rail-step.completed { color: var(--ink); }
+  .rail-step.completed::after {
+    content: '✓';
+    position: absolute;
+    top: 6px; right: 8px;
+    color: var(--ok);
+    font-weight: bold;
+  }
+  .rail-num { display: block; font-weight: 700; font-size: 10px; margin-bottom: 2px; }
+  .rail-title { display: block; font-size: 12px; }
+
+  /* ---------- Main layout ---------- */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 28px 80px;
+  }
+  .panel {
+    background: var(--paper);
+    border: 1.5px solid var(--rule);
+    border-radius: 4px;
+    padding: 32px clamp(20px, 4vw, 48px);
+    box-shadow: var(--shadow);
+    position: relative;
+    margin-bottom: 28px;
+  }
+  .panel::before {
+    content: attr(data-corner);
+    position: absolute;
+    top: -10px; left: 24px;
+    background: var(--paper);
+    padding: 0 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  h2.section-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 800;
+    font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+    line-height: 1.1;
+    margin: 0 0 8px;
+    letter-spacing: -0.015em;
+  }
+  .kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+  .lead {
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    max-width: 70ch;
+    margin: 0 0 24px;
+  }
+  p { max-width: 70ch; }
+  .panel p { margin: 0 0 14px; }
+
+  .step { display: none; animation: fadein 0.35s ease; }
+  .step.active { display: block; }
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px dashed var(--rule);
+    flex-wrap: wrap;
+  }
+  .btn {
+    background: var(--ink);
+    color: var(--paper);
+    border: 1.5px solid var(--ink);
+    padding: 10px 22px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: transform 0.15s, background 0.15s;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); background: var(--accent); border-color: var(--accent); }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.secondary {
+    background: transparent;
+    color: var(--ink);
+  }
+  .btn.secondary:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+
+  /* ---------- Callouts ---------- */
+  .callout {
+    border-left: 4px solid var(--accent-2);
+    background: var(--bg-2);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout strong { font-family: 'Fraunces', serif; font-weight: 600; }
+  .callout-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--accent-2);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .callout.warn .callout-label { color: var(--warn); }
+
+  /* ---------- IT vs OT classify game ---------- */
+  .classify-instructions {
+    background: var(--bg-2);
+    padding: 14px 18px;
+    border-radius: 4px;
+    margin-bottom: 18px;
+    font-size: 0.95rem;
+  }
+  .classify-board {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  @media (min-width: 720px) {
+    .classify-board { grid-template-columns: 1fr 1fr; }
+  }
+  .pile {
+    border: 2px dashed var(--rule);
+    border-radius: 4px;
+    padding: 16px;
+    background: var(--bg);
+    min-height: 220px;
+  }
+  .pile h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .pile .pile-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+  .pile.it { border-color: var(--accent-2); }
+  .pile.ot { border-color: var(--accent); }
+  .pile.it h3 { color: var(--accent-2); }
+  .pile.ot h3 { color: var(--accent); }
+
+  .traits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 16px;
+    background: var(--bg-2);
+    border-radius: 4px;
+    min-height: 60px;
+  }
+  .trait {
+    background: var(--paper);
+    border: 1.5px solid var(--rule);
+    border-radius: 4px;
+    font-size: 0.88rem;
+    transition: all 0.18s;
+    user-select: none;
+    font-family: 'Inter Tight', sans-serif;
+    display: inline-flex;
+    align-items: stretch;
+    overflow: hidden;
+    flex-basis: calc(50% - 6px);
+    flex-grow: 1;
+    min-width: 280px;
+  }
+  @media (max-width: 600px) { .trait { flex-basis: 100%; } }
+  .trait-text {
+    padding: 10px 14px;
+    flex: 1;
+    line-height: 1.3;
+    align-self: center;
+  }
+  .trait-actions {
+    display: flex;
+    flex-shrink: 0;
+    border-left: 1.5px solid var(--rule);
+  }
+  .trait-btn {
+    border: none;
+    background: var(--bg-2);
+    color: var(--ink);
+    padding: 0 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    border-left: 1px solid var(--rule);
+  }
+  .trait-btn:first-child { border-left: none; }
+  .trait-btn[data-choice="it"]:hover:not(:disabled) { background: var(--accent-2); color: white; }
+  .trait-btn[data-choice="ot"]:hover:not(:disabled) { background: var(--accent); color: white; }
+  .trait-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+  .trait-btn:disabled { cursor: default; opacity: 0.5; }
+  .trait.placed-correct { background: var(--ok); color: white; border-color: var(--ok); }
+  .trait.placed-correct .trait-actions { display: none; }
+  .trait.placed-correct .trait-text::after { content: ' ✓'; font-weight: bold; }
+  .trait.placed-wrong { animation: shake 0.4s; }
+  .trait.placed-wrong .trait-text { background: var(--danger); color: white; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  .pile-bin { display: flex; flex-direction: column; gap: 6px; }
+  .pile-bin .trait { flex-basis: auto; min-width: 0; width: 100%; }
+  .classify-status {
+    margin-top: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: center;
+  }
+
+  /* ---------- Quiz ---------- */
+  .quiz-q {
+    background: var(--bg-2);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 18px 22px;
+    margin-bottom: 16px;
+  }
+  .quiz-q .q-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .quiz-q .q-text {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 6px 0 14px;
+    line-height: 1.3;
+  }
+  .quiz-options { display: flex; flex-direction: column; gap: 8px; }
+  .quiz-option {
+    display: block;
+    padding: 11px 16px;
+    background: var(--paper);
+    border: 1.5px solid var(--rule);
+    border-radius: 3px;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 0.95rem;
+    color: var(--ink);
+    transition: all 0.15s;
+  }
+  .quiz-option:hover:not(:disabled) { background: var(--bg-2); border-color: var(--accent); }
+  .quiz-option:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .quiz-option.correct { background: var(--ok); color: white; border-color: var(--ok); }
+  .quiz-option.wrong { background: var(--danger); color: white; border-color: var(--danger); }
+  .quiz-option:disabled { cursor: default; }
+  .quiz-feedback {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: var(--paper);
+    border-left: 3px solid var(--accent-2);
+    font-size: 0.9rem;
+    display: none;
+  }
+  .quiz-feedback.show { display: block; }
+
+  /* ---------- Architecture diagram ---------- */
+  .arch-wrap {
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+    overflow-x: auto;
+  }
+  .arch-svg { width: 100%; height: auto; max-width: 900px; display: block; margin: 0 auto; }
+  .zone-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    fill: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .zone-rect {
+    fill: var(--paper);
+    stroke: var(--rule);
+    stroke-width: 1.5;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .zone-rect:hover, .zone-rect:focus { fill: var(--bg-2); stroke: var(--accent); stroke-width: 2.5; }
+  .zone-rect:focus { outline: none; }
+  .zone-rect.active { fill: var(--accent); stroke: var(--accent); }
+  .zone-rect.active + .zone-text { fill: var(--paper); }
+  .zone-text {
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 12px;
+    fill: var(--ink);
+    pointer-events: none;
+    font-weight: 600;
+  }
+  .conduit {
+    stroke: var(--ink);
+    stroke-width: 2;
+    fill: none;
+    stroke-dasharray: 0;
+  }
+  .arch-detail {
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--bg-2);
+    border-radius: 4px;
+    border-left: 3px solid var(--accent);
+    min-height: 80px;
+  }
+  .arch-detail h4 {
+    margin: 0 0 6px;
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+  }
+  .arch-detail .placeholder {
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  /* ---------- Scenario decision tree ---------- */
+  .scenario-card {
+    background: linear-gradient(135deg, var(--bg-2), var(--paper));
+    border: 1.5px solid var(--rule);
+    border-radius: 4px;
+    padding: 22px 26px;
+    margin: 18px 0;
+    position: relative;
+  }
+  .scenario-card::before {
+    content: 'SCENARIO';
+    position: absolute;
+    top: -10px; left: 18px;
+    background: var(--accent);
+    color: white;
+    padding: 3px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    border-radius: 2px;
+  }
+  .scenario-prompt {
+    font-family: 'Fraunces', serif;
+    font-size: 1.08rem;
+    margin: 6px 0 16px;
+    line-height: 1.45;
+  }
+  .scenario-choices {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  @media (min-width: 600px) {
+    .scenario-choices { grid-template-columns: 1fr 1fr; }
+  }
+  .scenario-choice {
+    padding: 14px 16px;
+    background: var(--paper);
+    border: 1.5px solid var(--rule);
+    border-radius: 3px;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 0.95rem;
+    color: var(--ink);
+    transition: all 0.15s;
+    line-height: 1.35;
+  }
+  .scenario-choice:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.08); border-color: var(--accent); }
+  .scenario-choice:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .scenario-choice.selected.best { background: var(--ok); color: white; border-color: var(--ok); }
+  .scenario-choice.selected.ok { background: var(--warn); color: white; border-color: var(--warn); }
+  .scenario-choice.selected.poor { background: var(--danger); color: white; border-color: var(--danger); }
+  .scenario-choice:disabled { cursor: default; }
+  .scenario-rationale {
+    margin-top: 14px;
+    padding: 14px 16px;
+    background: var(--bg);
+    border-radius: 3px;
+    font-size: 0.92rem;
+    display: none;
+    border-top: 2px solid var(--rule);
+  }
+  .scenario-rationale.show { display: block; }
+  .scenario-rationale .verdict {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .verdict.best { color: var(--ok); }
+  .verdict.ok { color: var(--warn); }
+  .verdict.poor { color: var(--danger); }
+
+  /* ---------- CSF mapper ---------- */
+  .csf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    margin: 16px 0;
+  }
+  .csf-bucket {
+    border: 2px dashed var(--rule);
+    border-radius: 4px;
+    padding: 10px;
+    min-height: 110px;
+    background: var(--bg);
+    transition: all 0.2s;
+  }
+  .csf-bucket.dragover { background: var(--bg-2); border-color: var(--accent); border-style: solid; }
+  .csf-bucket h4 {
+    margin: 0 0 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent-2);
+    text-align: center;
+  }
+  .csf-items {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-height: 50px;
+  }
+  .csf-pool {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+    background: var(--bg-2);
+    border-radius: 4px;
+    margin: 10px 0 16px;
+    min-height: 60px;
+  }
+  .csf-card {
+    background: var(--paper);
+    border: 1.5px solid var(--rule);
+    padding: 6px 12px;
+    border-radius: 3px;
+    font-size: 0.85rem;
+    cursor: grab;
+    user-select: none;
+    transition: all 0.15s;
+  }
+  .csf-card:hover { transform: translateY(-1px); border-color: var(--accent); }
+  .csf-card:active { cursor: grabbing; }
+  .csf-card.dragging { opacity: 0.4; }
+  .csf-card.placed-correct { background: var(--ok); color: white; border-color: var(--ok); }
+  .csf-card.placed-wrong { background: var(--danger); color: white; border-color: var(--danger); animation: shake 0.4s; }
+
+  /* ---------- Reflection ---------- */
+  .reflect-q {
+    background: var(--bg-2);
+    border-left: 3px solid var(--accent);
+    padding: 14px 18px;
+    margin: 12px 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .reflect-q label {
+    display: block;
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .reflect-q textarea {
+    width: 100%;
+    min-height: 70px;
+    padding: 10px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 0.95rem;
+    border-radius: 3px;
+    resize: vertical;
+  }
+  .reflect-q textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+
+  /* ---------- Score ribbon ---------- */
+  .score-ribbon {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+    padding: 18px 22px;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 4px;
+    align-items: center;
+  }
+  .score-stat { flex: 1; min-width: 120px; }
+  .score-stat .num {
+    font-family: 'Fraunces', serif;
+    font-size: 2.2rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--accent);
+  }
+  .score-stat .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 4px;
+    opacity: 0.85;
+  }
+
+  /* Two-column key terms */
+  .terms-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  @media (min-width: 600px) {
+    .terms-grid { grid-template-columns: 1fr 1fr; }
+  }
+  .term {
+    border: 1px solid var(--rule);
+    padding: 12px 16px;
+    border-radius: 3px;
+    background: var(--bg);
+  }
+  .term dt {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--accent);
+  }
+  .term dd {
+    margin: 0;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+  }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--rule);
+    padding: 24px 28px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Print styles */
+  @media print {
+    body { background: white; }
+    .step { display: block !important; page-break-after: always; }
+    header.masthead, .progress-rail, .btn-row, footer { display: none !important; }
+    .panel { box-shadow: none; border: 1px solid #000; }
+  }
+
+  /* Reduce motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  /* High-quality focus states */
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0;
+  }
+  .pill {
+    background: var(--bg-2);
+    border: 1px solid var(--rule);
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  ul.tight, ol.tight { padding-left: 22px; max-width: 70ch; }
+  ul.tight li, ol.tight li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="left">
+    <span class="stamp">TLP:CLEAR</span>
+    <div>
+      <h1>Adapting Zero Trust to OT</h1>
+      <span class="meta">Faculty Workshop · 30 min · Interactive</span>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="icon-btn" id="themeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+    <button class="icon-btn" id="resetBtn" aria-label="Reset progress" title="Reset progress">↺</button>
+    <button class="icon-btn" id="printBtn" aria-label="Print lesson" title="Print">⎙</button>
+  </div>
+</header>
+
+<nav class="progress-rail" aria-label="Lesson progress">
+  <button class="rail-step" data-step="0" aria-current="step"><span class="rail-num">01</span><span class="rail-title">Why Zero Trust + OT</span></button>
+  <button class="rail-step" data-step="1"><span class="rail-num">02</span><span class="rail-title">IT vs OT</span></button>
+  <button class="rail-step" data-step="2"><span class="rail-num">03</span><span class="rail-title">Architecture</span></button>
+  <button class="rail-step" data-step="3"><span class="rail-num">04</span><span class="rail-title">CSF Mapping</span></button>
+  <button class="rail-step" data-step="4"><span class="rail-num">05</span><span class="rail-title">Decisions</span></button>
+  <button class="rail-step" data-step="5"><span class="rail-num">06</span><span class="rail-title">Knowledge Check</span></button>
+  <button class="rail-step" data-step="6"><span class="rail-num">07</span><span class="rail-title">Wrap-Up</span></button>
+</nav>
+
+<main id="lessonRoot">
+
+  <!-- ============ STEP 1: INTRO ============ -->
+  <section class="step active" data-step="0" aria-labelledby="s1-title">
+    <article class="panel" data-corner="01 / Orientation">
+      <div class="kicker">5 minutes · Set the stage</div>
+      <h2 class="section-title" id="s1-title">When the network controls the physical world.</h2>
+      <p class="lead">A compromised database leaks data. A compromised PLC opens a floodgate. This workshop walks through the new joint guidance from CISA, DoW, DOE, FBI, and DOS on adapting Zero Trust principles to <em>Operational Technology</em> — the systems that run power grids, water treatment, building automation, and manufacturing floors.</p>
+
+      <div class="callout">
+        <span class="callout-label">Working Definition</span>
+        <strong>Operational Technology (OT)</strong> is a broad range of programmable systems and devices that interact with the physical environment — sensors, actuators, controllers, HMIs. Industrial control systems, building automation, transportation systems, and physical access control all qualify. <em>Source: NIST SP 800-82r3, cited in the joint guidance.</em>
+      </div>
+
+      <h3 style="font-family:'Fraunces',serif;margin-top:28px;">The five-agency premise, in one sentence</h3>
+      <p>Zero Trust assumes a breach has already occurred — and it works for OT only when adapted to the operational realities of safety, availability, and decades-long equipment lifecycles. <strong>Blanket application of IT-focused Zero Trust to OT is neither reasonable nor feasible.</strong></p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-top:24px;">Why faculty should care</h3>
+      <ul class="tight">
+        <li><strong>Cybersecurity faculty:</strong> Your students will graduate into a world where IT/OT convergence is the dominant attack surface. Volt Typhoon, BlackEnergy, Trisis, and Incontroller are not theoretical.</li>
+        <li><strong>Engineering &amp; electronics faculty:</strong> The PLCs and control systems your students learn on are the assets being defended. ZT changes how those systems are accessed and maintained.</li>
+        <li><strong>All STEAM faculty:</strong> Critical infrastructure is interdisciplinary by nature. A water utility incident is engineering, communications, public health, business continuity, and policy — all at once.</li>
+      </ul>
+
+      <div class="callout warn">
+        <span class="callout-label">A note on framing</span>
+        Throughout this lesson, we'll keep returning to a single question: <strong>"What's the worst thing that happens if this control fails?"</strong> In IT, the answer is usually about data. In OT, the answer often involves physical harm. That difference drives every adaptation.
+      </div>
+
+      <div class="btn-row">
+        <span></span>
+        <button class="btn" data-nav="next">Begin · Step 2 →</button>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============ STEP 2: IT vs OT CLASSIFY ============ -->
+  <section class="step" data-step="1" aria-labelledby="s2-title">
+    <article class="panel" data-corner="02 / Classification Exercise">
+      <div class="kicker">Interactive · 4 minutes</div>
+      <h2 class="section-title" id="s2-title">Sort the traits: IT or OT?</h2>
+      <p class="lead">Before we can adapt Zero Trust to OT, we have to be precise about how OT differs from IT. Click each trait below and place it where it belongs. Wrong answers bounce back so you can try again.</p>
+
+      <div class="classify-instructions">
+        <strong>How to play:</strong> Each trait has two buttons — <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent-2);">→ IT</span> and <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent);">→ OT</span>. Click the one you think is correct. Wrong picks shake red and let you try again; correct picks turn green and move into the matching pile. Get all 10 to unlock the next step.
+      </div>
+
+      <div class="traits" id="traitsPool" aria-label="Traits to classify"></div>
+
+      <div class="classify-board">
+        <div class="pile it" data-pile="it">
+          <h3>Information Technology</h3>
+          <div class="pile-sub">Data, systems, services</div>
+          <div class="pile-bin" id="binIT" aria-label="IT pile"></div>
+        </div>
+        <div class="pile ot" data-pile="ot">
+          <h3>Operational Technology</h3>
+          <div class="pile-sub">Physical processes, real-world impact</div>
+          <div class="pile-bin" id="binOT" aria-label="OT pile"></div>
+        </div>
+      </div>
+
+      <div class="classify-status" id="classifyStatus">0 of 10 placed correctly · Click any trait above to begin</div>
+
+      <div class="callout" id="classifyDone" style="display:none;">
+        <span class="callout-label">Key Takeaway</span>
+        <strong>OT prioritizes availability and safety over confidentiality.</strong> The guidance frames this as the foundational difference: in IT, downtime is annoying. In OT, downtime can mean a chemical reaction goes wrong, a turbine spins out of spec, or a hospital loses HVAC. Every Zero Trust adaptation that follows is shaped by this inversion of priorities.
+      </div>
+
+      <div class="btn-row">
+        <button class="btn secondary" data-nav="prev">← Back</button>
+        <button class="btn" data-nav="next" id="step2Next" disabled>Next · Architecture →</button>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============ STEP 3: ARCHITECTURE ============ -->
+  <section class="step" data-step="2" aria-labelledby="s3-title">
+    <article class="panel" data-corner="03 / Architecture Tour">
+      <div class="kicker">Interactive diagram · 5 minutes</div>
+      <h2 class="section-title" id="s3-title">Anatomy of a segmented OT network.</h2>
+      <p class="lead">Click each labeled zone in the diagram to learn what lives there and what Zero Trust controls apply. This simplified view follows the segmentation principles from the guidance — IT zone, OT DMZ with jump host, control network, and the cell/safety systems closest to the physical process.</p>
+
+      <div class="arch-wrap">
+        <svg class="arch-svg" viewBox="0 0 880 420" role="img" aria-label="Layered OT architecture diagram with five clickable zones">
+          <!-- Background grid -->
+          <defs>
+            <pattern id="archgrid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--grid)" stroke-width="0.5"/>
+            </pattern>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink)"/>
+            </marker>
+          </defs>
+          <rect x="0" y="0" width="880" height="420" fill="url(#archgrid)"/>
+
+          <!-- Zone labels (top) -->
+          <text x="100" y="30" class="zone-label">Enterprise IT</text>
+          <text x="295" y="30" class="zone-label">OT DMZ</text>
+          <text x="490" y="30" class="zone-label">Control Network</text>
+          <text x="700" y="30" class="zone-label">Cell / Safety</text>
+
+          <!-- Vertical separators -->
+          <line x1="220" y1="50" x2="220" y2="380" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 6"/>
+          <line x1="410" y1="50" x2="410" y2="380" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 6"/>
+          <line x1="610" y1="50" x2="610" y2="380" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 6"/>
+
+          <!-- Zone 1: IT -->
+          <g class="zone" tabindex="0" role="button" aria-label="Enterprise IT zone" data-zone="it">
+            <rect class="zone-rect" x="50" y="160" width="140" height="100" rx="4"/>
+            <text x="120" y="200" class="zone-text" text-anchor="middle">Workstations</text>
+            <text x="120" y="222" class="zone-text" text-anchor="middle">Email · ERP</text>
+            <text x="120" y="244" class="zone-text" text-anchor="middle">Active Directory</text>
+          </g>
+
+          <!-- Zone 2: DMZ + Jump Host -->
+          <g class="zone" tabindex="0" role="button" aria-label="OT DMZ and jump host" data-zone="dmz">
+            <rect class="zone-rect" x="240" y="140" width="150" height="60" rx="4"/>
+            <text x="315" y="175" class="zone-text" text-anchor="middle">Jump Host (MFA)</text>
+            <rect class="zone-rect" x="240" y="220" width="150" height="60" rx="4"/>
+            <text x="315" y="245" class="zone-text" text-anchor="middle">Data Historian</text>
+            <text x="315" y="262" class="zone-text" text-anchor="middle">EDR Staging</text>
+          </g>
+
+          <!-- Zone 3: Control Network -->
+          <g class="zone" tabindex="0" role="button" aria-label="Control network with HMI and engineering workstation" data-zone="control">
+            <rect class="zone-rect" x="430" y="140" width="160" height="60" rx="4"/>
+            <text x="510" y="175" class="zone-text" text-anchor="middle">HMI · SCADA</text>
+            <rect class="zone-rect" x="430" y="220" width="160" height="60" rx="4"/>
+            <text x="510" y="248" class="zone-text" text-anchor="middle">Engineering WS</text>
+          </g>
+
+          <!-- Zone 4: PLC + Safety -->
+          <g class="zone" tabindex="0" role="button" aria-label="PLC and field devices" data-zone="plc">
+            <rect class="zone-rect" x="630" y="140" width="100" height="60" rx="4"/>
+            <text x="680" y="175" class="zone-text" text-anchor="middle">PLC</text>
+            <rect class="zone-rect" x="745" y="140" width="100" height="60" rx="4"/>
+            <text x="795" y="175" class="zone-text" text-anchor="middle">Sensors</text>
+          </g>
+
+          <!-- Safety -->
+          <g class="zone" tabindex="0" role="button" aria-label="Safety instrumented system" data-zone="safety">
+            <rect class="zone-rect" x="690" y="240" width="155" height="60" rx="4" stroke-width="2.5" stroke="var(--danger)"/>
+            <text x="767" y="265" class="zone-text" text-anchor="middle">Safety System</text>
+            <text x="767" y="283" class="zone-text" text-anchor="middle" style="font-size:10px;">(SIS)</text>
+          </g>
+
+          <!-- Conduits -->
+          <line class="conduit" x1="190" y1="210" x2="240" y2="170" marker-end="url(#arrow)"/>
+          <line class="conduit" x1="390" y1="170" x2="430" y2="170" marker-end="url(#arrow)"/>
+          <line class="conduit" x1="390" y1="250" x2="430" y2="250" marker-start="url(#arrow)"/>
+          <line class="conduit" x1="590" y1="170" x2="630" y2="170" marker-end="url(#arrow)"/>
+          <line class="conduit" x1="730" y1="170" x2="745" y2="170"/>
+
+          <!-- Bottom legend -->
+          <text x="440" y="395" class="zone-label" text-anchor="middle" style="font-size:10px;">↑ Click any rectangle for details · Each dashed line is a Zero Trust enforcement boundary ↑</text>
+        </svg>
+      </div>
+
+      <div class="arch-detail" id="archDetail" aria-live="polite">
+        <p class="placeholder">Click any zone in the diagram above to see what controls Zero Trust applies there.</p>
+      </div>
+
+      <div class="callout" style="margin-top:20px;">
+        <span class="callout-label">The Big Idea</span>
+        Each dashed line is a <strong>trust boundary</strong>. The closer a zone gets to the physical process (right side), the more we lean on segmentation, jump hosts, and compensating controls — and the less we can rely on agents, encryption, or rapid patching.
+      </div>
+
+      <div class="btn-row">
+        <button class="btn secondary" data-nav="prev">← Back</button>
+        <button class="btn" data-nav="next" id="step3Next" disabled>Next · CSF Mapping →</button>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============ STEP 4: CSF MAPPING ============ -->
+  <section class="step" data-step="3" aria-labelledby="s4-title">
+    <article class="panel" data-corner="04 / Framework Mapping">
+      <div class="kicker">Drag-and-drop · 4 minutes</div>
+      <h2 class="section-title" id="s4-title">Map controls to NIST CSF 2.0 functions.</h2>
+      <p class="lead">The joint guidance is structured around the six NIST Cybersecurity Framework 2.0 functions. Drag each Zero Trust control card into the function it primarily supports. Touch and keyboard supported — use Tab + Enter, then arrow keys to choose a bucket.</p>
+
+      <div class="csf-pool" id="csfPool" aria-label="Controls to drag"></div>
+
+      <div class="csf-grid" id="csfGrid">
+        <div class="csf-bucket" data-fn="govern" tabindex="0"><h4>Govern</h4><div class="csf-items"></div></div>
+        <div class="csf-bucket" data-fn="identify" tabindex="0"><h4>Identify</h4><div class="csf-items"></div></div>
+        <div class="csf-bucket" data-fn="protect" tabindex="0"><h4>Protect</h4><div class="csf-items"></div></div>
+        <div class="csf-bucket" data-fn="detect" tabindex="0"><h4>Detect</h4><div class="csf-items"></div></div>
+        <div class="csf-bucket" data-fn="respond" tabindex="0"><h4>Respond</h4><div class="csf-items"></div></div>
+        <div class="csf-bucket" data-fn="recover" tabindex="0"><h4>Recover</h4><div class="csf-items"></div></div>
+      </div>
+
+      <div class="classify-status" id="csfStatus">0 of 12 controls mapped · Drag a card to a function bucket</div>
+
+      <div class="callout" id="csfDone" style="display:none;">
+        <span class="callout-label">Key Takeaway</span>
+        Most controls live in <strong>Protect</strong> — but the guidance is explicit that <strong>Govern</strong> and <strong>Identify</strong> work has to come first. You can't segment what you can't inventory, and you can't enforce a policy you haven't agreed on.
+      </div>
+
+      <div class="btn-row">
+        <button class="btn secondary" data-nav="prev">← Back</button>
+        <button class="btn" data-nav="next" id="step4Next" disabled>Next · Decisions →</button>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============ STEP 5: SCENARIOS ============ -->
+  <section class="step" data-step="4" aria-labelledby="s5-title">
+    <article class="panel" data-corner="05 / Decision Scenarios">
+      <div class="kicker">Three judgment calls · 5 minutes</div>
+      <h2 class="section-title" id="s5-title">What would you do?</h2>
+      <p class="lead">Real OT security is judgment, not algorithm. Each scenario has a "best" answer rooted in the joint guidance — but several plausible ones. Click your choice; you'll get reasoning either way.</p>
+
+      <div id="scenarioContainer"></div>
+
+      <div class="btn-row">
+        <button class="btn secondary" data-nav="prev">← Back</button>
+        <button class="btn" data-nav="next" id="step5Next" disabled>Next · Knowledge Check →</button>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============ STEP 6: KNOWLEDGE CHECK ============ -->
+  <section class="step" data-step="5" aria-labelledby="s6-title">
+    <article class="panel" data-corner="06 / Knowledge Check">
+      <div class="kicker">5 questions · 4 minutes</div>
+      <h2 class="section-title" id="s6-title">Do the concepts stick?</h2>
+      <p class="lead">Answer all five to see your score. Each question pulls directly from the joint guidance — answers and explanations follow each click.</p>
+
+      <div id="quizContainer"></div>
+
+      <div class="score-ribbon" id="scoreRibbon" style="display:none;">
+        <div class="score-stat">
+          <div class="num" id="scoreNum">0/5</div>
+          <div class="lbl">Final score</div>
+        </div>
+        <div class="score-stat">
+          <div class="num" id="scorePct">0%</div>
+          <div class="lbl">Accuracy</div>
+        </div>
+        <div class="score-stat" style="flex: 2;">
+          <div id="scoreVerdict" style="font-family:'Fraunces',serif;font-size:1.1rem;line-height:1.3;"></div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn secondary" data-nav="prev">← Back</button>
+        <button class="btn" data-nav="next" id="step6Next" disabled>Next · Wrap-Up →</button>
+      </div>
+    </article>
+  </section>
+
+  <!-- ============ STEP 7: WRAP UP ============ -->
+  <section class="step" data-step="6" aria-labelledby="s7-title">
+    <article class="panel" data-corner="07 / Wrap-Up &amp; Takeaway">
+      <div class="kicker">3 minutes · Synthesize</div>
+      <h2 class="section-title" id="s7-title">What to bring back to your classroom.</h2>
+      <p class="lead">You've now seen the structure of the guidance, the IT/OT distinction, the architecture, the framework mapping, three judgment calls, and tested your recall. Here's the through-line.</p>
+
+      <h3 style="font-family:'Fraunces',serif;margin-top:8px;">Five takeaways</h3>
+      <ol class="tight">
+        <li><strong>Assume a breach already happened.</strong> Zero Trust is a posture, not a product. In OT, that posture has to coexist with safety and availability.</li>
+        <li><strong>Inventory before architecture.</strong> Passive monitoring first; active scanning only with deep system knowledge. You cannot protect what you cannot see.</li>
+        <li><strong>Segmentation is the foundation.</strong> Microsegmentation is the natural next layer — but the guidance treats segmentation as a dynamic policy, not a one-time decision.</li>
+        <li><strong>Compensating controls are not failures.</strong> Legacy OT can't always meet ideal ZT. Out-of-band monitoring, jump hosts with MFA, and physical safeguards close gaps without disrupting operations.</li>
+        <li><strong>Cross-disciplinary teams aren't optional.</strong> Cyber + IT + OT engineering have to make tradeoffs together. The guidance returns to this point in nearly every section.</li>
+      </ol>
+
+      <h3 style="font-family:'Fraunces',serif;margin-top:28px;">Discussion prompts for your students</h3>
+      <p>Type a few thoughts below — they save locally to your browser, so you can come back later. (Nothing leaves your machine.)</p>
+
+      <div class="reflect-q">
+        <label for="r1">1. Pick one course you teach. Where could a 15-minute IT/OT segmentation discussion fit?</label>
+        <textarea id="r1" data-key="reflect-r1"></textarea>
+      </div>
+      <div class="reflect-q">
+        <label for="r2">2. Which of the five takeaways above would be hardest for your students to grasp, and why?</label>
+        <textarea id="r2" data-key="reflect-r2"></textarea>
+      </div>
+      <div class="reflect-q">
+        <label for="r3">3. Name one scenario from your own discipline where "what's the worst thing that happens if this fails?" leads to OT-style reasoning.</label>
+        <textarea id="r3" data-key="reflect-r3"></textarea>
+      </div>
+
+      <h3 style="font-family:'Fraunces',serif;margin-top:28px;">Key terms to revisit</h3>
+      <dl class="terms-grid">
+        <div class="term"><dt>Jump Host</dt><dd>Hardened, MFA-protected entry point in the OT DMZ. The only sanctioned remote-access path.</dd></div>
+        <div class="term"><dt>LOTL</dt><dd>Living off the land — adversaries using legitimate tools (PowerShell, vendor utilities) to evade detection.</dd></div>
+        <div class="term"><dt>Microsegmentation</dt><dd>Granular, policy-driven trust boundaries inside an already-segmented network.</dd></div>
+        <div class="term"><dt>MOC</dt><dd>Management of Change — the formal review process every OT change must go through.</dd></div>
+        <div class="term"><dt>SBOM</dt><dd>Software Bill of Materials — a manifest of components used by a product, key for supply chain risk.</dd></div>
+        <div class="term"><dt>SSVC</dt><dd>Stakeholder-Specific Vulnerability Categorization — decision trees for prioritizing patches against downtime.</dd></div>
+        <div class="term"><dt>Compensating Control</dt><dd>A non-ideal control used when the primary control is impossible or disruptive (e.g., out-of-band monitoring).</dd></div>
+        <div class="term"><dt>Break-Glass Account</dt><dd>Emergency-access account with limited lifespan and stringent auditing — non-negotiable in OT.</dd></div>
+      </dl>
+
+      <div class="callout" style="margin-top:28px;">
+        <span class="callout-label">Source &amp; Further Reading</span>
+        <p style="margin:0;">This lesson summarizes <em>Adapting Zero Trust Principles to Operational Technology</em> (CISA, DoW, DOE, FBI, DOS — April 29, 2026). For the full document, see CISA's Zero Trust resources page and NIST SP 800-82r3, "Guide to Operational Technology (OT) Security."</p>
+      </div>
+
+      <div class="pill-row" style="margin-top:24px;">
+        <span class="pill">CISA ZTMM</span>
+        <span class="pill">NIST CSF 2.0</span>
+        <span class="pill">NIST SP 800-207</span>
+        <span class="pill">NIST SP 800-82r3</span>
+        <span class="pill">ISA/IEC 62443</span>
+        <span class="pill">MITRE ATT&amp;CK for ICS</span>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn secondary" data-nav="prev">← Back</button>
+        <button class="btn" id="finishBtn">Finish Workshop ✓</button>
+      </div>
+    </article>
+  </section>
+
+</main>
+
+<footer>
+  Faculty Workshop · Adapting ZT to OT · Built for STEAM faculty · TLP:CLEAR source material
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  // ----------- State management -----------
+  const STORAGE_KEY = 'zt-ot-workshop-v1';
+  const defaultState = {
+    step: 0,
+    completed: [false, false, false, false, false, false, false],
+    classifyDone: false,
+    archDone: false,  // unlocked after viewing 3+ zones
+    archZonesViewed: [],
+    csfDone: false,
+    scenarioDone: false,
+    scenariosAnswered: [],
+    quizScore: 0,
+    quizAnswered: [],
+    theme: null
+  };
+
+  let state;
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    state = saved ? Object.assign({}, defaultState, JSON.parse(saved)) : Object.assign({}, defaultState);
+  } catch (e) {
+    state = Object.assign({}, defaultState);
+  }
+
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  // ----------- Theme -----------
+  function applyTheme(t) {
+    if (t === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
+  if (state.theme) applyTheme(state.theme);
+  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    applyTheme('dark');
+  }
+
+  document.getElementById('themeToggle').addEventListener('click', function() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    state.theme = isDark ? 'light' : 'dark';
+    applyTheme(state.theme);
+    saveState();
+  });
+
+  // ----------- Reset -----------
+  document.getElementById('resetBtn').addEventListener('click', function() {
+    if (confirm('Reset all progress? This will clear your answers and start over.')) {
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+      // Preserve theme
+      const t = state.theme;
+      state = Object.assign({}, defaultState);
+      state.theme = t;
+      saveState();
+      window.location.reload();
+    }
+  });
+
+  // ----------- Print -----------
+  document.getElementById('printBtn').addEventListener('click', function() {
+    window.print();
+  });
+
+  // ----------- Step navigation -----------
+  const steps = document.querySelectorAll('.step');
+  const railSteps = document.querySelectorAll('.rail-step');
+
+  function showStep(n) {
+    n = Math.max(0, Math.min(steps.length - 1, n));
+    steps.forEach(function(s) { s.classList.remove('active'); });
+    steps[n].classList.add('active');
+    railSteps.forEach(function(r, i) {
+      if (i === n) {
+        r.setAttribute('aria-current', 'step');
+      } else {
+        r.removeAttribute('aria-current');
+      }
+      if (state.completed[i]) {
+        r.classList.add('completed');
+      } else {
+        r.classList.remove('completed');
+      }
+    });
+    state.step = n;
+    saveState();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  document.querySelectorAll('[data-nav]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const dir = btn.getAttribute('data-nav');
+      const cur = state.step;
+      if (dir === 'next') {
+        // Mark current as completed if criteria met
+        markCompletionForCurrent();
+        showStep(cur + 1);
+      } else if (dir === 'prev') {
+        showStep(cur - 1);
+      }
+    });
+  });
+
+  railSteps.forEach(function(r) {
+    r.addEventListener('click', function() {
+      const target = parseInt(r.getAttribute('data-step'), 10);
+      // Allow free navigation; users can revisit
+      showStep(target);
+    });
+  });
+
+  function markCompletionForCurrent() {
+    const cur = state.step;
+    // Step-specific completion rules
+    if (cur === 0) state.completed[0] = true;
+    if (cur === 1 && state.classifyDone) state.completed[1] = true;
+    if (cur === 2 && state.archDone) state.completed[2] = true;
+    if (cur === 3 && state.csfDone) state.completed[3] = true;
+    if (cur === 4 && state.scenarioDone) state.completed[4] = true;
+    if (cur === 5 && state.quizAnswered.length === 5) state.completed[5] = true;
+    if (cur === 6) state.completed[6] = true;
+    saveState();
+  }
+
+  // ============================================================
+  // STEP 2: IT vs OT Classify
+  // ============================================================
+  const traits = [
+    { id: 't1', text: 'Uptime tolerance: minutes-to-hours of downtime acceptable', cat: 'it' },
+    { id: 't2', text: 'Uptime tolerance: any downtime can have physical consequences', cat: 'ot' },
+    { id: 't3', text: 'Equipment lifecycle: 3–5 years', cat: 'it' },
+    { id: 't4', text: 'Equipment lifecycle: 15–30+ years', cat: 'ot' },
+    { id: 't5', text: 'Primary security goal: data confidentiality &amp; integrity', cat: 'it' },
+    { id: 't6', text: 'Primary security goal: system availability &amp; safety', cat: 'ot' },
+    { id: 't7', text: 'Routine patching cadence (monthly or faster)', cat: 'it' },
+    { id: 't8', text: 'Patching tied to scheduled outage windows', cat: 'ot' },
+    { id: 't9', text: 'Active vulnerability scans run regularly', cat: 'it' },
+    { id: 't10', text: 'Active scans risk knocking devices offline', cat: 'ot' }
+  ];
+
+  const traitsPool = document.getElementById('traitsPool');
+  const binIT = document.getElementById('binIT');
+  const binOT = document.getElementById('binOT');
+  const classifyStatus = document.getElementById('classifyStatus');
+  const classifyDone = document.getElementById('classifyDone');
+  const step2Next = document.getElementById('step2Next');
+
+  let placedCount = 0;
+
+  function renderTraits() {
+    traitsPool.innerHTML = '';
+    traits.forEach(function(t) {
+      const card = document.createElement('div');
+      card.className = 'trait';
+      card.dataset.id = t.id;
+      card.dataset.cat = t.cat;
+
+      const txt = document.createElement('span');
+      txt.className = 'trait-text';
+      txt.innerHTML = t.text;
+
+      const actions = document.createElement('span');
+      actions.className = 'trait-actions';
+
+      const btnIT = document.createElement('button');
+      btnIT.className = 'trait-btn';
+      btnIT.dataset.choice = 'it';
+      btnIT.textContent = '→ IT';
+      btnIT.setAttribute('aria-label', 'Classify "' + t.text.replace(/&amp;/g, 'and').replace(/<[^>]+>/g, '') + '" as IT');
+      btnIT.addEventListener('click', function() { handleTraitChoice(card, t, 'it'); });
+
+      const btnOT = document.createElement('button');
+      btnOT.className = 'trait-btn';
+      btnOT.dataset.choice = 'ot';
+      btnOT.textContent = '→ OT';
+      btnOT.setAttribute('aria-label', 'Classify "' + t.text.replace(/&amp;/g, 'and').replace(/<[^>]+>/g, '') + '" as OT');
+      btnOT.addEventListener('click', function() { handleTraitChoice(card, t, 'ot'); });
+
+      actions.appendChild(btnIT);
+      actions.appendChild(btnOT);
+      card.appendChild(txt);
+      card.appendChild(actions);
+      traitsPool.appendChild(card);
+    });
+    updateStatus();
+  }
+
+  function handleTraitChoice(card, t, userChoice) {
+    if (card.classList.contains('placed-correct')) return;
+    if (userChoice === t.cat) {
+      // Correct: disable buttons, mark green, move to bin
+      card.classList.remove('placed-wrong');
+      card.classList.add('placed-correct');
+      card.querySelectorAll('.trait-btn').forEach(function(b) { b.disabled = true; });
+      const bin = userChoice === 'it' ? binIT : binOT;
+      bin.appendChild(card);
+      placedCount++;
+      updateStatus();
+      if (placedCount === traits.length) {
+        classifyDone.style.display = 'block';
+        step2Next.disabled = false;
+        state.classifyDone = true;
+        state.completed[1] = true;
+        saveState();
+        railSteps[1].classList.add('completed');
+      }
+    } else {
+      // Wrong: shake, then reset
+      card.classList.add('placed-wrong');
+      setTimeout(function() { card.classList.remove('placed-wrong'); }, 600);
+    }
+  }
+
+  function updateStatus() {
+    classifyStatus.textContent = placedCount + ' of ' + traits.length + ' placed correctly · ' + (placedCount === traits.length ? '✓ Complete!' : 'Click → IT or → OT on any trait');
+  }
+
+  renderTraits();
+
+  // Restore classify state if previously done
+  if (state.classifyDone) {
+    traits.forEach(function(t) {
+      const card = traitsPool.querySelector('[data-id="' + t.id + '"]');
+      if (card) {
+        card.classList.add('placed-correct');
+        card.querySelectorAll('.trait-btn').forEach(function(b) { b.disabled = true; });
+        const bin = t.cat === 'it' ? binIT : binOT;
+        bin.appendChild(card);
+      }
+    });
+    placedCount = traits.length;
+    updateStatus();
+    classifyDone.style.display = 'block';
+    step2Next.disabled = false;
+  }
+
+  // ============================================================
+  // STEP 3: Architecture diagram
+  // ============================================================
+  const archDetails = {
+    it: {
+      title: 'Enterprise IT Zone',
+      body: '<strong>What lives here:</strong> Workstations, email, ERP, Active Directory.<br><br><strong>ZT controls:</strong> Standard IT Zero Trust applies — identity-based access, MFA, EDR, patching cadences in days.<br><br><strong>The catch:</strong> Threat actors like Volt Typhoon target this zone <em>specifically</em> to harvest credentials and pivot to OT. The guidance is emphatic: never share Active Directory between IT and OT — keep them as separate forests or domains.'
+    },
+    dmz: {
+      title: 'OT DMZ + Jump Host',
+      body: '<strong>What lives here:</strong> Hardened jump host (the only sanctioned remote-access path), data historian, EDR staging server.<br><br><strong>ZT controls:</strong> MFA on the jump host is non-negotiable. Session recording, anomaly detection, time-based access constraints. Just-In-Time access for vendors during narrowly defined maintenance windows.<br><br><strong>Why it matters:</strong> The jump host is where you add modern authentication to legacy networks that can\'t support it natively. It is the single most leveraged ZT control in OT environments.'
+    },
+    control: {
+      title: 'Control Network (HMI · SCADA · Engineering Workstation)',
+      body: '<strong>What lives here:</strong> Operator HMIs, SCADA servers, engineering workstations used to push logic to PLCs.<br><br><strong>ZT controls:</strong> Microsegmentation between business units and between control vs safety. Privileged Access Management with credential vaulting. Behavioral monitoring (baseline-based or specification-based detection).<br><br><strong>The challenge:</strong> Engineering workstations are high-value targets — compromising one means you can push malicious logic to PLCs. Disconnected EWS is one reason an asset owner might keep operations running even after detecting a compromise.'
+    },
+    plc: {
+      title: 'PLCs · Sensors · Field Devices',
+      body: '<strong>What lives here:</strong> Programmable logic controllers, sensors, actuators — the components that actually read and write to the physical process.<br><br><strong>ZT controls:</strong> This is where ZT gets hardest. Many of these devices predate modern ICAM. Compensating controls dominate: coarse-grained RBAC, network segmentation, out-of-band monitoring, physical safeguards.<br><br><strong>Communication:</strong> OT-specific protocols (Modbus, DNP3, ENIP/CIP) often lack authentication. Secure variants exist (Modbus Security, DNP SAv5, CIP Security) but are frequently disabled for compatibility. When they can\'t be enabled, wrap legacy protocols in TLS tunnels at gateways.'
+    },
+    safety: {
+      title: 'Safety Instrumented System (SIS)',
+      body: '<strong>What lives here:</strong> The system designed to bring the process to a safe state if something goes wrong — emergency shutdowns, pressure relief, alarm logic.<br><br><strong>ZT controls:</strong> The guidance is unambiguous — <em>preventing adversaries from compromising critical safety mechanisms like safety instrumented systems</em> is a primary goal of microsegmentation.<br><br><strong>The principle:</strong> Safety systems must remain logically separated from control systems. A compromised HMI should never be able to disable an SIS. This is one place where defense-in-depth must win over operational convenience.'
+    }
+  };
+
+  const archDetail = document.getElementById('archDetail');
+  const step3Next = document.getElementById('step3Next');
+  const zoneRects = document.querySelectorAll('.zone-rect');
+  const archZones = document.querySelectorAll('.zone[data-zone]');
+
+  archZones.forEach(function(zg) {
+    const showFn = function() {
+      const id = zg.getAttribute('data-zone');
+      const data = archDetails[id];
+      if (!data) return;
+      // Visual highlight
+      document.querySelectorAll('.zone-rect.active').forEach(function(r) { r.classList.remove('active'); });
+      const rect = zg.querySelector('.zone-rect');
+      if (rect) rect.classList.add('active');
+      // Update detail
+      archDetail.innerHTML = '<h4>' + data.title + '</h4><p>' + data.body + '</p>';
+      // Track viewed
+      if (!state.archZonesViewed.includes(id)) {
+        state.archZonesViewed.push(id);
+      }
+      if (state.archZonesViewed.length >= 3) {
+        state.archDone = true;
+        state.completed[2] = true;
+        step3Next.disabled = false;
+        railSteps[2].classList.add('completed');
+      }
+      saveState();
+    };
+    zg.addEventListener('click', showFn);
+    zg.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        showFn();
+      }
+    });
+  });
+
+  // Restore arch state
+  if (state.archDone) {
+    step3Next.disabled = false;
+  }
+
+  // ============================================================
+  // STEP 4: CSF Mapping
+  // ============================================================
+  const csfControls = [
+    { id: 'c1', text: 'Set risk tolerance & escalation', fn: 'govern' },
+    { id: 'c2', text: 'SBOM review for vendors', fn: 'govern' },
+    { id: 'c3', text: 'Asset inventory (passive)', fn: 'identify' },
+    { id: 'c4', text: 'Threat modeling for OT', fn: 'identify' },
+    { id: 'c5', text: 'Network microsegmentation', fn: 'protect' },
+    { id: 'c6', text: 'Jump host w/ MFA', fn: 'protect' },
+    { id: 'c7', text: 'TLS-wrapped legacy protocols', fn: 'protect' },
+    { id: 'c8', text: 'Baseline behavioral analytics', fn: 'detect' },
+    { id: 'c9', text: 'Continuous monitoring at IT/OT boundary', fn: 'detect' },
+    { id: 'c10', text: 'OT-specific incident playbooks', fn: 'respond' },
+    { id: 'c11', text: 'Engineering logic backups', fn: 'recover' },
+    { id: 'c12', text: 'Hot-swap standby systems', fn: 'recover' }
+  ];
+
+  const csfPool = document.getElementById('csfPool');
+  const csfBuckets = document.querySelectorAll('.csf-bucket');
+  const csfStatus = document.getElementById('csfStatus');
+  const csfDoneEl = document.getElementById('csfDone');
+  const step4Next = document.getElementById('step4Next');
+  let csfPlaced = 0;
+
+  function renderCsfCards() {
+    csfPool.innerHTML = '';
+    csfControls.forEach(function(c) {
+      if (state.placedCsf && state.placedCsf[c.id]) return; // skip if already placed (state not used here, fresh each load)
+      const card = document.createElement('div');
+      card.className = 'csf-card';
+      card.textContent = c.text;
+      card.draggable = true;
+      card.dataset.id = c.id;
+      card.dataset.fn = c.fn;
+      card.tabIndex = 0;
+      card.setAttribute('aria-label', 'Control: ' + c.text + '. Drag to a function bucket, or press Enter to choose by keyboard.');
+      // Drag events
+      card.addEventListener('dragstart', function(e) {
+        card.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', c.id);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      card.addEventListener('dragend', function() {
+        card.classList.remove('dragging');
+      });
+      // Keyboard: open a chooser
+      card.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const choice = window.prompt('Type one of: govern, identify, protect, detect, respond, recover');
+          if (choice) placeCsfCard(c.id, choice.trim().toLowerCase());
+        }
+      });
+      csfPool.appendChild(card);
+    });
+  }
+
+  csfBuckets.forEach(function(b) {
+    b.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      b.classList.add('dragover');
+    });
+    b.addEventListener('dragleave', function() {
+      b.classList.remove('dragover');
+    });
+    b.addEventListener('drop', function(e) {
+      e.preventDefault();
+      b.classList.remove('dragover');
+      const id = e.dataTransfer.getData('text/plain');
+      const fn = b.getAttribute('data-fn');
+      placeCsfCard(id, fn);
+    });
+  });
+
+  function placeCsfCard(id, fn) {
+    const ctrl = csfControls.find(function(c) { return c.id === id; });
+    if (!ctrl) return;
+    const card = csfPool.querySelector('[data-id="' + id + '"]');
+    if (!card) return;
+    if (ctrl.fn === fn) {
+      // correct
+      card.classList.add('placed-correct');
+      card.draggable = false;
+      const bucket = document.querySelector('.csf-bucket[data-fn="' + fn + '"] .csf-items');
+      if (bucket) bucket.appendChild(card);
+      csfPlaced++;
+      updateCsfStatus();
+      if (csfPlaced === csfControls.length) {
+        csfDoneEl.style.display = 'block';
+        step4Next.disabled = false;
+        state.csfDone = true;
+        state.completed[3] = true;
+        saveState();
+        railSteps[3].classList.add('completed');
+      }
+    } else {
+      // wrong
+      card.classList.add('placed-wrong');
+      setTimeout(function() { card.classList.remove('placed-wrong'); }, 600);
+    }
+  }
+
+  function updateCsfStatus() {
+    csfStatus.textContent = csfPlaced + ' of ' + csfControls.length + ' controls mapped · ' + (csfPlaced === csfControls.length ? '✓ Complete!' : 'Drag a card to a function bucket');
+  }
+
+  renderCsfCards();
+  updateCsfStatus();
+
+  if (state.csfDone) {
+    // Auto-place all
+    csfControls.forEach(function(c) {
+      placeCsfCard(c.id, c.fn);
+    });
+  }
+
+  // ============================================================
+  // STEP 5: Scenarios
+  // ============================================================
+  const scenarios = [
+    {
+      id: 's1',
+      prompt: 'A vendor needs to push a firmware update to a PLC at a remote pumping station this afternoon. You have 2 hours\' notice. What is the best response under the joint guidance?',
+      choices: [
+        { id: 'a', text: 'Open a temporary VPN tunnel directly to the PLC for the vendor.', verdict: 'poor', why: 'Direct vendor access to control devices bypasses every Zero Trust principle in the guidance. This is exactly the pattern threat actors exploit.' },
+        { id: 'b', text: 'Provision Just-In-Time access through the OT DMZ jump host with MFA, session recording, and a hard time-window.', verdict: 'best', why: 'The guidance specifically calls out JIT access for narrowly specified vendor maintenance windows, routed through a jump host with MFA and session recording. This is the canonical Zero Trust adaptation for OT remote access.' },
+        { id: 'c', text: 'Defer the update; require the vendor to fly on-site within the week.', verdict: 'ok', why: 'Defensible and sometimes correct — but JIT remote access is the guidance\'s preferred answer when remote access is operationally necessary. Reserve on-site requirements for highest-risk changes.' },
+        { id: 'd', text: 'Have your engineer screen-share with the vendor and apply the update interactively.', verdict: 'poor', why: 'No session recording, no enforced segmentation, no auditability. Combines the worst of remote and physical access patterns.' }
+      ]
+    },
+    {
+      id: 's2',
+      prompt: 'CISA publishes a Known Exploited Vulnerability for the controller family in your water treatment plant. Patching requires a 4-hour outage. Active exploitation has been reported. What\'s the best path?',
+      choices: [
+        { id: 'a', text: 'Patch immediately during operations using hot-patching.', verdict: 'ok', why: 'If your architecture supports hot patching or redundant systems, this can work — but the guidance treats hot-patching as a "where possible" option, not a default. Test compatibility carefully.' },
+        { id: 'b', text: 'Use the SSVC decision tree to evaluate downtime vs exploitation risk; if exploitation risk wins, schedule an emergency outage with full MOC documentation.', verdict: 'best', why: 'Exactly the workflow the guidance prescribes. SSVC explicitly named for this tradeoff. Emergency Management of Change with documented escalation, full backup before/after, and engineering review.' },
+        { id: 'c', text: 'Apply compensating controls (block ports, increase monitoring) and wait for the next scheduled maintenance window.', verdict: 'ok', why: 'Acceptable when patching truly cannot happen — the guidance endorses isolating vulnerable systems with compensating controls. But for an actively exploited KEV, "wait" alone is usually too risky.' },
+        { id: 'd', text: 'Patch immediately, no MOC review, no backup — speed matters more than process.', verdict: 'poor', why: 'Skipping MOC and backup is the fastest path to a botched patch becoming an outage. The guidance is explicit: full system backup before and after every change.' }
+      ]
+    },
+    {
+      id: 's3',
+      prompt: 'Your IDS flags anomalous Modbus traffic from the engineering workstation to a PLC controlling a centrifuge. The plant is running. Containment options range from soft to aggressive.',
+      choices: [
+        { id: 'a', text: 'Immediately air-gap the entire OT network from IT.', verdict: 'ok', why: 'The guidance warns that aggressive isolation can disrupt critical processes and lead to safety incidents. Sometimes correct — but rarely the first move.' },
+        { id: 'b', text: 'Apply "soft segmentation" at a defined demarcation point, coordinate with process engineers, and decide together which functions can continue.', verdict: 'best', why: 'The guidance explicitly names "soft segmentation" as the appropriate first step in many cases. Cross-functional decision-making (security + ops) is non-negotiable here — the security team alone shouldn\'t decide what continues.' },
+        { id: 'c', text: 'Do nothing until the IDS confirms the activity is malicious — false positives are costly.', verdict: 'poor', why: 'OT IDS often runs with limited visibility; "wait and see" while a centrifuge runs is exactly the failure mode that turned up in cyber-physical incidents like Trisis.' },
+        { id: 'd', text: 'Shut down the centrifuge immediately and disconnect the engineering workstation.', verdict: 'ok', why: 'Defensible if safety risk is high — the guidance explicitly notes that proactive shutdown can limit impact to financial loss vs safety consequences. But escalating straight to shutdown skips the collaborative risk assessment the guidance recommends.' }
+      ]
+    }
+  ];
+
+  const scenarioContainer = document.getElementById('scenarioContainer');
+  const step5Next = document.getElementById('step5Next');
+
+  function renderScenarios() {
+    scenarioContainer.innerHTML = '';
+    scenarios.forEach(function(s, i) {
+      const card = document.createElement('div');
+      card.className = 'scenario-card';
+      card.innerHTML = '<div class="scenario-prompt"><strong>' + (i+1) + ' of 3.</strong> ' + s.prompt + '</div><div class="scenario-choices" data-sid="' + s.id + '"></div><div class="scenario-rationale" data-rid="' + s.id + '"></div>';
+      const choicesEl = card.querySelector('.scenario-choices');
+      const rationaleEl = card.querySelector('.scenario-rationale');
+      s.choices.forEach(function(c) {
+        const btn = document.createElement('button');
+        btn.className = 'scenario-choice';
+        btn.textContent = c.text;
+        btn.addEventListener('click', function() {
+          // Disable all
+          choicesEl.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+          btn.classList.add('selected', c.verdict);
+          const verdictText = c.verdict === 'best' ? 'BEST CHOICE' : (c.verdict === 'ok' ? 'DEFENSIBLE' : 'PROBLEMATIC');
+          rationaleEl.innerHTML = '<span class="verdict ' + c.verdict + '">' + verdictText + '</span>' + c.why;
+          rationaleEl.classList.add('show');
+          if (!state.scenariosAnswered.includes(s.id)) {
+            state.scenariosAnswered.push(s.id);
+          }
+          if (state.scenariosAnswered.length === scenarios.length) {
+            state.scenarioDone = true;
+            state.completed[4] = true;
+            step5Next.disabled = false;
+            railSteps[4].classList.add('completed');
+          }
+          saveState();
+        });
+        choicesEl.appendChild(btn);
+      });
+      scenarioContainer.appendChild(card);
+    });
+  }
+
+  renderScenarios();
+  if (state.scenarioDone) step5Next.disabled = false;
+
+  // ============================================================
+  // STEP 6: Quiz
+  // ============================================================
+  const quiz = [
+    {
+      q: 'According to the guidance, what assumption sits at the heart of Zero Trust?',
+      options: [
+        { t: 'The perimeter firewall is the strongest control.', c: false },
+        { t: 'A breach has already occurred.', c: true },
+        { t: 'OT and IT can share the same identity infrastructure.', c: false },
+        { t: 'Air-gapping eliminates the need for monitoring.', c: false }
+      ],
+      explain: 'ZT explicitly assumes a breach has occurred and is designed to limit threat actor movement and damage. The other options contradict the guidance directly.'
+    },
+    {
+      q: 'Why does the guidance discourage typical active vulnerability scanning in OT networks?',
+      options: [
+        { t: 'Scans take too long to complete.', c: false },
+        { t: 'Active scans can knock legacy OT devices offline.', c: true },
+        { t: 'Scans are expensive to license.', c: false },
+        { t: 'OT devices are immune to known vulnerabilities.', c: false }
+      ],
+      explain: 'The guidance includes a specific note: "Typical active scanning should not be attempted without a deep awareness of your system, as this may knock a legacy device offline." Passive monitoring is the default.'
+    },
+    {
+      q: 'Which of these is the guidance\'s preferred path when a modern secure protocol (e.g., Modbus Security) cannot be enabled in a legacy environment?',
+      options: [
+        { t: 'Disable communications entirely.', c: false },
+        { t: 'Encrypt every packet at the PLC.', c: false },
+        { t: 'Wrap legacy protocols in secure tunnels (e.g., TLS-enabled gateways).', c: true },
+        { t: 'Replace all PLCs immediately.', c: false }
+      ],
+      explain: 'When secure protocol support is unavailable, the guidance recommends wrapping legacy protocols in secure tunnels via TLS-enabled gateways, so encryption and authentication occur outside the control devices themselves.'
+    },
+    {
+      q: 'What does the guidance say about connecting IT and OT identity systems (e.g., Active Directory)?',
+      options: [
+        { t: 'Share a single AD forest for efficiency.', c: false },
+        { t: 'Use one-way trust from IT to OT only.', c: false },
+        { t: 'Avoid direct IT-OT trust relationships; segment AD entirely if used in OT.', c: true },
+        { t: 'Replace AD with a cloud identity provider.', c: false }
+      ],
+      explain: '"Segregation is Paramount" — the guidance explicitly says not to directly connect IT and OT ICAM, and recommends a separate forest or domain. Volt Typhoon-style attacks specifically exploit shared credentials.'
+    },
+    {
+      q: 'Which two practices does the guidance say should bracket every OT configuration change?',
+      options: [
+        { t: 'A press release before and after the change.', c: false },
+        { t: 'A full system backup before and after the change.', c: true },
+        { t: 'A vendor sign-off before and after.', c: false },
+        { t: 'A penetration test before and after.', c: false }
+      ],
+      explain: '"A full system backup should be taken immediately before and after any configuration change." This is one of the most concrete operational requirements in the guidance.'
+    }
+  ];
+
+  const quizContainer = document.getElementById('quizContainer');
+  const scoreRibbon = document.getElementById('scoreRibbon');
+  const scoreNum = document.getElementById('scoreNum');
+  const scorePct = document.getElementById('scorePct');
+  const scoreVerdict = document.getElementById('scoreVerdict');
+  const step6Next = document.getElementById('step6Next');
+
+  function renderQuiz() {
+    quizContainer.innerHTML = '';
+    quiz.forEach(function(qq, i) {
+      const card = document.createElement('div');
+      card.className = 'quiz-q';
+      card.innerHTML = '<div class="q-num">Question ' + (i+1) + ' of ' + quiz.length + '</div><div class="q-text">' + qq.q + '</div><div class="quiz-options" data-qi="' + i + '"></div><div class="quiz-feedback" data-fi="' + i + '"></div>';
+      const opts = card.querySelector('.quiz-options');
+      const fb = card.querySelector('.quiz-feedback');
+      qq.options.forEach(function(opt, oi) {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-option';
+        btn.textContent = opt.t;
+        btn.addEventListener('click', function() {
+          opts.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+          if (opt.c) {
+            btn.classList.add('correct');
+            state.quizScore++;
+          } else {
+            btn.classList.add('wrong');
+            // Reveal correct
+            opts.querySelectorAll('button').forEach(function(b, bi) {
+              if (qq.options[bi].c) b.classList.add('correct');
+            });
+          }
+          fb.innerHTML = '<strong>Why:</strong> ' + qq.explain;
+          fb.classList.add('show');
+          if (!state.quizAnswered.includes(i)) {
+            state.quizAnswered.push(i);
+          }
+          if (state.quizAnswered.length === quiz.length) {
+            showScore();
+            step6Next.disabled = false;
+            state.completed[5] = true;
+            railSteps[5].classList.add('completed');
+          }
+          saveState();
+        });
+        opts.appendChild(btn);
+      });
+      quizContainer.appendChild(card);
+    });
+  }
+
+  function showScore() {
+    const total = quiz.length;
+    const score = state.quizScore;
+    const pct = Math.round((score / total) * 100);
+    scoreNum.textContent = score + '/' + total;
+    scorePct.textContent = pct + '%';
+    let v;
+    if (pct === 100) v = 'Outstanding. You\'ve internalized the joint guidance.';
+    else if (pct >= 80) v = 'Strong grasp. Review the missed item before bringing this to your students.';
+    else if (pct >= 60) v = 'Solid foundation. Take a second pass on the architecture and ICAM sections.';
+    else v = 'The framework is dense — revisit the IT vs OT distinctions and try again.';
+    scoreVerdict.textContent = v;
+    scoreRibbon.style.display = 'flex';
+  }
+
+  renderQuiz();
+
+  if (state.quizAnswered.length === quiz.length) {
+    showScore();
+    step6Next.disabled = false;
+  }
+
+  // ============================================================
+  // STEP 7: Reflection (textareas with localStorage)
+  // ============================================================
+  document.querySelectorAll('textarea[data-key]').forEach(function(ta) {
+    const key = ta.getAttribute('data-key');
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY + ':' + key);
+      if (saved) ta.value = saved;
+    } catch (e) {}
+    ta.addEventListener('input', function() {
+      try { localStorage.setItem(STORAGE_KEY + ':' + key, ta.value); } catch (e) {}
+    });
+  });
+
+  document.getElementById('finishBtn').addEventListener('click', function() {
+    state.completed[6] = true;
+    saveState();
+    railSteps[6].classList.add('completed');
+    alert('Workshop complete. Your reflections are saved locally — they\'ll be here when you come back. Use the print button (top right) to save a PDF copy.');
+  });
+
+  // ============================================================
+  // Initial render
+  // ============================================================
+  showStep(state.step);
+
+  // Update completed indicators on initial load
+  state.completed.forEach(function(done, i) {
+    if (done) railSteps[i].classList.add('completed');
+  });
+
+})();
+</script>
+
+</body>
+</html>
