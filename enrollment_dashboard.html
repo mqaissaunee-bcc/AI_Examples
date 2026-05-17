@@ -2218,6 +2218,10 @@
     const showBench = state.showBenchmarks;
     const cw = showBench ? collegeWideStats(snap) : null;
 
+    // Build per-discipline rows, then filter out disciplines with zero
+    // sections in the current filtered view. Otherwise the table fills
+    // with noise rows like "AMSL: 0 sections, 0/0 enrolled, 0% fill, -37.6pp"
+    // when a fill bucket like Full or Empty is active.
     const tableRows = present.map(p => {
       const rows = snap.rows.filter(r => r._prefix === p && inFilter(r));
       const prevRows = prevSnap ? prevSnap.rows.filter(r => r._prefix === p && inFilter(r)) : null;
@@ -2227,6 +2231,19 @@
       const capacity = sum(rows, 'Capacity');
       const fill = capacity > 0 ? (enrolled / capacity * 100) : 0;
 
+      return { p, rows, prevRows, sections, enrolled, capacity, fill };
+    }).filter(d => d.sections > 0);
+
+    if (tableRows.length === 0) {
+      // Active filters eliminated every row — show a clear message instead
+      // of an empty table
+      return `<div class="section-title">By Discipline <span class="meta">no matches</span></div>
+        <p style="color:var(--ink-mute);font-style:italic;padding:14px 0">No discipline has any sections matching the current filters.</p>`;
+    }
+
+    const renderedRows = tableRows.map(d => {
+      const { p, rows, prevRows, sections, enrolled, capacity, fill } = d;
+
       let dFill = '';
       if (prevRows && prevRows.length > 0) {
         const ePrev = sum(prevRows, 'Enrolled Students');
@@ -2235,9 +2252,20 @@
         dFill = miniDelta(fill - fPrev, 'pp', 1);
       }
 
-      const vsCollegeCell = cw
+      // vs. College only makes sense if this discipline has capacity to
+      // compare. If capacity is 0 (e.g. all sections are placeholder-cap
+      // independent study), suppress the delta — comparing 0% to the
+      // college fill rate produces a misleading "-X.Xpp behind."
+      const vsCollegeCell = (cw && capacity > 0)
         ? `<span class="ds-bench">${miniDelta(fill - cw.fill, 'pp', 1, 'Compared to the college-wide fill rate right now.')}</span>`
         : '<span style="color:var(--ink-mute)">—</span>';
+
+      // Honest flag for fill > 100% from placeholder-capacity sections.
+      // ACAD-089 independent study sections have cap=1, enr=7 → 700% fill.
+      // The math is true but the display is confusing without context.
+      const fillDisplay = fill > 200
+        ? `<strong title="High fill % typically indicates placeholder-capacity sections (e.g., independent study) where ‘capacity’ is set to 1">${fill.toFixed(1)}%</strong>`
+        : `<strong>${fill.toFixed(1)}%</strong>`;
 
       // Sparkline of total enrollment for this discipline across snapshots
       const enrSeries = state.snapshots.map(s =>
@@ -2252,7 +2280,7 @@
           <td class="ds-disc"><span class="swatch" style="background:${colorFor(p)}"></span><strong>${escapeHtml(p)}</strong></td>
           <td class="right">${sections}</td>
           <td class="right">${enrolled} / ${capacity}</td>
-          <td class="right"><strong>${fill.toFixed(1)}%</strong> ${dFill}</td>
+          <td class="right">${fillDisplay} ${dFill}</td>
           <td class="right">${vsCollegeCell}</td>
           <td class="ds-trend">${sparkCell}</td>
         </tr>
@@ -2273,7 +2301,7 @@
               <th>Trend</th>
             </tr>
           </thead>
-          <tbody>${tableRows}</tbody>
+          <tbody>${renderedRows}</tbody>
         </table>
       </div>
     `;
