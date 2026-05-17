@@ -2,14 +2,13 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v4.6
-  Date:     May 13, 2026
-  Features: Adds per-discipline collapsibility for "Sections at a Glance"
-            (smart default + localStorage), context-aware siblings (hide
-            non-alternatives, flag absence of alternatives), and a compact
-            discipline comparison table replacing the card panels (auto-
-            hides when only one discipline is in view). Built on v4.4
-            canonical baseline.
+  Version:  v4.8
+  Date:     May 17, 2026
+  Features: Overview tab improvements — drill-in now focuses (replaces
+            selection with clicked discipline), 7-bucket finer color scale,
+            size/color metric toggles (sections/enrolled/capacity, fill/
+            change-since-last), three alert panels (High Demand, At Risk,
+            Under-Filled). Built on v4.4 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -891,6 +890,258 @@
   .delta-cell.down { color: var(--down); }
   .delta-cell.flat { color: var(--flat); }
 
+  /* Overview tab — college-wide treemap + alerts */
+  .overview-summary {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 1px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule-strong);
+    margin-bottom: 22px;
+    box-shadow: var(--shadow);
+  }
+  .overview-summary .ov-stat {
+    padding: 14px 16px;
+    border-right: 1px solid var(--rule);
+    text-align: left;
+  }
+  .overview-summary .ov-stat:last-child { border-right: none; }
+  .overview-summary .ov-label {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    margin-bottom: 6px;
+  }
+  .overview-summary .ov-value {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--ink);
+  }
+
+  .overview-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .overview-treemap-wrap,
+  .overview-alerts-wrap {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 18px 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .overview-head {
+    margin-bottom: 14px;
+  }
+  .overview-head h3 {
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--ink);
+    margin: 0 0 4px 0;
+    letter-spacing: 0.01em;
+  }
+  .overview-head .overview-meta {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+
+  .overview-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .overview-legend .lg-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .overview-legend .lg-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+  }
+
+  .treemap-container {
+    width: 100%;
+    aspect-ratio: 1000 / 550;
+    background: var(--bg);
+  }
+  .treemap-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .tm-tile {
+    transition: opacity 0.15s;
+  }
+  .tm-tile:hover {
+    opacity: 0.82;
+  }
+  .tm-tile:hover rect {
+    stroke-width: 3;
+    stroke: var(--ink);
+  }
+
+  /* Overview toggle bar (size metric, color metric) */
+  .overview-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding: 8px 0;
+  }
+  .overview-toggle-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .overview-toggle-group .lbl {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    margin-right: 4px;
+  }
+  .overview-toggle-group .chip.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Three-panel alerts column */
+  .alert-panel {
+    margin-bottom: 16px;
+  }
+  .alert-panel:last-child { margin-bottom: 0; }
+  .alert-panel-head {
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .alert-panel-head h4 {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink);
+    margin: 0 0 2px 0;
+  }
+  .alert-panel-head .alert-count {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    letter-spacing: 0.04em;
+  }
+  .alert-panel-head .alert-panel-sub {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-style: italic;
+    color: var(--ink-mute);
+  }
+  .alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .alert-card {
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--warn);
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .alert-card:hover {
+    background: var(--surface);
+    transform: translateX(2px);
+  }
+  /* Per-category accent colors so chairs can distinguish at a glance */
+  .alert-card.high-demand { border-left-color: var(--info); }
+  .alert-card.high-demand .alert-icon { color: var(--info); }
+  .alert-card.at-risk { border-left-color: #8b0000; }
+  .alert-card.at-risk .alert-icon { color: #8b0000; }
+  .alert-card.under-filled { border-left-color: #f4a261; }
+  .alert-card.under-filled .alert-icon { color: #f4a261; }
+
+  .alert-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 3px;
+  }
+  .alert-icon {
+    color: var(--warn);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .alert-code {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.04em;
+  }
+  .alert-title {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-bottom: 3px;
+    line-height: 1.3;
+  }
+  .alert-meta {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .overview-empty {
+    color: var(--ink-mute);
+    font-style: italic;
+    padding: 14px 8px;
+    text-align: center;
+    font-size: 11px;
+  }
+
+  .overview-badge {
+    background: transparent !important;
+    color: var(--ink-mute) !important;
+  }
+
+  /* Responsive: stack treemap and alerts on narrow screens */
+  @media (max-width: 1000px) {
+    .overview-grid { grid-template-columns: 1fr; }
+    .overview-summary { grid-template-columns: repeat(3, 1fr); }
+    .overview-summary .ov-stat:nth-child(3n) { border-right: none; }
+  }
+
   /* Snapshot management */
   .snapshot-list {
     border: 1px solid var(--rule);
@@ -1031,7 +1282,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v4.6</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v4.8</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -1091,6 +1342,8 @@
     fillBucket: 'all',      // 'all' | 'full' | 'almost' | 'under' | 'empty'
     cardExpansion: {},      // explicit per-discipline overrides: { ELEC: true, MATH: false }
                             //   missing key => use smart default (expand if <20 sections)
+    overviewSizeMetric: 'sections',  // 'sections' | 'enrolled' | 'capacity'
+    overviewColorMetric: 'fill',     // 'fill' | 'change'
 
     // Loading state for GitHub-hosted data
     loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
@@ -1623,6 +1876,8 @@
       body += renderTrendsView();
     } else if (state.activeTab === 'snapshots') {
       body += renderSnapshotManager();
+    } else if (state.activeTab === 'overview') {
+      body += renderOverview();
     }
 
     dash.innerHTML = body;
@@ -1731,6 +1986,7 @@
         <button class="tab ${state.activeTab === 'snapshot' ? 'active' : ''}" data-tab="snapshot">Current Snapshot <span class="count">${sections}</span></button>
         <button class="tab ${state.activeTab === 'trends' ? 'active' : ''}" data-tab="trends">Trends <span class="count">${state.snapshots.length}</span></button>
         <button class="tab ${state.activeTab === 'snapshots' ? 'active' : ''}" data-tab="snapshots">Snapshots</button>
+        <button class="tab ${state.activeTab === 'overview' ? 'active' : ''}" data-tab="overview">Overview <span class="count overview-badge" title="College-wide capacity heatmap">∷</span></button>
       </div>
     `;
   }
@@ -2763,6 +3019,425 @@
   }
 
   /* =========================================================================
+   * OVERVIEW TAB — college-wide capacity heatmap + critical alerts
+   * ========================================================================= */
+
+  // Squarified treemap algorithm (Bruls, Huijsen, van Wijk 2000).
+  // Takes a list of items with .value, packs them into a rectangle, returns
+  // items annotated with {x, y, w, h} for rendering.
+  //
+  // The algorithm packs items into rows (or columns, whichever direction is
+  // shorter at the moment), choosing greedily to keep aspect ratios close
+  // to 1 (square-ish). This produces visually balanced layouts where you
+  // can compare sizes by eye without needing axes.
+  function squarifyTreemap(items, x, y, w, h) {
+    // Sort by value descending — biggest items first
+    items = items.slice().sort((a, b) => b.value - a.value);
+    const total = items.reduce((s, i) => s + i.value, 0);
+    if (total <= 0 || items.length === 0) return [];
+
+    // Scale all values so they fit the rectangle's area exactly
+    const area = w * h;
+    const scaled = items.map(i => ({ ...i, scaledValue: (i.value / total) * area }));
+
+    const results = [];
+
+    // Layout cursor — tracks the remaining rectangle as we consume it
+    let rx = x, ry = y, rw = w, rh = h;
+
+    function layoutRow(row, shortSide) {
+      // Lay out a row of items along the shorter side of the remaining rect.
+      // 'shortSide' is the side perpendicular to the row's direction.
+      const rowTotal = row.reduce((s, i) => s + i.scaledValue, 0);
+      const rowDepth = rowTotal / shortSide;
+
+      if (rw < rh) {
+        // Layout horizontally: row goes left-to-right at the top
+        let cursorX = rx;
+        for (const item of row) {
+          const itemW = item.scaledValue / rowDepth;
+          results.push({ ...item, x: cursorX, y: ry, w: itemW, h: rowDepth });
+          cursorX += itemW;
+        }
+        ry += rowDepth;
+        rh -= rowDepth;
+      } else {
+        // Layout vertically: row goes top-to-bottom on the left
+        let cursorY = ry;
+        for (const item of row) {
+          const itemH = item.scaledValue / rowDepth;
+          results.push({ ...item, x: rx, y: cursorY, w: rowDepth, h: itemH });
+          cursorY += itemH;
+        }
+        rx += rowDepth;
+        rw -= rowDepth;
+      }
+    }
+
+    // Worst aspect ratio in a candidate row (closer to 1 is better)
+    function worstRatio(row, shortSide) {
+      const sum = row.reduce((s, i) => s + i.scaledValue, 0);
+      const rMax = Math.max(...row.map(i => i.scaledValue));
+      const rMin = Math.min(...row.map(i => i.scaledValue));
+      const s2 = shortSide * shortSide;
+      const sum2 = sum * sum;
+      return Math.max((s2 * rMax) / sum2, sum2 / (s2 * rMin));
+    }
+
+    let queue = scaled.slice();
+    let currentRow = [];
+
+    while (queue.length > 0) {
+      const shortSide = Math.min(rw, rh);
+      const candidate = queue[0];
+      const trialRow = currentRow.concat([candidate]);
+
+      if (currentRow.length === 0 ||
+          worstRatio(trialRow, shortSide) <= worstRatio(currentRow, shortSide)) {
+        // Adding this item improves or keeps the row's aspect — accept it
+        currentRow.push(candidate);
+        queue.shift();
+      } else {
+        // Adding this item would make ratios worse — commit current row and start fresh
+        layoutRow(currentRow, shortSide);
+        currentRow = [];
+      }
+    }
+    if (currentRow.length > 0) layoutRow(currentRow, Math.min(rw, rh));
+
+    return results;
+  }
+
+  // 7-bucket color scale used ONLY on the Overview tab. More granular than
+  // the 4-bucket fill-status filter so chairs scanning the treemap can
+  // distinguish "20% fill" from "5% fill" from "0%". Snapshot tab's filter
+  // keeps the 4-bucket scale because it's an interactive picker, not a
+  // passive heatmap.
+  const OVERVIEW_BUCKETS = [
+    { id: 'empty',     label: '0% (empty)',       min: -Infinity, max: 0,    color: '#8b0000', text: '#fff' },
+    { id: 'crit',      label: '1–19%',            min: 0.0001,    max: 20,   color: '#dc3545', text: '#fff' },
+    { id: 'under',     label: '20–49%',           min: 20,        max: 50,   color: '#f4a261', text: '#1a1a1a' },
+    { id: 'mid',       label: '50–74%',           min: 50,        max: 75,   color: '#e9c46a', text: '#1a1a1a' },
+    { id: 'healthy',   label: '75–89%',           min: 75,        max: 90,   color: '#a8c97f', text: '#1a1a1a' },
+    { id: 'almost',    label: '90–99%',           min: 90,        max: 100,  color: '#2a9d8f', text: '#fff' },
+    { id: 'full',      label: '100%+ (full)',     min: 100,       max: Infinity, color: '#264653', text: '#fff' },
+  ];
+
+  function overviewBucketFor(fillPct, enrolled) {
+    // Special-case: enrolled === 0 always maps to "empty" even if
+    // capacity is 0 (would otherwise be NaN/0% ambiguous)
+    if (enrolled === 0) return OVERVIEW_BUCKETS[0];
+    for (const b of OVERVIEW_BUCKETS) {
+      if (fillPct >= b.min && fillPct < b.max) return b;
+    }
+    return OVERVIEW_BUCKETS[OVERVIEW_BUCKETS.length - 1];
+  }
+
+  // Color for "change since last snapshot" mode. Diverging scale: large
+  // positive deltas trend green, flat stays neutral, large negative deltas
+  // trend red. Mostly used when the user toggles the Overview color metric
+  // from "current fill rate" to "change."
+  function changeBucketFor(deltaEnrolled) {
+    if (deltaEnrolled === 0)  return { color: 'var(--surface-2)', text: 'var(--ink)', label: 'flat' };
+    if (deltaEnrolled >= 50)  return { color: '#264653', text: '#fff', label: 'gained 50+' };
+    if (deltaEnrolled >= 20)  return { color: '#2a9d8f', text: '#fff', label: 'gained 20-49' };
+    if (deltaEnrolled >= 5)   return { color: '#a8c97f', text: '#1a1a1a', label: 'gained 5-19' };
+    if (deltaEnrolled > 0)    return { color: '#e9c46a', text: '#1a1a1a', label: 'gained 1-4' };
+    if (deltaEnrolled > -5)   return { color: '#f4a261', text: '#1a1a1a', label: 'lost 1-4' };
+    if (deltaEnrolled > -20)  return { color: '#dc3545', text: '#fff', label: 'lost 5-19' };
+    return { color: '#8b0000', text: '#fff', label: 'lost 20+' };
+  }
+
+  // Determine the area-weight for a discipline based on chosen size metric
+  function valueForSizeMetric(d, metric) {
+    if (metric === 'enrolled') return Math.max(1, d.enrolled);  // min 1 so 0-enroll tiles don't disappear
+    if (metric === 'capacity') return Math.max(1, d.capacity);
+    return Math.max(1, d.sections);
+  }
+
+  function renderOverview() {
+    const snap = currentSnapshot();
+    if (!snap) {
+      return `<p style="color:var(--ink-mute);padding:24px;font-style:italic">No snapshot loaded.</p>`;
+    }
+
+    // Aggregate stats per discipline prefix (college-wide, ignores selection)
+    const byPrefix = {};
+    snap.rows.forEach(r => {
+      const p = r._prefix;
+      if (!byPrefix[p]) byPrefix[p] = { prefix: p, sections: 0, enrolled: 0, capacity: 0, waitlist: 0 };
+      byPrefix[p].sections += 1;
+      byPrefix[p].enrolled += Number(r['Enrolled Students']) || 0;
+      byPrefix[p].capacity += Number(r.Capacity) || 0;
+      byPrefix[p].waitlist += Number(r['Wait List']) || 0;
+    });
+
+    // For "change" color metric: also aggregate previous snapshot per prefix
+    const prevSnap = previousSnapshot();
+    const prevByPrefix = {};
+    if (prevSnap) {
+      prevSnap.rows.forEach(r => {
+        const p = r._prefix;
+        if (!prevByPrefix[p]) prevByPrefix[p] = { enrolled: 0 };
+        prevByPrefix[p].enrolled += Number(r['Enrolled Students']) || 0;
+      });
+    }
+
+    const disciplines = Object.values(byPrefix);
+    const sizeMetric = state.overviewSizeMetric;
+    const colorMetric = state.overviewColorMetric;
+    const hasPrev = prevSnap !== null;
+    // Fall back to fill if user picked 'change' but there's no previous snapshot
+    const effectiveColorMetric = (colorMetric === 'change' && !hasPrev) ? 'fill' : colorMetric;
+
+    // Compute treemap layout — 1000x550 viewBox, scaled responsively via CSS
+    const tmW = 1000, tmH = 550;
+    const items = disciplines.map(d => {
+      const fill = d.capacity > 0 ? (d.enrolled / d.capacity * 100) : 0;
+      const prev = prevByPrefix[d.prefix];
+      const deltaEnrolled = prev ? (d.enrolled - prev.enrolled) : 0;
+      return {
+        ...d,
+        value: valueForSizeMetric(d, sizeMetric),
+        fill,
+        deltaEnrolled,
+      };
+    });
+    const laidOut = squarifyTreemap(items, 0, 0, tmW, tmH);
+
+    const tiles = laidOut.map(item => {
+      const colorBucket = effectiveColorMetric === 'change'
+        ? changeBucketFor(item.deltaEnrolled)
+        : overviewBucketFor(item.fill, item.enrolled);
+
+      const showLabel = item.w >= 50 && item.h >= 30;
+      const showSub = item.w >= 60 && item.h >= 45;
+      const labelFontSize = Math.min(14, Math.max(9, Math.sqrt(item.w * item.h) / 8));
+
+      const subText = effectiveColorMetric === 'change'
+        ? (item.deltaEnrolled >= 0 ? `+${item.deltaEnrolled}` : `${item.deltaEnrolled}`)
+        : `${item.fill.toFixed(0)}%`;
+
+      const tooltipParts = [
+        `${item.prefix} — ${item.sections} section${item.sections === 1 ? '' : 's'}`,
+        `${item.enrolled}/${item.capacity} enrolled`,
+        `${item.fill.toFixed(1)}% fill`,
+      ];
+      if (item.waitlist > 0) tooltipParts.push(`${item.waitlist} waitlisted`);
+      if (hasPrev) tooltipParts.push(`${item.deltaEnrolled >= 0 ? '+' : ''}${item.deltaEnrolled} since last snapshot`);
+
+      return `
+        <g class="tm-tile" data-overview-drill="${escapeHtml(item.prefix)}"
+           style="cursor:pointer">
+          <rect x="${item.x.toFixed(1)}" y="${item.y.toFixed(1)}"
+                width="${item.w.toFixed(1)}" height="${item.h.toFixed(1)}"
+                fill="${colorBucket.color}" stroke="${colorBucket.color}" stroke-width="2"/>
+          ${showLabel ? `
+            <text x="${(item.x + item.w/2).toFixed(1)}" y="${(item.y + item.h/2 - (showSub ? 8 : 0)).toFixed(1)}"
+                  text-anchor="middle" dominant-baseline="middle"
+                  fill="${colorBucket.text}" font-family="Helvetica Neue, sans-serif"
+                  font-size="${labelFontSize.toFixed(1)}" font-weight="700">
+              ${escapeHtml(item.prefix)}
+            </text>
+            ${showSub ? `
+              <text x="${(item.x + item.w/2).toFixed(1)}" y="${(item.y + item.h/2 + labelFontSize - 2).toFixed(1)}"
+                    text-anchor="middle" dominant-baseline="middle"
+                    fill="${colorBucket.text}" font-family="Helvetica Neue, sans-serif"
+                    font-size="${(labelFontSize * 0.85).toFixed(1)}" font-weight="500" opacity="0.95">
+                ${subText}
+              </text>
+            ` : ''}
+          ` : ''}
+          <title>${escapeHtml(tooltipParts.join(' · '))}</title>
+        </g>
+      `;
+    }).join('');
+
+    // Legend changes based on color metric
+    const legend = effectiveColorMetric === 'change'
+      ? `<div class="overview-legend">
+          <span class="lg-item"><span class="lg-swatch" style="background:#8b0000"></span>Lost 20+</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:#dc3545"></span>Lost 5-19</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:#f4a261"></span>Lost 1-4</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:var(--surface-2);border:1px solid var(--rule)"></span>No change</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:#e9c46a"></span>Gained 1-4</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:#a8c97f"></span>Gained 5-19</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:#2a9d8f"></span>Gained 20-49</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:#264653"></span>Gained 50+</span>
+        </div>`
+      : `<div class="overview-legend">
+          ${OVERVIEW_BUCKETS.map(b => `<span class="lg-item"><span class="lg-swatch" style="background:${b.color}"></span>${escapeHtml(b.label)}</span>`).join('')}
+        </div>`;
+
+    // Toggles for size and color metrics
+    const sizeOptions = [
+      { id: 'sections', label: 'Sections' },
+      { id: 'enrolled', label: 'Enrolled' },
+      { id: 'capacity', label: 'Capacity' },
+    ];
+    const colorOptions = [
+      { id: 'fill',   label: 'Fill rate' },
+      { id: 'change', label: 'Change vs. last', disabled: !hasPrev },
+    ];
+
+    const toggleBar = `
+      <div class="overview-toggles">
+        <div class="overview-toggle-group">
+          <span class="lbl">Size:</span>
+          ${sizeOptions.map(o => `
+            <button class="chip ${sizeMetric === o.id ? 'active' : ''}" data-ov-size="${o.id}">${escapeHtml(o.label)}</button>
+          `).join('')}
+        </div>
+        <div class="overview-toggle-group">
+          <span class="lbl">Color:</span>
+          ${colorOptions.map(o => `
+            <button class="chip ${effectiveColorMetric === o.id ? 'active' : ''}${o.disabled ? ' disabled' : ''}" data-ov-color="${o.id}" ${o.disabled ? 'disabled title="Need at least two snapshots to compare"' : ''}>${escapeHtml(o.label)}</button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    // === Alert panels ===
+    // Three categories of attention-worthy sections, sorted by severity.
+    // Each card is clickable to drill into that discipline.
+
+    function alertCard(r, metaText, modifier) {
+      return `
+        <div class="alert-card ${modifier || ''}" data-overview-drill="${escapeHtml(r._prefix)}" title="Click to focus on ${escapeHtml(r._prefix)}">
+          <div class="alert-head">
+            <span class="alert-icon">⚠</span>
+            <span class="alert-code">${escapeHtml(r.Section)}</span>
+          </div>
+          <div class="alert-title">${escapeHtml(r['Course Title'] || '')}</div>
+          <div class="alert-meta">${escapeHtml(metaText)}</div>
+        </div>
+      `;
+    }
+
+    // 1. Waitlist pressure — unmet demand
+    const waitlistRows = snap.rows
+      .filter(r => (Number(r['Wait List']) || 0) > 0)
+      .sort((a, b) => (Number(b['Wait List']) || 0) - (Number(a['Wait List']) || 0))
+      .slice(0, 8);
+
+    // 2. At Risk — zero enrolled sections
+    const atRiskRows = snap.rows
+      .filter(r => (Number(r['Enrolled Students']) || 0) === 0)
+      .sort((a, b) => (Number(b.Capacity) || 0) - (Number(a.Capacity) || 0))
+      .slice(0, 8);
+
+    // 3. Under-Filled — sections with at least one student but under 30% fill
+    //    (catches sections that have started enrolling but are struggling)
+    const underFilledRows = snap.rows
+      .filter(r => {
+        const enr = Number(r['Enrolled Students']) || 0;
+        const cap = Number(r.Capacity) || 0;
+        if (enr === 0 || cap === 0) return false;
+        const fill = (enr / cap) * 100;
+        return fill < 30;
+      })
+      .sort((a, b) => {
+        // Sort by absolute seat shortfall (cap - enr), descending: bigger gap = more concerning
+        const aSh = (Number(a.Capacity) || 0) - (Number(a['Enrolled Students']) || 0);
+        const bSh = (Number(b.Capacity) || 0) - (Number(b['Enrolled Students']) || 0);
+        return bSh - aSh;
+      })
+      .slice(0, 8);
+
+    function buildPanel(title, subtitle, rows, emptyMsg, formatMeta, modifier) {
+      const count = rows.length;
+      const cards = count === 0
+        ? `<p class="overview-empty">${emptyMsg}</p>`
+        : rows.map(r => alertCard(r, formatMeta(r), modifier)).join('');
+      return `
+        <div class="alert-panel">
+          <div class="alert-panel-head">
+            <h4>${escapeHtml(title)}${count > 0 ? ` <span class="alert-count">${count}</span>` : ''}</h4>
+            <span class="alert-panel-sub">${escapeHtml(subtitle)}</span>
+          </div>
+          <div class="alerts-list">${cards}</div>
+        </div>
+      `;
+    }
+
+    const waitlistPanel = buildPanel(
+      'High Demand',
+      'Waitlist pressure',
+      waitlistRows,
+      'No sections currently have a waitlist.',
+      r => `${Number(r['Wait List'])} waitlisted · ${r['Enrolled Students']}/${r.Capacity}`,
+      'high-demand'
+    );
+
+    const atRiskPanel = buildPanel(
+      'At Risk',
+      'Zero enrolled sections',
+      atRiskRows,
+      'No sections are sitting at zero.',
+      r => `0 / ${r.Capacity} enrolled`,
+      'at-risk'
+    );
+
+    const underPanel = buildPanel(
+      'Under-Filled',
+      'Below 30% fill',
+      underFilledRows,
+      'No sections in critical under-fill range.',
+      r => {
+        const enr = Number(r['Enrolled Students']) || 0;
+        const cap = Number(r.Capacity) || 0;
+        const fill = cap > 0 ? (enr / cap * 100) : 0;
+        return `${enr}/${cap} (${fill.toFixed(0)}%)`;
+      },
+      'under-filled'
+    );
+
+    // Top summary stats
+    const totalSections = snap.rows.length;
+    const totalEnrolled = sum(snap.rows, 'Enrolled Students');
+    const totalCapacity = sum(snap.rows, 'Capacity');
+    const totalFill = totalCapacity > 0 ? (totalEnrolled / totalCapacity * 100) : 0;
+    const totalWaitlist = sum(snap.rows, 'Wait List');
+
+    return `
+      <div class="overview-summary">
+        <div class="ov-stat"><div class="ov-label">As of</div><div class="ov-value">${fmtDate(snap.date)}</div></div>
+        <div class="ov-stat"><div class="ov-label">Disciplines</div><div class="ov-value">${disciplines.length}</div></div>
+        <div class="ov-stat"><div class="ov-label">Sections</div><div class="ov-value">${totalSections.toLocaleString()}</div></div>
+        <div class="ov-stat"><div class="ov-label">Enrolled</div><div class="ov-value">${totalEnrolled.toLocaleString()} / ${totalCapacity.toLocaleString()}</div></div>
+        <div class="ov-stat"><div class="ov-label">College Fill</div><div class="ov-value">${totalFill.toFixed(1)}%</div></div>
+        <div class="ov-stat"><div class="ov-label">Waitlisted</div><div class="ov-value">${totalWaitlist}</div></div>
+      </div>
+
+      <div class="overview-grid">
+        <div class="overview-treemap-wrap">
+          <div class="overview-head">
+            <h3>Department Capacity Map</h3>
+            <span class="overview-meta">Click any tile to focus on that discipline</span>
+          </div>
+          ${toggleBar}
+          ${legend}
+          <div class="treemap-container">
+            <svg viewBox="0 0 ${tmW} ${tmH}" preserveAspectRatio="none" class="treemap-svg">
+              ${tiles}
+            </svg>
+          </div>
+        </div>
+
+        <div class="overview-alerts-wrap">
+          <div class="overview-head">
+            <h3>Attention Needed</h3>
+            <span class="overview-meta">Three categories of sections worth looking at</span>
+          </div>
+          ${waitlistPanel}
+          ${atRiskPanel}
+          ${underPanel}
+        </div>
+      </div>
+    `;
+  }
+
+  /* =========================================================================
    * SNAPSHOT MANAGER
    * ========================================================================= */
 
@@ -2989,6 +3664,40 @@
     document.querySelectorAll('[data-tab]').forEach(t => {
       t.addEventListener('click', () => {
         state.activeTab = t.dataset.tab;
+        render();
+      });
+    });
+
+    // Overview drill-in: click a tile or alert card to focus on that
+    // discipline in detail. Replaces the current selection with just the
+    // clicked discipline — drilling in means narrowing, not adding. Use the
+    // discipline picker to restore a broader view.
+    document.querySelectorAll('[data-overview-drill]').forEach(t => {
+      t.addEventListener('click', () => {
+        const prefix = t.dataset.overviewDrill;
+        state.selectedDisciplines = new Set([prefix]);
+        state.activeDisciplineFilter.clear();
+        state.fillBucket = 'all';
+        saveStorage();
+        state.activeTab = 'snapshot';
+        toast(`Focused on ${prefix}`, 2200);
+        render();
+      });
+    });
+
+    // Overview size metric toggle
+    document.querySelectorAll('[data-ov-size]').forEach(b => {
+      b.addEventListener('click', () => {
+        state.overviewSizeMetric = b.dataset.ovSize;
+        render();
+      });
+    });
+
+    // Overview color metric toggle
+    document.querySelectorAll('[data-ov-color]').forEach(b => {
+      b.addEventListener('click', () => {
+        if (b.disabled) return;
+        state.overviewColorMetric = b.dataset.ovColor;
         render();
       });
     });
