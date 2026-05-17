@@ -1318,6 +1318,7 @@
     INSTITUTE_INDEX: 'enroll-inst-idx',
     BENCHMARKS: 'enroll-benchmarks',
     CARD_EXPANSION: 'enroll-card-expansion',
+    OVERVIEW_METRICS: 'enroll-overview-metrics',
   };
 
   const state = {
@@ -1343,7 +1344,7 @@
     cardExpansion: {},      // explicit per-discipline overrides: { ELEC: true, MATH: false }
                             //   missing key => use smart default (expand if <20 sections)
     overviewSizeMetric: 'sections',  // 'sections' | 'enrolled' | 'capacity'
-    overviewColorMetric: 'fill',     // 'fill' | 'change'
+    overviewColorMetric: null,       // 'fill' | 'change' | null (use smart default)
 
     // Loading state for GitHub-hosted data
     loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
@@ -1433,6 +1434,13 @@
 
       const ce = localStorage.getItem(STORAGE.CARD_EXPANSION);
       if (ce) state.cardExpansion = JSON.parse(ce);
+
+      const om = localStorage.getItem(STORAGE.OVERVIEW_METRICS);
+      if (om) {
+        const parsed = JSON.parse(om);
+        if (parsed.size) state.overviewSizeMetric = parsed.size;
+        if (parsed.color !== undefined) state.overviewColorMetric = parsed.color;
+      }
     } catch (err) {
       console.error('Storage load error:', err);
     }
@@ -1445,6 +1453,10 @@
       localStorage.setItem(STORAGE.INSTITUTE_INDEX, JSON.stringify(state.instituteIndex));
       localStorage.setItem(STORAGE.BENCHMARKS, String(state.showBenchmarks));
       localStorage.setItem(STORAGE.CARD_EXPANSION, JSON.stringify(state.cardExpansion));
+      localStorage.setItem(STORAGE.OVERVIEW_METRICS, JSON.stringify({
+        size: state.overviewSizeMetric,
+        color: state.overviewColorMetric,
+      }));
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
     }
@@ -2145,20 +2157,46 @@
       { id: 'empty',  label: 'Empty',       title: 'Sections with zero enrolled students' },
     ];
 
+    // Scope shortcuts: institute-level chips (BUSS, STEM, etc.) for quick
+    // broad-category switching. Institutes are mutually exclusive sets of
+    // disciplines, so clicking BUSS adds all BUSS disciplines to the
+    // selection. Clicking again (when BUSS is fully selected) removes them.
+    //
+    // A chip shows as "active" when every discipline in that institute is
+    // currently in the selection.
+    const institutes = Object.keys(state.instituteIndex).sort();
+
+    const isInstituteFullySelected = (inst) => {
+      const codes = state.instituteIndex[inst] || [];
+      return codes.length > 0 && codes.every(c => state.selectedDisciplines.has(c));
+    };
+
+    const instituteChips = institutes.length > 0
+      ? institutes.map(inst => {
+          const codes = state.instituteIndex[inst] || [];
+          const active = isInstituteFullySelected(inst);
+          const tip = active
+            ? `Remove all ${codes.length} ${inst} disciplines from selection`
+            : `Add all ${codes.length} ${inst} disciplines to selection`;
+          return `<button class="chip ${active ? 'active' : ''}" data-institute="${escapeHtml(inst)}" title="${escapeHtml(tip)}">${escapeHtml(inst)}</button>`;
+        }).join('')
+      : '';
+
     // Show "Show all" button when the user has narrowed to a subset.
     // Common scenario: they drilled in from the Overview tab and now want
     // to back out to the full college view without using the picker modal.
     const totalDisciplines = state.allDisciplines.length;
     const selectedCount = state.selectedDisciplines.size;
-    const showAllButton = (totalDisciplines > 0 && selectedCount < totalDisciplines)
-      ? `
-        <div class="filter-group">
+    const showAllChip = (totalDisciplines > 0 && selectedCount < totalDisciplines)
+      ? `<button class="chip" id="showAllDisciplines" type="button" title="Select all ${totalDisciplines} disciplines (currently showing ${selectedCount})">≡ Show all (${totalDisciplines})</button>`
+      : '';
+
+    const scopeGroup = (instituteChips || showAllChip)
+      ? `<div class="filter-group">
           <span class="lbl">Scope</span>
-          <button class="chip" id="showAllDisciplines" type="button" title="Select all ${totalDisciplines} disciplines (currently showing ${selectedCount})">
-            ≡ Show all (${totalDisciplines})
-          </button>
-        </div>
-      `
+          ${showAllChip}
+          ${instituteChips}
+        </div>`
       : '';
 
     return `
@@ -2193,7 +2231,7 @@
             ⊕ vs. College
           </button>
         </div>
-        ${showAllButton}
+        ${scopeGroup}
         <button class="reset" id="resetFilters">Reset filters</button>
       </div>
     `;
@@ -3232,8 +3270,26 @@
     const sizeMetric = state.overviewSizeMetric;
     const colorMetric = state.overviewColorMetric;
     const hasPrev = prevSnap !== null;
-    // Fall back to fill if user picked 'change' but there's no previous snapshot
-    const effectiveColorMetric = (colorMetric === 'change' && !hasPrev) ? 'fill' : colorMetric;
+
+    // Smart default for color metric when the user hasn't explicitly chosen:
+    //   < 4 snapshots → 'fill' (the change story is too thin with limited data)
+    //   ≥ 4 snapshots → 'change' (multiple data points make momentum visible)
+    //
+    // The user can always override by clicking either toggle. Their explicit
+    // choice persists via localStorage.
+    const DELTA_DEFAULT_THRESHOLD = 4;
+    let effectiveColorMetric;
+    if (colorMetric === null) {
+      // No explicit choice — use smart default
+      effectiveColorMetric = (state.snapshots.length >= DELTA_DEFAULT_THRESHOLD && hasPrev)
+        ? 'change'
+        : 'fill';
+    } else if (colorMetric === 'change' && !hasPrev) {
+      // Explicit 'change' but no previous snapshot to compare — fall back to fill
+      effectiveColorMetric = 'fill';
+    } else {
+      effectiveColorMetric = colorMetric;
+    }
 
     // Compute treemap layout — 1000x550 viewBox, scaled responsively via CSS
     const tmW = 1000, tmH = 550;
@@ -3734,6 +3790,7 @@
     document.querySelectorAll('[data-ov-size]').forEach(b => {
       b.addEventListener('click', () => {
         state.overviewSizeMetric = b.dataset.ovSize;
+        saveStorage();
         render();
       });
     });
@@ -3743,6 +3800,7 @@
       b.addEventListener('click', () => {
         if (b.disabled) return;
         state.overviewColorMetric = b.dataset.ovColor;
+        saveStorage();
         render();
       });
     });
@@ -3808,6 +3866,30 @@
       saveStorage();
       toast(`Showing all ${state.allDisciplines.length} disciplines`, 2200);
       render();
+    });
+
+    // Institute scope chips — additive toggle. Clicking BUSS adds all BUSS
+    // disciplines to selection; clicking again when all are present removes
+    // them. Lets users compose multi-institute views by clicking several.
+    document.querySelectorAll('[data-institute]').forEach(b => {
+      b.addEventListener('click', () => {
+        const inst = b.dataset.institute;
+        const codes = state.instituteIndex[inst] || [];
+        if (codes.length === 0) return;
+        const allSelected = codes.every(c => state.selectedDisciplines.has(c));
+        if (allSelected) {
+          // Remove all disciplines of this institute
+          codes.forEach(c => state.selectedDisciplines.delete(c));
+          toast(`Removed ${inst} (${codes.length} disciplines)`, 2000);
+        } else {
+          // Add all disciplines of this institute
+          codes.forEach(c => state.selectedDisciplines.add(c));
+          toast(`Added ${inst} (${codes.length} disciplines)`, 2000);
+        }
+        state.activeDisciplineFilter.clear();
+        saveStorage();
+        render();
+      });
     });
 
     const benchT = el('benchToggle');
