@@ -2145,6 +2145,22 @@
       { id: 'empty',  label: 'Empty',       title: 'Sections with zero enrolled students' },
     ];
 
+    // Show "Show all" button when the user has narrowed to a subset.
+    // Common scenario: they drilled in from the Overview tab and now want
+    // to back out to the full college view without using the picker modal.
+    const totalDisciplines = state.allDisciplines.length;
+    const selectedCount = state.selectedDisciplines.size;
+    const showAllButton = (totalDisciplines > 0 && selectedCount < totalDisciplines)
+      ? `
+        <div class="filter-group">
+          <span class="lbl">Scope</span>
+          <button class="chip" id="showAllDisciplines" type="button" title="Select all ${totalDisciplines} disciplines (currently showing ${selectedCount})">
+            ≡ Show all (${totalDisciplines})
+          </button>
+        </div>
+      `
+      : '';
+
     return `
       <div class="filter-bar">
         ${present.length > 1 ? `
@@ -2177,6 +2193,7 @@
             ⊕ vs. College
           </button>
         </div>
+        ${showAllButton}
         <button class="reset" id="resetFilters">Reset filters</button>
       </div>
     `;
@@ -3780,6 +3797,16 @@
       state.activeDisciplineFilter.clear();
       state.activeLocations.clear();
       state.fillBucket = 'all';
+      render();
+    });
+
+    // Show all disciplines — quick path back from a narrow drill-in view
+    const showAll = el('showAllDisciplines');
+    if (showAll) showAll.addEventListener('click', () => {
+      state.selectedDisciplines = new Set(state.allDisciplines.map(d => d.code));
+      state.activeDisciplineFilter.clear();
+      saveStorage();
+      toast(`Showing all ${state.allDisciplines.length} disciplines`, 2200);
       render();
     });
 
