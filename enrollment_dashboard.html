@@ -2,15 +2,17 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.0
+  Version:  v5.1
   Date:     May 18, 2026
-  Features: Adds course-grouped view for Empty and Full fill buckets.
-            Consolidates redundant sibling alternatives — instead of showing
-            MATH-021's 25 alternatives once per empty section (8 times),
-            shows them once per course. Includes waitlist callouts for Full
-            bucket and placeholder-capacity notes for ACAD-089-style data.
-            Toggle "Grouped / List" in filter bar lets users fall back to
-            the original per-section row display. Preference persists.
+  Features: Fixes to grouped view (v5.0):
+            - Empty bucket alternatives now correctly exclude already-full
+              sections (they have no seats, so they're not "alternatives")
+            - Full bucket triggered rows now show day/time alongside
+              waitlist, so chairs can see scheduling mismatches that might
+              explain why students aren't switching
+            - Waitlist callout includes a compact day/time per section
+            - "show all" links now actually expand the truncated lists
+              (real toggle buttons, not href="#" placeholders)
             Built on v4.9 canonical baseline.
 -->
 <html lang="en">
@@ -976,14 +978,21 @@
     margin-bottom: 6px;
   }
 
-  /* Triggered section rows */
+  /* Triggered section rows. Empty bucket: 5 columns. Full bucket: 7 columns
+     (adds Fill and Waitlist between Format and Days). Both grids share the
+     same row-level styling. */
   .cg-triggered-row {
     display: grid;
-    grid-template-columns: 90px 90px 80px 80px 1fr;
     gap: 10px;
     padding: 4px 0;
     font-size: 12px;
     font-variant-numeric: tabular-nums;
+  }
+  .cg-row-empty {
+    grid-template-columns: 90px 90px 80px 80px 1fr;
+  }
+  .cg-row-full {
+    grid-template-columns: 90px 90px 100px 90px 70px 80px 1fr;
   }
   .cg-triggered-row.cg-row-header {
     font-size: 10px;
@@ -1082,6 +1091,35 @@
     color: var(--info);
     text-decoration: none;
     border-bottom: 1px dotted var(--info);
+  }
+  /* Styled-as-link button for expansion toggles. Real <button> for keyboard
+     accessibility and to avoid href="#" jumping to top of page. */
+  .cg-toggle-link {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    color: var(--info);
+    font-size: inherit;
+    font-family: inherit;
+    font-style: inherit;
+    text-decoration: none;
+    border-bottom: 1px dotted var(--info);
+  }
+  .cg-toggle-link:hover {
+    color: var(--ink);
+    border-bottom-color: var(--ink);
+  }
+  .cg-toggle-link:focus-visible {
+    outline: 2px solid var(--info);
+    outline-offset: 2px;
+  }
+  /* Inline schedule in waitlist callout */
+  .cg-callout-schedule {
+    color: var(--ink-mute);
+    font-size: 10px;
+    margin-left: 1px;
   }
 
   /* No-alternatives warning */
@@ -1236,7 +1274,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.0</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.1</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -1297,6 +1335,12 @@
     fillBucket: 'all',      // 'all' | 'full' | 'almost' | 'under' | 'empty'
     cardExpansion: {},      // explicit per-discipline overrides: { ELEC: true, MATH: false }
                             //   missing key => use smart default (expand if <20 sections)
+
+    // Per-course expansion state for the grouped table view. Keys are
+    // "{courseCode}:{group}" where group is 'triggered', 'priority', or 'room'.
+    // Missing key => collapsed (show truncated list). Cleared per session;
+    // not persisted to keep the default predictable.
+    groupedExpansion: {},
 
     // When Empty or Full fill bucket is active, choose between a course-grouped
     // panel view (default) and the traditional one-row-per-section list. The
@@ -2917,15 +2961,23 @@
       allSectionsByCourse[r.Course].push(r);
     });
 
-    // Determine "useful alternative" predicate based on bucket
-    //   Empty bucket -> alternative = has any enrollment
-    //   Full bucket  -> alternative = has open seats
+    // Determine "useful alternative" predicate based on bucket.
+    //
+    //   Empty bucket -> alternative = has enrollment AND open seats.
+    //     The "has enrollment" part rules out other empty siblings (which
+    //     don't help absorb students). The "open seats" part rules out
+    //     siblings that are already full — a 23/23 section has zero room
+    //     to redirect students to, even though it's nominally a sibling.
+    //
+    //   Full bucket  -> alternative = has open seats.
+    //     Same logic from the other direction: full siblings don't help.
     const isAlternative = (s) => {
       const enr = Number(s['Enrolled Students']) || 0;
       const cap = Number(s.Capacity) || 0;
-      if (bucket === 'empty') return enr > 0;
+      const hasOpenSeats = cap > enr;
+      if (bucket === 'empty') return enr > 0 && hasOpenSeats;
       // bucket === 'full'
-      return cap > enr;
+      return hasOpenSeats;
     };
 
     // Render one course panel
@@ -2949,7 +3001,9 @@
         ? `<strong>${triggeredCount}</strong> of ${totalSections} section${totalSections === 1 ? '' : 's'} empty · <strong>${enrolledCount}</strong> with enrollment`
         : `<strong>${triggeredCount}</strong> of ${totalSections} section${totalSections === 1 ? '' : 's'} at/over capacity${totalWait > 0 ? ` · <strong>${totalWait}</strong> students waitlisted` : ''}`;
 
-      // Waitlist callout for full bucket
+      // Waitlist callout for full bucket. Includes day-summary alongside
+      // each section so chairs can see at a glance whether a schedule
+      // mismatch might be why students aren't switching to an alternative.
       let waitlistCallout = '';
       if (bucket === 'full' && totalWait > 0) {
         const withWait = triggeredSections
@@ -2959,7 +3013,12 @@
           const parts = withWait.map(s => {
             const w = Number(s['Wait List']) || 0;
             const code = s.Section.split('-').slice(-1)[0] || s.Section;
-            return `${escapeHtml(code)} (${w})`;
+            const days = cleanCell(s['Meeting Days'], '');
+            const time = cleanCell(s['Section Start Time'], '');
+            const schedule = (days || time)
+              ? ` <span class="cg-callout-schedule">${escapeHtml(days)}${days && time ? ' ' : ''}${escapeHtml(time)}</span>`
+              : '';
+            return `${escapeHtml(code)} (${w})${schedule}`;
           }).join(', ');
           waitlistCallout = `<div class="cg-waitlist-callout">⚠ <strong>Unmet demand:</strong> Waitlists on ${parts}</div>`;
         }
@@ -2978,9 +3037,14 @@
         }
       }
 
-      // Render triggered sections (compact rows)
+      // Render triggered sections (compact rows). When the user has
+      // explicitly expanded this course's triggered list, show all of them;
+      // otherwise truncate after 6 with a "show all" toggle.
       const MAX_TRIGGERED_INLINE = 8;
-      const showAllTriggered = triggeredSections.length <= MAX_TRIGGERED_INLINE;
+      const triggeredExpansionKey = `${courseCode}:triggered`;
+      const triggeredExpanded = state.groupedExpansion[triggeredExpansionKey] === true;
+      const naturallyFits = triggeredSections.length <= MAX_TRIGGERED_INLINE;
+      const showAllTriggered = triggeredExpanded || naturallyFits;
       const triggeredVisible = showAllTriggered ? triggeredSections : triggeredSections.slice(0, 6);
 
       const triggeredRowsHTML = triggeredVisible.map(s => {
@@ -2999,7 +3063,7 @@
 
         if (bucket === 'empty') {
           return `
-            <div class="cg-triggered-row">
+            <div class="cg-triggered-row cg-row-empty">
               <span class="code">${escapeHtml(sectionCode)}</span>
               <span>${formatTag}</span>
               <span>${escapeHtml(days)}</span>
@@ -3008,16 +3072,21 @@
             </div>
           `;
         } else {
-          // Full bucket: show fill % and waitlist
+          // Full bucket: show fill % and waitlist alongside day/time so
+          // chairs can see *why* students might not be switching to an
+          // open alternative ("the full section meets MWF at 10am but the
+          // alternative is M only at 4pm — schedule mismatch")
           const waitCell = wait > 0
             ? `<span style="color:var(--warn);font-weight:600">${wait} waiting</span>`
             : '<span style="color:var(--ink-mute)">—</span>';
           return `
-            <div class="cg-triggered-row">
+            <div class="cg-triggered-row cg-row-full">
               <span class="code">${escapeHtml(sectionCode)}</span>
               <span>${formatTag}</span>
               <span>${enr}/${cap} (${fillPct.toFixed(0)}%)</span>
               <span>${waitCell}</span>
+              <span>${escapeHtml(days)}</span>
+              <span>${escapeHtml(time)}</span>
               <span>${instructorHTML}</span>
             </div>
           `;
@@ -3025,15 +3094,20 @@
       }).join('');
 
       const triggeredHeaderRow = bucket === 'empty'
-        ? `<div class="cg-triggered-row cg-row-header">
+        ? `<div class="cg-triggered-row cg-row-empty cg-row-header">
             <span class="code">Section</span><span>Format</span><span>Days</span><span>Time</span><span>Instructor</span>
           </div>`
-        : `<div class="cg-triggered-row cg-row-header">
-            <span class="code">Section</span><span>Format</span><span>Fill</span><span>Waitlist</span><span>Instructor</span>
+        : `<div class="cg-triggered-row cg-row-full cg-row-header">
+            <span class="code">Section</span><span>Format</span><span>Fill</span><span>Waitlist</span><span>Days</span><span>Time</span><span>Instructor</span>
           </div>`;
 
-      const triggeredTruncatedMsg = showAllTriggered ? '' :
-        `<div class="cg-truncation-note">Showing first 6 of ${triggeredSections.length} · <a href="#" data-show-all-triggered="${escapeHtml(courseCode)}">show all</a></div>`;
+      // Build the "show all / collapse" toggle (only when truncating could apply)
+      let triggeredTruncatedMsg = '';
+      if (!naturallyFits) {
+        triggeredTruncatedMsg = triggeredExpanded
+          ? `<div class="cg-truncation-note"><button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(triggeredExpansionKey)}">show fewer</button></div>`
+          : `<div class="cg-truncation-note">Showing first 6 of ${triggeredSections.length} · <button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(triggeredExpansionKey)}">show all</button></div>`;
+      }
 
       const triggeredPanel = `
         <div class="cg-triggered-sections">
@@ -3078,6 +3152,48 @@
 
         const MAX_ALT_PER_GROUP = 6;
 
+        // Build a truncation toggle for a group. Honors per-course-per-group
+        // expansion state so clicking the link actually expands the list.
+        function truncationToggle(key, remaining, label) {
+          const expanded = state.groupedExpansion[key] === true;
+          if (expanded) {
+            return `<div class="cg-truncation-note"><button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(key)}">show fewer</button></div>`;
+          }
+          return `<div class="cg-truncation-note">+ ${remaining} ${label} — <button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(key)}">show all</button></div>`;
+        }
+
+        let priorityHTML = '';
+        if (priority.length > 0) {
+          const priorityKey = `${courseCode}:priority`;
+          const priorityExpanded = state.groupedExpansion[priorityKey] === true;
+          const visible = priorityExpanded ? priority : priority.slice(0, MAX_ALT_PER_GROUP);
+          const remaining = priority.length - visible.length;
+          const needsToggle = priorityExpanded ? priority.length > MAX_ALT_PER_GROUP : remaining > 0;
+          priorityHTML = `
+            <div class="cg-alt-group priority">
+              <div class="cg-alt-group-label">Push these over the line — sections 50%+ full, biggest leverage</div>
+              ${visible.map(s => renderAltRow(s, true)).join('')}
+              ${needsToggle ? truncationToggle(priorityKey, remaining, 'more in priority range') : ''}
+            </div>
+          `;
+        }
+
+        let moreRoomHTML = '';
+        if (moreRoom.length > 0) {
+          const roomKey = `${courseCode}:room`;
+          const roomExpanded = state.groupedExpansion[roomKey] === true;
+          const visible = roomExpanded ? moreRoom : moreRoom.slice(0, MAX_ALT_PER_GROUP);
+          const remaining = moreRoom.length - visible.length;
+          const needsToggle = roomExpanded ? moreRoom.length > MAX_ALT_PER_GROUP : remaining > 0;
+          moreRoomHTML = `
+            <div class="cg-alt-group">
+              <div class="cg-alt-group-label">More room available</div>
+              ${visible.map(s => renderAltRow(s, false)).join('')}
+              ${needsToggle ? truncationToggle(roomKey, remaining, 'more with open seats') : ''}
+            </div>
+          `;
+        }
+
         function renderAltRow(s, isPriority) {
           const sectionCode = s.Section.split('-').slice(-1)[0] || s.Section;
           const enr = Number(s['Enrolled Students']) || 0;
@@ -3099,32 +3215,6 @@
               <span>${formatTag}</span>
               <span>${escapeHtml(days)}</span>
               <span>${escapeHtml(time)} · ${instructorHTML}</span>
-            </div>
-          `;
-        }
-
-        let priorityHTML = '';
-        if (priority.length > 0) {
-          const visible = priority.slice(0, MAX_ALT_PER_GROUP);
-          const remaining = priority.length - visible.length;
-          priorityHTML = `
-            <div class="cg-alt-group priority">
-              <div class="cg-alt-group-label">Push these over the line — sections 50%+ full, biggest leverage</div>
-              ${visible.map(s => renderAltRow(s, true)).join('')}
-              ${remaining > 0 ? `<div class="cg-truncation-note">+ ${remaining} more in priority range — <a href="#" data-show-all-priority="${escapeHtml(courseCode)}">show all</a></div>` : ''}
-            </div>
-          `;
-        }
-
-        let moreRoomHTML = '';
-        if (moreRoom.length > 0) {
-          const visible = moreRoom.slice(0, MAX_ALT_PER_GROUP);
-          const remaining = moreRoom.length - visible.length;
-          moreRoomHTML = `
-            <div class="cg-alt-group">
-              <div class="cg-alt-group-label">More room available</div>
-              ${visible.map(s => renderAltRow(s, false)).join('')}
-              ${remaining > 0 ? `<div class="cg-truncation-note">+ ${remaining} more with open seats — <a href="#" data-show-all-room="${escapeHtml(courseCode)}">show all</a></div>` : ''}
             </div>
           `;
         }
@@ -3674,6 +3764,17 @@
       b.addEventListener('click', () => {
         state.groupedView = b.dataset.viewMode === 'grouped';
         saveStorage();
+        render();
+      });
+    });
+
+    // Per-course-per-group expansion toggles in the grouped view.
+    // Click "show all" -> expand that group; click "show fewer" -> collapse.
+    // State lives in state.groupedExpansion as { "MATH-021:priority": true }
+    document.querySelectorAll('[data-grouped-toggle]').forEach(b => {
+      b.addEventListener('click', () => {
+        const key = b.dataset.groupedToggle;
+        state.groupedExpansion[key] = !state.groupedExpansion[key];
         render();
       });
     });
