@@ -2,15 +2,15 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.2
+  Version:  v5.3
   Date:     May 18, 2026
-  Features: Adds Collapse all / Expand all toggle for "Sections at a Glance"
-            on the Snapshot tab. Smart default for card groups is now
-            COLLAPSED (was: expand if <20 sections) so the dashboard opens
-            tidy. Per-discipline explicit choices still persist.
-            Routes orphan disciplines (no Institute assignment in IR data —
-            currently just ESPT / Intro to Esports) to a new "Other" scope
-            chip with explanatory tooltip. Built on v4.9 canonical baseline.
+  Features: Excludes -295 (Special Project) and -299 (Internship) sections
+            from the Empty bucket filter and from "By Discipline"
+            empty-section counts. These are independent-enrollment courses
+            that aren't real capacity-planning concerns — students sign up
+            individually, often late, and "0 enrolled" is the expected
+            state, not a section in trouble. Still visible under "All" and
+            findable via search. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -1298,7 +1298,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.2</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.3</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -1797,6 +1797,17 @@
   //   almost   75% <= fill < 100%
   //   under    0 < fill < 50% (i.e., has some enrollment but under-filled)
   //   empty    enrolled === 0
+  // Sections ending in -295 (Special Projects) or -299 (Internships) are
+  // independent-enrollment courses — students sign up individually, often
+  // late, and "0 enrolled" doesn't indicate a section in trouble. Excluded
+  // from the Empty bucket filter and from empty-section counts in the
+  // "By Discipline" summary table. Still visible under "All" and findable
+  // via search ("295", "299", "internship").
+  function isIndependentEnrollment(r) {
+    const course = String(r.Course || '');
+    return /-295$/.test(course) || /-299$/.test(course);
+  }
+
   function rowInFillBucket(r, bucket) {
     if (bucket === 'all') return true;
     const fill = Number(r['Section Fill %']) || 0;
@@ -1804,7 +1815,7 @@
     if (bucket === 'full')   return fill >= 100;
     if (bucket === 'almost') return fill >= 75 && fill < 100;
     if (bucket === 'under')  return enrolled > 0 && fill < 50;
-    if (bucket === 'empty')  return enrolled === 0;
+    if (bucket === 'empty')  return enrolled === 0 && !isIndependentEnrollment(r);
     return true;
   }
 
