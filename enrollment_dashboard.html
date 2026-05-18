@@ -2,18 +2,15 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.1
+  Version:  v5.2
   Date:     May 18, 2026
-  Features: Fixes to grouped view (v5.0):
-            - Empty bucket alternatives now correctly exclude already-full
-              sections (they have no seats, so they're not "alternatives")
-            - Full bucket triggered rows now show day/time alongside
-              waitlist, so chairs can see scheduling mismatches that might
-              explain why students aren't switching
-            - Waitlist callout includes a compact day/time per section
-            - "show all" links now actually expand the truncated lists
-              (real toggle buttons, not href="#" placeholders)
-            Built on v4.9 canonical baseline.
+  Features: Adds Collapse all / Expand all toggle for "Sections at a Glance"
+            on the Snapshot tab. Smart default for card groups is now
+            COLLAPSED (was: expand if <20 sections) so the dashboard opens
+            tidy. Per-discipline explicit choices still persist.
+            Routes orphan disciplines (no Institute assignment in IR data —
+            currently just ESPT / Intro to Esports) to a new "Other" scope
+            chip with explanatory tooltip. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -490,6 +487,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
+    gap: 12px;
   }
   .section-title .meta {
     font-family: 'Helvetica Neue', sans-serif;
@@ -498,6 +496,32 @@
     letter-spacing: 0.14em;
     color: var(--ink-mute);
     font-style: normal;
+    flex: 1;
+    text-align: right;
+  }
+  /* Bulk-toggle button (Collapse all / Expand all) sits at the far right
+     of the Sections at a Glance heading. Same chip-style as Institute
+     scope chips for visual parity. */
+  .section-title .bulk-toggle {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    background: transparent;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink);
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    align-self: center;
+  }
+  .section-title .bulk-toggle:hover {
+    background: var(--ink);
+    color: var(--surface);
+  }
+  .section-title .bulk-toggle:focus-visible {
+    outline: 2px solid var(--info);
+    outline-offset: 2px;
   }
 
   .grid-auto {
@@ -1274,7 +1298,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.1</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.2</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -1620,10 +1644,13 @@
     if (fall.length === 0) return;
 
     fall.forEach(r => {
-      if (!r.Institute) return;
-      if (!state.instituteIndex[r.Institute]) state.instituteIndex[r.Institute] = [];
-      if (!state.instituteIndex[r.Institute].includes(r._prefix)) {
-        state.instituteIndex[r.Institute].push(r._prefix);
+      // Use "Other" as the Institute bucket for any row missing an Institute
+      // classification. This surfaces orphan disciplines like ESPT (where IR
+      // left Institute blank) in the scope chips rather than hiding them.
+      const inst = r.Institute || 'Other';
+      if (!state.instituteIndex[inst]) state.instituteIndex[inst] = [];
+      if (!state.instituteIndex[inst].includes(r._prefix)) {
+        state.instituteIndex[inst].push(r._prefix);
       }
     });
     Object.keys(state.instituteIndex).forEach(k => state.instituteIndex[k].sort());
@@ -1677,10 +1704,10 @@
 
     // Build/refresh institute index
     fall.forEach(r => {
-      if (!r.Institute) return;
-      if (!state.instituteIndex[r.Institute]) state.instituteIndex[r.Institute] = [];
-      if (!state.instituteIndex[r.Institute].includes(r._prefix)) {
-        state.instituteIndex[r.Institute].push(r._prefix);
+      const inst = r.Institute || 'Other';
+      if (!state.instituteIndex[inst]) state.instituteIndex[inst] = [];
+      if (!state.instituteIndex[inst].includes(r._prefix)) {
+        state.instituteIndex[inst].push(r._prefix);
       }
     });
     Object.keys(state.instituteIndex).forEach(k => state.instituteIndex[k].sort());
@@ -2155,8 +2182,14 @@
     // selection. Clicking again (when BUSS is fully selected) removes them.
     //
     // A chip shows as "active" when every discipline in that institute is
-    // currently in the selection.
-    const institutes = Object.keys(state.instituteIndex).sort();
+    // currently in the selection. "Other" (orphans without an Institute
+    // classification from IR) always sorts last so the five primary
+    // Institutes appear in their familiar order first.
+    const institutes = Object.keys(state.instituteIndex).sort((a, b) => {
+      if (a === 'Other') return 1;
+      if (b === 'Other') return -1;
+      return a.localeCompare(b);
+    });
 
     const isInstituteFullySelected = (inst) => {
       const codes = state.instituteIndex[inst] || [];
@@ -2167,9 +2200,20 @@
       ? institutes.map(inst => {
           const codes = state.instituteIndex[inst] || [];
           const active = isInstituteFullySelected(inst);
-          const tip = active
-            ? `Remove all ${codes.length} ${inst} disciplines from selection`
-            : `Add all ${codes.length} ${inst} disciplines to selection`;
+          // Special tooltip for "Other" since it isn't an actual Institute
+          // — it's the dashboard's catch-all for disciplines without an
+          // Institute assignment in IR's data.
+          let tip;
+          if (inst === 'Other') {
+            const list = codes.join(', ');
+            tip = active
+              ? `Remove unclassified disciplines from selection (${list})`
+              : `Add unclassified disciplines to selection. These have no Institute assignment in IR's data: ${list}`;
+          } else {
+            tip = active
+              ? `Remove all ${codes.length} ${inst} disciplines from selection`
+              : `Add all ${codes.length} ${inst} disciplines to selection`;
+          }
           return `<button class="chip ${active ? 'active' : ''}" data-institute="${escapeHtml(inst)}" title="${escapeHtml(tip)}">${escapeHtml(inst)}</button>`;
         }).join('')
       : '';
@@ -2408,15 +2452,16 @@
    * COURSE CARDS
    * ========================================================================= */
 
-  // Smart default for whether a discipline's cards should be expanded:
-  // small disciplines (<20 sections) auto-expand; large ones auto-collapse.
-  // An explicit user choice in state.cardExpansion overrides the default.
-  const SMART_EXPAND_THRESHOLD = 20;
+  // Smart default for whether a discipline's cards should be expanded.
+  // Default is COLLAPSED for all disciplines — the dashboard now opens
+  // with a tidy list of discipline headers, and users explicitly choose
+  // which to expand. Per-discipline explicit choices in state.cardExpansion
+  // override this default; they persist across sessions via localStorage.
   function isDisciplineExpanded(prefix, sectionCount) {
     if (Object.prototype.hasOwnProperty.call(state.cardExpansion, prefix)) {
       return state.cardExpansion[prefix];
     }
-    return sectionCount < SMART_EXPAND_THRESHOLD;
+    return false;
   }
 
   // Render a single section card. Extracted so we can call it per-discipline.
@@ -2529,8 +2574,23 @@
       `;
     }).join('');
 
+    // Determine the bulk-toggle button label. If any discipline is currently
+    // expanded, the button collapses everything. If everything is already
+    // collapsed, the button expands everything. Button label flips based on
+    // the current state so it's always actionable.
+    const anyExpanded = prefixes.some(p => isDisciplineExpanded(p, byPrefix[p].length));
+    const bulkLabel = anyExpanded ? 'Collapse all' : 'Expand all';
+    const bulkAction = anyExpanded ? 'collapse' : 'expand';
+    const bulkTooltip = anyExpanded
+      ? 'Collapse every discipline card group'
+      : 'Expand every discipline card group';
+
     return `
-      <div class="section-title">Sections at a Glance <span class="meta">click a discipline to expand or collapse its cards</span></div>
+      <div class="section-title">
+        Sections at a Glance
+        <span class="meta">click a discipline to expand or collapse its cards</span>
+        <button type="button" class="bulk-toggle" id="bulkDisciplineToggle" data-bulk-action="${bulkAction}" title="${escapeHtml(bulkTooltip)}">${bulkLabel}</button>
+      </div>
       ${groups}
     `;
   }
@@ -3795,6 +3855,28 @@
         render();
       });
     });
+
+    // Bulk collapse-all / expand-all toggle for the entire card grid.
+    // Sets explicit overrides for every currently-visible discipline so the
+    // choice persists. Reading data-bulk-action tells us which direction:
+    // 'collapse' -> set all to false, 'expand' -> set all to true.
+    const bulkBtn = el('bulkDisciplineToggle');
+    if (bulkBtn) {
+      bulkBtn.addEventListener('click', () => {
+        const action = bulkBtn.dataset.bulkAction;
+        const targetValue = action === 'expand';
+        const snap = currentSnapshot();
+        if (!snap) return;
+        // Find every discipline currently in scope (matches filteredRows logic)
+        const inScopePrefixes = new Set();
+        filteredRows().forEach(r => inScopePrefixes.add(r._prefix));
+        inScopePrefixes.forEach(prefix => {
+          state.cardExpansion[prefix] = targetValue;
+        });
+        saveStorage();
+        render();
+      });
+    }
 
     const reset = el('resetFilters');
     if (reset) reset.addEventListener('click', () => {
