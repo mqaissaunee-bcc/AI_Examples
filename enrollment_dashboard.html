@@ -2,13 +2,15 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v4.8
-  Date:     May 17, 2026
-  Features: Overview tab improvements — drill-in now focuses (replaces
-            selection with clicked discipline), 7-bucket finer color scale,
-            size/color metric toggles (sections/enrolled/capacity, fill/
-            change-since-last), three alert panels (High Demand, At Risk,
-            Under-Filled). Built on v4.4 canonical baseline.
+  Version:  v5.3
+  Date:     May 18, 2026
+  Features: Excludes -295 (Special Project) and -299 (Internship) sections
+            from the Empty bucket filter and from "By Discipline"
+            empty-section counts. These are independent-enrollment courses
+            that aren't real capacity-planning concerns — students sign up
+            individually, often late, and "0 enrolled" is the expected
+            state, not a section in trouble. Still visible under "All" and
+            findable via search. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -485,6 +487,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
+    gap: 12px;
   }
   .section-title .meta {
     font-family: 'Helvetica Neue', sans-serif;
@@ -493,6 +496,32 @@
     letter-spacing: 0.14em;
     color: var(--ink-mute);
     font-style: normal;
+    flex: 1;
+    text-align: right;
+  }
+  /* Bulk-toggle button (Collapse all / Expand all) sits at the far right
+     of the Sections at a Glance heading. Same chip-style as Institute
+     scope chips for visual parity. */
+  .section-title .bulk-toggle {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    background: transparent;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink);
+    padding: 4px 12px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    align-self: center;
+  }
+  .section-title .bulk-toggle:hover {
+    background: var(--ink);
+    color: var(--surface);
+  }
+  .section-title .bulk-toggle:focus-visible {
+    outline: 2px solid var(--info);
+    outline-offset: 2px;
   }
 
   .grid-auto {
@@ -890,257 +919,244 @@
   .delta-cell.down { color: var(--down); }
   .delta-cell.flat { color: var(--flat); }
 
-  /* Overview tab — college-wide treemap + alerts */
-  .overview-summary {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    background: var(--surface);
-    border: 1px solid var(--rule);
-    border-top: 1px solid var(--rule-strong);
-    border-bottom: 1px solid var(--rule-strong);
-    margin-bottom: 22px;
-    box-shadow: var(--shadow);
-  }
-  .overview-summary .ov-stat {
-    padding: 14px 16px;
-    border-right: 1px solid var(--rule);
-    text-align: left;
-  }
-  .overview-summary .ov-stat:last-child { border-right: none; }
-  .overview-summary .ov-label {
-    font-family: 'Helvetica Neue', sans-serif;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--ink-mute);
-    margin-bottom: 6px;
-  }
-  .overview-summary .ov-value {
-    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
-    font-size: 18px;
-    font-weight: 400;
-    color: var(--ink);
-  }
-
-  .overview-grid {
-    display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 20px;
-    margin-bottom: 24px;
-  }
-
-  .overview-treemap-wrap,
-  .overview-alerts-wrap {
-    background: var(--surface);
-    border: 1px solid var(--rule);
-    padding: 18px 20px 22px;
-    box-shadow: var(--shadow);
-  }
-  .overview-head {
-    margin-bottom: 14px;
-  }
-  .overview-head h3 {
-    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
-    font-size: 22px;
-    font-weight: 400;
-    color: var(--ink);
-    margin: 0 0 4px 0;
-    letter-spacing: 0.01em;
-  }
-  .overview-head .overview-meta {
-    font-family: 'Helvetica Neue', sans-serif;
-    font-size: 11px;
-    color: var(--ink-mute);
-    font-style: italic;
-  }
-
-  .overview-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    margin-bottom: 12px;
-    padding: 10px 12px;
-    background: var(--surface-2);
-    border: 1px solid var(--rule);
-    font-family: 'Helvetica Neue', sans-serif;
-    font-size: 11px;
-    color: var(--ink-soft);
-  }
-  .overview-legend .lg-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .overview-legend .lg-swatch {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border-radius: 2px;
-  }
-
-  .treemap-container {
-    width: 100%;
-    aspect-ratio: 1000 / 550;
-    background: var(--bg);
-  }
-  .treemap-svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-  .tm-tile {
-    transition: opacity 0.15s;
-  }
-  .tm-tile:hover {
-    opacity: 0.82;
-  }
-  .tm-tile:hover rect {
-    stroke-width: 3;
-    stroke: var(--ink);
-  }
-
-  /* Overview toggle bar (size metric, color metric) */
-  .overview-toggles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 12px;
-    padding: 8px 0;
-  }
-  .overview-toggle-group {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .overview-toggle-group .lbl {
-    font-family: 'Helvetica Neue', sans-serif;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--ink-mute);
-    margin-right: 4px;
-  }
-  .overview-toggle-group .chip.disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  /* Three-panel alerts column */
-  .alert-panel {
-    margin-bottom: 16px;
-  }
-  .alert-panel:last-child { margin-bottom: 0; }
-  .alert-panel-head {
-    padding-bottom: 6px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--rule);
-  }
-  .alert-panel-head h4 {
-    font-family: 'Helvetica Neue', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--ink);
-    margin: 0 0 2px 0;
-  }
-  .alert-panel-head .alert-count {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 7px;
-    background: var(--surface-2);
-    border: 1px solid var(--rule);
-    border-radius: 10px;
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--ink-soft);
-    letter-spacing: 0.04em;
-  }
-  .alert-panel-head .alert-panel-sub {
-    font-family: 'Helvetica Neue', sans-serif;
-    font-size: 10px;
-    font-style: italic;
-    color: var(--ink-mute);
-  }
-  .alerts-list {
+  /* ============================================================ */
+  /* Course-grouped view (cg-*) — Empty and Full buckets           */
+  /* Consolidates per-section sibling listings into per-course     */
+  /* panels with shared alternatives.                              */
+  /* ============================================================ */
+  .cg-container {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    max-height: 280px;
-    overflow-y: auto;
-    padding-right: 4px;
+    gap: 18px;
   }
-  .alert-card {
-    background: var(--surface-2);
+  .cg-panel {
     border: 1px solid var(--rule);
-    border-left: 3px solid var(--warn);
-    padding: 8px 10px;
-    cursor: pointer;
-    transition: background 0.15s, transform 0.15s;
-  }
-  .alert-card:hover {
+    border-left: 4px solid var(--warn);
     background: var(--surface);
-    transform: translateX(2px);
+    box-shadow: var(--shadow);
   }
-  /* Per-category accent colors so chairs can distinguish at a glance */
-  .alert-card.high-demand { border-left-color: var(--info); }
-  .alert-card.high-demand .alert-icon { color: var(--info); }
-  .alert-card.at-risk { border-left-color: #8b0000; }
-  .alert-card.at-risk .alert-icon { color: #8b0000; }
-  .alert-card.under-filled { border-left-color: #f4a261; }
-  .alert-card.under-filled .alert-icon { color: #f4a261; }
-
-  .alert-head {
+  .cg-panel.cg-full {
+    border-left-color: var(--info);
+  }
+  .cg-panel-head {
     display: flex;
-    align-items: center;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 3px;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
   }
-  .alert-icon {
-    color: var(--warn);
-    font-size: 13px;
+  .cg-panel-head .cg-course-id {
     font-weight: 700;
-  }
-  .alert-code {
-    font-family: 'Helvetica Neue', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 14px;
     color: var(--ink);
-    letter-spacing: 0.04em;
   }
-  .alert-title {
-    font-family: 'Helvetica Neue', sans-serif;
+  .cg-panel-head .cg-course-title {
+    color: var(--ink-soft);
+    margin-left: 8px;
+    font-size: 13px;
+  }
+  .cg-panel-head .cg-course-stats {
     font-size: 11px;
     color: var(--ink-soft);
-    margin-bottom: 3px;
-    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
   }
-  .alert-meta {
-    font-family: 'Helvetica Neue', sans-serif;
+  .cg-panel-head .cg-course-stats strong { color: var(--ink); }
+
+  /* Waitlist callout (full bucket) */
+  .cg-waitlist-callout {
+    padding: 7px 14px;
+    background: #fff7e8;
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px;
+    color: #6a5417;
+  }
+  .cg-waitlist-callout strong { color: #4a3a0f; }
+
+  /* Placeholder-capacity note (ACAD-089 etc.) */
+  .cg-placeholder-note {
+    padding: 7px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .cg-placeholder-note strong { color: var(--ink); }
+
+  /* Subpanel sections (triggered + alternatives) */
+  .cg-triggered-sections,
+  .cg-alternatives {
+    padding: 10px 14px;
+  }
+  .cg-alternatives {
+    border-top: 1px solid var(--rule);
+  }
+  .cg-panel-label {
     font-size: 10px;
-    color: var(--ink-mute);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    font-weight: 600;
+    margin-bottom: 6px;
   }
-  .overview-empty {
+
+  /* Triggered section rows. Empty bucket: 5 columns. Full bucket: 7 columns
+     (adds Fill and Waitlist between Format and Days). Both grids share the
+     same row-level styling. */
+  .cg-triggered-row {
+    display: grid;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cg-row-empty {
+    grid-template-columns: 90px 90px 80px 80px 1fr;
+  }
+  .cg-row-full {
+    grid-template-columns: 90px 90px 100px 90px 70px 80px 1fr;
+  }
+  .cg-triggered-row.cg-row-header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-mute);
+    font-weight: 600;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 4px;
+  }
+  .cg-triggered-row .code { font-weight: 700; }
+  .cg-instr-tba { color: var(--ink-mute); font-style: italic; }
+
+  /* Alternatives section */
+  .cg-alt-group {
+    margin-bottom: 10px;
+  }
+  .cg-alt-group:last-child { margin-bottom: 0; }
+  .cg-alt-group-label {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .cg-alt-group.priority .cg-alt-group-label::before {
+    content: '★ ';
+    color: var(--good);
+  }
+  .cg-alt-row {
+    display: grid;
+    grid-template-columns: 75px 100px 50px 95px 65px 1fr;
+    gap: 10px;
+    padding: 3px 0 3px 10px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    border-left: 2px solid transparent;
+  }
+  .cg-alt-row.priority {
+    border-left-color: var(--good);
+    background: rgba(45, 90, 61, 0.06);
+  }
+  .cg-alt-row .code { font-weight: 700; }
+  .cg-alt-row .right { text-align: right; }
+  .cg-alt-row .cg-open { font-weight: 600; color: var(--ink); }
+
+  /* Fill bar (mini visual in alternatives) */
+  .cg-fill-bar {
+    display: inline-block;
+    width: 50px;
+    height: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    position: relative;
+    vertical-align: middle;
+  }
+  .cg-fill-bar-inner {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: var(--good);
+  }
+  .cg-fill-bar-inner.over { background: var(--info); }
+
+  /* Format tags */
+  .cg-format-tag {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+  .cg-format-tag.online {
+    background: rgba(30, 78, 140, 0.12);
+    border-color: rgba(30, 78, 140, 0.35);
+    color: var(--info);
+  }
+  .cg-format-tag.evening {
+    background: rgba(196, 169, 90, 0.18);
+    border-color: rgba(196, 169, 90, 0.5);
+    color: #6a5417;
+  }
+  .cg-format-tag.wall { background: rgba(139, 71, 137, 0.12); border-color: rgba(139, 71, 137, 0.35); color: #6b3469; }
+
+  /* Truncation footer */
+  .cg-truncation-note {
+    text-align: center;
+    padding: 5px 4px;
+    font-size: 11px;
     color: var(--ink-mute);
     font-style: italic;
-    padding: 14px 8px;
-    text-align: center;
-    font-size: 11px;
+  }
+  .cg-truncation-note a {
+    color: var(--info);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--info);
+  }
+  /* Styled-as-link button for expansion toggles. Real <button> for keyboard
+     accessibility and to avoid href="#" jumping to top of page. */
+  .cg-toggle-link {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    color: var(--info);
+    font-size: inherit;
+    font-family: inherit;
+    font-style: inherit;
+    text-decoration: none;
+    border-bottom: 1px dotted var(--info);
+  }
+  .cg-toggle-link:hover {
+    color: var(--ink);
+    border-bottom-color: var(--ink);
+  }
+  .cg-toggle-link:focus-visible {
+    outline: 2px solid var(--info);
+    outline-offset: 2px;
+  }
+  /* Inline schedule in waitlist callout */
+  .cg-callout-schedule {
+    color: var(--ink-mute);
+    font-size: 10px;
+    margin-left: 1px;
   }
 
-  .overview-badge {
-    background: transparent !important;
-    color: var(--ink-mute) !important;
+  /* No-alternatives warning */
+  .cg-no-alts-warning {
+    padding: 10px 12px;
+    background: rgba(196, 69, 45, 0.08);
+    border: 1px solid var(--warn);
+    border-left: 3px solid var(--warn);
+    font-size: 12px;
+    color: var(--warn);
+    line-height: 1.45;
   }
-
-  /* Responsive: stack treemap and alerts on narrow screens */
-  @media (max-width: 1000px) {
-    .overview-grid { grid-template-columns: 1fr; }
-    .overview-summary { grid-template-columns: repeat(3, 1fr); }
-    .overview-summary .ov-stat:nth-child(3n) { border-right: none; }
-  }
+  .cg-no-alts-warning strong { color: var(--warn); }
 
   /* Snapshot management */
   .snapshot-list {
@@ -1282,7 +1298,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v4.8</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.3</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -1318,6 +1334,7 @@
     INSTITUTE_INDEX: 'enroll-inst-idx',
     BENCHMARKS: 'enroll-benchmarks',
     CARD_EXPANSION: 'enroll-card-expansion',
+    GROUPED_VIEW: 'enroll-grouped-view',
   };
 
   const state = {
@@ -1342,8 +1359,18 @@
     fillBucket: 'all',      // 'all' | 'full' | 'almost' | 'under' | 'empty'
     cardExpansion: {},      // explicit per-discipline overrides: { ELEC: true, MATH: false }
                             //   missing key => use smart default (expand if <20 sections)
-    overviewSizeMetric: 'sections',  // 'sections' | 'enrolled' | 'capacity'
-    overviewColorMetric: 'fill',     // 'fill' | 'change'
+
+    // Per-course expansion state for the grouped table view. Keys are
+    // "{courseCode}:{group}" where group is 'triggered', 'priority', or 'room'.
+    // Missing key => collapsed (show truncated list). Cleared per session;
+    // not persisted to keep the default predictable.
+    groupedExpansion: {},
+
+    // When Empty or Full fill bucket is active, choose between a course-grouped
+    // panel view (default) and the traditional one-row-per-section list. The
+    // grouped view consolidates redundant alternative listings; the list view
+    // is the original behavior, kept as a fallback for users who prefer it.
+    groupedView: true,
 
     // Loading state for GitHub-hosted data
     loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
@@ -1433,6 +1460,9 @@
 
       const ce = localStorage.getItem(STORAGE.CARD_EXPANSION);
       if (ce) state.cardExpansion = JSON.parse(ce);
+
+      const gv = localStorage.getItem(STORAGE.GROUPED_VIEW);
+      if (gv !== null) state.groupedView = gv === 'true';
     } catch (err) {
       console.error('Storage load error:', err);
     }
@@ -1445,6 +1475,7 @@
       localStorage.setItem(STORAGE.INSTITUTE_INDEX, JSON.stringify(state.instituteIndex));
       localStorage.setItem(STORAGE.BENCHMARKS, String(state.showBenchmarks));
       localStorage.setItem(STORAGE.CARD_EXPANSION, JSON.stringify(state.cardExpansion));
+      localStorage.setItem(STORAGE.GROUPED_VIEW, String(state.groupedView));
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
     }
@@ -1613,10 +1644,13 @@
     if (fall.length === 0) return;
 
     fall.forEach(r => {
-      if (!r.Institute) return;
-      if (!state.instituteIndex[r.Institute]) state.instituteIndex[r.Institute] = [];
-      if (!state.instituteIndex[r.Institute].includes(r._prefix)) {
-        state.instituteIndex[r.Institute].push(r._prefix);
+      // Use "Other" as the Institute bucket for any row missing an Institute
+      // classification. This surfaces orphan disciplines like ESPT (where IR
+      // left Institute blank) in the scope chips rather than hiding them.
+      const inst = r.Institute || 'Other';
+      if (!state.instituteIndex[inst]) state.instituteIndex[inst] = [];
+      if (!state.instituteIndex[inst].includes(r._prefix)) {
+        state.instituteIndex[inst].push(r._prefix);
       }
     });
     Object.keys(state.instituteIndex).forEach(k => state.instituteIndex[k].sort());
@@ -1670,10 +1704,10 @@
 
     // Build/refresh institute index
     fall.forEach(r => {
-      if (!r.Institute) return;
-      if (!state.instituteIndex[r.Institute]) state.instituteIndex[r.Institute] = [];
-      if (!state.instituteIndex[r.Institute].includes(r._prefix)) {
-        state.instituteIndex[r.Institute].push(r._prefix);
+      const inst = r.Institute || 'Other';
+      if (!state.instituteIndex[inst]) state.instituteIndex[inst] = [];
+      if (!state.instituteIndex[inst].includes(r._prefix)) {
+        state.instituteIndex[inst].push(r._prefix);
       }
     });
     Object.keys(state.instituteIndex).forEach(k => state.instituteIndex[k].sort());
@@ -1763,6 +1797,17 @@
   //   almost   75% <= fill < 100%
   //   under    0 < fill < 50% (i.e., has some enrollment but under-filled)
   //   empty    enrolled === 0
+  // Sections ending in -295 (Special Projects) or -299 (Internships) are
+  // independent-enrollment courses — students sign up individually, often
+  // late, and "0 enrolled" doesn't indicate a section in trouble. Excluded
+  // from the Empty bucket filter and from empty-section counts in the
+  // "By Discipline" summary table. Still visible under "All" and findable
+  // via search ("295", "299", "internship").
+  function isIndependentEnrollment(r) {
+    const course = String(r.Course || '');
+    return /-295$/.test(course) || /-299$/.test(course);
+  }
+
   function rowInFillBucket(r, bucket) {
     if (bucket === 'all') return true;
     const fill = Number(r['Section Fill %']) || 0;
@@ -1770,7 +1815,7 @@
     if (bucket === 'full')   return fill >= 100;
     if (bucket === 'almost') return fill >= 75 && fill < 100;
     if (bucket === 'under')  return enrolled > 0 && fill < 50;
-    if (bucket === 'empty')  return enrolled === 0;
+    if (bucket === 'empty')  return enrolled === 0 && !isIndependentEnrollment(r);
     return true;
   }
 
@@ -1876,8 +1921,6 @@
       body += renderTrendsView();
     } else if (state.activeTab === 'snapshots') {
       body += renderSnapshotManager();
-    } else if (state.activeTab === 'overview') {
-      body += renderOverview();
     }
 
     dash.innerHTML = body;
@@ -1986,7 +2029,6 @@
         <button class="tab ${state.activeTab === 'snapshot' ? 'active' : ''}" data-tab="snapshot">Current Snapshot <span class="count">${sections}</span></button>
         <button class="tab ${state.activeTab === 'trends' ? 'active' : ''}" data-tab="trends">Trends <span class="count">${state.snapshots.length}</span></button>
         <button class="tab ${state.activeTab === 'snapshots' ? 'active' : ''}" data-tab="snapshots">Snapshots</button>
-        <button class="tab ${state.activeTab === 'overview' ? 'active' : ''}" data-tab="overview">Overview <span class="count overview-badge" title="College-wide capacity heatmap">∷</span></button>
       </div>
     `;
   }
@@ -2145,6 +2187,65 @@
       { id: 'empty',  label: 'Empty',       title: 'Sections with zero enrolled students' },
     ];
 
+    // Scope shortcuts: institute-level chips (BUSS, STEM, etc.) for quick
+    // broad-category switching. Institutes are mutually exclusive sets of
+    // disciplines, so clicking BUSS adds all BUSS disciplines to the
+    // selection. Clicking again (when BUSS is fully selected) removes them.
+    //
+    // A chip shows as "active" when every discipline in that institute is
+    // currently in the selection. "Other" (orphans without an Institute
+    // classification from IR) always sorts last so the five primary
+    // Institutes appear in their familiar order first.
+    const institutes = Object.keys(state.instituteIndex).sort((a, b) => {
+      if (a === 'Other') return 1;
+      if (b === 'Other') return -1;
+      return a.localeCompare(b);
+    });
+
+    const isInstituteFullySelected = (inst) => {
+      const codes = state.instituteIndex[inst] || [];
+      return codes.length > 0 && codes.every(c => state.selectedDisciplines.has(c));
+    };
+
+    const instituteChips = institutes.length > 0
+      ? institutes.map(inst => {
+          const codes = state.instituteIndex[inst] || [];
+          const active = isInstituteFullySelected(inst);
+          // Special tooltip for "Other" since it isn't an actual Institute
+          // — it's the dashboard's catch-all for disciplines without an
+          // Institute assignment in IR's data.
+          let tip;
+          if (inst === 'Other') {
+            const list = codes.join(', ');
+            tip = active
+              ? `Remove unclassified disciplines from selection (${list})`
+              : `Add unclassified disciplines to selection. These have no Institute assignment in IR's data: ${list}`;
+          } else {
+            tip = active
+              ? `Remove all ${codes.length} ${inst} disciplines from selection`
+              : `Add all ${codes.length} ${inst} disciplines to selection`;
+          }
+          return `<button class="chip ${active ? 'active' : ''}" data-institute="${escapeHtml(inst)}" title="${escapeHtml(tip)}">${escapeHtml(inst)}</button>`;
+        }).join('')
+      : '';
+
+    // Show "Show all" button when the user has narrowed to a subset.
+    // Lets users restore the full college view without opening the
+    // discipline picker modal.
+    const totalDisciplines = state.allDisciplines.length;
+    const selectedCount = state.selectedDisciplines.size;
+    const showAllChip = (totalDisciplines > 0 && selectedCount < totalDisciplines)
+      ? `<button class="chip" id="showAllDisciplines" type="button" title="Select all ${totalDisciplines} disciplines (currently showing ${selectedCount})">≡ Show all (${totalDisciplines})</button>`
+      : '';
+
+    const scopeGroup = (instituteChips || showAllChip)
+      ? `<div class="filter-group">
+          <span class="lbl">Scope</span>
+          ${showAllChip}
+          ${instituteChips}
+        </div>`
+      : '';
+
     return `
       <div class="filter-bar">
         ${present.length > 1 ? `
@@ -2171,12 +2272,20 @@
             <button class="chip ${state.fillBucket === b.id ? 'active' : ''}" data-bucket="${b.id}" title="${escapeHtml(b.title)}">${escapeHtml(b.label)}</button>
           `).join('')}
         </div>
+        ${(state.fillBucket === 'empty' || state.fillBucket === 'full') ? `
+          <div class="filter-group">
+            <span class="lbl">View</span>
+            <button class="chip ${state.groupedView ? 'active' : ''}" data-view-mode="grouped" title="Group sections by course with shared alternatives">Grouped</button>
+            <button class="chip ${!state.groupedView ? 'active' : ''}" data-view-mode="list" title="Show each section as its own row (original behavior)">List</button>
+          </div>
+        ` : ''}
         <div class="filter-group">
           <span class="lbl">Compare</span>
           <button class="chip ${state.showBenchmarks ? 'active' : ''}" id="benchToggle" type="button" title="Compare against college-wide fall enrollment">
             ⊕ vs. College
           </button>
         </div>
+        ${scopeGroup}
         <button class="reset" id="resetFilters">Reset filters</button>
       </div>
     `;
@@ -2218,6 +2327,10 @@
     const showBench = state.showBenchmarks;
     const cw = showBench ? collegeWideStats(snap) : null;
 
+    // Build per-discipline rows, then filter out disciplines with zero
+    // sections in the current filtered view. Otherwise the table fills
+    // with noise rows like "AMSL: 0 sections, 0/0 enrolled, 0% fill, -37.6pp"
+    // when a fill bucket like Full or Empty is active.
     const tableRows = present.map(p => {
       const rows = snap.rows.filter(r => r._prefix === p && inFilter(r));
       const prevRows = prevSnap ? prevSnap.rows.filter(r => r._prefix === p && inFilter(r)) : null;
@@ -2227,6 +2340,19 @@
       const capacity = sum(rows, 'Capacity');
       const fill = capacity > 0 ? (enrolled / capacity * 100) : 0;
 
+      return { p, rows, prevRows, sections, enrolled, capacity, fill };
+    }).filter(d => d.sections > 0);
+
+    if (tableRows.length === 0) {
+      // Active filters eliminated every row — show a clear message instead
+      // of an empty table
+      return `<div class="section-title">By Discipline <span class="meta">no matches</span></div>
+        <p style="color:var(--ink-mute);font-style:italic;padding:14px 0">No discipline has any sections matching the current filters.</p>`;
+    }
+
+    const renderedRows = tableRows.map(d => {
+      const { p, rows, prevRows, sections, enrolled, capacity, fill } = d;
+
       let dFill = '';
       if (prevRows && prevRows.length > 0) {
         const ePrev = sum(prevRows, 'Enrolled Students');
@@ -2235,9 +2361,20 @@
         dFill = miniDelta(fill - fPrev, 'pp', 1);
       }
 
-      const vsCollegeCell = cw
+      // vs. College only makes sense if this discipline has capacity to
+      // compare. If capacity is 0 (e.g. all sections are placeholder-cap
+      // independent study), suppress the delta — comparing 0% to the
+      // college fill rate produces a misleading "-X.Xpp behind."
+      const vsCollegeCell = (cw && capacity > 0)
         ? `<span class="ds-bench">${miniDelta(fill - cw.fill, 'pp', 1, 'Compared to the college-wide fill rate right now.')}</span>`
         : '<span style="color:var(--ink-mute)">—</span>';
+
+      // Honest flag for fill > 100% from placeholder-capacity sections.
+      // ACAD-089 independent study sections have cap=1, enr=7 → 700% fill.
+      // The math is true but the display is confusing without context.
+      const fillDisplay = fill > 200
+        ? `<strong title="High fill % typically indicates placeholder-capacity sections (e.g., independent study) where ‘capacity’ is set to 1">${fill.toFixed(1)}%</strong>`
+        : `<strong>${fill.toFixed(1)}%</strong>`;
 
       // Sparkline of total enrollment for this discipline across snapshots
       const enrSeries = state.snapshots.map(s =>
@@ -2252,7 +2389,7 @@
           <td class="ds-disc"><span class="swatch" style="background:${colorFor(p)}"></span><strong>${escapeHtml(p)}</strong></td>
           <td class="right">${sections}</td>
           <td class="right">${enrolled} / ${capacity}</td>
-          <td class="right"><strong>${fill.toFixed(1)}%</strong> ${dFill}</td>
+          <td class="right">${fillDisplay} ${dFill}</td>
           <td class="right">${vsCollegeCell}</td>
           <td class="ds-trend">${sparkCell}</td>
         </tr>
@@ -2273,7 +2410,7 @@
               <th>Trend</th>
             </tr>
           </thead>
-          <tbody>${tableRows}</tbody>
+          <tbody>${renderedRows}</tbody>
         </table>
       </div>
     `;
@@ -2326,15 +2463,16 @@
    * COURSE CARDS
    * ========================================================================= */
 
-  // Smart default for whether a discipline's cards should be expanded:
-  // small disciplines (<20 sections) auto-expand; large ones auto-collapse.
-  // An explicit user choice in state.cardExpansion overrides the default.
-  const SMART_EXPAND_THRESHOLD = 20;
+  // Smart default for whether a discipline's cards should be expanded.
+  // Default is COLLAPSED for all disciplines — the dashboard now opens
+  // with a tidy list of discipline headers, and users explicitly choose
+  // which to expand. Per-discipline explicit choices in state.cardExpansion
+  // override this default; they persist across sessions via localStorage.
   function isDisciplineExpanded(prefix, sectionCount) {
     if (Object.prototype.hasOwnProperty.call(state.cardExpansion, prefix)) {
       return state.cardExpansion[prefix];
     }
-    return sectionCount < SMART_EXPAND_THRESHOLD;
+    return false;
   }
 
   // Render a single section card. Extracted so we can call it per-discipline.
@@ -2447,8 +2585,23 @@
       `;
     }).join('');
 
+    // Determine the bulk-toggle button label. If any discipline is currently
+    // expanded, the button collapses everything. If everything is already
+    // collapsed, the button expands everything. Button label flips based on
+    // the current state so it's always actionable.
+    const anyExpanded = prefixes.some(p => isDisciplineExpanded(p, byPrefix[p].length));
+    const bulkLabel = anyExpanded ? 'Collapse all' : 'Expand all';
+    const bulkAction = anyExpanded ? 'collapse' : 'expand';
+    const bulkTooltip = anyExpanded
+      ? 'Collapse every discipline card group'
+      : 'Expand every discipline card group';
+
     return `
-      <div class="section-title">Sections at a Glance <span class="meta">click a discipline to expand or collapse its cards</span></div>
+      <div class="section-title">
+        Sections at a Glance
+        <span class="meta">click a discipline to expand or collapse its cards</span>
+        <button type="button" class="bulk-toggle" id="bulkDisciplineToggle" data-bulk-action="${bulkAction}" title="${escapeHtml(bulkTooltip)}">${bulkLabel}</button>
+      </div>
       ${groups}
     `;
   }
@@ -2458,6 +2611,81 @@
     const s = String(v).trim();
     if (!s || s === ',' || s === ',,') return fallback;
     return s;
+  }
+
+  // ----- Section table search helpers (used by both list and grouped views) -----
+  // Brookdale day codes. R is an alias for TH in some academic conventions;
+  // we normalize both to "TH" internally.
+  const DAY_CODES = new Set(['M', 'T', 'W', 'TH', 'F', 'S']);
+  function isDayToken(raw) {
+    const upper = String(raw).toUpperCase();
+    if (upper === 'R') return 'TH';
+    return DAY_CODES.has(upper) ? upper : null;
+  }
+
+  // Parse a Meeting Days string into a Set of canonical day codes.
+  function parseDays(raw) {
+    const codes = new Set();
+    if (!raw) return codes;
+    const tokens = String(raw).toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+    for (const tok of tokens) {
+      if (DAY_CODES.has(tok)) codes.add(tok);
+      else if (tok === 'R') codes.add('TH');
+      else {
+        let i = 0;
+        while (i < tok.length) {
+          if (tok.slice(i, i + 2) === 'TH') { codes.add('TH'); i += 2; continue; }
+          const c = tok[i];
+          if (DAY_CODES.has(c)) codes.add(c);
+          else if (c === 'R') codes.add('TH');
+          i += 1;
+        }
+      }
+    }
+    return codes;
+  }
+
+  const normCompact = (s) =>
+    String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, '');
+
+  const normPhrase = (s) =>
+    String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, ' ').trim();
+
+  function parseSearchTokens(input) {
+    const tokens = [];
+    const re = /"([^"]*)"|(\S+)/g;
+    let m;
+    while ((m = re.exec(input)) !== null) {
+      if (m[1] !== undefined) {
+        const phrase = normPhrase(m[1]);
+        if (phrase) tokens.push({ kind: 'phrase', value: phrase });
+      } else if (m[2] !== undefined) {
+        const dayCode = isDayToken(m[2]);
+        if (dayCode) {
+          tokens.push({ kind: 'day', value: dayCode });
+        } else {
+          const word = normCompact(m[2]);
+          if (word) tokens.push({ kind: 'word', value: word });
+        }
+      }
+    }
+    return tokens;
+  }
+
+  function sectionMatchesAllTokens(row, tokens) {
+    if (tokens.length === 0) return true;
+    const raw = [
+      row.Section, row['Course Title'], row.Location, row['Meeting Days'],
+      row['Section Start Time'], row.Instructor, row.Course,
+    ].join(' ');
+    const compact = normCompact(raw);
+    const phrase = normPhrase(raw);
+    const days = parseDays(row['Meeting Days']);
+    return tokens.every(t => {
+      if (t.kind === 'phrase') return phrase.includes(t.value);
+      if (t.kind === 'day') return days.has(t.value);
+      return compact.includes(t.value);
+    });
   }
 
   function sectionHistory(sectionCode) {
@@ -2472,6 +2700,15 @@
    * ========================================================================= */
 
   function renderTable() {
+    // When Empty or Full bucket is active AND grouped view is on, render the
+    // course-grouped panel display instead of the per-section row table.
+    // The grouped view consolidates redundant alternative listings (e.g. for
+    // MATH-021's 8 empty sections, alternatives are shown once instead of 8
+    // times). Other buckets always use the list view.
+    if (state.groupedView && (state.fillBucket === 'empty' || state.fillBucket === 'full')) {
+      return renderTableGrouped();
+    }
+
     const headers = [
       { k: 'Section', label: 'Section' },
       { k: 'Course Title', label: 'Title' },
@@ -2520,107 +2757,16 @@
     //      treated specially: they match only against the Meeting Days field,
     //      so "M W" means "section meets on both Monday AND Wednesday" rather
     //      than "row contains the letter m AND the letter w somewhere."
+    //
+    // Implementation note: the search helpers (parseSearchTokens,
+    // sectionMatchesAllTokens, parseDays, etc.) are defined at module scope
+    // so the grouped view (renderTableGrouped) can use them too.
 
-    // Brookdale day codes. R is an alias for TH (some academic conventions
-    // use R for Thursday); we normalize both to "TH" internally.
-    const DAY_CODES = new Set(['M', 'T', 'W', 'TH', 'F', 'S']);
-    const isDayToken = (raw) => {
-      const upper = String(raw).toUpperCase();
-      if (upper === 'R') return 'TH';
-      return DAY_CODES.has(upper) ? upper : null;
-    };
-
-    // Parse a Meeting Days string into a Set of canonical day codes.
-    // Examples: "M,W"        -> {M, W}
-    //           "T TH"       -> {T, TH}
-    //           "M T W TH"   -> {M, T, W, TH}
-    //           "W F, F"     -> {W, F}     (de-duplicated)
-    function parseDays(raw) {
-      const codes = new Set();
-      if (!raw) return codes;
-      // TH is two letters and must be recognized before T to avoid the H
-      // splitting off into nothing. We do this by tokenizing on non-letter
-      // boundaries, then matching each token against the day set.
-      const tokens = String(raw).toUpperCase().split(/[^A-Z]+/).filter(Boolean);
-      for (const tok of tokens) {
-        if (DAY_CODES.has(tok)) codes.add(tok);
-        else if (tok === 'R') codes.add('TH');
-        // For tokens like "MWF" (compact, no separators) we walk them
-        else {
-          let i = 0;
-          while (i < tok.length) {
-            // Try TH first (two chars)
-            if (tok.slice(i, i + 2) === 'TH') { codes.add('TH'); i += 2; continue; }
-            const c = tok[i];
-            if (DAY_CODES.has(c)) codes.add(c);
-            else if (c === 'R') codes.add('TH');
-            i += 1;
-          }
-        }
-      }
-      return codes;
-    }
-
-    // Compact normalize: lowercase, strip all whitespace/punctuation
-    const normCompact = (s) =>
-      String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, '');
-
-    // Phrase normalize (for quoted terms): lowercase, collapse separators to
-    // a single space so internal word boundaries are preserved
-    const normPhrase = (s) =>
-      String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, ' ').trim();
-
-    // Tokenize the search input into a list of search terms. Quoted strings
-    // become single phrase tokens; unquoted whitespace splits into multiple.
-    // Day codes (M, T, W, TH, F, S, R) become 'day' tokens.
-    function tokenizeSearch(input) {
-      const tokens = [];
-      const re = /"([^"]*)"|(\S+)/g;
-      let m;
-      while ((m = re.exec(input)) !== null) {
-        if (m[1] !== undefined) {
-          // Quoted phrase — always a phrase token, never reinterpreted
-          const phrase = normPhrase(m[1]);
-          if (phrase) tokens.push({ kind: 'phrase', value: phrase });
-        } else if (m[2] !== undefined) {
-          // Unquoted word — check if it's a day code
-          const dayCode = isDayToken(m[2]);
-          if (dayCode) {
-            tokens.push({ kind: 'day', value: dayCode });
-          } else {
-            const word = normCompact(m[2]);
-            if (word) tokens.push({ kind: 'word', value: word });
-          }
-        }
-      }
-      return tokens;
-    }
-
-    const tokens = tokenizeSearch(state.tableSearch);
-
-    // Build the haystacks for each row, including parsed day codes
-    const haystack = (r) => {
-      const raw = [
-        r.Section, r['Course Title'], r.Location, r['Meeting Days'],
-        r['Section Start Time'], r.Instructor, r.Course,
-      ].join(' ');
-      return {
-        compact: normCompact(raw),
-        phrase: normPhrase(raw),
-        days: parseDays(r['Meeting Days']),
-      };
-    };
+    const tokens = parseSearchTokens(state.tableSearch);
 
     const searched = tokens.length === 0
       ? enriched
-      : enriched.filter(r => {
-          const h = haystack(r);
-          return tokens.every(t => {
-            if (t.kind === 'phrase') return h.phrase.includes(t.value);
-            if (t.kind === 'day') return h.days.has(t.value);
-            return h.compact.includes(t.value);
-          });
-        });
+      : enriched.filter(r => sectionMatchesAllTokens(r, tokens));
 
     const sorted = searched.slice().sort((a, b) => {
       let av = a[state.sortKey], bv = b[state.sortKey];
@@ -2825,6 +2971,413 @@
   }
 
   /* =========================================================================
+   * TABLE — GROUPED VIEW (Empty and Full buckets only)
+   *
+   * Consolidates the per-section sibling display into a per-course panel.
+   * Instead of repeating MATH-021's 25 alternatives once for each of its 8
+   * empty sections, we show the empty sections together and the alternatives
+   * once underneath.
+   * ========================================================================= */
+
+  function renderTableGrouped() {
+    const snap = currentSnapshot();
+    if (!snap) {
+      return `<div class="section-title">Full Section Detail</div>
+        <p style="color:var(--ink-mute);padding:14px 0;font-style:italic">No snapshot loaded.</p>`;
+    }
+
+    const bucket = state.fillBucket;  // 'empty' or 'full'
+    const prevSnap = previousSnapshot();
+    const prevByCode = {};
+    if (prevSnap) prevSnap.rows.forEach(r => { prevByCode[r.Section] = r; });
+
+    // Get the filtered rows (respects discipline/location/sub-filter selection
+    // AND the active fill bucket). These are the "triggered" sections — what
+    // the user is currently filtering to.
+    const triggered = filteredRows();
+
+    // Apply table search if present (same logic as list view)
+    const tokens = parseSearchTokens(state.tableSearch);
+    const searched = tokens.length > 0
+      ? triggered.filter(r => sectionMatchesAllTokens(r, tokens))
+      : triggered;
+
+    if (searched.length === 0) {
+      const hasActiveSearch = tokens.length > 0;
+      const emptyMessage = hasActiveSearch
+        ? `No sections match "${escapeHtml(state.tableSearch)}".`
+        : `No sections match the current filters.`;
+      return `${renderTableToolbar(triggered.length, searched.length, hasActiveSearch)}
+        <p style="color:var(--ink-mute);padding:24px;font-style:italic;text-align:center">${emptyMessage}</p>`;
+    }
+
+    // Group triggered sections by course code (e.g. "MATH-021", "ENGL-121")
+    const byCourse = {};
+    searched.forEach(r => {
+      if (!byCourse[r.Course]) byCourse[r.Course] = [];
+      byCourse[r.Course].push(r);
+    });
+
+    // Sort courses by triggered count desc (biggest concerns first), then alphabetical
+    const courseOrder = Object.keys(byCourse).sort((a, b) => {
+      const diff = byCourse[b].length - byCourse[a].length;
+      return diff !== 0 ? diff : a.localeCompare(b);
+    });
+
+    // For each course, also collect ALL sections from the snapshot (not just
+    // the triggered ones), so we can show alternatives.
+    const allSectionsByCourse = {};
+    snap.rows.forEach(r => {
+      if (!allSectionsByCourse[r.Course]) allSectionsByCourse[r.Course] = [];
+      allSectionsByCourse[r.Course].push(r);
+    });
+
+    // Determine "useful alternative" predicate based on bucket.
+    //
+    //   Empty bucket -> alternative = has enrollment AND open seats.
+    //     The "has enrollment" part rules out other empty siblings (which
+    //     don't help absorb students). The "open seats" part rules out
+    //     siblings that are already full — a 23/23 section has zero room
+    //     to redirect students to, even though it's nominally a sibling.
+    //
+    //   Full bucket  -> alternative = has open seats.
+    //     Same logic from the other direction: full siblings don't help.
+    const isAlternative = (s) => {
+      const enr = Number(s['Enrolled Students']) || 0;
+      const cap = Number(s.Capacity) || 0;
+      const hasOpenSeats = cap > enr;
+      if (bucket === 'empty') return enr > 0 && hasOpenSeats;
+      // bucket === 'full'
+      return hasOpenSeats;
+    };
+
+    // Render one course panel
+    const panels = courseOrder.map(courseCode => {
+      const triggeredSections = byCourse[courseCode];
+      const allSections = allSectionsByCourse[courseCode] || [];
+      const alternatives = allSections.filter(s =>
+        !triggeredSections.some(t => t.Section === s.Section) && isAlternative(s)
+      );
+      const courseTitle = triggeredSections[0]['Course Title'] || '';
+      const prefix = triggeredSections[0]._prefix;
+      const color = colorFor(prefix);
+
+      // Stats for the course header
+      const totalSections = allSections.length;
+      const triggeredCount = triggeredSections.length;
+      const enrolledCount = allSections.filter(s => (Number(s['Enrolled Students']) || 0) > 0).length;
+      const totalWait = sum(allSections, 'Wait List');
+
+      const courseStats = bucket === 'empty'
+        ? `<strong>${triggeredCount}</strong> of ${totalSections} section${totalSections === 1 ? '' : 's'} empty · <strong>${enrolledCount}</strong> with enrollment`
+        : `<strong>${triggeredCount}</strong> of ${totalSections} section${totalSections === 1 ? '' : 's'} at/over capacity${totalWait > 0 ? ` · <strong>${totalWait}</strong> students waitlisted` : ''}`;
+
+      // Waitlist callout for full bucket. Includes day-summary alongside
+      // each section so chairs can see at a glance whether a schedule
+      // mismatch might be why students aren't switching to an alternative.
+      let waitlistCallout = '';
+      if (bucket === 'full' && totalWait > 0) {
+        const withWait = triggeredSections
+          .filter(s => (Number(s['Wait List']) || 0) > 0)
+          .sort((a, b) => (Number(b['Wait List']) || 0) - (Number(a['Wait List']) || 0));
+        if (withWait.length > 0) {
+          const parts = withWait.map(s => {
+            const w = Number(s['Wait List']) || 0;
+            const code = s.Section.split('-').slice(-1)[0] || s.Section;
+            const days = cleanCell(s['Meeting Days'], '');
+            const time = cleanCell(s['Section Start Time'], '');
+            const schedule = (days || time)
+              ? ` <span class="cg-callout-schedule">${escapeHtml(days)}${days && time ? ' ' : ''}${escapeHtml(time)}</span>`
+              : '';
+            return `${escapeHtml(code)} (${w})${schedule}`;
+          }).join(', ');
+          waitlistCallout = `<div class="cg-waitlist-callout">⚠ <strong>Unmet demand:</strong> Waitlists on ${parts}</div>`;
+        }
+      }
+
+      // Placeholder-capacity note for fill > 200% (e.g. ACAD-089 with cap=1)
+      let placeholderNote = '';
+      if (bucket === 'full') {
+        const allOverFill = triggeredSections.every(s => {
+          const enr = Number(s['Enrolled Students']) || 0;
+          const cap = Number(s.Capacity) || 0;
+          return cap > 0 && (enr / cap) > 2;
+        });
+        if (allOverFill && triggeredSections.length > 0) {
+          placeholderNote = `<div class="cg-placeholder-note">ℹ <strong>Note:</strong> Sections show very high fill percentages, likely due to placeholder-capacity convention (e.g., capacity of 1 for independent study). Decisions here differ from regular capacity decisions.</div>`;
+        }
+      }
+
+      // Render triggered sections (compact rows). When the user has
+      // explicitly expanded this course's triggered list, show all of them;
+      // otherwise truncate after 6 with a "show all" toggle.
+      const MAX_TRIGGERED_INLINE = 8;
+      const triggeredExpansionKey = `${courseCode}:triggered`;
+      const triggeredExpanded = state.groupedExpansion[triggeredExpansionKey] === true;
+      const naturallyFits = triggeredSections.length <= MAX_TRIGGERED_INLINE;
+      const showAllTriggered = triggeredExpanded || naturallyFits;
+      const triggeredVisible = showAllTriggered ? triggeredSections : triggeredSections.slice(0, 6);
+
+      const triggeredRowsHTML = triggeredVisible.map(s => {
+        const sectionCode = s.Section.split('-').slice(-1)[0] || s.Section;
+        const days = cleanCell(s['Meeting Days'], '—');
+        const time = cleanCell(s['Section Start Time'], 'TBA');
+        const instructor = cleanCell(s.Instructor, '');
+        const instructorHTML = instructor
+          ? escapeHtml(instructor)
+          : '<span class="cg-instr-tba">TBA</span>';
+        const enr = Number(s['Enrolled Students']) || 0;
+        const cap = Number(s.Capacity) || 0;
+        const wait = Number(s['Wait List']) || 0;
+        const fillPct = cap > 0 ? (enr / cap * 100) : 0;
+        const formatTag = formatTagFor(s);
+
+        if (bucket === 'empty') {
+          return `
+            <div class="cg-triggered-row cg-row-empty">
+              <span class="code">${escapeHtml(sectionCode)}</span>
+              <span>${formatTag}</span>
+              <span>${escapeHtml(days)}</span>
+              <span>${escapeHtml(time)}</span>
+              <span>${instructorHTML}</span>
+            </div>
+          `;
+        } else {
+          // Full bucket: show fill % and waitlist alongside day/time so
+          // chairs can see *why* students might not be switching to an
+          // open alternative ("the full section meets MWF at 10am but the
+          // alternative is M only at 4pm — schedule mismatch")
+          const waitCell = wait > 0
+            ? `<span style="color:var(--warn);font-weight:600">${wait} waiting</span>`
+            : '<span style="color:var(--ink-mute)">—</span>';
+          return `
+            <div class="cg-triggered-row cg-row-full">
+              <span class="code">${escapeHtml(sectionCode)}</span>
+              <span>${formatTag}</span>
+              <span>${enr}/${cap} (${fillPct.toFixed(0)}%)</span>
+              <span>${waitCell}</span>
+              <span>${escapeHtml(days)}</span>
+              <span>${escapeHtml(time)}</span>
+              <span>${instructorHTML}</span>
+            </div>
+          `;
+        }
+      }).join('');
+
+      const triggeredHeaderRow = bucket === 'empty'
+        ? `<div class="cg-triggered-row cg-row-empty cg-row-header">
+            <span class="code">Section</span><span>Format</span><span>Days</span><span>Time</span><span>Instructor</span>
+          </div>`
+        : `<div class="cg-triggered-row cg-row-full cg-row-header">
+            <span class="code">Section</span><span>Format</span><span>Fill</span><span>Waitlist</span><span>Days</span><span>Time</span><span>Instructor</span>
+          </div>`;
+
+      // Build the "show all / collapse" toggle (only when truncating could apply)
+      let triggeredTruncatedMsg = '';
+      if (!naturallyFits) {
+        triggeredTruncatedMsg = triggeredExpanded
+          ? `<div class="cg-truncation-note"><button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(triggeredExpansionKey)}">show fewer</button></div>`
+          : `<div class="cg-truncation-note">Showing first 6 of ${triggeredSections.length} · <button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(triggeredExpansionKey)}">show all</button></div>`;
+      }
+
+      const triggeredPanel = `
+        <div class="cg-triggered-sections">
+          <div class="cg-panel-label">${bucket === 'empty' ? 'Empty sections' : 'Full sections'} (${triggeredSections.length})</div>
+          ${triggeredHeaderRow}
+          ${triggeredRowsHTML}
+          ${triggeredTruncatedMsg}
+        </div>
+      `;
+
+      // Render alternatives — split into priority (50%+ full) and more-room
+      let alternativesPanel = '';
+      if (alternatives.length === 0) {
+        // No alternatives — important warning
+        const warningText = bucket === 'empty'
+          ? `⚠ <strong>No in-course alternatives</strong> — all ${totalSections} section${totalSections === 1 ? '' : 's'} of ${escapeHtml(courseCode)} ${totalSections === 1 ? 'is' : 'are'} empty. This suggests a course-level enrollment problem, not a section-specific one. Cancellation or marketing-side intervention may be needed at the course level.`
+          : `⚠ <strong>No in-course alternatives</strong> — all ${totalSections} section${totalSections === 1 ? '' : 's'} of ${escapeHtml(courseCode)} ${totalSections === 1 ? 'is' : 'are'} at or over capacity. Consider opening additional sections; redirecting waitlisted students within this course is not possible.`;
+        alternativesPanel = `<div class="cg-alternatives"><div class="cg-no-alts-warning">${warningText}</div></div>`;
+      } else {
+        const priority = [];
+        const moreRoom = [];
+        alternatives.forEach(s => {
+          const enr = Number(s['Enrolled Students']) || 0;
+          const cap = Number(s.Capacity) || 0;
+          const fillPct = cap > 0 ? (enr / cap * 100) : 0;
+          if (fillPct >= 50) priority.push(s);
+          else moreRoom.push(s);
+        });
+
+        // Sort each group by fill descending (closest-to-full first within priority,
+        // most-full-first within more-room too)
+        priority.sort((a, b) => {
+          const fa = Number(a['Section Fill %']) || 0;
+          const fb = Number(b['Section Fill %']) || 0;
+          return fb - fa;
+        });
+        moreRoom.sort((a, b) => {
+          const fa = Number(a['Section Fill %']) || 0;
+          const fb = Number(b['Section Fill %']) || 0;
+          return fb - fa;
+        });
+
+        const MAX_ALT_PER_GROUP = 6;
+
+        // Build a truncation toggle for a group. Honors per-course-per-group
+        // expansion state so clicking the link actually expands the list.
+        function truncationToggle(key, remaining, label) {
+          const expanded = state.groupedExpansion[key] === true;
+          if (expanded) {
+            return `<div class="cg-truncation-note"><button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(key)}">show fewer</button></div>`;
+          }
+          return `<div class="cg-truncation-note">+ ${remaining} ${label} — <button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(key)}">show all</button></div>`;
+        }
+
+        let priorityHTML = '';
+        if (priority.length > 0) {
+          const priorityKey = `${courseCode}:priority`;
+          const priorityExpanded = state.groupedExpansion[priorityKey] === true;
+          const visible = priorityExpanded ? priority : priority.slice(0, MAX_ALT_PER_GROUP);
+          const remaining = priority.length - visible.length;
+          const needsToggle = priorityExpanded ? priority.length > MAX_ALT_PER_GROUP : remaining > 0;
+          priorityHTML = `
+            <div class="cg-alt-group priority">
+              <div class="cg-alt-group-label">Push these over the line — sections 50%+ full, biggest leverage</div>
+              ${visible.map(s => renderAltRow(s, true)).join('')}
+              ${needsToggle ? truncationToggle(priorityKey, remaining, 'more in priority range') : ''}
+            </div>
+          `;
+        }
+
+        let moreRoomHTML = '';
+        if (moreRoom.length > 0) {
+          const roomKey = `${courseCode}:room`;
+          const roomExpanded = state.groupedExpansion[roomKey] === true;
+          const visible = roomExpanded ? moreRoom : moreRoom.slice(0, MAX_ALT_PER_GROUP);
+          const remaining = moreRoom.length - visible.length;
+          const needsToggle = roomExpanded ? moreRoom.length > MAX_ALT_PER_GROUP : remaining > 0;
+          moreRoomHTML = `
+            <div class="cg-alt-group">
+              <div class="cg-alt-group-label">More room available</div>
+              ${visible.map(s => renderAltRow(s, false)).join('')}
+              ${needsToggle ? truncationToggle(roomKey, remaining, 'more with open seats') : ''}
+            </div>
+          `;
+        }
+
+        function renderAltRow(s, isPriority) {
+          const sectionCode = s.Section.split('-').slice(-1)[0] || s.Section;
+          const enr = Number(s['Enrolled Students']) || 0;
+          const cap = Number(s.Capacity) || 0;
+          const fillPct = cap > 0 ? (enr / cap * 100) : 0;
+          const open = Math.max(0, cap - enr);
+          const days = cleanCell(s['Meeting Days'], '—');
+          const time = cleanCell(s['Section Start Time'], 'TBA');
+          const instructor = cleanCell(s.Instructor, '');
+          const instructorHTML = instructor ? escapeHtml(instructor) : '<span class="cg-instr-tba">TBA</span>';
+          const formatTag = formatTagFor(s);
+          const fillBarWidth = Math.min(100, fillPct);
+          const overCap = fillPct > 100;
+          return `
+            <div class="cg-alt-row ${isPriority ? 'priority' : ''}">
+              <span class="code">${escapeHtml(sectionCode)}</span>
+              <span><span class="cg-fill-bar"><span class="cg-fill-bar-inner ${overCap ? 'over' : ''}" style="width:${fillBarWidth}%"></span></span> ${enr}/${cap}</span>
+              <span class="right cg-open">${open}</span>
+              <span>${formatTag}</span>
+              <span>${escapeHtml(days)}</span>
+              <span>${escapeHtml(time)} · ${instructorHTML}</span>
+            </div>
+          `;
+        }
+
+        alternativesPanel = `
+          <div class="cg-alternatives">
+            <div class="cg-panel-label">${bucket === 'empty' ? 'Available alternatives in ' + escapeHtml(courseCode) : 'Sections with room in ' + escapeHtml(courseCode)} (${alternatives.length})</div>
+            ${priorityHTML}
+            ${moreRoomHTML}
+          </div>
+        `;
+      }
+
+      const groupClass = bucket === 'empty' ? 'cg-empty' : 'cg-full';
+
+      return `
+        <div class="cg-panel ${groupClass}" style="border-left-color:${color}">
+          <div class="cg-panel-head">
+            <div>
+              <span class="cg-course-id">${escapeHtml(courseCode)}</span>
+              <span class="cg-course-title">${escapeHtml(courseTitle)}</span>
+            </div>
+            <div class="cg-course-stats">${courseStats}</div>
+          </div>
+          ${waitlistCallout}
+          ${placeholderNote}
+          ${triggeredPanel}
+          ${alternativesPanel}
+        </div>
+      `;
+    }).join('');
+
+    const totalCourses = courseOrder.length;
+    const totalTriggered = searched.length;
+    const subtitle = bucket === 'empty'
+      ? `${totalTriggered} empty section${totalTriggered === 1 ? '' : 's'} across ${totalCourses} course${totalCourses === 1 ? '' : 's'}`
+      : `${totalTriggered} full section${totalTriggered === 1 ? '' : 's'} across ${totalCourses} course${totalCourses === 1 ? '' : 's'}`;
+
+    return `
+      <div class="section-title">Full Section Detail <span class="meta">${subtitle}</span></div>
+      ${renderTableToolbar(triggered.length, searched.length, tokens.length > 0)}
+      <div class="cg-container">
+        ${panels}
+      </div>
+    `;
+  }
+
+  // Helper: format/modality tag for a section (used in both triggered rows and alternatives)
+  function formatTagFor(s) {
+    const sec = String(s.Section || '');
+    const loc = String(s.Location || '').toUpperCase();
+    // Distance Ed section codes contain "DE" or location is DE
+    if (/-DE\d/.test(sec) || loc === 'DE') {
+      return '<span class="cg-format-tag online">Online async</span>';
+    }
+    // Evening: 800-series section codes (legacy convention at Brookdale)
+    if (/-8\d{2}/.test(sec)) {
+      return '<span class="cg-format-tag evening">Evening</span>';
+    }
+    // Wall campus
+    if (loc === 'WALL') {
+      return '<span class="cg-format-tag wall">Wall campus</span>';
+    }
+    return '<span class="cg-format-tag in-person">In-person</span>';
+  }
+
+  // Helper: shared toolbar (search box + match count) extracted so both list
+  // and grouped renderers can use it
+  function renderTableToolbar(totalCount, matchCount, hasActiveSearch) {
+    const matchHTML = hasActiveSearch
+      ? `<span class="search-count">${matchCount} of ${totalCount}</span>`
+      : '';
+    return `
+      <div class="table-toolbar">
+        <div class="table-search">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input
+            type="text"
+            id="tableSearchInput"
+            class="search-input"
+            placeholder='Search — try "ENGI 101 LINC" or "Powell M W" or "MATH T TH"'
+            value="${escapeHtml(state.tableSearch)}"
+            autocomplete="off"
+            spellcheck="false">
+          ${state.tableSearch ? `<button class="search-clear" id="tableSearchClear" type="button" aria-label="Clear search">×</button>` : ''}
+        </div>
+        ${matchHTML}
+      </div>
+    `;
+  }
+
+  /* =========================================================================
    * TRENDS VIEW
    * ========================================================================= */
 
@@ -3014,425 +3567,6 @@
         <h3>${escapeHtml(title)}</h3>
         <div class="panel-sub">${items.length} section${items.length !== 1 ? 's' : ''}</div>
         ${rows}
-      </div>
-    `;
-  }
-
-  /* =========================================================================
-   * OVERVIEW TAB — college-wide capacity heatmap + critical alerts
-   * ========================================================================= */
-
-  // Squarified treemap algorithm (Bruls, Huijsen, van Wijk 2000).
-  // Takes a list of items with .value, packs them into a rectangle, returns
-  // items annotated with {x, y, w, h} for rendering.
-  //
-  // The algorithm packs items into rows (or columns, whichever direction is
-  // shorter at the moment), choosing greedily to keep aspect ratios close
-  // to 1 (square-ish). This produces visually balanced layouts where you
-  // can compare sizes by eye without needing axes.
-  function squarifyTreemap(items, x, y, w, h) {
-    // Sort by value descending — biggest items first
-    items = items.slice().sort((a, b) => b.value - a.value);
-    const total = items.reduce((s, i) => s + i.value, 0);
-    if (total <= 0 || items.length === 0) return [];
-
-    // Scale all values so they fit the rectangle's area exactly
-    const area = w * h;
-    const scaled = items.map(i => ({ ...i, scaledValue: (i.value / total) * area }));
-
-    const results = [];
-
-    // Layout cursor — tracks the remaining rectangle as we consume it
-    let rx = x, ry = y, rw = w, rh = h;
-
-    function layoutRow(row, shortSide) {
-      // Lay out a row of items along the shorter side of the remaining rect.
-      // 'shortSide' is the side perpendicular to the row's direction.
-      const rowTotal = row.reduce((s, i) => s + i.scaledValue, 0);
-      const rowDepth = rowTotal / shortSide;
-
-      if (rw < rh) {
-        // Layout horizontally: row goes left-to-right at the top
-        let cursorX = rx;
-        for (const item of row) {
-          const itemW = item.scaledValue / rowDepth;
-          results.push({ ...item, x: cursorX, y: ry, w: itemW, h: rowDepth });
-          cursorX += itemW;
-        }
-        ry += rowDepth;
-        rh -= rowDepth;
-      } else {
-        // Layout vertically: row goes top-to-bottom on the left
-        let cursorY = ry;
-        for (const item of row) {
-          const itemH = item.scaledValue / rowDepth;
-          results.push({ ...item, x: rx, y: cursorY, w: rowDepth, h: itemH });
-          cursorY += itemH;
-        }
-        rx += rowDepth;
-        rw -= rowDepth;
-      }
-    }
-
-    // Worst aspect ratio in a candidate row (closer to 1 is better)
-    function worstRatio(row, shortSide) {
-      const sum = row.reduce((s, i) => s + i.scaledValue, 0);
-      const rMax = Math.max(...row.map(i => i.scaledValue));
-      const rMin = Math.min(...row.map(i => i.scaledValue));
-      const s2 = shortSide * shortSide;
-      const sum2 = sum * sum;
-      return Math.max((s2 * rMax) / sum2, sum2 / (s2 * rMin));
-    }
-
-    let queue = scaled.slice();
-    let currentRow = [];
-
-    while (queue.length > 0) {
-      const shortSide = Math.min(rw, rh);
-      const candidate = queue[0];
-      const trialRow = currentRow.concat([candidate]);
-
-      if (currentRow.length === 0 ||
-          worstRatio(trialRow, shortSide) <= worstRatio(currentRow, shortSide)) {
-        // Adding this item improves or keeps the row's aspect — accept it
-        currentRow.push(candidate);
-        queue.shift();
-      } else {
-        // Adding this item would make ratios worse — commit current row and start fresh
-        layoutRow(currentRow, shortSide);
-        currentRow = [];
-      }
-    }
-    if (currentRow.length > 0) layoutRow(currentRow, Math.min(rw, rh));
-
-    return results;
-  }
-
-  // 7-bucket color scale used ONLY on the Overview tab. More granular than
-  // the 4-bucket fill-status filter so chairs scanning the treemap can
-  // distinguish "20% fill" from "5% fill" from "0%". Snapshot tab's filter
-  // keeps the 4-bucket scale because it's an interactive picker, not a
-  // passive heatmap.
-  const OVERVIEW_BUCKETS = [
-    { id: 'empty',     label: '0% (empty)',       min: -Infinity, max: 0,    color: '#8b0000', text: '#fff' },
-    { id: 'crit',      label: '1–19%',            min: 0.0001,    max: 20,   color: '#dc3545', text: '#fff' },
-    { id: 'under',     label: '20–49%',           min: 20,        max: 50,   color: '#f4a261', text: '#1a1a1a' },
-    { id: 'mid',       label: '50–74%',           min: 50,        max: 75,   color: '#e9c46a', text: '#1a1a1a' },
-    { id: 'healthy',   label: '75–89%',           min: 75,        max: 90,   color: '#a8c97f', text: '#1a1a1a' },
-    { id: 'almost',    label: '90–99%',           min: 90,        max: 100,  color: '#2a9d8f', text: '#fff' },
-    { id: 'full',      label: '100%+ (full)',     min: 100,       max: Infinity, color: '#264653', text: '#fff' },
-  ];
-
-  function overviewBucketFor(fillPct, enrolled) {
-    // Special-case: enrolled === 0 always maps to "empty" even if
-    // capacity is 0 (would otherwise be NaN/0% ambiguous)
-    if (enrolled === 0) return OVERVIEW_BUCKETS[0];
-    for (const b of OVERVIEW_BUCKETS) {
-      if (fillPct >= b.min && fillPct < b.max) return b;
-    }
-    return OVERVIEW_BUCKETS[OVERVIEW_BUCKETS.length - 1];
-  }
-
-  // Color for "change since last snapshot" mode. Diverging scale: large
-  // positive deltas trend green, flat stays neutral, large negative deltas
-  // trend red. Mostly used when the user toggles the Overview color metric
-  // from "current fill rate" to "change."
-  function changeBucketFor(deltaEnrolled) {
-    if (deltaEnrolled === 0)  return { color: 'var(--surface-2)', text: 'var(--ink)', label: 'flat' };
-    if (deltaEnrolled >= 50)  return { color: '#264653', text: '#fff', label: 'gained 50+' };
-    if (deltaEnrolled >= 20)  return { color: '#2a9d8f', text: '#fff', label: 'gained 20-49' };
-    if (deltaEnrolled >= 5)   return { color: '#a8c97f', text: '#1a1a1a', label: 'gained 5-19' };
-    if (deltaEnrolled > 0)    return { color: '#e9c46a', text: '#1a1a1a', label: 'gained 1-4' };
-    if (deltaEnrolled > -5)   return { color: '#f4a261', text: '#1a1a1a', label: 'lost 1-4' };
-    if (deltaEnrolled > -20)  return { color: '#dc3545', text: '#fff', label: 'lost 5-19' };
-    return { color: '#8b0000', text: '#fff', label: 'lost 20+' };
-  }
-
-  // Determine the area-weight for a discipline based on chosen size metric
-  function valueForSizeMetric(d, metric) {
-    if (metric === 'enrolled') return Math.max(1, d.enrolled);  // min 1 so 0-enroll tiles don't disappear
-    if (metric === 'capacity') return Math.max(1, d.capacity);
-    return Math.max(1, d.sections);
-  }
-
-  function renderOverview() {
-    const snap = currentSnapshot();
-    if (!snap) {
-      return `<p style="color:var(--ink-mute);padding:24px;font-style:italic">No snapshot loaded.</p>`;
-    }
-
-    // Aggregate stats per discipline prefix (college-wide, ignores selection)
-    const byPrefix = {};
-    snap.rows.forEach(r => {
-      const p = r._prefix;
-      if (!byPrefix[p]) byPrefix[p] = { prefix: p, sections: 0, enrolled: 0, capacity: 0, waitlist: 0 };
-      byPrefix[p].sections += 1;
-      byPrefix[p].enrolled += Number(r['Enrolled Students']) || 0;
-      byPrefix[p].capacity += Number(r.Capacity) || 0;
-      byPrefix[p].waitlist += Number(r['Wait List']) || 0;
-    });
-
-    // For "change" color metric: also aggregate previous snapshot per prefix
-    const prevSnap = previousSnapshot();
-    const prevByPrefix = {};
-    if (prevSnap) {
-      prevSnap.rows.forEach(r => {
-        const p = r._prefix;
-        if (!prevByPrefix[p]) prevByPrefix[p] = { enrolled: 0 };
-        prevByPrefix[p].enrolled += Number(r['Enrolled Students']) || 0;
-      });
-    }
-
-    const disciplines = Object.values(byPrefix);
-    const sizeMetric = state.overviewSizeMetric;
-    const colorMetric = state.overviewColorMetric;
-    const hasPrev = prevSnap !== null;
-    // Fall back to fill if user picked 'change' but there's no previous snapshot
-    const effectiveColorMetric = (colorMetric === 'change' && !hasPrev) ? 'fill' : colorMetric;
-
-    // Compute treemap layout — 1000x550 viewBox, scaled responsively via CSS
-    const tmW = 1000, tmH = 550;
-    const items = disciplines.map(d => {
-      const fill = d.capacity > 0 ? (d.enrolled / d.capacity * 100) : 0;
-      const prev = prevByPrefix[d.prefix];
-      const deltaEnrolled = prev ? (d.enrolled - prev.enrolled) : 0;
-      return {
-        ...d,
-        value: valueForSizeMetric(d, sizeMetric),
-        fill,
-        deltaEnrolled,
-      };
-    });
-    const laidOut = squarifyTreemap(items, 0, 0, tmW, tmH);
-
-    const tiles = laidOut.map(item => {
-      const colorBucket = effectiveColorMetric === 'change'
-        ? changeBucketFor(item.deltaEnrolled)
-        : overviewBucketFor(item.fill, item.enrolled);
-
-      const showLabel = item.w >= 50 && item.h >= 30;
-      const showSub = item.w >= 60 && item.h >= 45;
-      const labelFontSize = Math.min(14, Math.max(9, Math.sqrt(item.w * item.h) / 8));
-
-      const subText = effectiveColorMetric === 'change'
-        ? (item.deltaEnrolled >= 0 ? `+${item.deltaEnrolled}` : `${item.deltaEnrolled}`)
-        : `${item.fill.toFixed(0)}%`;
-
-      const tooltipParts = [
-        `${item.prefix} — ${item.sections} section${item.sections === 1 ? '' : 's'}`,
-        `${item.enrolled}/${item.capacity} enrolled`,
-        `${item.fill.toFixed(1)}% fill`,
-      ];
-      if (item.waitlist > 0) tooltipParts.push(`${item.waitlist} waitlisted`);
-      if (hasPrev) tooltipParts.push(`${item.deltaEnrolled >= 0 ? '+' : ''}${item.deltaEnrolled} since last snapshot`);
-
-      return `
-        <g class="tm-tile" data-overview-drill="${escapeHtml(item.prefix)}"
-           style="cursor:pointer">
-          <rect x="${item.x.toFixed(1)}" y="${item.y.toFixed(1)}"
-                width="${item.w.toFixed(1)}" height="${item.h.toFixed(1)}"
-                fill="${colorBucket.color}" stroke="${colorBucket.color}" stroke-width="2"/>
-          ${showLabel ? `
-            <text x="${(item.x + item.w/2).toFixed(1)}" y="${(item.y + item.h/2 - (showSub ? 8 : 0)).toFixed(1)}"
-                  text-anchor="middle" dominant-baseline="middle"
-                  fill="${colorBucket.text}" font-family="Helvetica Neue, sans-serif"
-                  font-size="${labelFontSize.toFixed(1)}" font-weight="700">
-              ${escapeHtml(item.prefix)}
-            </text>
-            ${showSub ? `
-              <text x="${(item.x + item.w/2).toFixed(1)}" y="${(item.y + item.h/2 + labelFontSize - 2).toFixed(1)}"
-                    text-anchor="middle" dominant-baseline="middle"
-                    fill="${colorBucket.text}" font-family="Helvetica Neue, sans-serif"
-                    font-size="${(labelFontSize * 0.85).toFixed(1)}" font-weight="500" opacity="0.95">
-                ${subText}
-              </text>
-            ` : ''}
-          ` : ''}
-          <title>${escapeHtml(tooltipParts.join(' · '))}</title>
-        </g>
-      `;
-    }).join('');
-
-    // Legend changes based on color metric
-    const legend = effectiveColorMetric === 'change'
-      ? `<div class="overview-legend">
-          <span class="lg-item"><span class="lg-swatch" style="background:#8b0000"></span>Lost 20+</span>
-          <span class="lg-item"><span class="lg-swatch" style="background:#dc3545"></span>Lost 5-19</span>
-          <span class="lg-item"><span class="lg-swatch" style="background:#f4a261"></span>Lost 1-4</span>
-          <span class="lg-item"><span class="lg-swatch" style="background:var(--surface-2);border:1px solid var(--rule)"></span>No change</span>
-          <span class="lg-item"><span class="lg-swatch" style="background:#e9c46a"></span>Gained 1-4</span>
-          <span class="lg-item"><span class="lg-swatch" style="background:#a8c97f"></span>Gained 5-19</span>
-          <span class="lg-item"><span class="lg-swatch" style="background:#2a9d8f"></span>Gained 20-49</span>
-          <span class="lg-item"><span class="lg-swatch" style="background:#264653"></span>Gained 50+</span>
-        </div>`
-      : `<div class="overview-legend">
-          ${OVERVIEW_BUCKETS.map(b => `<span class="lg-item"><span class="lg-swatch" style="background:${b.color}"></span>${escapeHtml(b.label)}</span>`).join('')}
-        </div>`;
-
-    // Toggles for size and color metrics
-    const sizeOptions = [
-      { id: 'sections', label: 'Sections' },
-      { id: 'enrolled', label: 'Enrolled' },
-      { id: 'capacity', label: 'Capacity' },
-    ];
-    const colorOptions = [
-      { id: 'fill',   label: 'Fill rate' },
-      { id: 'change', label: 'Change vs. last', disabled: !hasPrev },
-    ];
-
-    const toggleBar = `
-      <div class="overview-toggles">
-        <div class="overview-toggle-group">
-          <span class="lbl">Size:</span>
-          ${sizeOptions.map(o => `
-            <button class="chip ${sizeMetric === o.id ? 'active' : ''}" data-ov-size="${o.id}">${escapeHtml(o.label)}</button>
-          `).join('')}
-        </div>
-        <div class="overview-toggle-group">
-          <span class="lbl">Color:</span>
-          ${colorOptions.map(o => `
-            <button class="chip ${effectiveColorMetric === o.id ? 'active' : ''}${o.disabled ? ' disabled' : ''}" data-ov-color="${o.id}" ${o.disabled ? 'disabled title="Need at least two snapshots to compare"' : ''}>${escapeHtml(o.label)}</button>
-          `).join('')}
-        </div>
-      </div>
-    `;
-
-    // === Alert panels ===
-    // Three categories of attention-worthy sections, sorted by severity.
-    // Each card is clickable to drill into that discipline.
-
-    function alertCard(r, metaText, modifier) {
-      return `
-        <div class="alert-card ${modifier || ''}" data-overview-drill="${escapeHtml(r._prefix)}" title="Click to focus on ${escapeHtml(r._prefix)}">
-          <div class="alert-head">
-            <span class="alert-icon">⚠</span>
-            <span class="alert-code">${escapeHtml(r.Section)}</span>
-          </div>
-          <div class="alert-title">${escapeHtml(r['Course Title'] || '')}</div>
-          <div class="alert-meta">${escapeHtml(metaText)}</div>
-        </div>
-      `;
-    }
-
-    // 1. Waitlist pressure — unmet demand
-    const waitlistRows = snap.rows
-      .filter(r => (Number(r['Wait List']) || 0) > 0)
-      .sort((a, b) => (Number(b['Wait List']) || 0) - (Number(a['Wait List']) || 0))
-      .slice(0, 8);
-
-    // 2. At Risk — zero enrolled sections
-    const atRiskRows = snap.rows
-      .filter(r => (Number(r['Enrolled Students']) || 0) === 0)
-      .sort((a, b) => (Number(b.Capacity) || 0) - (Number(a.Capacity) || 0))
-      .slice(0, 8);
-
-    // 3. Under-Filled — sections with at least one student but under 30% fill
-    //    (catches sections that have started enrolling but are struggling)
-    const underFilledRows = snap.rows
-      .filter(r => {
-        const enr = Number(r['Enrolled Students']) || 0;
-        const cap = Number(r.Capacity) || 0;
-        if (enr === 0 || cap === 0) return false;
-        const fill = (enr / cap) * 100;
-        return fill < 30;
-      })
-      .sort((a, b) => {
-        // Sort by absolute seat shortfall (cap - enr), descending: bigger gap = more concerning
-        const aSh = (Number(a.Capacity) || 0) - (Number(a['Enrolled Students']) || 0);
-        const bSh = (Number(b.Capacity) || 0) - (Number(b['Enrolled Students']) || 0);
-        return bSh - aSh;
-      })
-      .slice(0, 8);
-
-    function buildPanel(title, subtitle, rows, emptyMsg, formatMeta, modifier) {
-      const count = rows.length;
-      const cards = count === 0
-        ? `<p class="overview-empty">${emptyMsg}</p>`
-        : rows.map(r => alertCard(r, formatMeta(r), modifier)).join('');
-      return `
-        <div class="alert-panel">
-          <div class="alert-panel-head">
-            <h4>${escapeHtml(title)}${count > 0 ? ` <span class="alert-count">${count}</span>` : ''}</h4>
-            <span class="alert-panel-sub">${escapeHtml(subtitle)}</span>
-          </div>
-          <div class="alerts-list">${cards}</div>
-        </div>
-      `;
-    }
-
-    const waitlistPanel = buildPanel(
-      'High Demand',
-      'Waitlist pressure',
-      waitlistRows,
-      'No sections currently have a waitlist.',
-      r => `${Number(r['Wait List'])} waitlisted · ${r['Enrolled Students']}/${r.Capacity}`,
-      'high-demand'
-    );
-
-    const atRiskPanel = buildPanel(
-      'At Risk',
-      'Zero enrolled sections',
-      atRiskRows,
-      'No sections are sitting at zero.',
-      r => `0 / ${r.Capacity} enrolled`,
-      'at-risk'
-    );
-
-    const underPanel = buildPanel(
-      'Under-Filled',
-      'Below 30% fill',
-      underFilledRows,
-      'No sections in critical under-fill range.',
-      r => {
-        const enr = Number(r['Enrolled Students']) || 0;
-        const cap = Number(r.Capacity) || 0;
-        const fill = cap > 0 ? (enr / cap * 100) : 0;
-        return `${enr}/${cap} (${fill.toFixed(0)}%)`;
-      },
-      'under-filled'
-    );
-
-    // Top summary stats
-    const totalSections = snap.rows.length;
-    const totalEnrolled = sum(snap.rows, 'Enrolled Students');
-    const totalCapacity = sum(snap.rows, 'Capacity');
-    const totalFill = totalCapacity > 0 ? (totalEnrolled / totalCapacity * 100) : 0;
-    const totalWaitlist = sum(snap.rows, 'Wait List');
-
-    return `
-      <div class="overview-summary">
-        <div class="ov-stat"><div class="ov-label">As of</div><div class="ov-value">${fmtDate(snap.date)}</div></div>
-        <div class="ov-stat"><div class="ov-label">Disciplines</div><div class="ov-value">${disciplines.length}</div></div>
-        <div class="ov-stat"><div class="ov-label">Sections</div><div class="ov-value">${totalSections.toLocaleString()}</div></div>
-        <div class="ov-stat"><div class="ov-label">Enrolled</div><div class="ov-value">${totalEnrolled.toLocaleString()} / ${totalCapacity.toLocaleString()}</div></div>
-        <div class="ov-stat"><div class="ov-label">College Fill</div><div class="ov-value">${totalFill.toFixed(1)}%</div></div>
-        <div class="ov-stat"><div class="ov-label">Waitlisted</div><div class="ov-value">${totalWaitlist}</div></div>
-      </div>
-
-      <div class="overview-grid">
-        <div class="overview-treemap-wrap">
-          <div class="overview-head">
-            <h3>Department Capacity Map</h3>
-            <span class="overview-meta">Click any tile to focus on that discipline</span>
-          </div>
-          ${toggleBar}
-          ${legend}
-          <div class="treemap-container">
-            <svg viewBox="0 0 ${tmW} ${tmH}" preserveAspectRatio="none" class="treemap-svg">
-              ${tiles}
-            </svg>
-          </div>
-        </div>
-
-        <div class="overview-alerts-wrap">
-          <div class="overview-head">
-            <h3>Attention Needed</h3>
-            <span class="overview-meta">Three categories of sections worth looking at</span>
-          </div>
-          ${waitlistPanel}
-          ${atRiskPanel}
-          ${underPanel}
-        </div>
       </div>
     `;
   }
@@ -3668,40 +3802,6 @@
       });
     });
 
-    // Overview drill-in: click a tile or alert card to focus on that
-    // discipline in detail. Replaces the current selection with just the
-    // clicked discipline — drilling in means narrowing, not adding. Use the
-    // discipline picker to restore a broader view.
-    document.querySelectorAll('[data-overview-drill]').forEach(t => {
-      t.addEventListener('click', () => {
-        const prefix = t.dataset.overviewDrill;
-        state.selectedDisciplines = new Set([prefix]);
-        state.activeDisciplineFilter.clear();
-        state.fillBucket = 'all';
-        saveStorage();
-        state.activeTab = 'snapshot';
-        toast(`Focused on ${prefix}`, 2200);
-        render();
-      });
-    });
-
-    // Overview size metric toggle
-    document.querySelectorAll('[data-ov-size]').forEach(b => {
-      b.addEventListener('click', () => {
-        state.overviewSizeMetric = b.dataset.ovSize;
-        render();
-      });
-    });
-
-    // Overview color metric toggle
-    document.querySelectorAll('[data-ov-color]').forEach(b => {
-      b.addEventListener('click', () => {
-        if (b.disabled) return;
-        state.overviewColorMetric = b.dataset.ovColor;
-        render();
-      });
-    });
-
     // Discipline sub-filters
     document.querySelectorAll('[data-disc-filter]').forEach(b => {
       b.addEventListener('click', () => {
@@ -3730,6 +3830,26 @@
       });
     });
 
+    // Grouped vs. list view toggle (only relevant when Empty or Full filter active)
+    document.querySelectorAll('[data-view-mode]').forEach(b => {
+      b.addEventListener('click', () => {
+        state.groupedView = b.dataset.viewMode === 'grouped';
+        saveStorage();
+        render();
+      });
+    });
+
+    // Per-course-per-group expansion toggles in the grouped view.
+    // Click "show all" -> expand that group; click "show fewer" -> collapse.
+    // State lives in state.groupedExpansion as { "MATH-021:priority": true }
+    document.querySelectorAll('[data-grouped-toggle]').forEach(b => {
+      b.addEventListener('click', () => {
+        const key = b.dataset.groupedToggle;
+        state.groupedExpansion[key] = !state.groupedExpansion[key];
+        render();
+      });
+    });
+
     // Per-discipline card collapse/expand toggle
     document.querySelectorAll('[data-toggle-discipline]').forEach(b => {
       b.addEventListener('click', () => {
@@ -3747,12 +3867,68 @@
       });
     });
 
+    // Bulk collapse-all / expand-all toggle for the entire card grid.
+    // Sets explicit overrides for every currently-visible discipline so the
+    // choice persists. Reading data-bulk-action tells us which direction:
+    // 'collapse' -> set all to false, 'expand' -> set all to true.
+    const bulkBtn = el('bulkDisciplineToggle');
+    if (bulkBtn) {
+      bulkBtn.addEventListener('click', () => {
+        const action = bulkBtn.dataset.bulkAction;
+        const targetValue = action === 'expand';
+        const snap = currentSnapshot();
+        if (!snap) return;
+        // Find every discipline currently in scope (matches filteredRows logic)
+        const inScopePrefixes = new Set();
+        filteredRows().forEach(r => inScopePrefixes.add(r._prefix));
+        inScopePrefixes.forEach(prefix => {
+          state.cardExpansion[prefix] = targetValue;
+        });
+        saveStorage();
+        render();
+      });
+    }
+
     const reset = el('resetFilters');
     if (reset) reset.addEventListener('click', () => {
       state.activeDisciplineFilter.clear();
       state.activeLocations.clear();
       state.fillBucket = 'all';
       render();
+    });
+
+    // Show all disciplines — quick path back from a narrow drill-in view
+    const showAll = el('showAllDisciplines');
+    if (showAll) showAll.addEventListener('click', () => {
+      state.selectedDisciplines = new Set(state.allDisciplines.map(d => d.code));
+      state.activeDisciplineFilter.clear();
+      saveStorage();
+      toast(`Showing all ${state.allDisciplines.length} disciplines`, 2200);
+      render();
+    });
+
+    // Institute scope chips — additive toggle. Clicking BUSS adds all BUSS
+    // disciplines to selection; clicking again when all are present removes
+    // them. Lets users compose multi-institute views by clicking several.
+    document.querySelectorAll('[data-institute]').forEach(b => {
+      b.addEventListener('click', () => {
+        const inst = b.dataset.institute;
+        const codes = state.instituteIndex[inst] || [];
+        if (codes.length === 0) return;
+        const allSelected = codes.every(c => state.selectedDisciplines.has(c));
+        if (allSelected) {
+          // Remove all disciplines of this institute
+          codes.forEach(c => state.selectedDisciplines.delete(c));
+          toast(`Removed ${inst} (${codes.length} disciplines)`, 2000);
+        } else {
+          // Add all disciplines of this institute
+          codes.forEach(c => state.selectedDisciplines.add(c));
+          toast(`Added ${inst} (${codes.length} disciplines)`, 2000);
+        }
+        state.activeDisciplineFilter.clear();
+        saveStorage();
+        render();
+      });
     });
 
     const benchT = el('benchToggle');
