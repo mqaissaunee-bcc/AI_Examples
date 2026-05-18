@@ -2,11 +2,16 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v4.9
-  Date:     May 17, 2026
-  Features: Removed Overview tab and capacity heatmap (user testing found
-            it confusing). Kept Institute scope chips and "Show all" button
-            for discipline scope navigation. Built on v4.4 canonical baseline.
+  Version:  v5.0
+  Date:     May 18, 2026
+  Features: Adds course-grouped view for Empty and Full fill buckets.
+            Consolidates redundant sibling alternatives — instead of showing
+            MATH-021's 25 alternatives once per empty section (8 times),
+            shows them once per course. Includes waitlist callouts for Full
+            bucket and placeholder-capacity notes for ACAD-089-style data.
+            Toggle "Grouped / List" in filter bar lets users fall back to
+            the original per-section row display. Preference persists.
+            Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -888,6 +893,209 @@
   .delta-cell.down { color: var(--down); }
   .delta-cell.flat { color: var(--flat); }
 
+  /* ============================================================ */
+  /* Course-grouped view (cg-*) — Empty and Full buckets           */
+  /* Consolidates per-section sibling listings into per-course     */
+  /* panels with shared alternatives.                              */
+  /* ============================================================ */
+  .cg-container {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .cg-panel {
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--warn);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .cg-panel.cg-full {
+    border-left-color: var(--info);
+  }
+  .cg-panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
+  }
+  .cg-panel-head .cg-course-id {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .cg-panel-head .cg-course-title {
+    color: var(--ink-soft);
+    margin-left: 8px;
+    font-size: 13px;
+  }
+  .cg-panel-head .cg-course-stats {
+    font-size: 11px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .cg-panel-head .cg-course-stats strong { color: var(--ink); }
+
+  /* Waitlist callout (full bucket) */
+  .cg-waitlist-callout {
+    padding: 7px 14px;
+    background: #fff7e8;
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px;
+    color: #6a5417;
+  }
+  .cg-waitlist-callout strong { color: #4a3a0f; }
+
+  /* Placeholder-capacity note (ACAD-089 etc.) */
+  .cg-placeholder-note {
+    padding: 7px 14px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .cg-placeholder-note strong { color: var(--ink); }
+
+  /* Subpanel sections (triggered + alternatives) */
+  .cg-triggered-sections,
+  .cg-alternatives {
+    padding: 10px 14px;
+  }
+  .cg-alternatives {
+    border-top: 1px solid var(--rule);
+  }
+  .cg-panel-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  /* Triggered section rows */
+  .cg-triggered-row {
+    display: grid;
+    grid-template-columns: 90px 90px 80px 80px 1fr;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cg-triggered-row.cg-row-header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-mute);
+    font-weight: 600;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 4px;
+  }
+  .cg-triggered-row .code { font-weight: 700; }
+  .cg-instr-tba { color: var(--ink-mute); font-style: italic; }
+
+  /* Alternatives section */
+  .cg-alt-group {
+    margin-bottom: 10px;
+  }
+  .cg-alt-group:last-child { margin-bottom: 0; }
+  .cg-alt-group-label {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .cg-alt-group.priority .cg-alt-group-label::before {
+    content: '★ ';
+    color: var(--good);
+  }
+  .cg-alt-row {
+    display: grid;
+    grid-template-columns: 75px 100px 50px 95px 65px 1fr;
+    gap: 10px;
+    padding: 3px 0 3px 10px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    border-left: 2px solid transparent;
+  }
+  .cg-alt-row.priority {
+    border-left-color: var(--good);
+    background: rgba(45, 90, 61, 0.06);
+  }
+  .cg-alt-row .code { font-weight: 700; }
+  .cg-alt-row .right { text-align: right; }
+  .cg-alt-row .cg-open { font-weight: 600; color: var(--ink); }
+
+  /* Fill bar (mini visual in alternatives) */
+  .cg-fill-bar {
+    display: inline-block;
+    width: 50px;
+    height: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    position: relative;
+    vertical-align: middle;
+  }
+  .cg-fill-bar-inner {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: var(--good);
+  }
+  .cg-fill-bar-inner.over { background: var(--info); }
+
+  /* Format tags */
+  .cg-format-tag {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+  .cg-format-tag.online {
+    background: rgba(30, 78, 140, 0.12);
+    border-color: rgba(30, 78, 140, 0.35);
+    color: var(--info);
+  }
+  .cg-format-tag.evening {
+    background: rgba(196, 169, 90, 0.18);
+    border-color: rgba(196, 169, 90, 0.5);
+    color: #6a5417;
+  }
+  .cg-format-tag.wall { background: rgba(139, 71, 137, 0.12); border-color: rgba(139, 71, 137, 0.35); color: #6b3469; }
+
+  /* Truncation footer */
+  .cg-truncation-note {
+    text-align: center;
+    padding: 5px 4px;
+    font-size: 11px;
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+  .cg-truncation-note a {
+    color: var(--info);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--info);
+  }
+
+  /* No-alternatives warning */
+  .cg-no-alts-warning {
+    padding: 10px 12px;
+    background: rgba(196, 69, 45, 0.08);
+    border: 1px solid var(--warn);
+    border-left: 3px solid var(--warn);
+    font-size: 12px;
+    color: var(--warn);
+    line-height: 1.45;
+  }
+  .cg-no-alts-warning strong { color: var(--warn); }
+
   /* Snapshot management */
   .snapshot-list {
     border: 1px solid var(--rule);
@@ -1028,7 +1236,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v4.9</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.0</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -1064,6 +1272,7 @@
     INSTITUTE_INDEX: 'enroll-inst-idx',
     BENCHMARKS: 'enroll-benchmarks',
     CARD_EXPANSION: 'enroll-card-expansion',
+    GROUPED_VIEW: 'enroll-grouped-view',
   };
 
   const state = {
@@ -1088,6 +1297,12 @@
     fillBucket: 'all',      // 'all' | 'full' | 'almost' | 'under' | 'empty'
     cardExpansion: {},      // explicit per-discipline overrides: { ELEC: true, MATH: false }
                             //   missing key => use smart default (expand if <20 sections)
+
+    // When Empty or Full fill bucket is active, choose between a course-grouped
+    // panel view (default) and the traditional one-row-per-section list. The
+    // grouped view consolidates redundant alternative listings; the list view
+    // is the original behavior, kept as a fallback for users who prefer it.
+    groupedView: true,
 
     // Loading state for GitHub-hosted data
     loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
@@ -1177,6 +1392,9 @@
 
       const ce = localStorage.getItem(STORAGE.CARD_EXPANSION);
       if (ce) state.cardExpansion = JSON.parse(ce);
+
+      const gv = localStorage.getItem(STORAGE.GROUPED_VIEW);
+      if (gv !== null) state.groupedView = gv === 'true';
     } catch (err) {
       console.error('Storage load error:', err);
     }
@@ -1189,6 +1407,7 @@
       localStorage.setItem(STORAGE.INSTITUTE_INDEX, JSON.stringify(state.instituteIndex));
       localStorage.setItem(STORAGE.BENCHMARKS, String(state.showBenchmarks));
       localStorage.setItem(STORAGE.CARD_EXPANSION, JSON.stringify(state.cardExpansion));
+      localStorage.setItem(STORAGE.GROUPED_VIEW, String(state.groupedView));
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
     }
@@ -1954,6 +2173,13 @@
             <button class="chip ${state.fillBucket === b.id ? 'active' : ''}" data-bucket="${b.id}" title="${escapeHtml(b.title)}">${escapeHtml(b.label)}</button>
           `).join('')}
         </div>
+        ${(state.fillBucket === 'empty' || state.fillBucket === 'full') ? `
+          <div class="filter-group">
+            <span class="lbl">View</span>
+            <button class="chip ${state.groupedView ? 'active' : ''}" data-view-mode="grouped" title="Group sections by course with shared alternatives">Grouped</button>
+            <button class="chip ${!state.groupedView ? 'active' : ''}" data-view-mode="list" title="Show each section as its own row (original behavior)">List</button>
+          </div>
+        ` : ''}
         <div class="filter-group">
           <span class="lbl">Compare</span>
           <button class="chip ${state.showBenchmarks ? 'active' : ''}" id="benchToggle" type="button" title="Compare against college-wide fall enrollment">
@@ -2272,6 +2498,81 @@
     return s;
   }
 
+  // ----- Section table search helpers (used by both list and grouped views) -----
+  // Brookdale day codes. R is an alias for TH in some academic conventions;
+  // we normalize both to "TH" internally.
+  const DAY_CODES = new Set(['M', 'T', 'W', 'TH', 'F', 'S']);
+  function isDayToken(raw) {
+    const upper = String(raw).toUpperCase();
+    if (upper === 'R') return 'TH';
+    return DAY_CODES.has(upper) ? upper : null;
+  }
+
+  // Parse a Meeting Days string into a Set of canonical day codes.
+  function parseDays(raw) {
+    const codes = new Set();
+    if (!raw) return codes;
+    const tokens = String(raw).toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+    for (const tok of tokens) {
+      if (DAY_CODES.has(tok)) codes.add(tok);
+      else if (tok === 'R') codes.add('TH');
+      else {
+        let i = 0;
+        while (i < tok.length) {
+          if (tok.slice(i, i + 2) === 'TH') { codes.add('TH'); i += 2; continue; }
+          const c = tok[i];
+          if (DAY_CODES.has(c)) codes.add(c);
+          else if (c === 'R') codes.add('TH');
+          i += 1;
+        }
+      }
+    }
+    return codes;
+  }
+
+  const normCompact = (s) =>
+    String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, '');
+
+  const normPhrase = (s) =>
+    String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, ' ').trim();
+
+  function parseSearchTokens(input) {
+    const tokens = [];
+    const re = /"([^"]*)"|(\S+)/g;
+    let m;
+    while ((m = re.exec(input)) !== null) {
+      if (m[1] !== undefined) {
+        const phrase = normPhrase(m[1]);
+        if (phrase) tokens.push({ kind: 'phrase', value: phrase });
+      } else if (m[2] !== undefined) {
+        const dayCode = isDayToken(m[2]);
+        if (dayCode) {
+          tokens.push({ kind: 'day', value: dayCode });
+        } else {
+          const word = normCompact(m[2]);
+          if (word) tokens.push({ kind: 'word', value: word });
+        }
+      }
+    }
+    return tokens;
+  }
+
+  function sectionMatchesAllTokens(row, tokens) {
+    if (tokens.length === 0) return true;
+    const raw = [
+      row.Section, row['Course Title'], row.Location, row['Meeting Days'],
+      row['Section Start Time'], row.Instructor, row.Course,
+    ].join(' ');
+    const compact = normCompact(raw);
+    const phrase = normPhrase(raw);
+    const days = parseDays(row['Meeting Days']);
+    return tokens.every(t => {
+      if (t.kind === 'phrase') return phrase.includes(t.value);
+      if (t.kind === 'day') return days.has(t.value);
+      return compact.includes(t.value);
+    });
+  }
+
   function sectionHistory(sectionCode) {
     return state.snapshots.map(s => ({
       date: s.date,
@@ -2284,6 +2585,15 @@
    * ========================================================================= */
 
   function renderTable() {
+    // When Empty or Full bucket is active AND grouped view is on, render the
+    // course-grouped panel display instead of the per-section row table.
+    // The grouped view consolidates redundant alternative listings (e.g. for
+    // MATH-021's 8 empty sections, alternatives are shown once instead of 8
+    // times). Other buckets always use the list view.
+    if (state.groupedView && (state.fillBucket === 'empty' || state.fillBucket === 'full')) {
+      return renderTableGrouped();
+    }
+
     const headers = [
       { k: 'Section', label: 'Section' },
       { k: 'Course Title', label: 'Title' },
@@ -2332,107 +2642,16 @@
     //      treated specially: they match only against the Meeting Days field,
     //      so "M W" means "section meets on both Monday AND Wednesday" rather
     //      than "row contains the letter m AND the letter w somewhere."
+    //
+    // Implementation note: the search helpers (parseSearchTokens,
+    // sectionMatchesAllTokens, parseDays, etc.) are defined at module scope
+    // so the grouped view (renderTableGrouped) can use them too.
 
-    // Brookdale day codes. R is an alias for TH (some academic conventions
-    // use R for Thursday); we normalize both to "TH" internally.
-    const DAY_CODES = new Set(['M', 'T', 'W', 'TH', 'F', 'S']);
-    const isDayToken = (raw) => {
-      const upper = String(raw).toUpperCase();
-      if (upper === 'R') return 'TH';
-      return DAY_CODES.has(upper) ? upper : null;
-    };
-
-    // Parse a Meeting Days string into a Set of canonical day codes.
-    // Examples: "M,W"        -> {M, W}
-    //           "T TH"       -> {T, TH}
-    //           "M T W TH"   -> {M, T, W, TH}
-    //           "W F, F"     -> {W, F}     (de-duplicated)
-    function parseDays(raw) {
-      const codes = new Set();
-      if (!raw) return codes;
-      // TH is two letters and must be recognized before T to avoid the H
-      // splitting off into nothing. We do this by tokenizing on non-letter
-      // boundaries, then matching each token against the day set.
-      const tokens = String(raw).toUpperCase().split(/[^A-Z]+/).filter(Boolean);
-      for (const tok of tokens) {
-        if (DAY_CODES.has(tok)) codes.add(tok);
-        else if (tok === 'R') codes.add('TH');
-        // For tokens like "MWF" (compact, no separators) we walk them
-        else {
-          let i = 0;
-          while (i < tok.length) {
-            // Try TH first (two chars)
-            if (tok.slice(i, i + 2) === 'TH') { codes.add('TH'); i += 2; continue; }
-            const c = tok[i];
-            if (DAY_CODES.has(c)) codes.add(c);
-            else if (c === 'R') codes.add('TH');
-            i += 1;
-          }
-        }
-      }
-      return codes;
-    }
-
-    // Compact normalize: lowercase, strip all whitespace/punctuation
-    const normCompact = (s) =>
-      String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, '');
-
-    // Phrase normalize (for quoted terms): lowercase, collapse separators to
-    // a single space so internal word boundaries are preserved
-    const normPhrase = (s) =>
-      String(s == null ? '' : s).toLowerCase().replace(/[\s\-_,./()\[\]]+/g, ' ').trim();
-
-    // Tokenize the search input into a list of search terms. Quoted strings
-    // become single phrase tokens; unquoted whitespace splits into multiple.
-    // Day codes (M, T, W, TH, F, S, R) become 'day' tokens.
-    function tokenizeSearch(input) {
-      const tokens = [];
-      const re = /"([^"]*)"|(\S+)/g;
-      let m;
-      while ((m = re.exec(input)) !== null) {
-        if (m[1] !== undefined) {
-          // Quoted phrase — always a phrase token, never reinterpreted
-          const phrase = normPhrase(m[1]);
-          if (phrase) tokens.push({ kind: 'phrase', value: phrase });
-        } else if (m[2] !== undefined) {
-          // Unquoted word — check if it's a day code
-          const dayCode = isDayToken(m[2]);
-          if (dayCode) {
-            tokens.push({ kind: 'day', value: dayCode });
-          } else {
-            const word = normCompact(m[2]);
-            if (word) tokens.push({ kind: 'word', value: word });
-          }
-        }
-      }
-      return tokens;
-    }
-
-    const tokens = tokenizeSearch(state.tableSearch);
-
-    // Build the haystacks for each row, including parsed day codes
-    const haystack = (r) => {
-      const raw = [
-        r.Section, r['Course Title'], r.Location, r['Meeting Days'],
-        r['Section Start Time'], r.Instructor, r.Course,
-      ].join(' ');
-      return {
-        compact: normCompact(raw),
-        phrase: normPhrase(raw),
-        days: parseDays(r['Meeting Days']),
-      };
-    };
+    const tokens = parseSearchTokens(state.tableSearch);
 
     const searched = tokens.length === 0
       ? enriched
-      : enriched.filter(r => {
-          const h = haystack(r);
-          return tokens.every(t => {
-            if (t.kind === 'phrase') return h.phrase.includes(t.value);
-            if (t.kind === 'day') return h.days.has(t.value);
-            return h.compact.includes(t.value);
-          });
-        });
+      : enriched.filter(r => sectionMatchesAllTokens(r, tokens));
 
     const sorted = searched.slice().sort((a, b) => {
       let av = a[state.sortKey], bv = b[state.sortKey];
@@ -2632,6 +2851,367 @@
           </thead>
           <tbody>${rows || `<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--ink-mute);font-style:italic">${emptyMessage}</td></tr>`}</tbody>
         </table>
+      </div>
+    `;
+  }
+
+  /* =========================================================================
+   * TABLE — GROUPED VIEW (Empty and Full buckets only)
+   *
+   * Consolidates the per-section sibling display into a per-course panel.
+   * Instead of repeating MATH-021's 25 alternatives once for each of its 8
+   * empty sections, we show the empty sections together and the alternatives
+   * once underneath.
+   * ========================================================================= */
+
+  function renderTableGrouped() {
+    const snap = currentSnapshot();
+    if (!snap) {
+      return `<div class="section-title">Full Section Detail</div>
+        <p style="color:var(--ink-mute);padding:14px 0;font-style:italic">No snapshot loaded.</p>`;
+    }
+
+    const bucket = state.fillBucket;  // 'empty' or 'full'
+    const prevSnap = previousSnapshot();
+    const prevByCode = {};
+    if (prevSnap) prevSnap.rows.forEach(r => { prevByCode[r.Section] = r; });
+
+    // Get the filtered rows (respects discipline/location/sub-filter selection
+    // AND the active fill bucket). These are the "triggered" sections — what
+    // the user is currently filtering to.
+    const triggered = filteredRows();
+
+    // Apply table search if present (same logic as list view)
+    const tokens = parseSearchTokens(state.tableSearch);
+    const searched = tokens.length > 0
+      ? triggered.filter(r => sectionMatchesAllTokens(r, tokens))
+      : triggered;
+
+    if (searched.length === 0) {
+      const hasActiveSearch = tokens.length > 0;
+      const emptyMessage = hasActiveSearch
+        ? `No sections match "${escapeHtml(state.tableSearch)}".`
+        : `No sections match the current filters.`;
+      return `${renderTableToolbar(triggered.length, searched.length, hasActiveSearch)}
+        <p style="color:var(--ink-mute);padding:24px;font-style:italic;text-align:center">${emptyMessage}</p>`;
+    }
+
+    // Group triggered sections by course code (e.g. "MATH-021", "ENGL-121")
+    const byCourse = {};
+    searched.forEach(r => {
+      if (!byCourse[r.Course]) byCourse[r.Course] = [];
+      byCourse[r.Course].push(r);
+    });
+
+    // Sort courses by triggered count desc (biggest concerns first), then alphabetical
+    const courseOrder = Object.keys(byCourse).sort((a, b) => {
+      const diff = byCourse[b].length - byCourse[a].length;
+      return diff !== 0 ? diff : a.localeCompare(b);
+    });
+
+    // For each course, also collect ALL sections from the snapshot (not just
+    // the triggered ones), so we can show alternatives.
+    const allSectionsByCourse = {};
+    snap.rows.forEach(r => {
+      if (!allSectionsByCourse[r.Course]) allSectionsByCourse[r.Course] = [];
+      allSectionsByCourse[r.Course].push(r);
+    });
+
+    // Determine "useful alternative" predicate based on bucket
+    //   Empty bucket -> alternative = has any enrollment
+    //   Full bucket  -> alternative = has open seats
+    const isAlternative = (s) => {
+      const enr = Number(s['Enrolled Students']) || 0;
+      const cap = Number(s.Capacity) || 0;
+      if (bucket === 'empty') return enr > 0;
+      // bucket === 'full'
+      return cap > enr;
+    };
+
+    // Render one course panel
+    const panels = courseOrder.map(courseCode => {
+      const triggeredSections = byCourse[courseCode];
+      const allSections = allSectionsByCourse[courseCode] || [];
+      const alternatives = allSections.filter(s =>
+        !triggeredSections.some(t => t.Section === s.Section) && isAlternative(s)
+      );
+      const courseTitle = triggeredSections[0]['Course Title'] || '';
+      const prefix = triggeredSections[0]._prefix;
+      const color = colorFor(prefix);
+
+      // Stats for the course header
+      const totalSections = allSections.length;
+      const triggeredCount = triggeredSections.length;
+      const enrolledCount = allSections.filter(s => (Number(s['Enrolled Students']) || 0) > 0).length;
+      const totalWait = sum(allSections, 'Wait List');
+
+      const courseStats = bucket === 'empty'
+        ? `<strong>${triggeredCount}</strong> of ${totalSections} section${totalSections === 1 ? '' : 's'} empty · <strong>${enrolledCount}</strong> with enrollment`
+        : `<strong>${triggeredCount}</strong> of ${totalSections} section${totalSections === 1 ? '' : 's'} at/over capacity${totalWait > 0 ? ` · <strong>${totalWait}</strong> students waitlisted` : ''}`;
+
+      // Waitlist callout for full bucket
+      let waitlistCallout = '';
+      if (bucket === 'full' && totalWait > 0) {
+        const withWait = triggeredSections
+          .filter(s => (Number(s['Wait List']) || 0) > 0)
+          .sort((a, b) => (Number(b['Wait List']) || 0) - (Number(a['Wait List']) || 0));
+        if (withWait.length > 0) {
+          const parts = withWait.map(s => {
+            const w = Number(s['Wait List']) || 0;
+            const code = s.Section.split('-').slice(-1)[0] || s.Section;
+            return `${escapeHtml(code)} (${w})`;
+          }).join(', ');
+          waitlistCallout = `<div class="cg-waitlist-callout">⚠ <strong>Unmet demand:</strong> Waitlists on ${parts}</div>`;
+        }
+      }
+
+      // Placeholder-capacity note for fill > 200% (e.g. ACAD-089 with cap=1)
+      let placeholderNote = '';
+      if (bucket === 'full') {
+        const allOverFill = triggeredSections.every(s => {
+          const enr = Number(s['Enrolled Students']) || 0;
+          const cap = Number(s.Capacity) || 0;
+          return cap > 0 && (enr / cap) > 2;
+        });
+        if (allOverFill && triggeredSections.length > 0) {
+          placeholderNote = `<div class="cg-placeholder-note">ℹ <strong>Note:</strong> Sections show very high fill percentages, likely due to placeholder-capacity convention (e.g., capacity of 1 for independent study). Decisions here differ from regular capacity decisions.</div>`;
+        }
+      }
+
+      // Render triggered sections (compact rows)
+      const MAX_TRIGGERED_INLINE = 8;
+      const showAllTriggered = triggeredSections.length <= MAX_TRIGGERED_INLINE;
+      const triggeredVisible = showAllTriggered ? triggeredSections : triggeredSections.slice(0, 6);
+
+      const triggeredRowsHTML = triggeredVisible.map(s => {
+        const sectionCode = s.Section.split('-').slice(-1)[0] || s.Section;
+        const days = cleanCell(s['Meeting Days'], '—');
+        const time = cleanCell(s['Section Start Time'], 'TBA');
+        const instructor = cleanCell(s.Instructor, '');
+        const instructorHTML = instructor
+          ? escapeHtml(instructor)
+          : '<span class="cg-instr-tba">TBA</span>';
+        const enr = Number(s['Enrolled Students']) || 0;
+        const cap = Number(s.Capacity) || 0;
+        const wait = Number(s['Wait List']) || 0;
+        const fillPct = cap > 0 ? (enr / cap * 100) : 0;
+        const formatTag = formatTagFor(s);
+
+        if (bucket === 'empty') {
+          return `
+            <div class="cg-triggered-row">
+              <span class="code">${escapeHtml(sectionCode)}</span>
+              <span>${formatTag}</span>
+              <span>${escapeHtml(days)}</span>
+              <span>${escapeHtml(time)}</span>
+              <span>${instructorHTML}</span>
+            </div>
+          `;
+        } else {
+          // Full bucket: show fill % and waitlist
+          const waitCell = wait > 0
+            ? `<span style="color:var(--warn);font-weight:600">${wait} waiting</span>`
+            : '<span style="color:var(--ink-mute)">—</span>';
+          return `
+            <div class="cg-triggered-row">
+              <span class="code">${escapeHtml(sectionCode)}</span>
+              <span>${formatTag}</span>
+              <span>${enr}/${cap} (${fillPct.toFixed(0)}%)</span>
+              <span>${waitCell}</span>
+              <span>${instructorHTML}</span>
+            </div>
+          `;
+        }
+      }).join('');
+
+      const triggeredHeaderRow = bucket === 'empty'
+        ? `<div class="cg-triggered-row cg-row-header">
+            <span class="code">Section</span><span>Format</span><span>Days</span><span>Time</span><span>Instructor</span>
+          </div>`
+        : `<div class="cg-triggered-row cg-row-header">
+            <span class="code">Section</span><span>Format</span><span>Fill</span><span>Waitlist</span><span>Instructor</span>
+          </div>`;
+
+      const triggeredTruncatedMsg = showAllTriggered ? '' :
+        `<div class="cg-truncation-note">Showing first 6 of ${triggeredSections.length} · <a href="#" data-show-all-triggered="${escapeHtml(courseCode)}">show all</a></div>`;
+
+      const triggeredPanel = `
+        <div class="cg-triggered-sections">
+          <div class="cg-panel-label">${bucket === 'empty' ? 'Empty sections' : 'Full sections'} (${triggeredSections.length})</div>
+          ${triggeredHeaderRow}
+          ${triggeredRowsHTML}
+          ${triggeredTruncatedMsg}
+        </div>
+      `;
+
+      // Render alternatives — split into priority (50%+ full) and more-room
+      let alternativesPanel = '';
+      if (alternatives.length === 0) {
+        // No alternatives — important warning
+        const warningText = bucket === 'empty'
+          ? `⚠ <strong>No in-course alternatives</strong> — all ${totalSections} section${totalSections === 1 ? '' : 's'} of ${escapeHtml(courseCode)} ${totalSections === 1 ? 'is' : 'are'} empty. This suggests a course-level enrollment problem, not a section-specific one. Cancellation or marketing-side intervention may be needed at the course level.`
+          : `⚠ <strong>No in-course alternatives</strong> — all ${totalSections} section${totalSections === 1 ? '' : 's'} of ${escapeHtml(courseCode)} ${totalSections === 1 ? 'is' : 'are'} at or over capacity. Consider opening additional sections; redirecting waitlisted students within this course is not possible.`;
+        alternativesPanel = `<div class="cg-alternatives"><div class="cg-no-alts-warning">${warningText}</div></div>`;
+      } else {
+        const priority = [];
+        const moreRoom = [];
+        alternatives.forEach(s => {
+          const enr = Number(s['Enrolled Students']) || 0;
+          const cap = Number(s.Capacity) || 0;
+          const fillPct = cap > 0 ? (enr / cap * 100) : 0;
+          if (fillPct >= 50) priority.push(s);
+          else moreRoom.push(s);
+        });
+
+        // Sort each group by fill descending (closest-to-full first within priority,
+        // most-full-first within more-room too)
+        priority.sort((a, b) => {
+          const fa = Number(a['Section Fill %']) || 0;
+          const fb = Number(b['Section Fill %']) || 0;
+          return fb - fa;
+        });
+        moreRoom.sort((a, b) => {
+          const fa = Number(a['Section Fill %']) || 0;
+          const fb = Number(b['Section Fill %']) || 0;
+          return fb - fa;
+        });
+
+        const MAX_ALT_PER_GROUP = 6;
+
+        function renderAltRow(s, isPriority) {
+          const sectionCode = s.Section.split('-').slice(-1)[0] || s.Section;
+          const enr = Number(s['Enrolled Students']) || 0;
+          const cap = Number(s.Capacity) || 0;
+          const fillPct = cap > 0 ? (enr / cap * 100) : 0;
+          const open = Math.max(0, cap - enr);
+          const days = cleanCell(s['Meeting Days'], '—');
+          const time = cleanCell(s['Section Start Time'], 'TBA');
+          const instructor = cleanCell(s.Instructor, '');
+          const instructorHTML = instructor ? escapeHtml(instructor) : '<span class="cg-instr-tba">TBA</span>';
+          const formatTag = formatTagFor(s);
+          const fillBarWidth = Math.min(100, fillPct);
+          const overCap = fillPct > 100;
+          return `
+            <div class="cg-alt-row ${isPriority ? 'priority' : ''}">
+              <span class="code">${escapeHtml(sectionCode)}</span>
+              <span><span class="cg-fill-bar"><span class="cg-fill-bar-inner ${overCap ? 'over' : ''}" style="width:${fillBarWidth}%"></span></span> ${enr}/${cap}</span>
+              <span class="right cg-open">${open}</span>
+              <span>${formatTag}</span>
+              <span>${escapeHtml(days)}</span>
+              <span>${escapeHtml(time)} · ${instructorHTML}</span>
+            </div>
+          `;
+        }
+
+        let priorityHTML = '';
+        if (priority.length > 0) {
+          const visible = priority.slice(0, MAX_ALT_PER_GROUP);
+          const remaining = priority.length - visible.length;
+          priorityHTML = `
+            <div class="cg-alt-group priority">
+              <div class="cg-alt-group-label">Push these over the line — sections 50%+ full, biggest leverage</div>
+              ${visible.map(s => renderAltRow(s, true)).join('')}
+              ${remaining > 0 ? `<div class="cg-truncation-note">+ ${remaining} more in priority range — <a href="#" data-show-all-priority="${escapeHtml(courseCode)}">show all</a></div>` : ''}
+            </div>
+          `;
+        }
+
+        let moreRoomHTML = '';
+        if (moreRoom.length > 0) {
+          const visible = moreRoom.slice(0, MAX_ALT_PER_GROUP);
+          const remaining = moreRoom.length - visible.length;
+          moreRoomHTML = `
+            <div class="cg-alt-group">
+              <div class="cg-alt-group-label">More room available</div>
+              ${visible.map(s => renderAltRow(s, false)).join('')}
+              ${remaining > 0 ? `<div class="cg-truncation-note">+ ${remaining} more with open seats — <a href="#" data-show-all-room="${escapeHtml(courseCode)}">show all</a></div>` : ''}
+            </div>
+          `;
+        }
+
+        alternativesPanel = `
+          <div class="cg-alternatives">
+            <div class="cg-panel-label">${bucket === 'empty' ? 'Available alternatives in ' + escapeHtml(courseCode) : 'Sections with room in ' + escapeHtml(courseCode)} (${alternatives.length})</div>
+            ${priorityHTML}
+            ${moreRoomHTML}
+          </div>
+        `;
+      }
+
+      const groupClass = bucket === 'empty' ? 'cg-empty' : 'cg-full';
+
+      return `
+        <div class="cg-panel ${groupClass}" style="border-left-color:${color}">
+          <div class="cg-panel-head">
+            <div>
+              <span class="cg-course-id">${escapeHtml(courseCode)}</span>
+              <span class="cg-course-title">${escapeHtml(courseTitle)}</span>
+            </div>
+            <div class="cg-course-stats">${courseStats}</div>
+          </div>
+          ${waitlistCallout}
+          ${placeholderNote}
+          ${triggeredPanel}
+          ${alternativesPanel}
+        </div>
+      `;
+    }).join('');
+
+    const totalCourses = courseOrder.length;
+    const totalTriggered = searched.length;
+    const subtitle = bucket === 'empty'
+      ? `${totalTriggered} empty section${totalTriggered === 1 ? '' : 's'} across ${totalCourses} course${totalCourses === 1 ? '' : 's'}`
+      : `${totalTriggered} full section${totalTriggered === 1 ? '' : 's'} across ${totalCourses} course${totalCourses === 1 ? '' : 's'}`;
+
+    return `
+      <div class="section-title">Full Section Detail <span class="meta">${subtitle}</span></div>
+      ${renderTableToolbar(triggered.length, searched.length, tokens.length > 0)}
+      <div class="cg-container">
+        ${panels}
+      </div>
+    `;
+  }
+
+  // Helper: format/modality tag for a section (used in both triggered rows and alternatives)
+  function formatTagFor(s) {
+    const sec = String(s.Section || '');
+    const loc = String(s.Location || '').toUpperCase();
+    // Distance Ed section codes contain "DE" or location is DE
+    if (/-DE\d/.test(sec) || loc === 'DE') {
+      return '<span class="cg-format-tag online">Online async</span>';
+    }
+    // Evening: 800-series section codes (legacy convention at Brookdale)
+    if (/-8\d{2}/.test(sec)) {
+      return '<span class="cg-format-tag evening">Evening</span>';
+    }
+    // Wall campus
+    if (loc === 'WALL') {
+      return '<span class="cg-format-tag wall">Wall campus</span>';
+    }
+    return '<span class="cg-format-tag in-person">In-person</span>';
+  }
+
+  // Helper: shared toolbar (search box + match count) extracted so both list
+  // and grouped renderers can use it
+  function renderTableToolbar(totalCount, matchCount, hasActiveSearch) {
+    const matchHTML = hasActiveSearch
+      ? `<span class="search-count">${matchCount} of ${totalCount}</span>`
+      : '';
+    return `
+      <div class="table-toolbar">
+        <div class="table-search">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input
+            type="text"
+            id="tableSearchInput"
+            class="search-input"
+            placeholder='Search — try "ENGI 101 LINC" or "Powell M W" or "MATH T TH"'
+            value="${escapeHtml(state.tableSearch)}"
+            autocomplete="off"
+            spellcheck="false">
+          ${state.tableSearch ? `<button class="search-clear" id="tableSearchClear" type="button" aria-label="Clear search">×</button>` : ''}
+        </div>
+        ${matchHTML}
       </div>
     `;
   }
@@ -3085,6 +3665,15 @@
     document.querySelectorAll('[data-bucket]').forEach(b => {
       b.addEventListener('click', () => {
         state.fillBucket = b.dataset.bucket;
+        render();
+      });
+    });
+
+    // Grouped vs. list view toggle (only relevant when Empty or Full filter active)
+    document.querySelectorAll('[data-view-mode]').forEach(b => {
+      b.addEventListener('click', () => {
+        state.groupedView = b.dataset.viewMode === 'grouped';
+        saveStorage();
         render();
       });
     });
