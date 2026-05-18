@@ -2,19 +2,13 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.5
+  Version:  v5.6
   Date:     May 18, 2026
-  Features: - Adds a Location column (IR's literal location code: LINC,
-              WALL, DE, etc.) alongside the existing Format column in the
-              grouped Empty and Full views. Same vocabulary as the Location
-              filter chips above.
-            - Renames "FTE Progress" KPI to "FTE vs. fall goal" with a
-              small discoverable info icon (i) on the label. Tooltip now
-              explains the SCH ÷ 30 formula and that goals reset each
-              semester. Sub-line shows distance-to-goal ("1110 to go") when
-              viewing the full college, or selection contribution when
-              scoped to a subset.
-            Built on v4.9 canonical baseline.
+  Features: Fix: FTE tooltip now uses a custom CSS tooltip instead of the
+            native HTML title attribute. The native tooltip was unreliable
+            (browser-delayed, OS-styled, sometimes failed to appear).
+            Custom tooltip is immediate, persists while cursor is on the
+            trigger, and matches dashboard styling. Built on v4.9 baseline.
 -->
 <html lang="en">
 <head>
@@ -432,6 +426,60 @@
     color: var(--ink);
     border-color: var(--ink);
     outline: none;
+  }
+
+  /* Custom tooltip — replaces native title= for reliability.
+     - Wrap is positioning anchor
+     - Tooltip is hidden by default, shown on hover or focus of the trigger
+     - Appears immediately (no browser-defined delay)
+     - Stays visible as long as the cursor is on the trigger
+     - Styled to match dashboard, not OS chrome */
+  .kpi .kpi-info-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .kpi .kpi-tooltip {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    max-width: 90vw;
+    padding: 10px 12px;
+    background: var(--ink);
+    color: var(--surface);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0.01em;
+    line-height: 1.45;
+    border: 1px solid var(--ink);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.12s, visibility 0s linear 0.12s;
+    z-index: 100;
+    white-space: normal;
+    text-align: left;
+  }
+  /* Caret pointing up to the icon */
+  .kpi .kpi-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-bottom-color: var(--ink);
+  }
+  .kpi .kpi-info-wrap:hover .kpi-tooltip,
+  .kpi .kpi-info:focus-visible + .kpi-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.12s, visibility 0s;
   }
   .kpi .value {
     font-family: 'Didot', 'Bodoni 72', Georgia, serif;
@@ -1347,7 +1395,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.5</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.6</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -2152,15 +2200,21 @@
         ? `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · your selection: ${yourFTE.toFixed(1)}`
         : `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · ${Math.max(0, goal - collegeFTE).toFixed(0)} to go`;
 
-      // Tooltip explains FTE, calculation, and goal scope. The ⓘ icon makes
-      // it discoverable rather than requiring users to know to hover the card.
+      // Tooltip explains FTE, calculation, and goal scope. A custom CSS
+      // tooltip (not native title=) so it appears immediately on hover,
+      // stays put while the cursor is on the trigger, and renders with
+      // dashboard styling rather than OS chrome. Native title tooltips are
+      // unreliable: delayed, dismissed quickly, and styled inconsistently.
       const fteTooltip = `Full-Time Equivalent (FTE) = Total Student Credit Hours ÷ 30 (Brookdale convention). Compared against the fall enrollment goal of ${goal.toLocaleString()}, set by Institutional Research. Goals reset each semester.`;
 
       fteCard = `
         <div class="kpi">
           <div class="label">
             FTE vs. fall goal
-            <span class="kpi-info" tabindex="0" title="${escapeHtml(fteTooltip)}" aria-label="About FTE">i</span>
+            <span class="kpi-info-wrap">
+              <span class="kpi-info" tabindex="0" role="button" aria-label="About FTE">i</span>
+              <span class="kpi-tooltip" role="tooltip">${escapeHtml(fteTooltip)}</span>
+            </span>
           </div>
           <div class="value">${collegeFTE.toFixed(1)} ${dStr}</div>
           <div class="sub">${sub}</div>
