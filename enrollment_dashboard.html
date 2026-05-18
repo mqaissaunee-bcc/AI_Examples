@@ -2,15 +2,20 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.3
+  Version:  v5.4
   Date:     May 18, 2026
-  Features: Excludes -295 (Special Project) and -299 (Internship) sections
-            from the Empty bucket filter and from "By Discipline"
-            empty-section counts. These are independent-enrollment courses
-            that aren't real capacity-planning concerns — students sign up
-            individually, often late, and "0 enrolled" is the expected
-            state, not a section in trouble. Still visible under "All" and
-            findable via search. Built on v4.9 canonical baseline.
+  Features: Refinements to grouped Empty/Full view and labels:
+            - Courses sorted alphabetically (was: triggered count desc) for
+              predictable position when scanning
+            - No-alternatives warning trimmed to one sentence for
+              single-section courses ("The only section of X is empty")
+            - Alternatives merged into one fill-descending list; subgroup
+              headings ("Push these over the line", "More room available")
+              removed; subtle priority row tint retained as visual cue;
+              added a column header row
+            - KPI label "Students Enrolled" -> "Enrollment"
+            - Filter bar group label "Scope" -> "Discipline group"
+            Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -501,7 +506,7 @@
   }
   /* Bulk-toggle button (Collapse all / Expand all) sits at the far right
      of the Sections at a Glance heading. Same chip-style as Institute
-     scope chips for visual parity. */
+     discipline-group chips for visual parity. */
   .section-title .bulk-toggle {
     font-family: 'Helvetica Neue', sans-serif;
     font-size: 10px;
@@ -1062,6 +1067,19 @@
   .cg-alt-row .code { font-weight: 700; }
   .cg-alt-row .right { text-align: right; }
   .cg-alt-row .cg-open { font-weight: 600; color: var(--ink); }
+  /* Column header for the merged alternatives list */
+  .cg-alt-row.cg-alt-header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-mute);
+    font-weight: 600;
+    padding-top: 4px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 4px;
+    border-left: none;
+  }
 
   /* Fill bar (mini visual in alternatives) */
   .cg-fill-bar {
@@ -1298,7 +1316,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.3</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.4</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -1646,7 +1664,7 @@
     fall.forEach(r => {
       // Use "Other" as the Institute bucket for any row missing an Institute
       // classification. This surfaces orphan disciplines like ESPT (where IR
-      // left Institute blank) in the scope chips rather than hiding them.
+      // left Institute blank) in the discipline-group chips rather than hiding them.
       const inst = r.Institute || 'Other';
       if (!state.instituteIndex[inst]) state.instituteIndex[inst] = [];
       if (!state.instituteIndex[inst].includes(r._prefix)) {
@@ -2121,7 +2139,7 @@
           <div class="sub">${fullCount} at capacity · ${emptyCount} with zero enrolled</div>
         </div>
         <div class="kpi">
-          <div class="label">Students Enrolled</div>
+          <div class="label">Enrollment</div>
           <div class="value">${enrolledNow} ${dEnrolled}</div>
           <div class="sub">of ${capacityNow} total seats</div>
         </div>
@@ -2187,7 +2205,7 @@
       { id: 'empty',  label: 'Empty',       title: 'Sections with zero enrolled students' },
     ];
 
-    // Scope shortcuts: institute-level chips (BUSS, STEM, etc.) for quick
+    // Discipline-group shortcuts: institute-level chips (BUSS, STEM, etc.) for quick
     // broad-category switching. Institutes are mutually exclusive sets of
     // disciplines, so clicking BUSS adds all BUSS disciplines to the
     // selection. Clicking again (when BUSS is fully selected) removes them.
@@ -2240,7 +2258,7 @@
 
     const scopeGroup = (instituteChips || showAllChip)
       ? `<div class="filter-group">
-          <span class="lbl">Scope</span>
+          <span class="lbl">Discipline group</span>
           ${showAllChip}
           ${instituteChips}
         </div>`
@@ -3018,11 +3036,10 @@
       byCourse[r.Course].push(r);
     });
 
-    // Sort courses by triggered count desc (biggest concerns first), then alphabetical
-    const courseOrder = Object.keys(byCourse).sort((a, b) => {
-      const diff = byCourse[b].length - byCourse[a].length;
-      return diff !== 0 ? diff : a.localeCompare(b);
-    });
+    // Sort courses alphabetically. Predictable position is more valuable
+    // than "biggest problem first" — chairs looking for a specific course
+    // (e.g., "where's BIOL-112?") want to know exactly where to find it.
+    const courseOrder = Object.keys(byCourse).sort((a, b) => a.localeCompare(b));
 
     // For each course, also collect ALL sections from the snapshot (not just
     // the triggered ones), so we can show alternatives.
@@ -3192,84 +3209,41 @@
       // Render alternatives — split into priority (50%+ full) and more-room
       let alternativesPanel = '';
       if (alternatives.length === 0) {
-        // No alternatives — important warning
-        const warningText = bucket === 'empty'
-          ? `⚠ <strong>No in-course alternatives</strong> — all ${totalSections} section${totalSections === 1 ? '' : 's'} of ${escapeHtml(courseCode)} ${totalSections === 1 ? 'is' : 'are'} empty. This suggests a course-level enrollment problem, not a section-specific one. Cancellation or marketing-side intervention may be needed at the course level.`
-          : `⚠ <strong>No in-course alternatives</strong> — all ${totalSections} section${totalSections === 1 ? '' : 's'} of ${escapeHtml(courseCode)} ${totalSections === 1 ? 'is' : 'are'} at or over capacity. Consider opening additional sections; redirecting waitlisted students within this course is not possible.`;
+        // The warning text adapts based on whether this course has just one
+        // section or multiple. With one section, there's nothing to say about
+        // "course-level problems" or "intervention" — it's just that the only
+        // section is empty/full. With multiple sections all in the same state,
+        // the broader "this is a course-level concern" framing is genuine and
+        // worth surfacing.
+        let warningText;
+        if (totalSections === 1) {
+          warningText = bucket === 'empty'
+            ? `⚠ <strong>The only section of ${escapeHtml(courseCode)} is empty.</strong>`
+            : `⚠ <strong>The only section of ${escapeHtml(courseCode)} is at or over capacity.</strong>`;
+        } else {
+          warningText = bucket === 'empty'
+            ? `⚠ <strong>No in-course alternatives</strong> — all ${totalSections} sections of ${escapeHtml(courseCode)} are empty. This suggests a course-level enrollment problem, not a section-specific one. Cancellation or marketing-side intervention may be needed at the course level.`
+            : `⚠ <strong>No in-course alternatives</strong> — all ${totalSections} sections of ${escapeHtml(courseCode)} are at or over capacity. Consider opening additional sections; redirecting waitlisted students within this course is not possible.`;
+        }
         alternativesPanel = `<div class="cg-alternatives"><div class="cg-no-alts-warning">${warningText}</div></div>`;
       } else {
-        const priority = [];
-        const moreRoom = [];
-        alternatives.forEach(s => {
-          const enr = Number(s['Enrolled Students']) || 0;
-          const cap = Number(s.Capacity) || 0;
-          const fillPct = cap > 0 ? (enr / cap * 100) : 0;
-          if (fillPct >= 50) priority.push(s);
-          else moreRoom.push(s);
-        });
-
-        // Sort each group by fill descending (closest-to-full first within priority,
-        // most-full-first within more-room too)
-        priority.sort((a, b) => {
-          const fa = Number(a['Section Fill %']) || 0;
-          const fb = Number(b['Section Fill %']) || 0;
-          return fb - fa;
-        });
-        moreRoom.sort((a, b) => {
+        // Merge all alternatives into a single list sorted by fill descending.
+        // Rows that are 50%+ full retain a subtle green-tinted background as
+        // a visual leverage cue, but the explicit grouping headings are gone —
+        // the fill bar plus the row tint communicates the same thing without
+        // editorial labels.
+        const sortedAlts = alternatives.slice().sort((a, b) => {
           const fa = Number(a['Section Fill %']) || 0;
           const fb = Number(b['Section Fill %']) || 0;
           return fb - fa;
         });
 
-        const MAX_ALT_PER_GROUP = 6;
-
-        // Build a truncation toggle for a group. Honors per-course-per-group
-        // expansion state so clicking the link actually expands the list.
-        function truncationToggle(key, remaining, label) {
-          const expanded = state.groupedExpansion[key] === true;
-          if (expanded) {
-            return `<div class="cg-truncation-note"><button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(key)}">show fewer</button></div>`;
-          }
-          return `<div class="cg-truncation-note">+ ${remaining} ${label} — <button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(key)}">show all</button></div>`;
-        }
-
-        let priorityHTML = '';
-        if (priority.length > 0) {
-          const priorityKey = `${courseCode}:priority`;
-          const priorityExpanded = state.groupedExpansion[priorityKey] === true;
-          const visible = priorityExpanded ? priority : priority.slice(0, MAX_ALT_PER_GROUP);
-          const remaining = priority.length - visible.length;
-          const needsToggle = priorityExpanded ? priority.length > MAX_ALT_PER_GROUP : remaining > 0;
-          priorityHTML = `
-            <div class="cg-alt-group priority">
-              <div class="cg-alt-group-label">Push these over the line — sections 50%+ full, biggest leverage</div>
-              ${visible.map(s => renderAltRow(s, true)).join('')}
-              ${needsToggle ? truncationToggle(priorityKey, remaining, 'more in priority range') : ''}
-            </div>
-          `;
-        }
-
-        let moreRoomHTML = '';
-        if (moreRoom.length > 0) {
-          const roomKey = `${courseCode}:room`;
-          const roomExpanded = state.groupedExpansion[roomKey] === true;
-          const visible = roomExpanded ? moreRoom : moreRoom.slice(0, MAX_ALT_PER_GROUP);
-          const remaining = moreRoom.length - visible.length;
-          const needsToggle = roomExpanded ? moreRoom.length > MAX_ALT_PER_GROUP : remaining > 0;
-          moreRoomHTML = `
-            <div class="cg-alt-group">
-              <div class="cg-alt-group-label">More room available</div>
-              ${visible.map(s => renderAltRow(s, false)).join('')}
-              ${needsToggle ? truncationToggle(roomKey, remaining, 'more with open seats') : ''}
-            </div>
-          `;
-        }
-
-        function renderAltRow(s, isPriority) {
+        function renderAltRow(s) {
           const sectionCode = s.Section.split('-').slice(-1)[0] || s.Section;
           const enr = Number(s['Enrolled Students']) || 0;
           const cap = Number(s.Capacity) || 0;
           const fillPct = cap > 0 ? (enr / cap * 100) : 0;
+          const isPriority = fillPct >= 50;
           const open = Math.max(0, cap - enr);
           const days = cleanCell(s['Meeting Days'], '—');
           const time = cleanCell(s['Section Start Time'], 'TBA');
@@ -3290,11 +3264,38 @@
           `;
         }
 
+        // Truncate long lists; per-course expansion state persists the toggle
+        const MAX_ALTS_VISIBLE = 8;
+        const altKey = `${courseCode}:alts`;
+        const altsExpanded = state.groupedExpansion[altKey] === true;
+        const visibleAlts = altsExpanded ? sortedAlts : sortedAlts.slice(0, MAX_ALTS_VISIBLE);
+        const remaining = sortedAlts.length - visibleAlts.length;
+
+        let truncationMsg = '';
+        if (altsExpanded && sortedAlts.length > MAX_ALTS_VISIBLE) {
+          truncationMsg = `<div class="cg-truncation-note"><button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(altKey)}">show fewer</button></div>`;
+        } else if (remaining > 0) {
+          truncationMsg = `<div class="cg-truncation-note">+ ${remaining} more — <button type="button" class="cg-toggle-link" data-grouped-toggle="${escapeHtml(altKey)}">show all</button></div>`;
+        }
+
+        // Column header row mirrors the visual columns of the alt rows below
+        const altHeader = `
+          <div class="cg-alt-row cg-alt-header">
+            <span class="code">Section</span>
+            <span>Fill</span>
+            <span class="right">Open</span>
+            <span>Format</span>
+            <span>Days</span>
+            <span>Time · Instructor</span>
+          </div>
+        `;
+
         alternativesPanel = `
           <div class="cg-alternatives">
             <div class="cg-panel-label">${bucket === 'empty' ? 'Available alternatives in ' + escapeHtml(courseCode) : 'Sections with room in ' + escapeHtml(courseCode)} (${alternatives.length})</div>
-            ${priorityHTML}
-            ${moreRoomHTML}
+            ${altHeader}
+            ${visibleAlts.map(renderAltRow).join('')}
+            ${truncationMsg}
           </div>
         `;
       }
@@ -3907,7 +3908,7 @@
       render();
     });
 
-    // Institute scope chips — additive toggle. Clicking BUSS adds all BUSS
+    // Discipline-group chips — additive toggle. Clicking BUSS adds all BUSS
     // disciplines to selection; clicking again when all are present removes
     // them. Lets users compose multi-institute views by clicking several.
     document.querySelectorAll('[data-institute]').forEach(b => {
