@@ -1,0 +1,3515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Faculty tool for building discipline-agnostic interactive case study prompts. Choose a genre, configure the scenario, and generate a one-shot prompt for ChatGPT, Claude, or Gemini.">
+<title>Case Study Prompt Builder</title>
+<style>
+/* ============================================================
+   CSS variables — theme + accent (accent flips per genre)
+   ============================================================ */
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-soft: #f1f5f9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text: #0f172a;
+  --text-soft: #475569;
+  --text-mute: #64748b;
+  --text-faint: #94a3b8;
+
+  /* Accent — swapped by JS when genre changes */
+  --accent: #4f46e5;          /* indigo-600 default */
+  --accent-hover: #4338ca;    /* indigo-700 */
+  --accent-soft: #eef2ff;     /* indigo-50 */
+  --accent-soft-border: #c7d2fe; /* indigo-200 */
+  --accent-ink: #3730a3;      /* indigo-800 */
+
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --danger: #e11d48;
+  --warning: #d97706;
+
+  --radius: 12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.04);
+  --shadow: 0 4px 12px rgba(15,23,42,0.06);
+  --shadow-lg: 0 12px 24px rgba(15,23,42,0.08);
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --surface: #111827;
+    --surface-soft: #1f2937;
+    --border: #1f2937;
+    --border-strong: #334155;
+    --text: #f1f5f9;
+    --text-soft: #cbd5e1;
+    --text-mute: #94a3b8;
+    --text-faint: #64748b;
+    --accent-soft: #1e1b4b;
+    --accent-soft-border: #3730a3;
+    --accent-ink: #c7d2fe;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--accent);
+  color: white;
+  padding: 8px 12px;
+  z-index: 100;
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+  font-weight: 600;
+}
+.skip-link:focus { left: 0; }
+
+/* ============================================================
+   Header
+   ============================================================ */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: var(--shadow-sm);
+}
+.header-inner {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.logo {
+  background: var(--accent);
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(79,70,229,0.25);
+  transition: background 0.2s;
+}
+.logo svg { width: 22px; height: 22px; }
+.title-block { flex: 1; min-width: 240px; }
+.title-block h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.title-block p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-mute);
+  font-weight: 500;
+}
+
+.header-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.icon-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font);
+}
+.icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.icon-btn svg { width: 18px; height: 18px; }
+.font-controls {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.font-controls button {
+  background: var(--surface);
+  border: 0;
+  width: 32px;
+  height: 38px;
+  min-height: 38px;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-weight: 700;
+  font-family: var(--font);
+}
+.font-controls button + button { border-left: 1px solid var(--border); }
+.font-controls button:hover { color: var(--accent); }
+.font-controls button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ============================================================
+   Main layout
+   ============================================================ */
+main {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 24px;
+}
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+.card h2 {
+  margin: 0 0 18px;
+  font-size: 16px;
+  font-weight: 700;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Section heading inside form */
+.field-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.field-label .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Form rows */
+.section-block { margin-top: 22px; }
+.section-block:first-child { margin-top: 0; }
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.row.row-3 { grid-template-columns: 1fr 1fr 1fr; }
+.row.row-1 { grid-template-columns: 1fr; }
+@media (max-width: 640px) {
+  .row, .row.row-3 { grid-template-columns: 1fr; }
+}
+
+.field { display: flex; flex-direction: column; }
+.field label, .field .lbl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+}
+.field .help {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+select, input[type="text"], textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  min-height: 38px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+select:focus, input[type="text"]:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79,70,229,0.15);
+  background: var(--surface);
+}
+textarea { resize: vertical; min-height: 80px; font-size: 13px; line-height: 1.5; }
+
+/* ============================================================
+   Genre selector (top of form)
+   ============================================================ */
+.genre-panel {
+  background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);
+  border: 1px solid var(--accent-soft-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.genre-panel-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-ink);
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.genre-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+@media (max-width: 760px) {
+  .genre-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.genre-btn {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+  padding: 10px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  text-align: center;
+  line-height: 1.3;
+  min-height: 44px;
+  transition: all 0.15s;
+}
+.genre-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.genre-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.genre-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+.genre-description {
+  font-size: 12px;
+  color: var(--text-mute);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--accent-soft-border);
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Templates panel
+   ============================================================ */
+.templates-panel {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 20px;
+}
+.templates-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.tpl-btn {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  text-align: left;
+  min-height: 44px;
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tpl-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.tpl-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tpl-btn .tpl-level {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.tpl-btn.loaded {
+  background: var(--success-soft);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+/* ============================================================
+   LLM selector
+   ============================================================ */
+.llm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.llm-btn {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  color: var(--text-soft);
+  padding: 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font);
+  min-height: 44px;
+  transition: all 0.15s;
+}
+.llm-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.llm-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.llm-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ============================================================
+   Tabs
+   ============================================================ */
+.tab-strip {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin: 22px 0 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-strip::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-mute);
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font);
+  white-space: nowrap;
+  min-height: 44px;
+  transition: all 0.15s;
+}
+.tab-btn:hover {
+  color: var(--text);
+}
+.tab-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab-pane {
+  display: none;
+  animation: fadeIn 0.25s ease-out;
+  padding-top: 18px;
+}
+.tab-pane.active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-pane { animation: none; }
+}
+
+/* Divider inside tabs */
+.divider {
+  border-top: 1px solid var(--border);
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+/* Hint chips for narrative starters */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  min-height: 28px;
+  transition: all 0.15s;
+}
+.chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.narrative-block {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 12px;
+}
+
+/* ============================================================
+   Artifacts (Tab 3)
+   ============================================================ */
+.artifact-group { margin-top: 18px; }
+.artifact-group:first-of-type { margin-top: 0; }
+.artifact-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.artifact-group-header h4 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.select-all-btn {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-family: var(--font);
+  min-height: 28px;
+}
+.select-all-btn:hover { color: var(--accent-hover); }
+.select-all-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.artifact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .artifact-grid { grid-template-columns: 1fr; }
+}
+.artifact-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-soft);
+  font-weight: 500;
+  min-height: 38px;
+  transition: all 0.15s;
+}
+.artifact-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.artifact-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ============================================================
+   Pedagogy section toggles (Tab 4)
+   ============================================================ */
+.section-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+@media (max-width: 640px) {
+  .section-toggles { grid-template-columns: 1fr; }
+}
+.toggle-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.toggle-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  margin-top: 2px;
+  cursor: pointer;
+}
+.toggle-item-content { flex: 1; }
+.toggle-item-content .name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+.toggle-item-content .desc {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* ============================================================
+   Action bar
+   ============================================================ */
+.action-bar {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font);
+  border: 1px solid transparent;
+  min-height: 44px;
+  transition: all 0.15s;
+}
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text-soft);
+  border-color: var(--border-strong);
+}
+.btn-secondary:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Output panel (right)
+   ============================================================ */
+.output-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 96px;
+  height: calc(100vh - 120px);
+  min-height: 480px;
+  box-shadow: var(--shadow-lg);
+}
+@media (max-width: 1100px) {
+  .output-card {
+    position: static;
+    height: auto;
+    min-height: 520px;
+  }
+}
+.output-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.output-title {
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.window-dots {
+  display: flex;
+  gap: 5px;
+}
+.window-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.window-dots span:nth-child(1) { background: #f43f5e; }
+.window-dots span:nth-child(2) { background: #f59e0b; }
+.window-dots span:nth-child(3) { background: #10b981; }
+
+.output-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.copy-feedback {
+  font-size: 12px;
+  color: #34d399;
+  background: rgba(52,211,153,0.12);
+  padding: 4px 8px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.copy-feedback.visible { opacity: 1; }
+.copy-btn, .download-btn {
+  background: var(--accent);
+  color: white;
+  border: 0;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+}
+.copy-btn:hover, .download-btn:hover { background: var(--accent-hover); }
+.copy-btn:focus-visible, .download-btn:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+.copy-btn svg, .download-btn svg { width: 13px; height: 13px; }
+.download-btn {
+  background: rgba(255,255,255,0.08);
+  color: #cbd5e1;
+}
+.download-btn:hover { background: rgba(255,255,255,0.14); }
+
+#promptOutput {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: #cbd5e1;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 14px 12px;
+  resize: none;
+  width: 100%;
+}
+#promptOutput:focus { outline: none; }
+#promptOutput::-webkit-scrollbar { width: 8px; }
+#promptOutput::-webkit-scrollbar-track { background: transparent; }
+#promptOutput::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+/* ============================================================
+   Footer
+   ============================================================ */
+footer {
+  max-width: 1500px;
+  margin: 24px auto 12px;
+  padding: 12px 24px;
+  font-size: 12px;
+  color: var(--text-mute);
+  text-align: center;
+}
+
+/* Font-size scaling — set via JS on <html data-fs="...">  */
+html[data-fs="lg"]  body { font-size: 16px; }
+html[data-fs="xl"]  body { font-size: 17px; }
+html[data-fs="xxl"] body { font-size: 18px; }
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<header>
+  <div class="header-inner">
+    <div class="logo" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="15" y2="17"></line></svg>
+    </div>
+    <div class="title-block">
+      <h1>Case Study Prompt Builder</h1>
+      <p>Configure a case study by discipline, genre, and pedagogy — generate a one-shot prompt for any major AI tool.</p>
+    </div>
+    <div class="header-controls" role="toolbar" aria-label="Display controls">
+      <div class="font-controls" role="group" aria-label="Font size">
+        <button type="button" id="fontDec" aria-label="Decrease font size" title="Decrease font size">A-</button>
+        <button type="button" id="fontReset" aria-label="Reset font size" title="Reset font size">A</button>
+        <button type="button" id="fontInc" aria-label="Increase font size" title="Increase font size">A+</button>
+      </div>
+      <button type="button" class="icon-btn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="layout">
+
+    <!-- ================== LEFT: FORM ================== -->
+    <section class="card" aria-labelledby="form-heading">
+      <h2 id="form-heading">Case Study Parameters</h2>
+
+      <form id="promptForm">
+
+        <!-- GENRE -->
+        <div class="genre-panel">
+          <p class="genre-panel-label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            Case Study Genre — choose first
+          </p>
+          <div class="genre-grid" role="radiogroup" aria-label="Case study genre">
+            <button type="button" class="genre-btn active" data-genre="decision" role="radio" aria-checked="true">Decision / Dilemma</button>
+            <button type="button" class="genre-btn" data-genre="diagnostic" role="radio" aria-checked="false">Diagnostic</button>
+            <button type="button" class="genre-btn" data-genre="historical" role="radio" aria-checked="false">Historical / Analytical</button>
+            <button type="button" class="genre-btn" data-genre="design" role="radio" aria-checked="false">Design / Engineering</button>
+            <button type="button" class="genre-btn" data-genre="literary" role="radio" aria-checked="false">Literary / Textual</button>
+            <button type="button" class="genre-btn" data-genre="negotiation" role="radio" aria-checked="false">Negotiation / Stakeholders</button>
+          </div>
+          <p class="genre-description" id="genreDescription" aria-live="polite"></p>
+        </div>
+
+        <!-- QUICK-START TEMPLATES -->
+        <div class="templates-panel">
+          <p class="field-label" style="margin-bottom:8px;">
+            <span class="dot"></span>
+            Quick-Start Templates <span id="templateGenreName" style="color: var(--text-mute); font-weight:500; text-transform: none; letter-spacing: 0;">(current genre)</span>
+          </p>
+          <div class="templates-grid" id="templatesGrid"></div>
+        </div>
+
+        <!-- LLM -->
+        <div class="section-block">
+          <p class="field-label">
+            <span class="dot"></span>
+            Target AI Platform
+          </p>
+          <div class="llm-grid" role="radiogroup" aria-label="Target AI platform">
+            <button type="button" class="llm-btn active" data-llm="chatgpt" role="radio" aria-checked="true">ChatGPT</button>
+            <button type="button" class="llm-btn" data-llm="claude" role="radio" aria-checked="false">Claude</button>
+            <button type="button" class="llm-btn" data-llm="gemini" role="radio" aria-checked="false">Gemini</button>
+          </div>
+        </div>
+
+        <!-- TABS -->
+        <div class="tab-strip" role="tablist" aria-label="Configuration sections">
+          <button type="button" class="tab-btn active" data-target="tab-context" role="tab" aria-selected="true" aria-controls="tab-context" id="tabbtn-context">1. Context</button>
+          <button type="button" class="tab-btn" data-target="tab-scenario" role="tab" aria-selected="false" aria-controls="tab-scenario" id="tabbtn-scenario">2. <span id="scenarioTabLabel">Scenario</span></button>
+          <button type="button" class="tab-btn" data-target="tab-artifacts" role="tab" aria-selected="false" aria-controls="tab-artifacts" id="tabbtn-artifacts">3. Artifacts</button>
+          <button type="button" class="tab-btn" data-target="tab-pedagogy" role="tab" aria-selected="false" aria-controls="tab-pedagogy" id="tabbtn-pedagogy">4. Pedagogy</button>
+        </div>
+
+        <!-- TAB 1: CONTEXT -->
+        <div id="tab-context" class="tab-pane active" role="tabpanel" aria-labelledby="tabbtn-context">
+
+          <div class="row">
+            <div class="field">
+              <label for="discipline">Discipline / Subject Area</label>
+              <input type="text" id="discipline" placeholder="e.g. Registered Nursing, Business Ethics, U.S. History">
+              <p class="help">Free-text — used verbatim in the prompt.</p>
+            </div>
+            <div class="field">
+              <label for="courseLevel">Course Level</label>
+              <select id="courseLevel">
+                <option>High School / Intro</option>
+                <option>Community College — Introductory</option>
+                <option selected>Community College — Intermediate</option>
+                <option>Undergraduate — Upper Division</option>
+                <option>Graduate / Professional</option>
+                <option>Continuing Education / Workforce</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row divider">
+            <div class="field">
+              <label for="learnerProfile">Learner Profile</label>
+              <select id="learnerProfile">
+                <option>Traditional-age first-time students</option>
+                <option selected>Returning adult learners</option>
+                <option>Career switchers / non-majors</option>
+                <option>Working professionals (continuing ed)</option>
+                <option>Honors / advanced students</option>
+                <option>Mixed cohort (all of the above)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="setting">Setting / Organization Type</label>
+              <input type="text" id="setting" placeholder="e.g. 300-bed urban hospital, mid-size manufacturer, 1850 New England port town">
+              <p class="help">Where the case takes place. Be specific enough to anchor realism.</p>
+            </div>
+          </div>
+
+          <div class="row divider">
+            <div class="field">
+              <label for="settingScale">Scale</label>
+              <select id="settingScale">
+                <option>Individual / Personal</option>
+                <option>Small team or family unit</option>
+                <option selected>Single organization / community</option>
+                <option>Multi-organization / regional</option>
+                <option>National / societal</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="timeFrame">Time Frame</label>
+              <select id="timeFrame">
+                <option>Minutes to hours (acute)</option>
+                <option selected>Days to weeks</option>
+                <option>Months</option>
+                <option>Years to decades</option>
+                <option>Historical / retrospective</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row row-1 divider">
+            <div class="field">
+              <label for="contextConstraints">Contextual Constraints (optional)</label>
+              <input type="text" id="contextConstraints" placeholder="e.g. limited budget, regulatory oversight, public scrutiny, language barriers">
+              <p class="help">Pressures and limitations that shape what's possible.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: SCENARIO (genre-driven) -->
+        <div id="tab-scenario" class="tab-pane" role="tabpanel" aria-labelledby="tabbtn-scenario">
+          <div id="scenarioFields"><!-- populated by JS based on genre --></div>
+
+          <div class="narrative-block">
+            <p class="field-label" style="margin-bottom:8px;">
+              <span class="dot"></span>
+              Narrative Hook (opening for the student)
+            </p>
+            <div class="chip-row" id="narrativeChips"><!-- populated by JS --></div>
+            <textarea id="narrative" rows="3" placeholder="Describe the opening scene the student walks into..."></textarea>
+          </div>
+        </div>
+
+        <!-- TAB 3: ARTIFACTS -->
+        <div id="tab-artifacts" class="tab-pane" role="tabpanel" aria-labelledby="tabbtn-artifacts">
+          <p style="color: var(--text-mute); font-size: 13px; margin-top: 0; margin-bottom: 14px;">Choose which evidence the AI should generate. The artifact library updates based on your selected genre. Add discipline-specific items in the custom field.</p>
+
+          <div id="artifactGroups"><!-- populated by JS --></div>
+
+          <div class="divider">
+            <div class="field">
+              <label for="customArtifacts">Custom Artifacts (comma-separated)</label>
+              <textarea id="customArtifacts" rows="2" placeholder="e.g. ECG strip, NIH Stroke Scale documentation, family pedigree chart"></textarea>
+              <p class="help">Discipline-specific items the generated case must include in addition to the checked ones.</p>
+            </div>
+          </div>
+
+          <div class="row divider">
+            <div class="field">
+              <label for="artifactStyle">Artifact Style / Authenticity</label>
+              <select id="artifactStyle">
+                <option>Realistic / professional-grade (mimics real documents)</option>
+                <option selected>Educational simplification (clear but accurate)</option>
+                <option>Stylized / illustrative (focus on concept over realism)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="evidenceDensity">Evidence Density</label>
+              <select id="evidenceDensity">
+                <option>Sparse (5-7 artifacts, minimal text)</option>
+                <option selected>Moderate (8-12 artifacts, balanced detail)</option>
+                <option>Rich (12-18 artifacts, substantial detail)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: PEDAGOGY -->
+        <div id="tab-pedagogy" class="tab-pane" role="tabpanel" aria-labelledby="tabbtn-pedagogy">
+
+          <div class="row row-3">
+            <div class="field">
+              <label for="studentRole">Student Role / Perspective</label>
+              <input type="text" id="studentRole" placeholder="e.g. attending physician, plant safety officer, archive curator">
+              <p class="help">"You are a..." framing.</p>
+            </div>
+            <div class="field">
+              <label for="deliverableType">Final Deliverable</label>
+              <select id="deliverableType">
+                <option>Executive / one-page brief</option>
+                <option>Analytical essay</option>
+                <option selected>Decision memo with rationale</option>
+                <option>Technical report</option>
+                <option>Oral presentation outline</option>
+                <option>Reflection / journal entry</option>
+                <option>Group discussion preparation</option>
+                <option>Policy / procedure recommendation</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="gradingRubric">Assessment Focus</label>
+              <select id="gradingRubric">
+                <option>Evidence-based reasoning</option>
+                <option>Communication clarity</option>
+                <option>Disciplinary methodology</option>
+                <option>Ethical / professional judgment</option>
+                <option>Quantitative / technical accuracy</option>
+                <option selected>Synthesis across artifacts</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row row-3 divider">
+            <div class="field">
+              <label for="difficulty">Difficulty</label>
+              <select id="difficulty">
+                <option>Intro</option>
+                <option selected>Intermediate</option>
+                <option>Advanced</option>
+              </select>
+              <p class="help" id="difficultyHelper"></p>
+            </div>
+            <div class="field">
+              <label for="richness">Richness</label>
+              <select id="richness">
+                <option>Lite</option>
+                <option selected>Standard</option>
+                <option>Deep-dive</option>
+              </select>
+              <p class="help" id="richnessHelper"></p>
+            </div>
+            <div class="field">
+              <label for="distractors">Distractors / Red Herrings</label>
+              <select id="distractors">
+                <option>None (clean path)</option>
+                <option selected>Low (1-2 minor distractions)</option>
+                <option>High (substantial misleading info)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row divider">
+            <div class="field">
+              <label for="bloomsTaxonomy">Cognitive Level (Bloom's)</label>
+              <select id="bloomsTaxonomy">
+                <option>Remember & Understand</option>
+                <option>Apply</option>
+                <option selected>Analyze</option>
+                <option>Evaluate</option>
+                <option>Create</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="instructionalScaffolding">Instructional Scaffolding</label>
+              <select id="instructionalScaffolding">
+                <option>Heavy (hints, glossary, guided questions)</option>
+                <option selected>Standard (open-ended but fair)</option>
+                <option>Minimal (no hints, ambiguity preserved)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row divider">
+            <div class="field">
+              <label for="seatTime">Seat Time</label>
+              <select id="seatTime">
+                <option>15 minutes</option>
+                <option>30 minutes</option>
+                <option>45 minutes</option>
+                <option selected>60 minutes</option>
+                <option>90 minutes</option>
+                <option>2 hours</option>
+                <option>Multi-session</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="discussionMode">Discussion / Interaction Mode</label>
+              <select id="discussionMode">
+                <option selected>Individual work</option>
+                <option>Pair / partner work</option>
+                <option>Small group discussion</option>
+                <option>Full class debate</option>
+                <option>Asynchronous online discussion</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="divider">
+            <p class="field-label" style="margin-bottom:10px;">
+              <span class="dot"></span>
+              Output Sections — toggle which sections appear in the generated case study
+            </p>
+            <div class="section-toggles" id="sectionToggles"><!-- populated by JS --></div>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <button type="button" class="btn btn-secondary" id="resetBtn">Reset Defaults</button>
+          <button type="button" class="btn btn-secondary" id="exportConfigBtn">Export Config (JSON)</button>
+          <button type="button" class="btn btn-secondary" id="importConfigBtn">Import Config</button>
+          <input type="file" id="configFileInput" accept="application/json" style="display:none;">
+        </div>
+      </form>
+    </section>
+
+    <!-- ================== RIGHT: OUTPUT ================== -->
+    <aside class="output-card" aria-labelledby="output-heading">
+      <div class="output-head">
+        <div class="output-title">
+          <div class="window-dots"><span></span><span></span><span></span></div>
+          <span id="output-heading">Generated Prompt</span>
+        </div>
+        <div class="output-actions">
+          <span class="copy-feedback" id="copyFeedback" aria-live="polite">Copied!</span>
+          <button type="button" class="download-btn" id="downloadPromptBtn" title="Download as .txt">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download
+          </button>
+          <button type="button" class="copy-btn" id="copyBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            Copy Prompt
+          </button>
+        </div>
+      </div>
+      <textarea id="promptOutput" readonly aria-label="Generated prompt output"></textarea>
+    </aside>
+  </div>
+</main>
+
+<footer>
+  <p>Case Study Prompt Builder · Faculty Tool · Brookdale Community College · 2026</p>
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============================================================
+  // GENRE CONFIGURATION
+  // Each genre defines: accent color, description, scenario fields,
+  // narrative starter chips, output section labels & defaults,
+  // artifact library (3 groups), and quick-start templates.
+  // ============================================================
+
+  const GENRES = {
+
+    decision: {
+      name: 'Decision / Dilemma',
+      description: 'A protagonist faces competing pressures and must choose. Used for ethics, management, policy, and leadership cases.',
+      accent: { c: '#4f46e5', h: '#4338ca', s: '#eef2ff', sb: '#c7d2fe', i: '#3730a3' }, // indigo
+      decisionSectionLabel: 'Decisions',
+      scenarioFields: [
+        { id: 'stakeholders', label: 'Stakeholders Involved', options: ['Frontline employees', 'Middle management', 'Senior leadership / board', 'Customers / clients', 'Community / public', 'Regulators / oversight bodies', 'Mixed internal + external'] },
+        { id: 'competingValues', label: 'Competing Values at Stake', options: ['Profit vs. people', 'Short-term gain vs. long-term harm', 'Loyalty vs. honesty', 'Individual vs. collective good', 'Compliance vs. mission', 'Innovation vs. safety', 'Privacy vs. accountability'] },
+        { id: 'pressureSource', label: 'Pressure Source', options: ['Time deadline', 'Financial constraint', 'Public / media scrutiny', 'Whistleblower / internal report', 'Legal threat', 'Competitive pressure', 'Crisis event'] },
+        { id: 'timeHorizon', label: 'Decision Time Horizon', options: ['Must decide now (hours)', 'This week', 'Within the quarter', 'Strategic / multi-year'] },
+        { id: 'decisionStakes', label: 'Stakes of the Decision', options: ['Career / job security', 'Organizational survival', 'Reputational / brand', 'Legal / regulatory exposure', 'Human safety or wellbeing', 'Mission / values integrity'] }
+      ],
+      extraField: { id: 'framework', label: 'Ethical / Decision Framework (optional)', placeholder: 'e.g. utilitarian vs. deontological, AICPA Code of Conduct, Markkula method' },
+      narrativeChips: [
+        { label: 'The Email', text: 'It is 7:42 AM. You arrive at your desk to find an email marked CONFIDENTIAL waiting in your inbox. You read it once, then again.' },
+        { label: 'The Meeting', text: 'You have been called into a meeting that wasn\u2019t on your calendar this morning. The agenda is one line: "Time-sensitive matter requiring your judgment."' },
+        { label: 'The Report', text: 'A trusted colleague has just shared something with you that they shouldn\u2019t have. They are asking what you intend to do about it.' },
+        { label: 'The Press Call', text: 'A reporter from a major outlet has left three messages. They have a story. You have one hour to decide what your organization will say.' }
+      ],
+      artifactLibrary: {
+        'Documents & Records': [
+          'Internal memo or email thread', 'Financial statement excerpt', 'HR file or personnel record',
+          'Board meeting minutes', 'Policy document', 'Contract clause', 'Audit finding'
+        ],
+        'People & Communications': [
+          'Stakeholder interview transcript', 'Whistleblower statement', 'Customer complaint',
+          'Press release draft', 'Internal Slack/Teams thread', 'Executive talking points'
+        ],
+        'External & Context': [
+          'News article or media coverage', 'Industry benchmark data', 'Regulatory guidance excerpt',
+          'Public opinion survey', 'Competitor analysis', 'Legal opinion summary'
+        ]
+      },
+      defaultSections: { intro: true, artifacts: true, questions: true, decisions: true, capstone: true, reflection: false, glossary: false }
+    },
+
+    diagnostic: {
+      name: 'Diagnostic',
+      description: 'Evidence leads to a probable cause, condition, or root cause. Used for clinical, technical, engineering troubleshooting, and root-cause analysis cases.',
+      accent: { c: '#0891b2', h: '#0e7490', s: '#ecfeff', sb: '#a5f3fc', i: '#155e75' }, // cyan
+      decisionSectionLabel: 'Differential',
+      scenarioFields: [
+        { id: 'presentation', label: 'Presentation / Initial Findings', options: ['Acute, severe symptoms or failure', 'Gradual onset / progressive', 'Intermittent / hard to reproduce', 'Discovered incidentally', 'Cluster / multiple instances'] },
+        { id: 'history', label: 'History / Background', options: ['No prior history (new event)', 'Recurrence of a known issue', 'Recent change preceding the event', 'Long-standing condition that worsened', 'Conflicting / incomplete history'] },
+        { id: 'differential', label: 'Differential Considerations', options: ['Two plausible causes, similar likelihood', 'One obvious cause + one easily-missed', 'Multiple possible causes, must rank', 'Rare condition mimicking common one', 'Comorbid / co-occurring causes'] },
+        { id: 'acuity', label: 'Acuity / Urgency', options: ['Stable — work-up can proceed methodically', 'Time-sensitive — minutes-to-hours window', 'Critical — immediate action required', 'Chronic — long-term management focus'] },
+        { id: 'diagnosticConstraints', label: 'Diagnostic Constraints', options: ['Full resources available', 'Limited testing / equipment', 'Rural / resource-constrained setting', 'Patient or system refuses certain tests', 'Time pressure prevents thorough work-up'] }
+      ],
+      extraField: { id: 'framework', label: 'Diagnostic Framework / Standard (optional)', placeholder: 'e.g. SOAP, ABCDE, 5 Whys, fishbone/Ishikawa, DSM-5 criteria' },
+      narrativeChips: [
+        { label: 'The Call', text: 'The page comes in at 2:14 AM. The summary is brief, but something in it doesn\u2019t add up.' },
+        { label: 'The Ticket', text: 'It\u2019s the third ticket this week about the same intermittent issue, but the previous techs all closed theirs as "could not reproduce."' },
+        { label: 'The Walk-In', text: 'They show up without an appointment, apologetic, certain it\u2019s "probably nothing." You take one look and you\u2019re not so sure.' },
+        { label: 'The Failure', text: 'The system failed at 14:23 yesterday. By the time you arrived, the team had already restarted it. Now you have to figure out what happened.' }
+      ],
+      artifactLibrary: {
+        'Primary Data & Observations': [
+          'Vital signs / readings / measurements', 'Lab results or test data', 'Imaging / visual inspection',
+          'Sensor or instrument logs', 'Direct observation notes', 'Performance metrics'
+        ],
+        'Interviews & History': [
+          'Patient/user interview transcript', 'Family / colleague account', 'Prior records or history',
+          'Operator log or shift handoff', 'Incident report'
+        ],
+        'Reference & Comparison': [
+          'Reference ranges or specifications', 'Maintenance / treatment history', 'Similar past cases',
+          'Vendor or expert consultation', 'Protocol or guideline excerpt'
+        ]
+      },
+      defaultSections: { intro: true, artifacts: true, questions: true, decisions: true, capstone: true, reflection: false, glossary: true }
+    },
+
+    historical: {
+      name: 'Historical / Analytical',
+      description: 'Students interpret an event using primary and secondary sources. Used for history, social studies, and policy-analysis cases.',
+      accent: { c: '#b45309', h: '#92400e', s: '#fffbeb', sb: '#fde68a', i: '#78350f' }, // amber
+      decisionSectionLabel: 'Interpretations',
+      scenarioFields: [
+        { id: 'periodSetting', label: 'Period & Setting', options: ['Specific year or short window', 'A decade', 'A century', 'Long-duration era (multi-century)', 'Comparative across periods'] },
+        { id: 'keyActors', label: 'Key Actors', options: ['Named individuals (rulers, leaders, figures)', 'Institutions and movements', 'Ordinary people / "history from below"', 'Mixed: powerful and powerless', 'Anonymous collective forces'] },
+        { id: 'precipitating', label: 'Precipitating Events', options: ['Single decisive event', 'Slow-building crisis', 'Long-term structural shift', 'Sudden external shock', 'Convergence of multiple factors'] },
+        { id: 'contested', label: 'Contested Interpretations', options: ['Settled consensus — focus on explaining it', 'Active scholarly debate', 'Recent revisionist challenge to old narrative', 'Politically charged in the present', 'Limited evidence — interpretation is necessary'] },
+        { id: 'historiographical', label: 'Historiographical Lens', options: ['Political / diplomatic', 'Social / cultural', 'Economic', 'Intellectual / ideological', 'Comparative / transnational', 'Environmental / spatial'] }
+      ],
+      extraField: { id: 'framework', label: 'Disciplinary Framework (optional)', placeholder: 'e.g. world-systems theory, microhistory, Atlantic history, longue dur\u00e9e' },
+      narrativeChips: [
+        { label: 'The Archive', text: 'You have been given access to a folder of documents that have not been examined together in over fifty years. The cataloguing notes are sparse.' },
+        { label: 'The Anniversary', text: 'The anniversary is next month. Public memory has flattened the story into a slogan. Your job is to ask what really happened — and why we remember it the way we do.' },
+        { label: 'The Letter', text: 'A single letter, dated and signed. It changes how scholars have understood the events of that summer. You have been asked to weigh its claims.' },
+        { label: 'The Contradiction', text: 'Two eyewitness accounts disagree on a basic fact. Both witnesses are credible. The standard textbook narrative depends on only one of them being right.' }
+      ],
+      artifactLibrary: {
+        'Primary Sources': [
+          'Letters or personal correspondence', 'Diaries or journals', 'Government / official documents',
+          'Speeches or public addresses', 'Newspaper articles of the period', 'Maps or cartography', 'Photographs or visual records'
+        ],
+        'Material & Quantitative': [
+          'Statistical / census records', 'Economic data (prices, wages, trade)', 'Material objects / artifacts',
+          'Architectural evidence', 'Oral history transcripts'
+        ],
+        'Secondary & Interpretive': [
+          'Scholarly journal article excerpt', 'Historiographical overview', 'Competing scholars\u2019 interpretations',
+          'Contemporary commentary', 'Memoirs or retrospective accounts'
+        ]
+      },
+      defaultSections: { intro: true, artifacts: true, questions: true, decisions: true, capstone: true, reflection: true, glossary: true }
+    },
+
+    design: {
+      name: 'Design / Engineering',
+      description: 'Students solve a problem under constraints and trade-offs. Used for engineering, architecture, product design, and applied technical cases.',
+      accent: { c: '#0d9488', h: '#0f766e', s: '#f0fdfa', sb: '#99f6e4', i: '#115e59' }, // teal
+      decisionSectionLabel: 'Design Choices',
+      scenarioFields: [
+        { id: 'problemConstraints', label: 'Problem Constraints', options: ['Cost-constrained', 'Schedule-constrained', 'Materials/technology limited', 'Regulatory / code requirements', 'Site or physical limitations', 'Sustainability / environmental requirements'] },
+        { id: 'usersStakeholders', label: 'Users / Stakeholders', options: ['Single end-user type', 'Multiple user types with different needs', 'Operator + maintenance staff', 'Vulnerable population (accessibility, safety)', 'Public-facing — wide range of users'] },
+        { id: 'technicalReq', label: 'Technical Requirements', options: ['Performance (speed/efficiency)', 'Reliability / uptime', 'Safety-critical', 'Scalability', 'Interoperability with existing systems', 'Maintainability over time'] },
+        { id: 'tradeoffs', label: 'Key Trade-offs', options: ['Performance vs. cost', 'Speed vs. quality', 'Innovation vs. proven approach', 'Optimization for normal use vs. edge cases', 'In-house vs. outsourced', 'Custom vs. off-the-shelf'] },
+        { id: 'failureModes', label: 'Failure Modes / Risks', options: ['Catastrophic single-point failure', 'Gradual degradation', 'Misuse by operator', 'Environmental / external stressors', 'Cascading failure across systems'] }
+      ],
+      extraField: { id: 'framework', label: 'Design / Engineering Framework (optional)', placeholder: 'e.g. FMEA, design thinking double-diamond, IEEE 1012, Agile/Scrum, ISO 9001' },
+      narrativeChips: [
+        { label: 'The RFP', text: 'The RFP arrived last week. The deadline is tight, the budget is tighter, and the requirements contradict each other in at least two places.' },
+        { label: 'The Field Visit', text: 'Your first site visit revealed three problems that were not in the brief. The client doesn\u2019t know about them yet.' },
+        { label: 'The Prototype', text: 'The prototype passed every test in the lab. It failed in the first week of real-world use. The team needs to know why before the production run.' },
+        { label: 'The Recall', text: 'Customer reports are coming in. The pattern is faint but consistent. Engineering must determine whether a recall is warranted.' }
+      ],
+      artifactLibrary: {
+        'Specifications & Requirements': [
+          'Requirements document', 'Technical specifications', 'Drawings / schematics / CAD',
+          'Standards or code excerpts', 'Bill of materials', 'Cost estimate'
+        ],
+        'Performance & Test Data': [
+          'Test results / measurements', 'Simulation output', 'Field performance data',
+          'Failure / incident report', 'Calibration records'
+        ],
+        'Stakeholder & Process': [
+          'Client correspondence', 'User feedback / surveys', 'Vendor proposals',
+          'Project schedule / Gantt', 'Meeting minutes', 'Risk register'
+        ]
+      },
+      defaultSections: { intro: true, artifacts: true, questions: true, decisions: true, capstone: true, reflection: false, glossary: true }
+    },
+
+    literary: {
+      name: 'Literary / Textual',
+      description: 'Students analyze a text, artifact, or work of art. Used for literature, film, art history, and rhetorical-analysis cases.',
+      accent: { c: '#9333ea', h: '#7e22ce', s: '#faf5ff', sb: '#e9d5ff', i: '#6b21a8' }, // purple
+      decisionSectionLabel: 'Readings',
+      scenarioFields: [
+        { id: 'textContext', label: 'Text / Work Context', options: ['Single short text (poem, story, scene)', 'Excerpt from longer work', 'Full short work', 'Pair / comparison of works', 'Multimodal (text + image/film)'] },
+        { id: 'authorContext', label: 'Author / Creator Context', options: ['Canonical, much-studied author', 'Lesser-known or recovered author', 'Anonymous / collaborative authorship', 'Contemporary author still publishing', 'Author whose biography matters to reading'] },
+        { id: 'criticalLens', label: 'Critical Lens', options: ['Close / formalist reading', 'Historical / biographical', 'Postcolonial', 'Feminist / gender studies', 'Marxist / class-focused', 'Psychoanalytic', 'Reader-response', 'Ecocritical', 'Queer theory'] },
+        { id: 'thematicTensions', label: 'Thematic Tensions', options: ['Form vs. content', 'Tradition vs. innovation', 'Public vs. private voice', 'Power and silence', 'Memory and history', 'Identity and language', 'Nature and culture'] },
+        { id: 'reception', label: 'Reception History', options: ['Celebrated at the time, still celebrated', 'Ignored at the time, later recovered', 'Controversial at the time, mainstream now', 'Acclaimed then, reassessed critically since', 'Recent work — reception still forming'] }
+      ],
+      extraField: { id: 'framework', label: 'Specific Theory or Concept (optional)', placeholder: 'e.g. Bakhtinian dialogism, the male gaze, Saidian Orientalism, defamiliarization' },
+      narrativeChips: [
+        { label: 'The Discovery', text: 'You have been asked to write the introduction for a new edition. The work has been out of print for forty years. You begin with the question: why now?' },
+        { label: 'The Argument', text: 'A colleague has published a reading of the text that you find both brilliant and wrong. You have been asked to write a response for the same journal.' },
+        { label: 'The Classroom', text: 'Your students have read the text and most of them hated it. You have one class session to change their minds — or to take their resistance seriously.' },
+        { label: 'The Adaptation', text: 'A new adaptation has just been released. It departs significantly from the source. You\u2019ve been asked to weigh what was gained and what was lost.' }
+      ],
+      artifactLibrary: {
+        'The Text Itself': [
+          'Excerpt or full short text', 'Multiple drafts / variants', 'Marginalia or annotations',
+          'Translations (compared)', 'Original-language version'
+        ],
+        'Author & Creation Context': [
+          'Author\u2019s letters or notebooks', 'Biographical timeline', 'Author\u2019s own statements / interviews',
+          'Manuscript / publication history', 'Contemporary correspondence'
+        ],
+        'Reception & Criticism': [
+          'Contemporary reviews', 'Modern scholarly essay excerpts', 'Competing critical readings',
+          'Adaptation or response work', 'Reader response over time'
+        ]
+      },
+      defaultSections: { intro: true, artifacts: true, questions: true, decisions: true, capstone: true, reflection: true, glossary: true }
+    },
+
+    negotiation: {
+      name: 'Negotiation / Multi-stakeholder',
+      description: 'Multiple parties with different interests must reach (or refuse) agreement. Used for labor relations, diplomacy, conflict resolution, and stakeholder-management cases.',
+      accent: { c: '#dc2626', h: '#b91c1c', s: '#fef2f2', sb: '#fecaca', i: '#991b1b' }, // red
+      decisionSectionLabel: 'Moves',
+      scenarioFields: [
+        { id: 'parties', label: 'Parties at the Table', options: ['Two parties (bilateral)', 'Three parties (triangular dynamics)', 'Multilateral (4+ parties)', 'Parties + observers / mediators', 'Coalitions on each side'] },
+        { id: 'interestsPositions', label: 'Interests vs. Positions', options: ['Stated positions look incompatible — interests may overlap', 'Positions align — hidden conflict in interests', 'Genuinely zero-sum on the core issue', 'Distributive on some issues, integrative on others', 'One party\u2019s interests are unclear / shifting'] },
+        { id: 'batna', label: 'BATNA / Walk-Away Options', options: ['Strong BATNA for one side, weak for the other', 'Both sides have weak BATNAs', 'Both sides have strong BATNAs', 'BATNA depends on uncertain external events', 'Walking away is not an option for at least one party'] },
+        { id: 'powerDynamics', label: 'Power Dynamics', options: ['Roughly equal power', 'Significant power asymmetry', 'Power shifting during negotiation', 'Hidden power (back-channel influence)', 'Power tied to information asymmetry'] },
+        { id: 'culturalFactors', label: 'Cultural / Contextual Factors', options: ['Cross-cultural / international', 'Cross-organizational (different norms)', 'Intra-organizational (same culture)', 'High-stakes public visibility', 'Confidential / private', 'History of prior conflict or cooperation'] }
+      ],
+      extraField: { id: 'framework', label: 'Negotiation Framework (optional)', placeholder: 'e.g. principled negotiation (Fisher/Ury), distributive vs. integrative, ZOPA analysis, Thomas-Kilmann' },
+      narrativeChips: [
+        { label: 'The Deadline', text: 'You have 72 hours. After that, the strike begins, or the deal collapses, or the deadline passes and something far worse begins. The other side knows it too.' },
+        { label: 'The Walkout', text: 'They walked out fifteen minutes ago. The room is quiet. The question is whether you call them back, wait, or let it fail.' },
+        { label: 'The Leak', text: 'Someone leaked your internal position to the other side. You don\u2019t know who. The negotiation resumes in an hour.' },
+        { label: 'The Mediator', text: 'A third party has offered to mediate. Both sides would have to agree. Each side has reasons to want it and reasons to refuse.' }
+      ],
+      artifactLibrary: {
+        'Positions & Proposals': [
+          'Opening offer / position paper', 'Counter-proposal', 'Term sheet or draft agreement',
+          'Confidential bottom-line memo (one side)', 'Concession history'
+        ],
+        'Stakeholder Intelligence': [
+          'Stakeholder map / influence diagram', 'Intelligence on other side\u2019s interests', 'Internal coalition dynamics memo',
+          'Constituency / membership pressures', 'Past negotiation history'
+        ],
+        'External Context': [
+          'Media coverage', 'Market or economic data', 'Legal / regulatory framework',
+          'Public statements by each party', 'Third-party / expert analysis'
+        ]
+      },
+      defaultSections: { intro: true, artifacts: true, questions: true, decisions: true, capstone: true, reflection: true, glossary: false }
+    }
+  };
+
+  // ============================================================
+  // SECTION DEFINITIONS — what shows up in output
+  // ============================================================
+  const SECTIONS = [
+    { id: 'intro',      name: 'Intro / Overview',  desc: 'Sets the scene; frames the student role.' },
+    { id: 'artifacts',  name: 'Artifacts',         desc: 'Clickable cards with evidence/sources.' },
+    { id: 'questions',  name: 'Analysis Questions',desc: '6\u20138 open-ended questions w/ instructor notes.' },
+    { id: 'decisions',  name: 'Decisions',         desc: 'Branching choices with consequences (label varies by genre).' },
+    { id: 'capstone',   name: 'Capstone Deliverable', desc: 'Final assignment with rubric.' },
+    { id: 'reflection', name: 'Reflection',        desc: 'Metacognitive / process prompts.' },
+    { id: 'glossary',   name: 'Glossary',          desc: 'Key terms defined inline.' }
+  ];
+
+  // ============================================================
+  // QUICK-START TEMPLATES — 2 per genre (simple + rich)
+  // ============================================================
+  const TEMPLATES = {
+    decision: [
+      {
+        key: 'decision-simple',
+        label: 'Manager\u2019s Dilemma',
+        level: 'Simple',
+        data: {
+          discipline: 'Business Ethics',
+          courseLevel: 'Community College — Introductory',
+          learnerProfile: 'Returning adult learners',
+          setting: 'Mid-size regional retail chain',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Public-company quarterly earnings pressure',
+          scenario: { stakeholders: 'Frontline employees', competingValues: 'Profit vs. people', pressureSource: 'Financial constraint', timeHorizon: 'This week', decisionStakes: 'Career / job security' },
+          framework: '',
+          narrative: 'It is Monday morning. Corporate has informed you that your store must cut payroll by 15% before the end of the month. You have built this team over four years.',
+          studentRole: 'Store manager',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Ethical / professional judgment',
+          difficulty: 'Intro', richness: 'Lite', distractors: 'None (clean path)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Heavy (hints, glossary, guided questions)',
+          seatTime: '30 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: '',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Sparse (5-7 artifacts, minimal text)',
+          artifacts: ['Internal memo or email thread', 'HR file or personnel record', 'Customer complaint', 'Industry benchmark data']
+        }
+      },
+      {
+        key: 'decision-rich',
+        label: 'Whistleblower Crisis',
+        level: 'Rich',
+        data: {
+          discipline: 'Healthcare Administration',
+          courseLevel: 'Graduate / Professional',
+          learnerProfile: 'Working professionals (continuing ed)',
+          setting: 'Large urban academic medical center',
+          settingScale: 'Multi-organization / regional',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Federal investigation; media interest; union contract negotiations underway',
+          scenario: { stakeholders: 'Mixed internal + external', competingValues: 'Loyalty vs. honesty', pressureSource: 'Whistleblower / internal report', timeHorizon: 'Must decide now (hours)', decisionStakes: 'Reputational / brand' },
+          framework: 'AMA Code of Medical Ethics; Markkula framework',
+          narrative: 'A senior physician has filed an internal complaint alleging that the CMO has systematically suppressed adverse-event reporting for two years. The complaint will become public in 72 hours unless action is taken.',
+          studentRole: 'Chief Compliance Officer',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Ethical / professional judgment',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'High (substantial misleading info)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)',
+          seatTime: '90 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: 'Joint Commission accreditation correspondence, Press release draft (2 versions)',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Internal memo or email thread', 'Board meeting minutes', 'Whistleblower statement', 'News article or media coverage', 'Regulatory guidance excerpt', 'Legal opinion summary', 'Executive talking points']
+        }
+      },
+      {
+        key: 'decision-hospitality',
+        label: 'Hotel Crisis Response',
+        level: 'Simple',
+        data: {
+          discipline: 'Hospitality Management',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Returning adult learners',
+          setting: 'A 180-room beachfront hotel on the Jersey Shore during peak summer season',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Minutes to hours (acute)',
+          contextConstraints: 'Sold-out weekend; major wedding party in-house; corporate brand standards apply',
+          scenario: { stakeholders: 'Customers / clients', competingValues: 'Profit vs. people', pressureSource: 'Crisis event', timeHorizon: 'Must decide now (hours)', decisionStakes: 'Reputational / brand' },
+          framework: 'AHLA crisis communication protocol',
+          narrative: 'It is Saturday at 11:47 PM. A guest has fallen ill at a wedding reception in your ballroom. Paramedics are en route. The bride\u2019s family is demanding answers. The hotel manager is two hours away. You are the front office supervisor on duty.',
+          studentRole: 'Front office supervisor on the overnight shift',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Communication clarity',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: 'Hotel emergency response checklist, Guest incident report template',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Internal memo or email thread', 'Customer complaint', 'Press release draft', 'Executive talking points', 'Policy document']
+        }
+      },
+      {
+        key: 'decision-education',
+        label: 'Teacher\u2019s Judgment Call',
+        level: 'Simple',
+        data: {
+          discipline: 'Education / Teacher Preparation',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'A suburban New Jersey K-5 public elementary school',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Mandatory reporting laws apply; principal is new; parent is on the PTA board',
+          scenario: { stakeholders: 'Frontline employees', competingValues: 'Loyalty vs. honesty', pressureSource: 'Whistleblower / internal report', timeHorizon: 'This week', decisionStakes: 'Career / job security' },
+          framework: 'NJ Department of Education mandatory reporting; NEA Code of Ethics',
+          narrative: 'A second-grader has shown you a drawing. She told you she made it after something happened at home. You are not sure what you are looking at, but you are sure you cannot un-see it.',
+          studentRole: 'Second-year elementary teacher',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Ethical / professional judgment',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'NJ DCP&P (Division of Child Protection and Permanency) reporting flowchart',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Internal memo or email thread', 'HR file or personnel record', 'Policy document', 'Stakeholder interview transcript', 'Regulatory guidance excerpt']
+        }
+      },
+      {
+        key: 'decision-paralegal',
+        label: 'Legal Ethics Bind',
+        level: 'Rich',
+        data: {
+          discipline: 'Paralegal Studies',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Returning adult learners',
+          setting: 'A mid-size law firm specializing in personal injury and family law',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'NJ Rules of Professional Conduct apply; supervising attorney is on vacation; filing deadline is Friday',
+          scenario: { stakeholders: 'Frontline employees', competingValues: 'Loyalty vs. honesty', pressureSource: 'Time deadline', timeHorizon: 'This week', decisionStakes: 'Legal / regulatory exposure' },
+          framework: 'NJ Rules of Professional Conduct (RPC 5.3, 5.5); NALA Code of Ethics',
+          narrative: 'The senior partner has asked you to sign a document on his behalf. He is in Florida and cannot be reached. The court filing is due tomorrow. You are a paralegal. You know what that signature would mean.',
+          studentRole: 'Senior paralegal preparing court filings',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Ethical / professional judgment',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'High (substantial misleading info)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)',
+          seatTime: '90 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: 'Sample court filing requiring signature, NJ RPC 5.3 text excerpt',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Internal memo or email thread', 'Contract clause', 'Stakeholder interview transcript', 'Regulatory guidance excerpt', 'Legal opinion summary', 'Policy document']
+        }
+      },
+      {
+        key: 'decision-sports',
+        label: 'Athletics Eligibility',
+        level: 'Simple',
+        data: {
+          discipline: 'Sports Management',
+          courseLevel: 'Community College — Introductory',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'A community college athletics department, NJCAA Division III',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'NJCAA eligibility rules; player is team captain; championship qualifier is in two weeks',
+          scenario: { stakeholders: 'Frontline employees', competingValues: 'Compliance vs. mission', pressureSource: 'Time deadline', timeHorizon: 'This week', decisionStakes: 'Reputational / brand' },
+          framework: 'NJCAA eligibility rules; institutional academic integrity policy',
+          narrative: 'A grade-change request has crossed your desk. The student is your star midfielder. The professor who submitted it has a coaching child on the same team. The championship qualifier is in fourteen days.',
+          studentRole: 'Athletics compliance coordinator',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Ethical / professional judgment',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '45 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: '',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Internal memo or email thread', 'Policy document', 'HR file or personnel record', 'Industry benchmark data']
+        }
+      },
+      {
+        key: 'decision-addiction',
+        label: 'Recovery Support Boundary',
+        level: 'Rich',
+        data: {
+          discipline: 'Addiction Studies / Human Services',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Working professionals (continuing ed)',
+          setting: 'A community-based outpatient addiction recovery program in Monmouth County',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'HIPAA and 42 CFR Part 2 confidentiality apply; dual relationships are a known risk in recovery communities',
+          scenario: { stakeholders: 'Customers / clients', competingValues: 'Individual vs. collective good', pressureSource: 'Whistleblower / internal report', timeHorizon: 'This week', decisionStakes: 'Human safety or wellbeing' },
+          framework: 'NAADAC Code of Ethics; SAMHSA harm reduction principles',
+          narrative: 'A client in your recovery support group has missed the last two sessions. Another client tells you, in confidence, that they saw the first client at a relapse-risk location yesterday. You are also in recovery. You know the first client from before you were a counselor.',
+          studentRole: 'Certified peer recovery specialist',
+          deliverableType: 'Reflection / journal entry',
+          gradingRubric: 'Ethical / professional judgment',
+          difficulty: 'Advanced', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: '42 CFR Part 2 plain-language summary',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Stakeholder interview transcript', 'Policy document', 'Regulatory guidance excerpt', 'HR file or personnel record']
+        }
+      }
+    ],
+
+    diagnostic: [
+      {
+        key: 'diagnostic-simple',
+        label: 'Walk-In Clinic Case',
+        level: 'Simple',
+        data: {
+          discipline: 'Registered Nursing',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'Suburban walk-in urgent care clinic',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Minutes to hours (acute)',
+          contextConstraints: 'Limited on-site lab; transfer to hospital requires ambulance',
+          scenario: { presentation: 'Acute, severe symptoms or failure', history: 'No prior history (new event)', differential: 'One obvious cause + one easily-missed', acuity: 'Time-sensitive — minutes-to-hours window', diagnosticConstraints: 'Limited testing / equipment' },
+          framework: 'ABCDE primary survey; SOAP documentation',
+          narrative: 'A 47-year-old patient walks in complaining of "the worst headache of my life," onset two hours ago. They appear fatigued but alert.',
+          studentRole: 'Triage RN',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Disciplinary methodology',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '30 minutes', discussionMode: 'Individual work',
+          customArtifacts: 'NIH Stroke Scale documentation',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Vital signs / readings / measurements', 'Patient/user interview transcript', 'Reference ranges or specifications', 'Protocol or guideline excerpt']
+        }
+      },
+      {
+        key: 'diagnostic-rich',
+        label: 'Intermittent System Failure',
+        level: 'Rich',
+        data: {
+          discipline: 'Industrial Engineering / Root Cause Analysis',
+          courseLevel: 'Undergraduate — Upper Division',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'Automotive parts manufacturing line, 24/7 operations',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Months',
+          contextConstraints: 'Production cannot stop for more than 4 hours; corporate audit in 2 weeks',
+          scenario: { presentation: 'Intermittent / hard to reproduce', history: 'Recurrence of a known issue', differential: 'Multiple possible causes, must rank', acuity: 'Chronic — long-term management focus', diagnosticConstraints: 'Time pressure prevents thorough work-up' },
+          framework: '5 Whys; fishbone/Ishikawa; FMEA',
+          narrative: 'For six months, Line 4 has produced an intermittent stream of out-of-tolerance parts. Three prior investigations closed inconclusively. The audit is in two weeks.',
+          studentRole: 'Quality engineer leading root-cause investigation',
+          deliverableType: 'Technical report',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'High (substantial misleading info)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)',
+          seatTime: '2 hours', discussionMode: 'Small group discussion',
+          customArtifacts: 'SPC control charts (3 months), Pareto analysis of defect codes',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Sensor or instrument logs', 'Performance metrics', 'Maintenance / treatment history', 'Operator log or shift handoff', 'Incident report', 'Similar past cases', 'Vendor or expert consultation']
+        }
+      },
+      {
+        key: 'diagnostic-respiratory',
+        label: 'ICU Vent Patient',
+        level: 'Rich',
+        data: {
+          discipline: 'Respiratory Care',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: '12-bed ICU at a community hospital',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Minutes to hours (acute)',
+          contextConstraints: 'Patient is on day 4 of mechanical ventilation; family is at bedside; attending is rounding in another unit',
+          scenario: { presentation: 'Gradual onset / progressive', history: 'Long-standing condition that worsened', differential: 'Multiple possible causes, must rank', acuity: 'Time-sensitive — minutes-to-hours window', diagnosticConstraints: 'Full resources available' },
+          framework: 'ABG interpretation (Henderson-Hasselbalch); ARDSNet ventilator protocols',
+          narrative: 'The high-pressure alarm has gone off three times in the last twenty minutes. The patient\u2019s SpO2 is drifting down. The night-shift RT signed off two hours ago with a stable note. You walk into the room and look at the ventilator screen.',
+          studentRole: 'Day-shift Respiratory Therapist',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Disciplinary methodology',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Ventilator waveform screenshots (3 time points), ABG trend over 24 hours',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Vital signs / readings / measurements', 'Lab results or test data', 'Sensor or instrument logs', 'Direct observation notes', 'Prior records or history', 'Protocol or guideline excerpt']
+        }
+      },
+      {
+        key: 'diagnostic-auto',
+        label: 'Won\u2019t-Start Mystery',
+        level: 'Simple',
+        data: {
+          discipline: 'Automotive Technology',
+          courseLevel: 'Community College — Introductory',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'Independent automotive repair shop, 8 bays',
+          settingScale: 'Small team or family unit',
+          timeFrame: 'Minutes to hours (acute)',
+          contextConstraints: 'Customer needs the vehicle by 5 PM; shop is fully booked; previous shop already attempted repairs',
+          scenario: { presentation: 'Intermittent / hard to reproduce', history: 'Recurrence of a known issue', differential: 'Multiple possible causes, must rank', acuity: 'Time-sensitive — minutes-to-hours window', diagnosticConstraints: 'Limited testing / equipment' },
+          framework: 'OBD-II diagnostic procedure; ASE A6 (Electrical/Electronic Systems)',
+          narrative: 'A 2018 sedan, 87,000 miles. The customer says it sometimes won\u2019t start in the morning, then runs fine all day. The previous shop replaced the starter, the battery, and the alternator. They charged her $1,800 and the problem came back the next week.',
+          studentRole: 'Lead diagnostic technician',
+          deliverableType: 'Technical report',
+          gradingRubric: 'Disciplinary methodology',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '45 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'OBD-II trouble code printout, multimeter voltage readings at battery and ground',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Sensor or instrument logs', 'Patient/user interview transcript', 'Maintenance / treatment history', 'Reference ranges or specifications', 'Direct observation notes']
+        }
+      },
+      {
+        key: 'diagnostic-network',
+        label: 'Intermittent Outage',
+        level: 'Simple',
+        data: {
+          discipline: 'Network Technology',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'Mid-size company with 200 employees across two buildings',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'No dedicated network monitoring tools; help desk tickets are the primary data source; users are non-technical',
+          scenario: { presentation: 'Intermittent / hard to reproduce', history: 'Recent change preceding the event', differential: 'Multiple possible causes, must rank', acuity: 'Stable — work-up can proceed methodically', diagnosticConstraints: 'Limited testing / equipment' },
+          framework: 'OSI model troubleshooting; CompTIA Network+ N-220 troubleshooting methodology',
+          narrative: 'For the last week, users in Building B have been complaining about "the internet being slow" between 2 PM and 4 PM. Building A reports no issues. The help desk has closed twelve tickets with the note "could not reproduce." You have been asked to figure out what is actually happening.',
+          studentRole: 'Junior network administrator',
+          deliverableType: 'Technical report',
+          gradingRubric: 'Disciplinary methodology',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Ping/traceroute output, switch port statistics, network topology diagram',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Sensor or instrument logs', 'Performance metrics', 'Patient/user interview transcript', 'Operator log or shift handoff', 'Reference ranges or specifications']
+        }
+      },
+      {
+        key: 'diagnostic-radtech',
+        label: 'Equivocal Imaging Study',
+        level: 'Rich',
+        data: {
+          discipline: 'Radiologic Technology',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'Outpatient imaging center, weekend coverage',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Minutes to hours (acute)',
+          contextConstraints: 'On-call radiologist for after-hours read; patient transport already arranged to return home',
+          scenario: { presentation: 'Discovered incidentally', history: 'Conflicting / incomplete history', differential: 'Rare condition mimicking common one', acuity: 'Time-sensitive — minutes-to-hours window', diagnosticConstraints: 'Limited testing / equipment' },
+          framework: 'ARRT standards of ethics; ALARA principle; appropriate-imaging criteria',
+          narrative: 'You completed the chest X-ray as ordered. As you reviewed the image for technical quality, you noticed something the referring physician did not order for and may not be expecting. Procedure says you do not interpret. You also know what waiting for Monday could mean.',
+          studentRole: 'Registered Radiologic Technologist (ARRT)',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Ethical / professional judgment',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: 'Sample chest X-ray image with incidental finding (annotated), ARRT Code of Ethics excerpt',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Vital signs / readings / measurements', 'Imaging / visual inspection', 'Patient/user interview transcript', 'Prior records or history', 'Protocol or guideline excerpt', 'Reference ranges or specifications']
+        }
+      },
+      {
+        key: 'diagnostic-biology',
+        label: 'Unknown Bacterial Sample',
+        level: 'Simple',
+        data: {
+          discipline: 'Microbiology / General Biology',
+          courseLevel: 'Community College — Introductory',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'Undergraduate microbiology teaching lab',
+          settingScale: 'Individual / Personal',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Standard lab safety BSL-2; limited reagents; week 11 of a 15-week semester',
+          scenario: { presentation: 'Acute, severe symptoms or failure', history: 'No prior history (new event)', differential: 'Multiple possible causes, must rank', acuity: 'Stable — work-up can proceed methodically', diagnosticConstraints: 'Limited testing / equipment' },
+          framework: 'Bergey\u2019s Manual identification key; standard differential staining',
+          narrative: 'The unknown culture is on your bench. The instructor has given you four lab sessions to identify it. Your lab partner has just told you she thinks it might be Staphylococcus aureus. You have not yet run a single test. You should not let her be wrong, but you also should not let her be right by accident.',
+          studentRole: 'Microbiology student identifying an unknown',
+          deliverableType: 'Technical report',
+          gradingRubric: 'Disciplinary methodology',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Heavy (hints, glossary, guided questions)',
+          seatTime: 'Multi-session', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Gram stain microscopy images, biochemical test results (catalase, coagulase, oxidase)',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Lab results or test data', 'Imaging / visual inspection', 'Direct observation notes', 'Reference ranges or specifications', 'Protocol or guideline excerpt']
+        }
+      }
+    ],
+
+    historical: [
+      {
+        key: 'historical-simple',
+        label: 'A Local Strike',
+        level: 'Simple',
+        data: {
+          discipline: 'U.S. History',
+          courseLevel: 'Community College — Introductory',
+          learnerProfile: 'Returning adult learners',
+          setting: 'A New England textile town',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Limited surviving sources; many workers were immigrants whose voices appear only in employer records',
+          scenario: { periodSetting: 'Specific year or short window', keyActors: 'Ordinary people / "history from below"', precipitating: 'Slow-building crisis', contested: 'Active scholarly debate', historiographical: 'Social / cultural' },
+          framework: 'Microhistory; history from below',
+          narrative: 'In the winter of 1912, workers at the American Woolen Company walked off the job. The strike lasted ten weeks. The reasons depend on who is telling the story.',
+          studentRole: 'Researcher writing for a local history journal',
+          deliverableType: 'Analytical essay',
+          gradingRubric: 'Evidence-based reasoning',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Individual work',
+          customArtifacts: '',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Newspaper articles of the period', 'Government / official documents', 'Letters or personal correspondence', 'Statistical / census records', 'Oral history transcripts']
+        }
+      },
+      {
+        key: 'historical-rich',
+        label: 'Contested Anniversary',
+        level: 'Rich',
+        data: {
+          discipline: 'Modern European History',
+          courseLevel: 'Undergraduate — Upper Division',
+          learnerProfile: 'Honors / advanced students',
+          setting: 'A European capital, mid-twentieth century',
+          settingScale: 'National / societal',
+          timeFrame: 'Years to decades',
+          contextConstraints: 'Politically sensitive in present-day memory politics; primary sources in multiple languages',
+          scenario: { periodSetting: 'A decade', keyActors: 'Mixed: powerful and powerless', precipitating: 'Convergence of multiple factors', contested: 'Politically charged in the present', historiographical: 'Comparative / transnational' },
+          framework: 'Comparative collective-memory studies; the Sonderweg debate',
+          narrative: 'The seventy-fifth anniversary is next month. The official commemorations will simplify a story that historians have spent decades complicating. You have been asked to write a piece that reintroduces the complexity.',
+          studentRole: 'Visiting scholar invited to contribute to a public-facing volume',
+          deliverableType: 'Analytical essay',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'High (substantial misleading info)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)',
+          seatTime: 'Multi-session', discussionMode: 'Full class debate',
+          customArtifacts: 'Recent commemoration speeches (3 leaders compared)',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Government / official documents', 'Speeches or public addresses', 'Newspaper articles of the period', 'Photographs or visual records', 'Statistical / census records', 'Oral history transcripts', 'Scholarly journal article excerpt', 'Competing scholars\u2019 interpretations']
+        }
+      },
+      {
+        key: 'historical-anthro',
+        label: 'Ethnographic Field Notes',
+        level: 'Rich',
+        data: {
+          discipline: 'Cultural Anthropology',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Mixed cohort (all of the above)',
+          setting: 'A coastal fishing community where a researcher conducted fieldwork over three summers in the late 1970s',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Years to decades',
+          contextConstraints: 'Researcher\u2019s field notes were published posthumously; the community itself has since changed dramatically; some descendants of original participants now contest the published account',
+          scenario: { periodSetting: 'A decade', keyActors: 'Ordinary people / "history from below"', precipitating: 'Long-term structural shift', contested: 'Recent revisionist challenge to old narrative', historiographical: 'Social / cultural' },
+          framework: 'Reflexive anthropology; ethics of representation in ethnography',
+          narrative: 'The researcher\u2019s field notes have been donated to a university archive. The published book has been required reading in introductory anthropology for thirty years. Last month, a grandchild of one of the named informants published an essay in a popular magazine. The essay is titled, simply: "She got us wrong."',
+          studentRole: 'Graduate student reviewing the archive for a methods seminar',
+          deliverableType: 'Analytical essay',
+          gradingRubric: 'Evidence-based reasoning',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '90 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: 'Researcher\u2019s field notebook excerpts (3 entries), Contemporary magazine essay',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Diaries or journals', 'Oral history transcripts', 'Photographs or visual records', 'Memoirs or retrospective accounts', 'Scholarly journal article excerpt', 'Competing scholars\u2019 interpretations']
+        }
+      },
+      {
+        key: 'historical-sociology',
+        label: 'A Neighborhood Changes',
+        level: 'Simple',
+        data: {
+          discipline: 'Sociology',
+          courseLevel: 'Community College — Introductory',
+          learnerProfile: 'Returning adult learners',
+          setting: 'A Monmouth County working-class neighborhood from 1980 to 2020',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Years to decades',
+          contextConstraints: 'Census data available at the tract level; oral histories collected by a local historical society; rapid recent change creates strong feelings among residents',
+          scenario: { periodSetting: 'Long-duration era (multi-century)', keyActors: 'Ordinary people / "history from below"', precipitating: 'Long-term structural shift', contested: 'Politically charged in the present', historiographical: 'Social / cultural' },
+          framework: 'Gentrification and displacement frameworks; urban sociology (Sharkey, Sampson)',
+          narrative: 'The corner deli closed in March. The owner was the third generation. The new tenant is a small-batch coffee roaster. The deli closing was the third such closure on that block this year. You have been asked by the local newspaper to write a piece that explains, in real terms, what has happened to this neighborhood since 1980.',
+          studentRole: 'Sociology student writing for a community newspaper',
+          deliverableType: 'Analytical essay',
+          gradingRubric: 'Communication clarity',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Heavy (hints, glossary, guided questions)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Census tract demographic comparison 1980/2000/2020',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Statistical / census records', 'Photographs or visual records', 'Newspaper articles of the period', 'Oral history transcripts', 'Economic data (prices, wages, trade)']
+        }
+      },
+      {
+        key: 'historical-poliscience',
+        label: 'A Landmark Decision',
+        level: 'Rich',
+        data: {
+          discipline: 'Political Science / Constitutional Law',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Honors / advanced students',
+          setting: 'A landmark U.S. Supreme Court case from the second half of the twentieth century',
+          settingScale: 'National / societal',
+          timeFrame: 'Years to decades',
+          contextConstraints: 'Decision remains politically contested; original justices are deceased; subsequent decisions have complicated the precedent',
+          scenario: { periodSetting: 'A decade', keyActors: 'Institutions and movements', precipitating: 'Single decisive event', contested: 'Politically charged in the present', historiographical: 'Political / diplomatic' },
+          framework: 'Originalism vs. living constitutionalism; legal realism',
+          narrative: 'You have been asked to write a teaching brief for first-year political science students. Your readers know the case by name. Most of them think they know what it means. Your job is to show them the case as the lawyers who argued it would have seen it on the morning the opinion came down.',
+          studentRole: 'Graduate student preparing teaching materials',
+          deliverableType: 'Analytical essay',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)',
+          seatTime: '90 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: 'Majority opinion excerpts (annotated), Dissent excerpts (annotated), Oral argument transcript excerpt',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Government / official documents', 'Speeches or public addresses', 'Newspaper articles of the period', 'Scholarly journal article excerpt', 'Competing scholars\u2019 interpretations', 'Contemporary commentary']
+        }
+      },
+      {
+        key: 'historical-holocaust',
+        label: 'Witness Testimony Analysis',
+        level: 'Rich',
+        data: {
+          discipline: 'Holocaust & Genocide Studies (Chhange)',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Mixed cohort (all of the above)',
+          setting: 'A regional center for Holocaust and genocide education with an oral history archive',
+          settingScale: 'National / societal',
+          timeFrame: 'Years to decades',
+          contextConstraints: 'Survivors are very few and elderly; testimonies were recorded across multiple decades; rising Holocaust denial in public discourse',
+          scenario: { periodSetting: 'A decade', keyActors: 'Ordinary people / "history from below"', precipitating: 'Convergence of multiple factors', contested: 'Politically charged in the present', historiographical: 'Social / cultural' },
+          framework: 'Lawrence Langer on Holocaust testimony; the Shoah Foundation\u2019s testimony methodology',
+          narrative: 'You have been given access to three testimonies from the same survivor, recorded in 1962, 1985, and 2008. The accounts differ in small but significant ways. You have been asked to prepare materials for a high school workshop that will use these testimonies to teach about both genocide and the nature of memory.',
+          studentRole: 'Student docent preparing educational materials',
+          deliverableType: 'Oral presentation outline',
+          gradingRubric: 'Communication clarity',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: 'Multi-session', discussionMode: 'Small group discussion',
+          customArtifacts: 'Transcript excerpts from three time points, Audio waveform timestamps showing pauses',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Oral history transcripts', 'Memoirs or retrospective accounts', 'Photographs or visual records', 'Government / official documents', 'Scholarly journal article excerpt']
+        }
+      }
+    ],
+
+    design: [
+      {
+        key: 'design-simple',
+        label: 'Lab Bench Procurement',
+        level: 'Simple',
+        data: {
+          discipline: 'Electronics Engineering Technology',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'Community college electronics teaching lab',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Months',
+          contextConstraints: 'Fixed $20,000 budget; needs to support 7 student workstations',
+          scenario: { problemConstraints: 'Cost-constrained', usersStakeholders: 'Multiple user types with different needs', technicalReq: 'Reliability / uptime', tradeoffs: 'Performance vs. cost', failureModes: 'Misuse by operator' },
+          framework: '',
+          narrative: 'You have $20,000 and seven workstations to outfit. The previous lab was scavenged from a defunct corporate training program and is now beyond repair. Students start in eight weeks.',
+          studentRole: 'Lab coordinator preparing a procurement plan',
+          deliverableType: 'Technical report',
+          gradingRubric: 'Quantitative / technical accuracy',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: '',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Requirements document', 'Cost estimate', 'Vendor proposals', 'Bill of materials', 'Standards or code excerpts']
+        }
+      },
+      {
+        key: 'design-rich',
+        label: 'Bridge Retrofit Decision',
+        level: 'Rich',
+        data: {
+          discipline: 'Civil / Structural Engineering',
+          courseLevel: 'Graduate / Professional',
+          learnerProfile: 'Working professionals (continuing ed)',
+          setting: 'State DOT — aging interstate bridge, 1965 vintage, urban corridor',
+          settingScale: 'Multi-organization / regional',
+          timeFrame: 'Years to decades',
+          contextConstraints: 'Average daily traffic of 120k vehicles; full closure for replacement not politically feasible; recent fatigue findings',
+          scenario: { problemConstraints: 'Cost-constrained', usersStakeholders: 'Public-facing — wide range of users', technicalReq: 'Safety-critical', tradeoffs: 'Innovation vs. proven approach', failureModes: 'Gradual degradation' },
+          framework: 'AASHTO LRFD; FEMA P-58',
+          narrative: 'Recent NDE testing identified fatigue cracking on three primary girders. The bridge has thirty more years of design life. Or it does not. Your team must recommend a path: monitor, retrofit, or accelerated replacement.',
+          studentRole: 'Lead structural engineer for the DOT bridge management office',
+          deliverableType: 'Technical report',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'High (substantial misleading info)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)',
+          seatTime: 'Multi-session', discussionMode: 'Small group discussion',
+          customArtifacts: 'NDE inspection report with photos, Traffic-impact study (closure scenarios)',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Technical specifications', 'Drawings / schematics / CAD', 'Standards or code excerpts', 'Test results / measurements', 'Simulation output', 'Field performance data', 'Failure / incident report', 'Cost estimate', 'Risk register']
+        }
+      },
+      {
+        key: 'design-architecture',
+        label: 'Adaptive Reuse Studio',
+        level: 'Rich',
+        data: {
+          discipline: 'Architecture',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'A vacant former mill building in a small New Jersey town, listed on the National Register of Historic Places',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Months',
+          contextConstraints: 'Historic preservation guidelines apply; tight site; mixed-income housing required by zoning bonus; community advocates split on density',
+          scenario: { problemConstraints: 'Regulatory / code requirements', usersStakeholders: 'Multiple user types with different needs', technicalReq: 'Maintainability over time', tradeoffs: 'Innovation vs. proven approach', failureModes: 'Misuse by operator' },
+          framework: 'Secretary of the Interior\u2019s Standards for Rehabilitation; Adaptive Reuse Design Principles',
+          narrative: 'The mill is in worse condition than the listing suggested. The town wants housing. The preservation board wants the brick exterior untouched. The developer wants the project to actually pencil out. You have until the design review meeting in six weeks to find a path all three can sign.',
+          studentRole: 'Junior designer at a small architecture firm',
+          deliverableType: 'Oral presentation outline',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Create', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: 'Multi-session', discussionMode: 'Small group discussion',
+          customArtifacts: 'Existing conditions photographs (interior and exterior), Site survey with utility locations',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Requirements document', 'Drawings / schematics / CAD', 'Standards or code excerpts', 'Cost estimate', 'Client correspondence', 'User feedback / surveys']
+        }
+      },
+      {
+        key: 'design-interior',
+        label: 'Aging-in-Place Renovation',
+        level: 'Simple',
+        data: {
+          discipline: 'Interior Design',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'A 1950s ranch home in central New Jersey',
+          settingScale: 'Individual / Personal',
+          timeFrame: 'Months',
+          contextConstraints: 'Client is 78, recently widowed, wants to remain in the home; adult children disagree about whether she should; modest renovation budget',
+          scenario: { problemConstraints: 'Cost-constrained', usersStakeholders: 'Vulnerable population (accessibility, safety)', technicalReq: 'Reliability / uptime', tradeoffs: 'Performance vs. cost', failureModes: 'Misuse by operator' },
+          framework: 'Universal Design principles; ANSI A117.1 accessibility standards',
+          narrative: 'Mrs. K. has lived in this house for forty-two years. She wants to die in it. Her daughter wants her in assisted living. Her son wants whatever costs the least. She has hired you to make the house safe for the next ten years.',
+          studentRole: 'Junior interior designer specializing in aging-in-place',
+          deliverableType: 'Technical report',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '90 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Existing floor plan with annotations, Photos of high-risk areas (bathroom, stairs)',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Requirements document', 'Drawings / schematics / CAD', 'Standards or code excerpts', 'Cost estimate', 'Client correspondence', 'User feedback / surveys']
+        }
+      },
+      {
+        key: 'design-graphic',
+        label: 'Nonprofit Rebrand',
+        level: 'Simple',
+        data: {
+          discipline: 'Graphic Design',
+          courseLevel: 'Community College — Introductory',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'A 45-year-old Monmouth County food pantry preparing to launch a major capital campaign',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Months',
+          contextConstraints: 'Long-time donors strongly attached to original logo; younger volunteers want a modern identity; pro-bono budget means limited deliverables',
+          scenario: { problemConstraints: 'Cost-constrained', usersStakeholders: 'Multiple user types with different needs', technicalReq: 'Scalability', tradeoffs: 'Innovation vs. proven approach', failureModes: 'Misuse by operator' },
+          framework: 'Brand identity systems (Wheeler); WCAG color contrast requirements for accessibility',
+          narrative: 'The board has voted to rebrand. The founder, who designed the original logo herself in 1981, is on the board. She also signed off on the vote. She has also told you, privately, that she does not actually want anything changed.',
+          studentRole: 'Student designer on a community service project',
+          deliverableType: 'Oral presentation outline',
+          gradingRubric: 'Communication clarity',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Create', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Current logo and brand materials, Examples of three peer-organization rebrands',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Requirements document', 'Client correspondence', 'User feedback / surveys', 'Standards or code excerpts', 'Meeting minutes']
+        }
+      },
+      {
+        key: 'design-gamedev',
+        label: 'Indie Game Mechanic',
+        level: 'Simple',
+        data: {
+          discipline: 'Game Design',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'A two-person indie game studio working on their first commercial release',
+          settingScale: 'Small team or family unit',
+          timeFrame: 'Months',
+          contextConstraints: 'Limited budget; planned release window in 4 months; existing prototype playtests poorly with new players but well with returning players',
+          scenario: { problemConstraints: 'Schedule-constrained', usersStakeholders: 'Single end-user type', technicalReq: 'Performance (speed/efficiency)', tradeoffs: 'Innovation vs. proven approach', failureModes: 'Misuse by operator' },
+          framework: 'MDA framework (Mechanics-Dynamics-Aesthetics); onboarding flow theory',
+          narrative: 'Playtest sessions have confirmed it: new players quit at level 3, but anyone who reaches level 6 stays for forty hours. Your studio partner wants to simplify level 3. You think the problem is somewhere else entirely.',
+          studentRole: 'Lead designer at a two-person indie studio',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Disciplinary methodology',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Playtest session retention curve (chart), Open-ended player feedback transcripts',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Requirements document', 'Test results / measurements', 'User feedback / surveys', 'Field performance data', 'Project schedule / Gantt']
+        }
+      },
+      {
+        key: 'design-compsci',
+        label: 'System Refactor Plan',
+        level: 'Rich',
+        data: {
+          discipline: 'Computer Science / Software Engineering',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'A regional logistics company with a fifteen-year-old in-house order management system',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Months',
+          contextConstraints: 'Cannot stop production; original developers gone; documentation incomplete; new compliance requirements take effect in 9 months',
+          scenario: { problemConstraints: 'Schedule-constrained', usersStakeholders: 'Operator + maintenance staff', technicalReq: 'Maintainability over time', tradeoffs: 'Custom vs. off-the-shelf', failureModes: 'Cascading failure across systems' },
+          framework: 'Strangler Fig pattern; SOLID principles; CI/CD pipeline design',
+          narrative: 'The system processes seven thousand orders a day. The last developer who understood it retired three years ago. The compliance deadline is nine months out. You have been asked whether to refactor, rewrite, or buy.',
+          studentRole: 'Lead developer evaluating the refactor strategy',
+          deliverableType: 'Technical report',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'High (substantial misleading info)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)',
+          seatTime: 'Multi-session', discussionMode: 'Small group discussion',
+          customArtifacts: 'Legacy system architecture diagram, Code metrics report (complexity, test coverage)',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Requirements document', 'Technical specifications', 'Drawings / schematics / CAD', 'Test results / measurements', 'Field performance data', 'Vendor proposals', 'Risk register', 'Cost estimate']
+        }
+      },
+      {
+        key: 'design-culinary',
+        label: 'Restaurant Menu Redesign',
+        level: 'Simple',
+        data: {
+          discipline: 'Culinary Arts',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'A 60-seat farm-to-table restaurant in central New Jersey',
+          settingScale: 'Small team or family unit',
+          timeFrame: 'Months',
+          contextConstraints: 'Food costs up 22% year-over-year; existing menu prices set six months ago; kitchen line cooks have varied skill levels; supplier relationships from prior chef',
+          scenario: { problemConstraints: 'Cost-constrained', usersStakeholders: 'Multiple user types with different needs', technicalReq: 'Reliability / uptime', tradeoffs: 'Performance vs. cost', failureModes: 'Misuse by operator' },
+          framework: 'Menu engineering matrix (stars, plowhorses, puzzles, dogs); standardized recipe costing',
+          narrative: 'You took over as Chef de Cuisine three weeks ago. Your sales mix shows the most-ordered dish has the worst margin. Your highest-margin dish is rarely ordered. The owner wants margins up by twenty percent in ninety days. The dining room is half full on weekdays.',
+          studentRole: 'New Chef de Cuisine',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Quantitative / technical accuracy',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Current menu with sales-mix and food-cost columns, Supplier price comparison sheet',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Requirements document', 'Cost estimate', 'Performance metrics', 'Vendor proposals', 'User feedback / surveys']
+        }
+      }
+    ],
+
+    literary: [
+      {
+        key: 'literary-simple',
+        label: 'Close Reading a Poem',
+        level: 'Simple',
+        data: {
+          discipline: 'Introduction to Poetry',
+          courseLevel: 'Community College — Introductory',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'A poem first published in a small literary magazine',
+          settingScale: 'Individual / Personal',
+          timeFrame: 'Historical / retrospective',
+          contextConstraints: 'Students have limited prior background in poetry analysis',
+          scenario: { textContext: 'Single short text (poem, story, scene)', authorContext: 'Lesser-known or recovered author', criticalLens: 'Close / formalist reading', thematicTensions: 'Form vs. content', reception: 'Ignored at the time, later recovered' },
+          framework: 'New Criticism close reading',
+          narrative: 'The poem is twenty-four lines long. You will read it three times before you write a single sentence about it. The first reading is for sound. The second is for image. The third is for argument.',
+          studentRole: 'Student close reader',
+          deliverableType: 'Analytical essay',
+          gradingRubric: 'Communication clarity',
+          difficulty: 'Intro', richness: 'Lite', distractors: 'None (clean path)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Heavy (hints, glossary, guided questions)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: '',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Sparse (5-7 artifacts, minimal text)',
+          artifacts: ['Excerpt or full short text', 'Author\u2019s letters or notebooks', 'Contemporary reviews']
+        }
+      },
+      {
+        key: 'literary-rich',
+        label: 'Contested Novel',
+        level: 'Rich',
+        data: {
+          discipline: 'Postcolonial Literature',
+          courseLevel: 'Undergraduate — Upper Division',
+          learnerProfile: 'Honors / advanced students',
+          setting: 'A mid-twentieth-century novel that has become canonical despite continuing controversy',
+          settingScale: 'National / societal',
+          timeFrame: 'Years to decades',
+          contextConstraints: 'The author\u2019s public statements complicate readings of the work; competing translations exist',
+          scenario: { textContext: 'Excerpt from longer work', authorContext: 'Canonical, much-studied author', criticalLens: 'Postcolonial', thematicTensions: 'Power and silence', reception: 'Acclaimed then, reassessed critically since' },
+          framework: 'Saidian Orientalism; Spivak on the subaltern',
+          narrative: 'A colleague has just published an essay arguing that the novel\u2019s most celebrated passage is also its most ethically compromised. The journal has invited you to respond.',
+          studentRole: 'Literary scholar drafting a response essay',
+          deliverableType: 'Analytical essay',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)',
+          seatTime: 'Multi-session', discussionMode: 'Asynchronous online discussion',
+          customArtifacts: 'Two translations of the contested passage (compared side-by-side)',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Excerpt or full short text', 'Multiple drafts / variants', 'Author\u2019s letters or notebooks', 'Author\u2019s own statements / interviews', 'Contemporary reviews', 'Modern scholarly essay excerpts', 'Competing critical readings']
+        }
+      },
+      {
+        key: 'literary-creative',
+        label: 'Workshop a Short Story',
+        level: 'Simple',
+        data: {
+          discipline: 'Creative Writing',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Mixed cohort (all of the above)',
+          setting: 'A workshop story submitted by a peer in an introductory creative writing class',
+          settingScale: 'Individual / Personal',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Writer is a beginner; story handles sensitive autobiographical material; workshop norms emphasize generosity but truthfulness',
+          scenario: { textContext: 'Full short work', authorContext: 'Anonymous / collaborative authorship', criticalLens: 'Close / formalist reading', thematicTensions: 'Form vs. content', reception: 'Recent work — reception still forming' },
+          framework: 'Iowa-style workshop method; "describe before evaluate" critique practice',
+          narrative: 'The story is twelve pages. It is the writer\u2019s first submitted draft of the semester. It is also, you suspect, partly true. You have to lead the workshop discussion tomorrow morning. You take out a pen.',
+          studentRole: 'Student workshop leader',
+          deliverableType: 'Oral presentation outline',
+          gradingRubric: 'Communication clarity',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Evaluate', instructionalScaffolding: 'Heavy (hints, glossary, guided questions)',
+          seatTime: '60 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: 'Sample story draft (8-12 pages) with annotation space',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Sparse (5-7 artifacts, minimal text)',
+          artifacts: ['Excerpt or full short text', 'Multiple drafts / variants', 'Reader response over time']
+        }
+      },
+      {
+        key: 'literary-theater',
+        label: 'Director\u2019s Concept',
+        level: 'Rich',
+        data: {
+          discipline: 'Theater Arts',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'A canonical Western dramatic work being staged by a small regional theater',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Months',
+          contextConstraints: 'Modest production budget; audience expects "traditional" interpretation; younger actors want something more current; rights for cuts and adaptations are limited',
+          scenario: { textContext: 'Excerpt from longer work', authorContext: 'Canonical, much-studied author', criticalLens: 'Historical / biographical', thematicTensions: 'Tradition vs. innovation', reception: 'Celebrated at the time, still celebrated' },
+          framework: 'Director\u2019s concept document conventions; Stanislavski given circumstances',
+          narrative: 'You have been hired to direct it. The play has been performed in this region perhaps three hundred times before. Your job is to make it land as if no one in the house had ever seen it. The first read-through is in nine days. You sit down with the script.',
+          studentRole: 'Assistant director developing a concept document',
+          deliverableType: 'Oral presentation outline',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Create', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: 'Multi-session', discussionMode: 'Small group discussion',
+          customArtifacts: 'Script excerpts from three key scenes, Stage layout / sightline diagram of the proposed venue',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Excerpt or full short text', 'Author\u2019s letters or notebooks', 'Adaptation or response work', 'Contemporary reviews', 'Modern scholarly essay excerpts', 'Competing critical readings']
+        }
+      },
+      {
+        key: 'literary-film',
+        label: 'Film Analysis Brief',
+        level: 'Simple',
+        data: {
+          discipline: 'Communication Media / Film Studies',
+          courseLevel: 'Community College — Introductory',
+          learnerProfile: 'Traditional-age first-time students',
+          setting: 'A widely-screened mainstream film selected by the instructor for textual analysis',
+          settingScale: 'Individual / Personal',
+          timeFrame: 'Historical / retrospective',
+          contextConstraints: 'Students may have seen the film as casual viewers; some elements (music, editing) may not be familiar as objects of analysis',
+          scenario: { textContext: 'Multimodal (text + image/film)', authorContext: 'Lesser-known or recovered author', criticalLens: 'Close / formalist reading', thematicTensions: 'Form vs. content', reception: 'Celebrated at the time, still celebrated' },
+          framework: 'Mise-en-sc\u00e8ne analysis; Bordwell & Thompson categories',
+          narrative: 'The instructor has assigned a five-minute sequence and asked you to read it with the same care you would give a poem. You watched the whole film over the weekend. You enjoyed it. You are about to find out what it looks like to actually look.',
+          studentRole: 'Film studies student writing a sequence analysis',
+          deliverableType: 'Analytical essay',
+          gradingRubric: 'Communication clarity',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'None (clean path)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Heavy (hints, glossary, guided questions)',
+          seatTime: '60 minutes', discussionMode: 'Individual work',
+          customArtifacts: 'Shot-by-shot frame stills for an assigned 90-second sequence, Sound design notes',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Excerpt or full short text', 'Multiple drafts / variants', 'Contemporary reviews', 'Modern scholarly essay excerpts']
+        }
+      },
+      {
+        key: 'literary-music',
+        label: 'Listening Analysis',
+        level: 'Simple',
+        data: {
+          discipline: 'Music History / Music Theory',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Mixed cohort (all of the above)',
+          setting: 'A single recorded performance of a piece from the standard Western concert repertoire',
+          settingScale: 'Individual / Personal',
+          timeFrame: 'Historical / retrospective',
+          contextConstraints: 'Students may not read score fluently; performance practices have changed since the piece was composed; multiple recordings exist with very different interpretations',
+          scenario: { textContext: 'Single short text (poem, story, scene)', authorContext: 'Canonical, much-studied author', criticalLens: 'Close / formalist reading', thematicTensions: 'Tradition vs. innovation', reception: 'Celebrated at the time, still celebrated' },
+          framework: 'Schenkerian analysis (introduced informally); historically informed performance practice',
+          narrative: 'You have been given two recordings of the same piece, made fifty years apart. The notes are the same. Almost everything else is different. Your task is to describe, precisely, what each performer is doing — and to guess at why.',
+          studentRole: 'Music student preparing a listening journal entry',
+          deliverableType: 'Reflection / journal entry',
+          gradingRubric: 'Disciplinary methodology',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '45 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Score excerpt (8 measures), Timing chart comparing two performances',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Excerpt or full short text', 'Author\u2019s letters or notebooks', 'Contemporary reviews', 'Modern scholarly essay excerpts', 'Adaptation or response work']
+        }
+      }
+    ],
+
+    negotiation: [
+      {
+        key: 'negotiation-simple',
+        label: 'Vendor Contract',
+        level: 'Simple',
+        data: {
+          discipline: 'Business Management',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Returning adult learners',
+          setting: 'Small business renewing a multi-year vendor contract',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Vendor knows you have limited alternatives in the region',
+          scenario: { parties: 'Two parties (bilateral)', interestsPositions: 'Stated positions look incompatible — interests may overlap', batna: 'Strong BATNA for one side, weak for the other', powerDynamics: 'Significant power asymmetry', culturalFactors: 'Intra-organizational (same culture)' },
+          framework: 'Principled negotiation (Fisher/Ury); ZOPA analysis',
+          narrative: 'The current contract expires in 30 days. Your vendor has proposed a 22% increase, citing "market conditions." Your budget cannot absorb it. They know it. You know they know it.',
+          studentRole: 'Operations manager leading the renewal',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Disciplinary methodology',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: '',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Opening offer / position paper', 'Counter-proposal', 'Stakeholder map / influence diagram', 'Market or economic data', 'Past negotiation history']
+        }
+      },
+      {
+        key: 'negotiation-rich',
+        label: 'Multi-Party Labor Crisis',
+        level: 'Rich',
+        data: {
+          discipline: 'Labor Relations / Public Administration',
+          courseLevel: 'Graduate / Professional',
+          learnerProfile: 'Working professionals (continuing ed)',
+          setting: 'Major metropolitan transit authority — three unions, agency leadership, mayor\u2019s office, riding public',
+          settingScale: 'Multi-organization / regional',
+          timeFrame: 'Days to weeks',
+          contextConstraints: '72 hours to strike deadline; mayor faces re-election in 4 months; one union has internal split',
+          scenario: { parties: 'Multilateral (4+ parties)', interestsPositions: 'Distributive on some issues, integrative on others', batna: 'Both sides have weak BATNAs', powerDynamics: 'Power shifting during negotiation', culturalFactors: 'High-stakes public visibility' },
+          framework: 'Principled negotiation; coalition theory',
+          narrative: 'Three unions have aligned their contract expirations for the first time in transit-authority history. The strike deadline is in 72 hours. The mayor has just called you personally — twice.',
+          studentRole: 'Chief negotiator for the transit authority',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Synthesis across artifacts',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'High (substantial misleading info)',
+          bloomsTaxonomy: 'Create', instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)',
+          seatTime: 'Multi-session', discussionMode: 'Full class debate',
+          customArtifacts: 'Mayor\u2019s office text messages (back-channel), Internal union strategy memo (leaked)',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Opening offer / position paper', 'Counter-proposal', 'Term sheet or draft agreement', 'Confidential bottom-line memo (one side)', 'Stakeholder map / influence diagram', 'Internal coalition dynamics memo', 'Media coverage', 'Public statements by each party', 'Third-party / expert analysis']
+        }
+      },
+      {
+        key: 'negotiation-cj',
+        label: 'Community Policing Meeting',
+        level: 'Rich',
+        data: {
+          discipline: 'Criminal Justice / Community Policing',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Working professionals (continuing ed)',
+          setting: 'A suburban New Jersey police department\u2019s monthly community advisory board meeting',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Recent use-of-force incident has drawn national attention; community trust at historic low; collective bargaining agreement constrains some reforms',
+          scenario: { parties: 'Multilateral (4+ parties)', interestsPositions: 'Positions align — hidden conflict in interests', batna: 'Both sides have weak BATNAs', powerDynamics: 'Power tied to information asymmetry', culturalFactors: 'History of prior conflict or cooperation' },
+          framework: 'President\u2019s Task Force on 21st Century Policing pillars; restorative dialogue',
+          narrative: 'The meeting starts at 7 PM. The chief will sit on a panel with three community advocates, the union president, and the mayor. You are the new community policing liaison. You have ninety minutes to prepare the chief\u2019s opening statement and to identify the three questions you most fear being asked.',
+          studentRole: 'Community policing liaison preparing the chief\u2019s materials',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Communication clarity',
+          difficulty: 'Advanced', richness: 'Deep-dive', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Create', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '90 minutes', discussionMode: 'Small group discussion',
+          customArtifacts: 'Recent department use-of-force statistics, Community survey results (last 3 years)',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)',
+          artifacts: ['Opening offer / position paper', 'Stakeholder map / influence diagram', 'Intelligence on other side\u2019s interests', 'Past negotiation history', 'Media coverage', 'Public statements by each party']
+        }
+      },
+      {
+        key: 'negotiation-parent',
+        label: 'Parent-Teacher Conference',
+        level: 'Simple',
+        data: {
+          discipline: 'Education',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'A New Jersey middle school during scheduled parent conferences',
+          settingScale: 'Individual / Personal',
+          timeFrame: 'Minutes to hours (acute)',
+          contextConstraints: 'Twenty-minute time slot; student is present; parent has been told to "be ready for a hard conversation"; principal\u2019s office is two doors down',
+          scenario: { parties: 'Three parties (triangular dynamics)', interestsPositions: 'Stated positions look incompatible — interests may overlap', batna: 'Both sides have weak BATNAs', powerDynamics: 'Significant power asymmetry', culturalFactors: 'Cross-organizational (different norms)' },
+          framework: 'Difficult Conversations (Stone/Patton/Heen); restorative practices in schools',
+          narrative: 'The conference is at 4:15. The student is failing your class. The parent has emailed twice this week, in increasingly frustrated terms, asking why you have not done more. The student has not done assigned work in six weeks and has stopped speaking in class.',
+          studentRole: 'Sixth-grade English teacher',
+          deliverableType: 'Reflection / journal entry',
+          gradingRubric: 'Communication clarity',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Heavy (hints, glossary, guided questions)',
+          seatTime: '45 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Email thread (parent and teacher, past 2 weeks), Student gradebook printout',
+          artifactStyle: 'Educational simplification (clear but accurate)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Opening offer / position paper', 'Intelligence on other side\u2019s interests', 'Past negotiation history', 'Constituency / membership pressures']
+        }
+      },
+      {
+        key: 'negotiation-marketing',
+        label: 'Client Account Crisis',
+        level: 'Simple',
+        data: {
+          discipline: 'Marketing',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Returning adult learners',
+          setting: 'A boutique marketing agency, 15 employees, in a suburban office park',
+          settingScale: 'Single organization / community',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Client represents 28% of agency revenue; campaign results are below promised metrics; competing agency is rumored to be pitching the client',
+          scenario: { parties: 'Two parties (bilateral)', interestsPositions: 'Genuinely zero-sum on the core issue', batna: 'Strong BATNA for one side, weak for the other', powerDynamics: 'Significant power asymmetry', culturalFactors: 'Cross-organizational (different norms)' },
+          framework: 'Account retention strategy; ZOPA mapping',
+          narrative: 'The Q2 campaign underperformed. The client\u2019s CMO has asked for a meeting on Friday. Your team lead suggested presenting a "win-back" proposal. The CFO has reminded you, quietly, what losing this account would mean for next year\u2019s hiring.',
+          studentRole: 'Account director preparing for a retention meeting',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Disciplinary methodology',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Apply', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Campaign performance dashboard, Original SOW with promised KPIs',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Opening offer / position paper', 'Counter-proposal', 'Stakeholder map / influence diagram', 'Market or economic data', 'Past negotiation history']
+        }
+      },
+      {
+        key: 'negotiation-fashion',
+        label: 'Vendor Terms Sheet',
+        level: 'Simple',
+        data: {
+          discipline: 'Fashion Design & Merchandising',
+          courseLevel: 'Community College — Intermediate',
+          learnerProfile: 'Career switchers / non-majors',
+          setting: 'A small fashion brand preparing for its first wholesale season',
+          settingScale: 'Small team or family unit',
+          timeFrame: 'Days to weeks',
+          contextConstraints: 'Bootstrapped brand; this would be the first major buyer; standard wholesale terms include payment cycles that the brand cannot fully fund',
+          scenario: { parties: 'Two parties (bilateral)', interestsPositions: 'Distributive on some issues, integrative on others', batna: 'Strong BATNA for one side, weak for the other', powerDynamics: 'Significant power asymmetry', culturalFactors: 'Cross-organizational (different norms)' },
+          framework: 'Principled negotiation (Fisher/Ury); BATNA development for small businesses',
+          narrative: 'A regional department store buyer has offered to place a wholesale order. The order would triple your brand\u2019s revenue for the year. The buyer has sent over a standard vendor agreement. You read it twice. There are six clauses you cannot afford to accept.',
+          studentRole: 'Brand founder negotiating wholesale terms',
+          deliverableType: 'Decision memo with rationale',
+          gradingRubric: 'Quantitative / technical accuracy',
+          difficulty: 'Intermediate', richness: 'Standard', distractors: 'Low (1-2 minor distractions)',
+          bloomsTaxonomy: 'Analyze', instructionalScaffolding: 'Standard (open-ended but fair)',
+          seatTime: '60 minutes', discussionMode: 'Pair / partner work',
+          customArtifacts: 'Standard buyer vendor agreement (with problematic clauses highlighted), Brand cash-flow projection',
+          artifactStyle: 'Realistic / professional-grade (mimics real documents)', evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)',
+          artifacts: ['Opening offer / position paper', 'Counter-proposal', 'Term sheet or draft agreement', 'Confidential bottom-line memo (one side)', 'Market or economic data']
+        }
+      }
+    ]
+  };
+
+  // ============================================================
+  // STATE
+  // ============================================================
+  let currentGenre = 'decision';
+  let currentLLM = 'chatgpt';
+
+  // ============================================================
+  // DOM HELPERS
+  // ============================================================
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  // ============================================================
+  // GENRE / ACCENT APPLICATION
+  // ============================================================
+  function applyAccent(accent) {
+    const root = document.documentElement;
+    root.style.setProperty('--accent', accent.c);
+    root.style.setProperty('--accent-hover', accent.h);
+    root.style.setProperty('--accent-soft', accent.s);
+    root.style.setProperty('--accent-soft-border', accent.sb);
+    root.style.setProperty('--accent-ink', accent.i);
+  }
+
+  function setGenre(genreKey) {
+    currentGenre = genreKey;
+    const genre = GENRES[genreKey];
+
+    // visual: accent + active button + descriptor
+    applyAccent(genre.accent);
+    $$('.genre-btn').forEach(b => {
+      const isActive = b.dataset.genre === genreKey;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-checked', isActive ? 'true' : 'false');
+    });
+    $('genreDescription').textContent = genre.description;
+
+    // Tab 2 label
+    $('scenarioTabLabel').textContent = (genre.name.split(/\s*[\/\u2014-]\s*/)[0]) || 'Scenario';
+    $('templateGenreName').textContent = '(' + genre.name + ')';
+
+    // rebuild scenario fields, narrative chips, artifact groups, section toggles, templates
+    rebuildScenarioFields();
+    rebuildNarrativeChips();
+    rebuildArtifactGroups();
+    rebuildSectionToggles();
+    rebuildTemplatesGrid();
+
+    buildPrompt();
+  }
+
+  function rebuildScenarioFields() {
+    const genre = GENRES[currentGenre];
+    const container = $('scenarioFields');
+    container.innerHTML = '';
+
+    // Render fields in pairs (rows of 2)
+    const fields = genre.scenarioFields;
+    for (let i = 0; i < fields.length; i += 2) {
+      const row = document.createElement('div');
+      row.className = 'row' + (i > 0 ? ' divider' : '');
+      [fields[i], fields[i + 1]].forEach(f => {
+        if (!f) {
+          row.appendChild(document.createElement('div')); // empty cell
+          return;
+        }
+        const field = document.createElement('div');
+        field.className = 'field';
+        const label = document.createElement('label');
+        label.setAttribute('for', 'scn-' + f.id);
+        label.textContent = f.label;
+        const select = document.createElement('select');
+        select.id = 'scn-' + f.id;
+        select.dataset.scenarioField = f.id;
+        f.options.forEach((opt, idx) => {
+          const o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          if (idx === 0) o.selected = true;
+          select.appendChild(o);
+        });
+        select.addEventListener('change', buildPrompt);
+        field.appendChild(label);
+        field.appendChild(select);
+        row.appendChild(field);
+      });
+      container.appendChild(row);
+    }
+
+    // Add the optional extra framework field
+    if (genre.extraField) {
+      const row = document.createElement('div');
+      row.className = 'row row-1 divider';
+      const field = document.createElement('div');
+      field.className = 'field';
+      const label = document.createElement('label');
+      label.setAttribute('for', 'scn-framework');
+      label.textContent = genre.extraField.label;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'scn-framework';
+      input.placeholder = genre.extraField.placeholder;
+      input.addEventListener('input', buildPrompt);
+      const help = document.createElement('p');
+      help.className = 'help';
+      help.textContent = 'Adds a discipline-specific frame the AI must apply when constructing the case.';
+      field.appendChild(label);
+      field.appendChild(input);
+      field.appendChild(help);
+      row.appendChild(field);
+      container.appendChild(row);
+    }
+  }
+
+  function rebuildNarrativeChips() {
+    const genre = GENRES[currentGenre];
+    const container = $('narrativeChips');
+    container.innerHTML = '';
+    genre.narrativeChips.forEach((chip, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'chip';
+      btn.textContent = chip.label;
+      btn.dataset.text = chip.text;
+      btn.addEventListener('click', () => {
+        $('narrative').value = chip.text;
+        buildPrompt();
+      });
+      container.appendChild(btn);
+      if (idx === 0) $('narrative').value = chip.text; // set first as default
+    });
+  }
+
+  function rebuildArtifactGroups() {
+    const genre = GENRES[currentGenre];
+    const container = $('artifactGroups');
+    container.innerHTML = '';
+
+    Object.entries(genre.artifactLibrary).forEach(([groupName, items], groupIdx) => {
+      const group = document.createElement('div');
+      group.className = 'artifact-group';
+
+      const header = document.createElement('div');
+      header.className = 'artifact-group-header';
+      const h4 = document.createElement('h4');
+      h4.textContent = groupName;
+      const sa = document.createElement('button');
+      sa.type = 'button';
+      sa.className = 'select-all-btn';
+      sa.textContent = 'Select All';
+      sa.dataset.group = 'group-' + groupIdx;
+      header.appendChild(h4);
+      header.appendChild(sa);
+
+      const grid = document.createElement('div');
+      grid.className = 'artifact-grid';
+      grid.id = 'group-' + groupIdx;
+
+      items.forEach((item, itemIdx) => {
+        const lbl = document.createElement('label');
+        lbl.className = 'artifact-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = item;
+        cb.name = 'artifact';
+        if (groupIdx === 0 && itemIdx < 2) cb.checked = true; // sensible defaults
+        cb.addEventListener('change', buildPrompt);
+        const span = document.createElement('span');
+        span.textContent = item;
+        lbl.appendChild(cb);
+        lbl.appendChild(span);
+        grid.appendChild(lbl);
+      });
+
+      sa.addEventListener('click', () => {
+        const checkboxes = grid.querySelectorAll('input[type="checkbox"]');
+        const allChecked = Array.from(checkboxes).every(c => c.checked);
+        checkboxes.forEach(c => { c.checked = !allChecked; });
+        sa.textContent = allChecked ? 'Select All' : 'Clear All';
+        buildPrompt();
+      });
+
+      group.appendChild(header);
+      group.appendChild(grid);
+      container.appendChild(group);
+    });
+  }
+
+  function rebuildSectionToggles() {
+    const genre = GENRES[currentGenre];
+    const container = $('sectionToggles');
+    container.innerHTML = '';
+
+    SECTIONS.forEach(sec => {
+      const lbl = document.createElement('label');
+      lbl.className = 'toggle-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.section = sec.id;
+      cb.checked = !!genre.defaultSections[sec.id];
+      cb.addEventListener('change', buildPrompt);
+      const content = document.createElement('div');
+      content.className = 'toggle-item-content';
+      const name = document.createElement('div');
+      name.className = 'name';
+      // Use genre-specific decision label
+      name.textContent = (sec.id === 'decisions') ? genre.decisionSectionLabel : sec.name;
+      const desc = document.createElement('div');
+      desc.className = 'desc';
+      desc.textContent = sec.desc;
+      content.appendChild(name);
+      content.appendChild(desc);
+      lbl.appendChild(cb);
+      lbl.appendChild(content);
+      container.appendChild(lbl);
+    });
+  }
+
+  function rebuildTemplatesGrid() {
+    const container = $('templatesGrid');
+    container.innerHTML = '';
+    const tpls = TEMPLATES[currentGenre] || [];
+    tpls.forEach(t => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tpl-btn';
+      btn.dataset.tplKey = t.key;
+      const lvl = document.createElement('span');
+      lvl.className = 'tpl-level';
+      lvl.textContent = t.level;
+      const lbl = document.createElement('span');
+      lbl.textContent = t.label;
+      btn.appendChild(lvl);
+      btn.appendChild(lbl);
+      btn.addEventListener('click', () => applyTemplate(t));
+      container.appendChild(btn);
+    });
+  }
+
+  function applyTemplate(tpl) {
+    const d = tpl.data;
+    $('discipline').value = d.discipline || '';
+    $('courseLevel').value = d.courseLevel || $('courseLevel').options[0].value;
+    $('learnerProfile').value = d.learnerProfile || $('learnerProfile').options[0].value;
+    $('setting').value = d.setting || '';
+    $('settingScale').value = d.settingScale || $('settingScale').options[0].value;
+    $('timeFrame').value = d.timeFrame || $('timeFrame').options[0].value;
+    $('contextConstraints').value = d.contextConstraints || '';
+
+    // scenario fields
+    if (d.scenario) {
+      Object.entries(d.scenario).forEach(([key, val]) => {
+        const el = $('scn-' + key);
+        if (el) el.value = val;
+      });
+    }
+    const fwEl = $('scn-framework');
+    if (fwEl) fwEl.value = d.framework || '';
+
+    $('narrative').value = d.narrative || '';
+
+    // pedagogy
+    $('studentRole').value = d.studentRole || '';
+    $('deliverableType').value = d.deliverableType || $('deliverableType').options[0].value;
+    $('gradingRubric').value = d.gradingRubric || $('gradingRubric').options[0].value;
+    $('difficulty').value = d.difficulty || 'Intermediate';
+    $('richness').value = d.richness || 'Standard';
+    $('distractors').value = d.distractors || 'Low (1-2 minor distractions)';
+    $('bloomsTaxonomy').value = d.bloomsTaxonomy || 'Analyze';
+    $('instructionalScaffolding').value = d.instructionalScaffolding || 'Standard (open-ended but fair)';
+    $('seatTime').value = d.seatTime || '60 minutes';
+    $('discussionMode').value = d.discussionMode || 'Individual work';
+
+    $('customArtifacts').value = d.customArtifacts || '';
+    $('artifactStyle').value = d.artifactStyle || 'Educational simplification (clear but accurate)';
+    $('evidenceDensity').value = d.evidenceDensity || 'Moderate (8-12 artifacts, balanced detail)';
+
+    // artifact checkboxes
+    const checkSet = new Set(d.artifacts || []);
+    $$('input[name="artifact"]').forEach(cb => {
+      cb.checked = checkSet.has(cb.value);
+    });
+
+    updateHelpers();
+    buildPrompt();
+
+    // Visual confirmation
+    const btn = container__findTplButton(tpl.key);
+    if (btn) {
+      const origText = btn.querySelector('span:last-child').textContent;
+      btn.classList.add('loaded');
+      btn.querySelector('span:last-child').textContent = 'Loaded!';
+      setTimeout(() => {
+        btn.classList.remove('loaded');
+        btn.querySelector('span:last-child').textContent = origText;
+      }, 1400);
+    }
+  }
+  function container__findTplButton(key) {
+    return Array.from($('templatesGrid').querySelectorAll('.tpl-btn')).find(b => b.dataset.tplKey === key);
+  }
+
+  // ============================================================
+  // HELPER TEXT (difficulty / richness)
+  // ============================================================
+  const HELPERS = {
+    difficulty: {
+      'Intro': 'Obvious evidence; questions stay close to the artifacts.',
+      'Intermediate': 'Requires correlating 2-3 artifacts to reach the answer.',
+      'Advanced': 'Subtle clues, ambiguity, and strategic judgment required.'
+    },
+    richness: {
+      'Lite': 'Shorter artifacts, minimal reading, fast completion.',
+      'Standard': 'Balanced detail; mix of short and longer artifacts.',
+      'Deep-dive': 'Extensive artifacts with substantial detail and metadata.'
+    }
+  };
+  function updateHelpers() {
+    $('difficultyHelper').textContent = HELPERS.difficulty[$('difficulty').value] || '';
+    $('richnessHelper').textContent = HELPERS.richness[$('richness').value] || '';
+  }
+
+  // ============================================================
+  // PROMPT BUILDER
+  // ============================================================
+  function collectInputs() {
+    const genre = GENRES[currentGenre];
+
+    const scenario = {};
+    genre.scenarioFields.forEach(f => {
+      const el = $('scn-' + f.id);
+      if (el) scenario[f.label] = el.value;
+    });
+    const fwEl = $('scn-framework');
+    const framework = fwEl ? fwEl.value.trim() : '';
+
+    const selectedArtifacts = Array.from($$('input[name="artifact"]:checked')).map(cb => cb.value);
+    const customArtifacts = $('customArtifacts').value.trim()
+      .split(',').map(s => s.trim()).filter(Boolean);
+    const allArtifacts = [...selectedArtifacts, ...customArtifacts];
+
+    const sections = {};
+    $$('input[data-section]').forEach(cb => {
+      sections[cb.dataset.section] = cb.checked;
+    });
+
+    return {
+      genre: genre,
+      discipline: $('discipline').value.trim() || '[Discipline not specified]',
+      courseLevel: $('courseLevel').value,
+      learnerProfile: $('learnerProfile').value,
+      setting: $('setting').value.trim() || '[Setting not specified]',
+      settingScale: $('settingScale').value,
+      timeFrame: $('timeFrame').value,
+      contextConstraints: $('contextConstraints').value.trim(),
+      scenario: scenario,
+      framework: framework,
+      narrative: $('narrative').value.trim(),
+      studentRole: $('studentRole').value.trim() || '[Role not specified]',
+      deliverableType: $('deliverableType').value,
+      gradingRubric: $('gradingRubric').value,
+      difficulty: $('difficulty').value,
+      richness: $('richness').value,
+      distractors: $('distractors').value,
+      bloomsTaxonomy: $('bloomsTaxonomy').value,
+      instructionalScaffolding: $('instructionalScaffolding').value,
+      seatTime: $('seatTime').value,
+      discussionMode: $('discussionMode').value,
+      artifactStyle: $('artifactStyle').value,
+      evidenceDensity: $('evidenceDensity').value,
+      artifacts: allArtifacts,
+      sections: sections
+    };
+  }
+
+  function scenarioToText(scenario) {
+    return Object.entries(scenario).map(([k, v]) => `  - ${k}: ${v}`).join('\n');
+  }
+
+  function activeSectionsList(sections, genre) {
+    const labelOf = (id) => {
+      const sec = SECTIONS.find(s => s.id === id);
+      if (!sec) return id;
+      return (id === 'decisions') ? genre.decisionSectionLabel : sec.name;
+    };
+    return Object.entries(sections).filter(([_, v]) => v).map(([id]) => labelOf(id));
+  }
+
+  function buildPrompt() {
+    const i = collectInputs();
+    const activeSections = activeSectionsList(i.sections, i.genre);
+    const decisionLabel = i.genre.decisionSectionLabel;
+    const artifactsList = i.artifacts.length ? i.artifacts.join(', ') : 'a balanced mix appropriate to the discipline';
+
+    let out = '';
+    if (currentLLM === 'claude') {
+      out = buildClaudePrompt(i, activeSections, decisionLabel, artifactsList);
+    } else if (currentLLM === 'gemini') {
+      out = buildGeminiPrompt(i, activeSections, decisionLabel, artifactsList);
+    } else {
+      out = buildChatGPTPrompt(i, activeSections, decisionLabel, artifactsList);
+    }
+
+    $('promptOutput').value = out;
+  }
+
+  function sharedSectionDescriptions(genre, decisionLabel) {
+    return {
+      intro:     `1. Intro / Overview card — Shows discipline, setting, and a short summary. Includes a brief "You are a [role]..." framing for the student.`,
+      artifacts: `2. Artifacts card group — Clickable cards grouped under three headings matching the discipline. Each card has an ID (e.g., A1, B2) and a short label. Clicking reveals detailed artifact content in a display panel on the same page.`,
+      questions: `3. Analysis Questions card group — Reveals 6\u20138 open-ended questions (Q1\u2013Q8). Each question explicitly references at least one artifact ID. Under each question include a collapsed "Instructor Notes" area that expands on click.`,
+      decisions: `4. ${decisionLabel} card group — Reveals 2\u20133 ${decisionLabel.toLowerCase()} blocks. Each block presents a scenario, three option buttons (A/B/C), and reveals consequence text directly below when clicked.`,
+      capstone:  `5. Capstone card — Reveals the final assignment description and a large <textarea> for student response. Include a short bulleted grading rubric below the assignment.`,
+      reflection: `6. Reflection card — Reveals 2\u20133 metacognitive prompts asking the student to articulate their reasoning process, biases, or remaining uncertainty.`,
+      glossary:  `7. Glossary card — Reveals a list of 6\u201310 key discipline-specific terms used in the case, each with a one-sentence definition.`
+    };
+  }
+
+  function buildSectionInstructions(activeSections, descriptions) {
+    return activeSections.map(label => {
+      const key = Object.keys(descriptions).find(k => {
+        if (k === 'decisions') return descriptions[k].includes(label);
+        return descriptions[k].toLowerCase().includes(label.toLowerCase());
+      });
+      // fallback by mapping section IDs to keys directly
+      return null;
+    }).filter(Boolean);
+  }
+
+  // Cleaner version: build using SECTIONS data
+  function activeSectionInstructions(sections, genre) {
+    const decisionLabel = genre.decisionSectionLabel;
+    const desc = sharedSectionDescriptions(genre, decisionLabel);
+    const order = ['intro', 'artifacts', 'questions', 'decisions', 'capstone', 'reflection', 'glossary'];
+    let n = 1;
+    const lines = [];
+    order.forEach(id => {
+      if (sections[id]) {
+        // replace leading number
+        const original = desc[id];
+        const renumbered = original.replace(/^\d+\./, `${n}.`);
+        lines.push(renumbered);
+        n++;
+      }
+    });
+    return lines.join('\n\n');
+  }
+
+  // -------- CHATGPT PROMPT --------
+  function buildChatGPTPrompt(i, activeSections, decisionLabel, artifactsList) {
+    const sectionInstructions = activeSectionInstructions(i.sections, i.genre);
+    const constraints = i.contextConstraints ? `Contextual Constraints: ${i.contextConstraints}` : '';
+    const frameworkLine = i.framework ? `Disciplinary Framework: ${i.framework}` : '';
+
+    return `You are an expert front-end developer and instructional designer specializing in ${i.discipline}.
+
+GOAL
+Build a single-page interactive case study for students. The page should use a clean card-based layout: a top title area, a grid of clickable cards in the main area, and a detail panel that updates when a card is clicked. No page navigation — all interaction happens on the same page via vanilla JavaScript.
+
+CASE GENRE: ${i.genre.name}
+${i.genre.description}
+
+CONTEXT
+- Discipline: ${i.discipline}
+- Course Level: ${i.courseLevel}
+- Learner Profile: ${i.learnerProfile}
+- Setting / Organization: ${i.setting}
+- Scale: ${i.settingScale}
+- Time Frame: ${i.timeFrame}
+${constraints ? '- ' + constraints : ''}
+
+SCENARIO PARAMETERS
+${scenarioToText(i.scenario)}
+${frameworkLine ? '  - ' + frameworkLine : ''}
+
+NARRATIVE HOOK (use as the opening line in the intro section)
+${i.narrative || '[No narrative provided — invent an appropriate opening scene.]'}
+
+PEDAGOGY
+- Student Role: ${i.studentRole}
+- Final Deliverable: ${i.deliverableType}
+- Assessment Focus: ${i.gradingRubric}
+- Difficulty: ${i.difficulty}
+- Richness: ${i.richness}
+- Distractors / Red Herrings: ${i.distractors}
+- Cognitive Level (Bloom's): ${i.bloomsTaxonomy}
+- Scaffolding: ${i.instructionalScaffolding}
+- Seat Time: ${i.seatTime}
+- Interaction Mode: ${i.discussionMode}
+
+ARTIFACTS YOU MUST GENERATE
+You MUST generate realistic, detailed artifacts for the following items: [${artifactsList}].
+- Group these artifacts into three headings that fit the discipline (you choose appropriate group names).
+- Artifact authenticity style: ${i.artifactStyle}
+- Evidence density: ${i.evidenceDensity}
+
+REQUIRED SECTIONS (build only the sections listed below, in this order)
+${sectionInstructions}
+
+PEDAGOGICAL CONSTRAINTS
+- Match language complexity to ${i.courseLevel} and ${i.learnerProfile}.
+- Explain specialized jargon briefly on first use.
+- Every artifact must be referenced by at least one question, ${decisionLabel.toLowerCase()} block, or the capstone.
+- The content should be appropriate for ${i.discussionMode}.
+
+STYLING REQUIREMENTS
+- Single-file HTML5 document: all CSS in one <style> block in <head>, all JavaScript in one <script> block at the end of <body>. No external dependencies whatsoever (no CDN, no Google Fonts, no Tailwind, no frameworks).
+- Use a CSS variable system on :root for all colors (e.g., --bg, --surface, --text, --accent, --border) so the palette is centralized.
+- Use a system font stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif.
+- Card-based layout using CSS grid or flexbox. Light background, surfaces with subtle drop shadows, rounded corners.
+- Fully responsive: works at 360px (mobile), 768px (tablet), and 1280px+ (desktop). Mobile-first CSS.
+
+ACCESSIBILITY REQUIREMENTS (WCAG 2.1 AA — non-negotiable, this content must be ADA compliant)
+- Semantic HTML: use <header>, <main>, <nav>, <section>, <article>, <footer> appropriately — not <div> for everything.
+- First focusable element must be a "Skip to main content" link that is visible on focus.
+- All interactive elements must be real <button> elements (not <div> with onclick) and reachable by keyboard Tab navigation.
+- Visible focus indicators on every interactive element. Do NOT use outline:none without providing an equivalent focus style.
+- Tap targets must be at least 44x44 pixels (min-height: 44px; min-width: 44px on buttons).
+- Color contrast must meet WCAG AA: at least 4.5:1 for body text against its background, at least 3:1 for large text (18pt+) and UI components.
+- Never use color alone to convey state or meaning — always pair color with text, an icon, or a pattern.
+- All images must have meaningful alt text; decorative images get alt="".
+- Every form input must have a properly associated <label>.
+- Use ARIA only where semantic HTML doesn't already cover it (e.g., role="tablist" on tab strips; aria-live="polite" for dynamic status messages).
+- Honor @media (prefers-reduced-motion: reduce) — disable or shorten all animations and transitions for users with that preference.
+- Provide a dark-mode variant via @media (prefers-color-scheme: dark) by overriding the CSS variables on :root.
+
+COLOR REQUIREMENTS
+- Use web-safe, broadly supported colors that render consistently across browsers and devices. Stay within standard sRGB hex values.
+- Do not rely on system-specific named colors, experimental CSS color functions (oklch, color-mix, etc.), or device-specific gamuts.
+- Verify contrast ratios mentally before committing to a palette. If body text is on a light background, the text must be at least #555555 dark; on dark backgrounds, body text must be at least #DDDDDD light.
+- Avoid pure black (#000) on pure white (#FFF) — use #0F172A or similar near-black on #F8FAFC or similar off-white for reduced eye strain.
+
+TECHNICAL REQUIREMENTS
+- Vanilla JavaScript only — no frameworks, no CDN dependencies, no external scripts.
+- All event binding via addEventListener (NO inline onclick="" attributes — this is required for Content Security Policy compatibility with Canvas LMS and similar environments).
+- No eval(), no Function() constructor, no inline event handler attributes.
+- Use try/catch around any localStorage access (Safari private mode throws).
+- Must work offline once loaded; must embed cleanly inside a Canvas LMS iframe with no horizontal scroll.
+
+OUTPUT FORMAT
+- Return ONLY a single complete HTML5 document.
+- Start with <!DOCTYPE html>, include lang="en" on <html>, <meta charset="UTF-8">, and <meta name="viewport" content="width=device-width, initial-scale=1">.
+- Include a descriptive <title> and <meta name="description">.
+- Do NOT wrap the HTML in markdown code blocks.
+- Do NOT include any commentary, explanation, or preamble before or after the HTML.`;
+  }
+
+  // -------- CLAUDE PROMPT (XML tags) --------
+  function buildClaudePrompt(i, activeSections, decisionLabel, artifactsList) {
+    const sectionInstructions = activeSectionInstructions(i.sections, i.genre);
+    const constraints = i.contextConstraints ? `\n- Contextual Constraints: ${i.contextConstraints}` : '';
+    const frameworkLine = i.framework ? `\n  - Disciplinary Framework: ${i.framework}` : '';
+
+    return `You are an expert front-end developer and instructional designer specializing in ${i.discipline}.
+
+<goal>
+Build a single-page interactive case study for students in ${i.discipline}. Use a clean card-based layout: a top title area, a grid of clickable cards in the main area, and a detail panel that updates when a card is clicked. All interaction happens on the same page via vanilla JavaScript.
+</goal>
+
+<case_genre>
+${i.genre.name}: ${i.genre.description}
+</case_genre>
+
+<context>
+- Discipline: ${i.discipline}
+- Course Level: ${i.courseLevel}
+- Learner Profile: ${i.learnerProfile}
+- Setting: ${i.setting}
+- Scale: ${i.settingScale}
+- Time Frame: ${i.timeFrame}${constraints}
+</context>
+
+<scenario>
+${scenarioToText(i.scenario)}${frameworkLine}
+</scenario>
+
+<narrative>
+${i.narrative || '[Invent an appropriate opening scene consistent with the scenario.]'}
+</narrative>
+
+<pedagogy>
+- Student Role: ${i.studentRole}
+- Final Deliverable: ${i.deliverableType}
+- Assessment Focus: ${i.gradingRubric}
+- Difficulty: ${i.difficulty}
+- Richness: ${i.richness}
+- Distractors / Red Herrings: ${i.distractors}
+- Cognitive Level (Bloom's): ${i.bloomsTaxonomy}
+- Scaffolding: ${i.instructionalScaffolding}
+- Seat Time: ${i.seatTime}
+- Interaction Mode: ${i.discussionMode}
+</pedagogy>
+
+<artifacts_required>
+You MUST generate realistic, detailed artifacts for: [${artifactsList}].
+- Group artifacts into three headings appropriate to the discipline (you choose names).
+- Artifact authenticity style: ${i.artifactStyle}
+- Evidence density: ${i.evidenceDensity}
+</artifacts_required>
+
+<required_sections>
+Build only the sections below, in this order:
+
+${sectionInstructions}
+</required_sections>
+
+<pedagogical_constraints>
+- Match language complexity to ${i.courseLevel} and ${i.learnerProfile}.
+- Explain specialized jargon briefly on first use.
+- Every artifact must be referenced by at least one question, ${decisionLabel.toLowerCase()} block, or the capstone.
+- The content should be appropriate for ${i.discussionMode}.
+</pedagogical_constraints>
+
+<styling>
+- Single-file HTML5 document: all CSS in one <style> block in <head>, all JavaScript in one <script> block at the end of <body>. No external dependencies whatsoever (no CDN, no Google Fonts, no Tailwind, no frameworks).
+- Use a CSS variable system on :root for all colors so the palette is centralized.
+- Use a system font stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif.
+- Card-based layout using CSS grid or flexbox. Light background, surfaces with subtle drop shadows, rounded corners.
+- Fully responsive at 360px, 768px, and 1280px. Mobile-first CSS.
+</styling>
+
+<accessibility>
+This content must be ADA compliant and meet WCAG 2.1 AA. These are non-negotiable:
+- Semantic HTML: <header>, <main>, <nav>, <section>, <article>, <footer> — not <div> for everything.
+- First focusable element is a visible-on-focus "Skip to main content" link.
+- All interactive elements are real <button> elements (not <div> with onclick) and reachable by keyboard Tab.
+- Visible focus indicators on every interactive element. Never outline:none without a replacement focus style.
+- Tap targets at least 44x44 pixels (min-height: 44px; min-width: 44px).
+- Color contrast at least 4.5:1 for body text, at least 3:1 for large text and UI components. Verify before committing to a palette.
+- Never use color alone to convey state — pair color with text, icon, or pattern.
+- All images have meaningful alt text; decorative images use alt="".
+- Every form input has an associated <label>.
+- ARIA only where semantic HTML doesn't cover it (e.g., role="tablist", aria-live for dynamic announcements).
+- Honor @media (prefers-reduced-motion: reduce) — disable or shorten animations.
+- Provide a dark-mode variant via @media (prefers-color-scheme: dark) by overriding the CSS variables on :root.
+</accessibility>
+
+<colors>
+- Use web-safe, broadly supported sRGB hex colors that render consistently across browsers and devices.
+- Do not rely on system-specific named colors, experimental CSS color functions (oklch, color-mix, etc.), or device-specific gamuts.
+- Avoid pure black (#000) on pure white (#FFF) — use a near-black like #0F172A on an off-white like #F8FAFC for reduced eye strain.
+- When in doubt about contrast, darken text and lighten backgrounds.
+</colors>
+
+<technical>
+- Vanilla JavaScript only — no frameworks, no CDN dependencies, no external scripts.
+- All event binding via addEventListener. NO inline onclick="" attributes — this is required for Content Security Policy compatibility with Canvas LMS and similar environments.
+- No eval(), no Function() constructor, no inline event handler attributes.
+- Use try/catch around any localStorage access (Safari private mode throws).
+- Must work offline once loaded; must embed cleanly inside a Canvas LMS iframe with no horizontal scroll.
+</technical>
+
+<output_format>
+- Return ONLY a single complete HTML5 document.
+- Start with <!DOCTYPE html>, include lang="en" on <html>, <meta charset="UTF-8">, and <meta name="viewport" content="width=device-width, initial-scale=1">.
+- Include a descriptive <title> and <meta name="description">.
+- Do not output any explanation, preamble, or markdown — only the raw HTML.
+</output_format>`;
+  }
+
+  // -------- GEMINI PROMPT (Markdown) --------
+  function buildGeminiPrompt(i, activeSections, decisionLabel, artifactsList) {
+    const sectionInstructions = activeSectionInstructions(i.sections, i.genre);
+    const constraints = i.contextConstraints ? `\n* **Contextual Constraints:** ${i.contextConstraints}` : '';
+    const frameworkLine = i.framework ? `\n  * **Disciplinary Framework:** ${i.framework}` : '';
+
+    return `You are an expert front-end developer and instructional designer specializing in ${i.discipline}.
+
+## GOAL
+Build a single-page interactive case study for students in ${i.discipline}. Use a clean card-based layout with a clickable card grid and a same-page detail panel.
+
+## CASE GENRE
+**${i.genre.name}** — ${i.genre.description}
+
+## CONTEXT
+* **Discipline:** ${i.discipline}
+* **Course Level:** ${i.courseLevel}
+* **Learner Profile:** ${i.learnerProfile}
+* **Setting:** ${i.setting}
+* **Scale:** ${i.settingScale}
+* **Time Frame:** ${i.timeFrame}${constraints}
+
+## SCENARIO PARAMETERS
+${Object.entries(i.scenario).map(([k, v]) => `* **${k}:** ${v}`).join('\n')}${frameworkLine}
+
+## NARRATIVE HOOK
+${i.narrative || '[Invent an appropriate opening scene.]'}
+
+## PEDAGOGY
+* **Student Role:** ${i.studentRole}
+* **Final Deliverable:** ${i.deliverableType}
+* **Assessment Focus:** ${i.gradingRubric}
+* **Difficulty:** ${i.difficulty}
+* **Richness:** ${i.richness}
+* **Distractors:** ${i.distractors}
+* **Cognitive Level (Bloom's):** ${i.bloomsTaxonomy}
+* **Scaffolding:** ${i.instructionalScaffolding}
+* **Seat Time:** ${i.seatTime}
+* **Interaction Mode:** ${i.discussionMode}
+
+## ARTIFACTS YOU MUST GENERATE
+CRITICAL: You MUST generate realistic, detailed artifacts for these items: **[${artifactsList}]**.
+* Group artifacts into three headings appropriate to the discipline.
+* Authenticity style: ${i.artifactStyle}
+* Evidence density: ${i.evidenceDensity}
+
+## REQUIRED SECTIONS (build only these, in order)
+${sectionInstructions}
+
+## PEDAGOGICAL CONSTRAINTS
+* Match complexity to ${i.courseLevel} and ${i.learnerProfile}.
+* Explain jargon briefly on first use.
+* Every artifact must be referenced by at least one question, ${decisionLabel.toLowerCase()}, or the capstone.
+
+## STYLING
+* Single-file HTML5 document: all CSS in one \`<style>\` block in \`<head>\`, all JavaScript in one \`<script>\` block at end of \`<body>\`. No external dependencies (no CDN, no Google Fonts, no Tailwind, no frameworks).
+* CSS variable system on \`:root\` for all colors so the palette is centralized.
+* System font stack: \`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif\`.
+* Card-based grid/flex layout. Light background, surfaces with subtle drop shadows, rounded corners.
+* Mobile-first responsive at 360px, 768px, and 1280px.
+
+## ACCESSIBILITY (WCAG 2.1 AA — non-negotiable, this content must be ADA compliant)
+* **Semantic HTML:** use \`<header>\`, \`<main>\`, \`<nav>\`, \`<section>\`, \`<article>\`, \`<footer>\` — not \`<div>\` for everything.
+* **Skip link:** first focusable element is a visible-on-focus "Skip to main content" link.
+* **Real buttons:** all interactive elements are \`<button>\` elements (not \`<div>\` with onclick) and reachable by keyboard Tab.
+* **Focus indicators:** visible focus styles on every interactive element. Never \`outline: none\` without a replacement.
+* **Tap targets:** at least 44x44 pixels (\`min-height: 44px; min-width: 44px\` on buttons).
+* **Color contrast:** at least 4.5:1 for body text, at least 3:1 for large text and UI components. Verify before committing to a palette.
+* **Never color-only meaning:** pair color with text, icon, or pattern for state.
+* **Alt text:** meaningful alt on all images; \`alt=""\` for decorative.
+* **Form labels:** every input has an associated \`<label>\`.
+* **ARIA:** only where semantic HTML doesn't cover it (\`role="tablist"\`, \`aria-live\` for dynamic announcements).
+* **Reduced motion:** honor \`@media (prefers-reduced-motion: reduce)\` — disable or shorten animations.
+* **Dark mode:** provide a \`@media (prefers-color-scheme: dark)\` variant that overrides the CSS variables.
+
+## COLORS
+* Use web-safe, broadly supported sRGB hex colors that render consistently across browsers and devices.
+* Do NOT use experimental color functions (oklch, color-mix), system-specific named colors, or device-specific gamuts.
+* Avoid pure black (#000) on pure white (#FFF) — use near-black like #0F172A on off-white like #F8FAFC.
+
+## TECHNICAL
+* Vanilla JavaScript only — no frameworks, no CDN dependencies, no external scripts.
+* All event binding via \`addEventListener\` — **NO** inline \`onclick=""\` attributes (required for Canvas LMS Content Security Policy).
+* No \`eval()\`, no \`Function()\` constructor, no inline event handlers.
+* Wrap any \`localStorage\` access in try/catch.
+* Must work offline once loaded; must embed cleanly inside a Canvas LMS iframe.
+
+## STRICT OUTPUT REQUIREMENTS
+* CRITICAL: Return EXACTLY ONE complete HTML5 document.
+* CRITICAL: Do NOT wrap in markdown code blocks (no \`\`\`html ... \`\`\`).
+* Include \`lang="en"\` on \`<html>\`, \`<meta charset="UTF-8">\`, \`<meta name="viewport" content="width=device-width, initial-scale=1">\`, descriptive \`<title>\`, and \`<meta name="description">\`.
+* Start your response directly with \`<!DOCTYPE html>\`. No preamble.`;
+  }
+
+  // ============================================================
+  // BUTTON HANDLERS & INIT
+  // ============================================================
+
+  // Genre buttons
+  $$('.genre-btn').forEach(b => {
+    b.addEventListener('click', () => setGenre(b.dataset.genre));
+  });
+
+  // Tab buttons (with arrow-key navigation)
+  const tabButtons = Array.from($$('.tab-btn'));
+  tabButtons.forEach((btn, idx) => {
+    btn.addEventListener('click', () => activateTab(btn));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const dir = e.key === 'ArrowRight' ? 1 : -1;
+        const next = tabButtons[(idx + dir + tabButtons.length) % tabButtons.length];
+        next.focus();
+        activateTab(next);
+      }
+    });
+  });
+  function activateTab(btn) {
+    tabButtons.forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+      b.setAttribute('tabindex', '-1');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    btn.setAttribute('tabindex', '0');
+    $$('.tab-pane').forEach(p => p.classList.remove('active'));
+    const target = $(btn.dataset.target);
+    if (target) target.classList.add('active');
+  }
+
+  // LLM buttons
+  $$('.llm-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      $$('.llm-btn').forEach(x => {
+        x.classList.remove('active');
+        x.setAttribute('aria-checked', 'false');
+      });
+      b.classList.add('active');
+      b.setAttribute('aria-checked', 'true');
+      currentLLM = b.dataset.llm;
+      buildPrompt();
+    });
+  });
+
+  // Static input listeners
+  const staticIds = ['discipline','courseLevel','learnerProfile','setting','settingScale','timeFrame','contextConstraints',
+                     'narrative','studentRole','deliverableType','gradingRubric','difficulty','richness','distractors',
+                     'bloomsTaxonomy','instructionalScaffolding','seatTime','discussionMode',
+                     'customArtifacts','artifactStyle','evidenceDensity'];
+  staticIds.forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('change', () => { updateHelpers(); buildPrompt(); });
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      el.addEventListener('input', () => { updateHelpers(); buildPrompt(); });
+    }
+  });
+
+  // Reset button
+  $('resetBtn').addEventListener('click', () => {
+    if (!confirm('Reset all fields to defaults? Current configuration will be lost.')) return;
+    document.getElementById('promptForm').reset();
+    currentLLM = 'chatgpt';
+    $$('.llm-btn').forEach(b => {
+      const isActive = b.dataset.llm === 'chatgpt';
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-checked', isActive ? 'true' : 'false');
+    });
+    setGenre('decision');
+    updateHelpers();
+  });
+
+  // Copy button
+  $('copyBtn').addEventListener('click', () => {
+    const out = $('promptOutput');
+    out.select();
+    out.setSelectionRange(0, 99999);
+    let success = false;
+    try { success = document.execCommand('copy'); } catch (e) {}
+    if (!success && navigator.clipboard) {
+      navigator.clipboard.writeText(out.value).then(() => showCopied()).catch(() => {});
+    } else if (success) {
+      showCopied();
+    }
+    window.getSelection().removeAllRanges();
+  });
+  function showCopied() {
+    const f = $('copyFeedback');
+    f.classList.add('visible');
+    setTimeout(() => f.classList.remove('visible'), 1800);
+  }
+
+  // Download prompt
+  $('downloadPromptBtn').addEventListener('click', () => {
+    const txt = $('promptOutput').value;
+    const blob = new Blob([txt], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `case-study-prompt-${currentGenre}-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  // Export/Import config
+  $('exportConfigBtn').addEventListener('click', () => {
+    const config = collectInputs();
+    // Strip the genre object to its key for portability
+    const portable = { ...config, genre: currentGenre, llm: currentLLM };
+    const json = JSON.stringify(portable, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `case-study-config-${currentGenre}-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  $('importConfigBtn').addEventListener('click', () => $('configFileInput').click());
+  $('configFileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const cfg = JSON.parse(ev.target.result);
+        applyImportedConfig(cfg);
+      } catch (err) {
+        alert('Could not parse JSON file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  function applyImportedConfig(cfg) {
+    if (cfg.genre && GENRES[cfg.genre]) setGenre(cfg.genre);
+    if (cfg.llm) {
+      currentLLM = cfg.llm;
+      $$('.llm-btn').forEach(b => {
+        const isActive = b.dataset.llm === currentLLM;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-checked', isActive ? 'true' : 'false');
+      });
+    }
+    // Apply fields after a tick so the scenario fields exist
+    setTimeout(() => {
+      const setVal = (id, val) => { const el = $(id); if (el && val !== undefined) el.value = val; };
+      setVal('discipline', cfg.discipline);
+      setVal('courseLevel', cfg.courseLevel);
+      setVal('learnerProfile', cfg.learnerProfile);
+      setVal('setting', cfg.setting);
+      setVal('settingScale', cfg.settingScale);
+      setVal('timeFrame', cfg.timeFrame);
+      setVal('contextConstraints', cfg.contextConstraints);
+      setVal('narrative', cfg.narrative);
+      setVal('studentRole', cfg.studentRole);
+      setVal('deliverableType', cfg.deliverableType);
+      setVal('gradingRubric', cfg.gradingRubric);
+      setVal('difficulty', cfg.difficulty);
+      setVal('richness', cfg.richness);
+      setVal('distractors', cfg.distractors);
+      setVal('bloomsTaxonomy', cfg.bloomsTaxonomy);
+      setVal('instructionalScaffolding', cfg.instructionalScaffolding);
+      setVal('seatTime', cfg.seatTime);
+      setVal('discussionMode', cfg.discussionMode);
+      setVal('artifactStyle', cfg.artifactStyle);
+      setVal('evidenceDensity', cfg.evidenceDensity);
+      // customArtifacts may have been folded into artifacts list; preserve as text if present
+      if (typeof cfg.customArtifacts === 'string') setVal('customArtifacts', cfg.customArtifacts);
+
+      // scenario fields
+      if (cfg.scenario) {
+        const genre = GENRES[currentGenre];
+        genre.scenarioFields.forEach(f => {
+          const el = $('scn-' + f.id);
+          // Imported value is keyed by label, find by label
+          if (el && cfg.scenario[f.label]) el.value = cfg.scenario[f.label];
+        });
+      }
+      if (cfg.framework !== undefined) {
+        const fwEl = $('scn-framework');
+        if (fwEl) fwEl.value = cfg.framework;
+      }
+
+      // sections
+      if (cfg.sections) {
+        Object.entries(cfg.sections).forEach(([id, val]) => {
+          const cb = document.querySelector(`input[data-section="${id}"]`);
+          if (cb) cb.checked = !!val;
+        });
+      }
+
+      // artifacts (selected)
+      if (Array.isArray(cfg.artifacts)) {
+        const set = new Set(cfg.artifacts);
+        $$('input[name="artifact"]').forEach(cb => { cb.checked = set.has(cb.value); });
+      }
+
+      updateHelpers();
+      buildPrompt();
+    }, 20);
+  }
+
+  // Font size + theme controls
+  const FS_KEY = 'cs-builder-fs';
+  const TH_KEY = 'cs-builder-theme';
+  function applyFontSize(level) {
+    if (level === 'md') document.documentElement.removeAttribute('data-fs');
+    else document.documentElement.setAttribute('data-fs', level);
+    try { localStorage.setItem(FS_KEY, level); } catch (e) {}
+  }
+  $('fontInc').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-fs') || 'md';
+    const next = { md: 'lg', lg: 'xl', xl: 'xxl', xxl: 'xxl' }[cur];
+    applyFontSize(next);
+  });
+  $('fontDec').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-fs') || 'md';
+    const next = { xxl: 'xl', xl: 'lg', lg: 'md', md: 'md' }[cur];
+    applyFontSize(next);
+  });
+  $('fontReset').addEventListener('click', () => applyFontSize('md'));
+
+  function applyTheme(theme) {
+    if (theme === 'dark') document.documentElement.style.colorScheme = 'dark';
+    else if (theme === 'light') document.documentElement.style.colorScheme = 'light';
+    else document.documentElement.style.colorScheme = '';
+    try { localStorage.setItem(TH_KEY, theme); } catch (e) {}
+  }
+  let themeState = 'auto';
+  $('themeBtn').addEventListener('click', () => {
+    themeState = themeState === 'auto' ? 'light' : (themeState === 'light' ? 'dark' : 'auto');
+    applyTheme(themeState);
+  });
+
+  // Restore preferences
+  try {
+    const fs = localStorage.getItem(FS_KEY);
+    if (fs) applyFontSize(fs);
+    const th = localStorage.getItem(TH_KEY);
+    if (th) { themeState = th; applyTheme(th); }
+  } catch (e) {}
+
+  // Prevent any accidental form submission
+  $('promptForm').addEventListener('submit', (e) => e.preventDefault());
+
+  // Init
+  setGenre('decision');
+  updateHelpers();
+})();
+</script>
+</body>
+</html>
