@@ -3509,6 +3509,44 @@ ${sectionInstructions}
   // Init
   setGenre('decision');
   updateHelpers();
+
+  // ============================================================
+  // WIZARD HANDOFF RECEIVER
+  // Accepts a configuration passed in via URL hash (#config=BASE64JSON)
+  // from the Case Study Wizard. Falls back silently on any error.
+  // This is the only "external entry point" into the builder besides
+  // the existing Import Config button.
+  // ============================================================
+  try {
+    const hash = window.location.hash || '';
+    const match = hash.match(/^#config=(.+)$/);
+    if (match && match[1]) {
+      let decoded = null;
+      try {
+        const b64 = decodeURIComponent(match[1]);
+        // Decode base64 to a binary string, then re-interpret as UTF-8.
+        // This is required so non-ASCII characters (em-dashes etc.) in
+        // dropdown values survive the roundtrip.
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        decoded = new TextDecoder('utf-8').decode(bytes);
+      } catch (e) {
+        decoded = null;
+      }
+      if (decoded) {
+        let cfg = null;
+        try { cfg = JSON.parse(decoded); } catch (e) { cfg = null; }
+        if (cfg && typeof cfg === 'object') {
+          // Clear the hash so a refresh doesn't re-apply the same config
+          try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) {}
+          applyImportedConfig(cfg);
+        }
+      }
+    }
+  } catch (e) {
+    // Silent: handoff is purely opt-in. Builder works fine without it.
+  }
 })();
 </script>
 </body>

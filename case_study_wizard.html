@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A 5-question wizard that produces a starting configuration for the Case Study Prompt Builder. Answer a few questions about what you teach and what you want students to do, and the wizard prepares a ready-to-refine case study configuration.">
+<title>Case Study Wizard</title>
+<style>
+/* ============================================================
+   Shared variable system (matches builder)
+   ============================================================ */
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-soft: #f1f5f9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text: #0f172a;
+  --text-soft: #475569;
+  --text-mute: #64748b;
+  --text-faint: #94a3b8;
+
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: #eef2ff;
+  --accent-soft-border: #c7d2fe;
+  --accent-ink: #3730a3;
+
+  --success: #059669;
+  --success-soft: #ecfdf5;
+
+  --radius: 12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.04);
+  --shadow: 0 4px 12px rgba(15,23,42,0.06);
+  --shadow-lg: 0 12px 24px rgba(15,23,42,0.08);
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --surface: #111827;
+    --surface-soft: #1f2937;
+    --border: #1f2937;
+    --border-strong: #334155;
+    --text: #f1f5f9;
+    --text-soft: #cbd5e1;
+    --text-mute: #94a3b8;
+    --text-faint: #64748b;
+    --accent-soft: #1e1b4b;
+    --accent-soft-border: #3730a3;
+    --accent-ink: #c7d2fe;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--accent);
+  color: white;
+  padding: 8px 12px;
+  z-index: 100;
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+  font-weight: 600;
+}
+.skip-link:focus { left: 0; }
+
+/* ============================================================
+   Header
+   ============================================================ */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.header-inner {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.logo {
+  background: var(--accent);
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(79,70,229,0.25);
+}
+.logo svg { width: 22px; height: 22px; }
+.title-block h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.title-block p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-mute);
+  font-weight: 500;
+}
+
+/* ============================================================
+   Main layout
+   ============================================================ */
+main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.intro {
+  background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);
+  border: 1px solid var(--accent-soft-border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.intro h2 {
+  margin: 0 0 8px;
+  color: var(--accent-ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+.intro p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.intro a {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Step (one per question)
+   ============================================================ */
+.step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+.step h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.step .step-hint {
+  color: var(--text-mute);
+  font-size: 13px;
+  margin: 0 0 16px 36px;
+  line-height: 1.5;
+}
+
+/* Inputs */
+input[type="text"], textarea, select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  min-height: 44px;
+}
+input[type="text"]:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79,70,229,0.15);
+  background: var(--surface);
+}
+textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.suggestion {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font);
+  min-height: 28px;
+}
+.suggestion:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.suggestion:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Genre cards */
+.genre-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (max-width: 640px) {
+  .genre-cards { grid-template-columns: 1fr; }
+}
+.genre-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font);
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: all 0.15s;
+}
+.genre-card:hover {
+  border-color: var(--accent);
+}
+.genre-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.genre-card.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.genre-card-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+.genre-card.selected .genre-card-title { color: var(--accent-ink); }
+.genre-card-desc {
+  font-size: 12px;
+  color: var(--text-mute);
+  line-height: 1.4;
+}
+
+/* Choice rows (radio-style for level + duration) */
+.choice-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+@media (max-width: 560px) {
+  .choice-row { grid-template-columns: 1fr; }
+}
+.choice-btn {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  color: var(--text-soft);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font);
+  min-height: 44px;
+  text-align: center;
+  transition: all 0.15s;
+}
+.choice-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.choice-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.choice-btn.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ============================================================
+   Action panel
+   ============================================================ */
+.action-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.action-panel h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.action-panel p {
+  color: var(--text-mute);
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+
+.summary-box {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--text-soft);
+  line-height: 1.6;
+}
+.summary-box strong { color: var(--text); font-weight: 600; }
+.summary-box .summary-row { margin: 0; }
+.summary-box .pending { color: var(--text-faint); font-style: italic; }
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.btn {
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: var(--font);
+  border: 1px solid transparent;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text-soft);
+  border-color: var(--border-strong);
+}
+.btn-secondary:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.btn svg { width: 14px; height: 14px; }
+
+.feedback {
+  font-size: 13px;
+  color: var(--success);
+  margin-top: 10px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  background: var(--success-soft);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.feedback.visible { opacity: 1; }
+
+/* ============================================================
+   Footer
+   ============================================================ */
+footer {
+  max-width: 880px;
+  margin: 32px auto 12px;
+  padding: 12px 24px;
+  font-size: 12px;
+  color: var(--text-mute);
+  text-align: center;
+}
+footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+footer a:hover { text-decoration: underline; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<header>
+  <div class="header-inner">
+    <div class="logo" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+    </div>
+    <div class="title-block">
+      <h1>Case Study Wizard</h1>
+      <p>Answer five questions. Hand off to the Case Study Builder.</p>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <div class="intro">
+    <h2>New to case studies? Start here.</h2>
+    <p>This is a short on-ramp to the <a href="case_study_builder.html">Case Study Prompt Builder</a>. Answer five questions about your discipline and what you want students to do. The wizard will prepare a starting configuration and hand it off — you'll land on the builder with sensible defaults already filled in, ready to refine. Already know exactly what you want? Skip the wizard and <a href="case_study_builder.html">open the builder directly</a>.</p>
+  </div>
+
+  <!-- STEP 1: Discipline -->
+  <section class="step" aria-labelledby="step1-title">
+    <h3 id="step1-title"><span class="step-num" aria-hidden="true">1</span>What do you teach?</h3>
+    <p class="step-hint">Free text. Used verbatim in the case study (e.g., "Registered Nursing," "Business Ethics," "U.S. History," "Automotive Technology").</p>
+    <input type="text" id="discipline" placeholder="e.g. Registered Nursing" autocomplete="off">
+    <div class="suggestions" id="disciplineSuggestions" role="list">
+      <button type="button" class="suggestion" data-val="Registered Nursing" role="listitem">Nursing</button>
+      <button type="button" class="suggestion" data-val="Business Administration" role="listitem">Business</button>
+      <button type="button" class="suggestion" data-val="U.S. History" role="listitem">History</button>
+      <button type="button" class="suggestion" data-val="Network Technology" role="listitem">Networking</button>
+      <button type="button" class="suggestion" data-val="Education / Teacher Preparation" role="listitem">Education</button>
+      <button type="button" class="suggestion" data-val="Automotive Technology" role="listitem">Automotive</button>
+      <button type="button" class="suggestion" data-val="Respiratory Care" role="listitem">Respiratory Care</button>
+      <button type="button" class="suggestion" data-val="Paralegal Studies" role="listitem">Paralegal</button>
+      <button type="button" class="suggestion" data-val="Hospitality Management" role="listitem">Hospitality</button>
+      <button type="button" class="suggestion" data-val="Computer Science / Software Engineering" role="listitem">Comp Sci</button>
+      <button type="button" class="suggestion" data-val="Graphic Design" role="listitem">Graphic Design</button>
+      <button type="button" class="suggestion" data-val="Theater Arts" role="listitem">Theater</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: What do students do? (genre selector) -->
+  <section class="step" aria-labelledby="step2-title">
+    <h3 id="step2-title"><span class="step-num" aria-hidden="true">2</span>What do you want students to do?</h3>
+    <p class="step-hint">Pick the closest match. This shapes everything: the scenario fields, the artifact library, and the section labels in the generated case study.</p>
+    <div class="genre-cards" role="radiogroup" aria-label="Case study genre">
+      <button type="button" class="genre-card" data-genre="decision" role="radio" aria-checked="false">
+        <span class="genre-card-title">Make a hard decision</span>
+        <span class="genre-card-desc">Ethics, management, policy, leadership dilemmas — choose under pressure.</span>
+      </button>
+      <button type="button" class="genre-card" data-genre="diagnostic" role="radio" aria-checked="false">
+        <span class="genre-card-title">Figure out what's wrong</span>
+        <span class="genre-card-desc">Clinical, technical, or troubleshooting — work from evidence to root cause.</span>
+      </button>
+      <button type="button" class="genre-card" data-genre="historical" role="radio" aria-checked="false">
+        <span class="genre-card-title">Interpret a past event</span>
+        <span class="genre-card-desc">History, social studies, policy analysis — read sources, build an argument.</span>
+      </button>
+      <button type="button" class="genre-card" data-genre="design" role="radio" aria-checked="false">
+        <span class="genre-card-title">Solve a design problem</span>
+        <span class="genre-card-desc">Engineering, architecture, product, technical work — design under constraints.</span>
+      </button>
+      <button type="button" class="genre-card" data-genre="literary" role="radio" aria-checked="false">
+        <span class="genre-card-title">Analyze a text or work</span>
+        <span class="genre-card-desc">Literature, film, art, music — close reading and critical interpretation.</span>
+      </button>
+      <button type="button" class="genre-card" data-genre="negotiation" role="radio" aria-checked="false">
+        <span class="genre-card-title">Navigate multiple stakeholders</span>
+        <span class="genre-card-desc">Negotiation, conflict resolution, multi-party deals — balance interests and power.</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- STEP 3: Course level -->
+  <section class="step" aria-labelledby="step3-title">
+    <h3 id="step3-title"><span class="step-num" aria-hidden="true">3</span>What level are your students?</h3>
+    <p class="step-hint">Shapes language complexity, scaffolding, and how much jargon the case explains.</p>
+    <div class="choice-row" role="radiogroup" aria-label="Course level">
+      <button type="button" class="choice-btn" data-level="intro" role="radio" aria-checked="false">Intro / First-Year</button>
+      <button type="button" class="choice-btn selected" data-level="intermediate" role="radio" aria-checked="true">Intermediate / Sophomore</button>
+      <button type="button" class="choice-btn" data-level="advanced" role="radio" aria-checked="false">Advanced / Capstone</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: Seat time -->
+  <section class="step" aria-labelledby="step4-title">
+    <h3 id="step4-title"><span class="step-num" aria-hidden="true">4</span>How long should it take?</h3>
+    <p class="step-hint">In-class activity, full session, or a multi-session project — choose the rough duration.</p>
+    <div class="choice-row" role="radiogroup" aria-label="Seat time">
+      <button type="button" class="choice-btn" data-time="short" role="radio" aria-checked="false">15–30 min</button>
+      <button type="button" class="choice-btn selected" data-time="standard" role="radio" aria-checked="true">45–60 min</button>
+      <button type="button" class="choice-btn" data-time="long" role="radio" aria-checked="false">90 min+ / Multi-session</button>
+    </div>
+  </section>
+
+  <!-- STEP 5: Narrative -->
+  <section class="step" aria-labelledby="step5-title">
+    <h3 id="step5-title"><span class="step-num" aria-hidden="true">5</span>Describe the case in one or two sentences.</h3>
+    <p class="step-hint">This becomes the opening "narrative hook" the student reads. Be specific — what's happening, who's involved, what's at stake.</p>
+    <textarea id="narrative" rows="3" placeholder="e.g. A 47-year-old patient walks in complaining of the worst headache of their life, onset two hours ago. They appear fatigued but alert."></textarea>
+  </section>
+
+  <!-- ACTION PANEL -->
+  <section class="action-panel" aria-labelledby="action-title">
+    <h3 id="action-title">Ready to build</h3>
+    <p>Review your answers, then hand off to the builder. You'll land on the form with these answers prefilled — and full control to refine every detail before generating the prompt.</p>
+
+    <div class="summary-box" id="summaryBox" aria-live="polite">
+      <p class="summary-row" id="sumDiscipline"><strong>Discipline:</strong> <span class="pending">(not yet entered)</span></p>
+      <p class="summary-row" id="sumGenre"><strong>Genre:</strong> <span class="pending">(not yet selected)</span></p>
+      <p class="summary-row" id="sumLevel"><strong>Level:</strong> Intermediate</p>
+      <p class="summary-row" id="sumTime"><strong>Duration:</strong> 60 minutes</p>
+      <p class="summary-row" id="sumNarrative"><strong>Narrative:</strong> <span class="pending">(not yet written)</span></p>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn btn-primary" id="openBuilderBtn" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+        Open in Builder
+      </button>
+      <button type="button" class="btn btn-secondary" id="downloadConfigBtn" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download Config (JSON)
+      </button>
+      <button type="button" class="btn btn-secondary" id="resetBtn">Reset</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+  </section>
+
+</main>
+
+<footer>
+  <p>Case Study Wizard · Faculty Tool · <a href="case_study_builder.html">Open Case Study Builder directly &rarr;</a></p>
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============================================================
+  // STATE
+  // ============================================================
+  const state = {
+    discipline: '',
+    genre: null,
+    level: 'intermediate',
+    time: 'standard',
+    narrative: ''
+  };
+
+  // ============================================================
+  // MAPPINGS — wizard answers to builder field values
+  // These values MUST match the option values in the builder's dropdowns.
+  // ============================================================
+
+  const GENRE_NAMES = {
+    decision: 'Decision / Dilemma',
+    diagnostic: 'Diagnostic',
+    historical: 'Historical / Analytical',
+    design: 'Design / Engineering',
+    literary: 'Literary / Textual',
+    negotiation: 'Negotiation / Multi-stakeholder'
+  };
+
+  const LEVEL_MAP = {
+    intro: {
+      courseLevel: 'Community College — Introductory',
+      learnerProfile: 'Traditional-age first-time students',
+      difficulty: 'Intro',
+      bloomsTaxonomy: 'Apply',
+      instructionalScaffolding: 'Heavy (hints, glossary, guided questions)'
+    },
+    intermediate: {
+      courseLevel: 'Community College — Intermediate',
+      learnerProfile: 'Returning adult learners',
+      difficulty: 'Intermediate',
+      bloomsTaxonomy: 'Analyze',
+      instructionalScaffolding: 'Standard (open-ended but fair)'
+    },
+    advanced: {
+      courseLevel: 'Undergraduate — Upper Division',
+      learnerProfile: 'Working professionals (continuing ed)',
+      difficulty: 'Advanced',
+      bloomsTaxonomy: 'Evaluate',
+      instructionalScaffolding: 'Minimal (no hints, ambiguity preserved)'
+    }
+  };
+
+  const TIME_MAP = {
+    short:    { seatTime: '30 minutes', richness: 'Lite',      evidenceDensity: 'Sparse (5-7 artifacts, minimal text)' },
+    standard: { seatTime: '60 minutes', richness: 'Standard',  evidenceDensity: 'Moderate (8-12 artifacts, balanced detail)' },
+    long:     { seatTime: 'Multi-session', richness: 'Deep-dive', evidenceDensity: 'Rich (12-18 artifacts, substantial detail)' }
+  };
+
+  // Genre-specific defaults that the wizard can confidently set.
+  // Keys map to fields in the builder's collectInputs() output.
+  // Scenario fields are passed by LABEL (matching the genre's scenarioFields[].label).
+  const GENRE_DEFAULTS = {
+    decision: {
+      deliverableType: 'Decision memo with rationale',
+      gradingRubric: 'Ethical / professional judgment',
+      distractors: 'Low (1-2 minor distractions)',
+      discussionMode: 'Small group discussion',
+      artifactStyle: 'Educational simplification (clear but accurate)',
+      settingScale: 'Single organization / community',
+      timeFrame: 'Days to weeks',
+      // Scenario field labels and starting values
+      scenario: {
+        'Stakeholders Involved': 'Mixed internal + external',
+        'Competing Values at Stake': 'Profit vs. people',
+        'Pressure Source': 'Time deadline',
+        'Decision Time Horizon': 'This week',
+        'Stakes of the Decision': 'Reputational / brand'
+      }
+    },
+    diagnostic: {
+      deliverableType: 'Decision memo with rationale',
+      gradingRubric: 'Disciplinary methodology',
+      distractors: 'Low (1-2 minor distractions)',
+      discussionMode: 'Individual work',
+      artifactStyle: 'Educational simplification (clear but accurate)',
+      settingScale: 'Single organization / community',
+      timeFrame: 'Minutes to hours (acute)',
+      scenario: {
+        'Presentation / Initial Findings': 'Acute, severe symptoms or failure',
+        'History / Background': 'No prior history (new event)',
+        'Differential Considerations': 'One obvious cause + one easily-missed',
+        'Acuity / Urgency': 'Time-sensitive — minutes-to-hours window',
+        'Diagnostic Constraints': 'Limited testing / equipment'
+      }
+    },
+    historical: {
+      deliverableType: 'Analytical essay',
+      gradingRubric: 'Evidence-based reasoning',
+      distractors: 'Low (1-2 minor distractions)',
+      discussionMode: 'Individual work',
+      artifactStyle: 'Educational simplification (clear but accurate)',
+      settingScale: 'National / societal',
+      timeFrame: 'Years to decades',
+      scenario: {
+        'Period & Setting': 'Specific year or short window',
+        'Key Actors': 'Mixed: powerful and powerless',
+        'Precipitating Events': 'Convergence of multiple factors',
+        'Contested Interpretations': 'Active scholarly debate',
+        'Historiographical Lens': 'Social / cultural'
+      }
+    },
+    design: {
+      deliverableType: 'Technical report',
+      gradingRubric: 'Quantitative / technical accuracy',
+      distractors: 'Low (1-2 minor distractions)',
+      discussionMode: 'Pair / partner work',
+      artifactStyle: 'Realistic / professional-grade (mimics real documents)',
+      settingScale: 'Single organization / community',
+      timeFrame: 'Months',
+      scenario: {
+        'Problem Constraints': 'Cost-constrained',
+        'Users / Stakeholders': 'Multiple user types with different needs',
+        'Technical Requirements': 'Reliability / uptime',
+        'Key Trade-offs': 'Performance vs. cost',
+        'Failure Modes / Risks': 'Gradual degradation'
+      }
+    },
+    literary: {
+      deliverableType: 'Analytical essay',
+      gradingRubric: 'Communication clarity',
+      distractors: 'None (clean path)',
+      discussionMode: 'Pair / partner work',
+      artifactStyle: 'Educational simplification (clear but accurate)',
+      settingScale: 'Individual / Personal',
+      timeFrame: 'Historical / retrospective',
+      scenario: {
+        'Text / Work Context': 'Single short text (poem, story, scene)',
+        'Author / Creator Context': 'Canonical, much-studied author',
+        'Critical Lens': 'Close / formalist reading',
+        'Thematic Tensions': 'Form vs. content',
+        'Reception History': 'Celebrated at the time, still celebrated'
+      }
+    },
+    negotiation: {
+      deliverableType: 'Decision memo with rationale',
+      gradingRubric: 'Disciplinary methodology',
+      distractors: 'Low (1-2 minor distractions)',
+      discussionMode: 'Small group discussion',
+      artifactStyle: 'Educational simplification (clear but accurate)',
+      settingScale: 'Single organization / community',
+      timeFrame: 'Days to weeks',
+      scenario: {
+        'Parties at the Table': 'Two parties (bilateral)',
+        'Interests vs. Positions': 'Stated positions look incompatible — interests may overlap',
+        'BATNA / Walk-Away Options': 'Strong BATNA for one side, weak for the other',
+        'Power Dynamics': 'Significant power asymmetry',
+        'Cultural / Contextual Factors': 'Cross-organizational (different norms)'
+      }
+    }
+  };
+
+  // Sensible student-role hints per genre (free text, used as-is)
+  const ROLE_HINTS = {
+    decision: 'Decision-maker on the spot',
+    diagnostic: 'Clinician / technician / investigator',
+    historical: 'Researcher writing for publication',
+    design: 'Lead designer or engineer',
+    literary: 'Student close reader',
+    negotiation: 'Lead negotiator'
+  };
+
+  // ============================================================
+  // CONFIG BUILDER — assembles the JSON the builder expects
+  // Matches the shape produced by collectInputs() in the builder.
+  // ============================================================
+  function buildConfig() {
+    const level = LEVEL_MAP[state.level];
+    const time = TIME_MAP[state.time];
+    const gd = GENRE_DEFAULTS[state.genre];
+
+    const config = {
+      // Marker so importing tools can identify wizard-generated configs
+      _source: 'case-study-wizard',
+      _version: 1,
+
+      // Top-level fields the builder reads
+      genre: state.genre,
+      llm: 'chatgpt',
+
+      discipline: state.discipline.trim(),
+      courseLevel: level.courseLevel,
+      learnerProfile: level.learnerProfile,
+      setting: '',
+      settingScale: gd.settingScale,
+      timeFrame: gd.timeFrame,
+      contextConstraints: '',
+
+      narrative: state.narrative.trim(),
+      framework: '',
+
+      studentRole: ROLE_HINTS[state.genre] || '',
+      deliverableType: gd.deliverableType,
+      gradingRubric: gd.gradingRubric,
+      difficulty: level.difficulty,
+      richness: time.richness,
+      distractors: gd.distractors,
+      bloomsTaxonomy: level.bloomsTaxonomy,
+      instructionalScaffolding: level.instructionalScaffolding,
+      seatTime: time.seatTime,
+      discussionMode: gd.discussionMode,
+
+      customArtifacts: '',
+      artifactStyle: gd.artifactStyle,
+      evidenceDensity: time.evidenceDensity,
+      artifacts: [],  // Faculty picks these in the builder
+
+      // Scenario fields, keyed by label (matches collectInputs() output)
+      scenario: gd.scenario,
+
+      // Default sections per genre — let the builder use its own defaults
+      // by not specifying sections; this means the imported config
+      // won't override the builder's genre-default section toggles.
+      sections: null
+    };
+
+    return config;
+  }
+
+  // ============================================================
+  // VALIDATION
+  // ============================================================
+  function isReady() {
+    return !!(state.discipline.trim() && state.genre && state.narrative.trim());
+  }
+
+  function updateButtons() {
+    const ready = isReady();
+    document.getElementById('openBuilderBtn').disabled = !ready;
+    document.getElementById('downloadConfigBtn').disabled = !ready;
+  }
+
+  // ============================================================
+  // SUMMARY DISPLAY
+  // ============================================================
+  function updateSummary() {
+    const set = (id, label, val, pending) => {
+      const el = document.getElementById(id);
+      if (val) {
+        el.innerHTML = '<strong>' + label + ':</strong> ' + escapeHtml(val);
+      } else {
+        el.innerHTML = '<strong>' + label + ':</strong> <span class="pending">' + pending + '</span>';
+      }
+    };
+    set('sumDiscipline', 'Discipline', state.discipline.trim(), '(not yet entered)');
+    set('sumGenre', 'Genre', state.genre ? GENRE_NAMES[state.genre] : '', '(not yet selected)');
+    set('sumLevel', 'Level', LEVEL_MAP[state.level].courseLevel, '');
+    set('sumTime', 'Duration', TIME_MAP[state.time].seatTime, '');
+    const nar = state.narrative.trim();
+    set('sumNarrative', 'Narrative', nar.length > 140 ? nar.substring(0, 140) + '…' : nar, '(not yet written)');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  }
+
+  // ============================================================
+  // HANDOFF — base64-encode JSON, append to builder URL
+  // ============================================================
+  function encodeConfigForURL(cfg) {
+    const json = JSON.stringify(cfg);
+    // unescape + encodeURIComponent trick is no longer needed in modern browsers,
+    // but we ensure UTF-8 safety with TextEncoder where available.
+    let b64;
+    try {
+      // Modern path: encode UTF-8 bytes, then base64
+      const bytes = new TextEncoder().encode(json);
+      let binary = '';
+      bytes.forEach(b => { binary += String.fromCharCode(b); });
+      b64 = btoa(binary);
+    } catch (e) {
+      // Fallback: assume ASCII-safe
+      b64 = btoa(unescape(encodeURIComponent(json)));
+    }
+    return encodeURIComponent(b64);
+  }
+
+  function openInBuilder() {
+    if (!isReady()) return;
+    const cfg = buildConfig();
+    const encoded = encodeConfigForURL(cfg);
+    const url = 'case_study_builder.html#config=' + encoded;
+    // Open in same tab so faculty don't lose context if they hit back
+    window.location.href = url;
+  }
+
+  function downloadConfig() {
+    if (!isReady()) return;
+    const cfg = buildConfig();
+    const json = JSON.stringify(cfg, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = state.discipline.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) || 'case-study';
+    a.href = url;
+    a.download = `wizard-${state.genre}-${safeName}-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showFeedback('Downloaded. Import it via the builder\u2019s "Import Config" button.');
+  }
+
+  function showFeedback(msg) {
+    const el = document.getElementById('feedback');
+    el.textContent = msg;
+    el.classList.add('visible');
+    setTimeout(() => el.classList.remove('visible'), 3500);
+  }
+
+  // ============================================================
+  // INPUT BINDING
+  // ============================================================
+  const $ = id => document.getElementById(id);
+
+  // Discipline
+  $('discipline').addEventListener('input', (e) => {
+    state.discipline = e.target.value;
+    updateSummary();
+    updateButtons();
+  });
+
+  document.querySelectorAll('#disciplineSuggestions .suggestion').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $('discipline').value = btn.dataset.val;
+      state.discipline = btn.dataset.val;
+      updateSummary();
+      updateButtons();
+      $('discipline').focus();
+    });
+  });
+
+  // Genre cards
+  document.querySelectorAll('.genre-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.genre-card').forEach(c => {
+        c.classList.remove('selected');
+        c.setAttribute('aria-checked', 'false');
+      });
+      card.classList.add('selected');
+      card.setAttribute('aria-checked', 'true');
+      state.genre = card.dataset.genre;
+      updateSummary();
+      updateButtons();
+    });
+    // Keyboard support for radio cards
+    card.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        card.click();
+      }
+    });
+  });
+
+  // Level
+  document.querySelectorAll('[data-level]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-level]').forEach(b => {
+        b.classList.remove('selected');
+        b.setAttribute('aria-checked', 'false');
+      });
+      btn.classList.add('selected');
+      btn.setAttribute('aria-checked', 'true');
+      state.level = btn.dataset.level;
+      updateSummary();
+    });
+  });
+
+  // Time
+  document.querySelectorAll('[data-time]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-time]').forEach(b => {
+        b.classList.remove('selected');
+        b.setAttribute('aria-checked', 'false');
+      });
+      btn.classList.add('selected');
+      btn.setAttribute('aria-checked', 'true');
+      state.time = btn.dataset.time;
+      updateSummary();
+    });
+  });
+
+  // Narrative
+  $('narrative').addEventListener('input', (e) => {
+    state.narrative = e.target.value;
+    updateSummary();
+    updateButtons();
+  });
+
+  // Actions
+  $('openBuilderBtn').addEventListener('click', openInBuilder);
+  $('downloadConfigBtn').addEventListener('click', downloadConfig);
+
+  $('resetBtn').addEventListener('click', () => {
+    state.discipline = '';
+    state.genre = null;
+    state.level = 'intermediate';
+    state.time = 'standard';
+    state.narrative = '';
+    $('discipline').value = '';
+    $('narrative').value = '';
+    document.querySelectorAll('.genre-card').forEach(c => {
+      c.classList.remove('selected');
+      c.setAttribute('aria-checked', 'false');
+    });
+    document.querySelectorAll('[data-level]').forEach(b => {
+      const isDefault = b.dataset.level === 'intermediate';
+      b.classList.toggle('selected', isDefault);
+      b.setAttribute('aria-checked', isDefault ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-time]').forEach(b => {
+      const isDefault = b.dataset.time === 'standard';
+      b.classList.toggle('selected', isDefault);
+      b.setAttribute('aria-checked', isDefault ? 'true' : 'false');
+    });
+    updateSummary();
+    updateButtons();
+    $('discipline').focus();
+  });
+
+  // Init
+  updateSummary();
+  updateButtons();
+})();
+</script>
+</body>
+</html>
