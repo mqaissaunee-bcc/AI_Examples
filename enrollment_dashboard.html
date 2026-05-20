@@ -2,13 +2,15 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.7
-  Date:     May 18, 2026
-  Features: Adds a top Apply/Clear All action bar to the discipline picker
-            modal. The bar stays sticky while scrolling so users don't have
-            to scroll to the bottom of a long discipline list to apply their
-            selection. Selected-count label is synced between the top and
-            bottom. Built on v4.9 canonical baseline.
+  Version:  v5.8
+  Date:     May 20, 2026
+  Features: Fully removes -295 (Special Project) and -299 (Internship)
+            sections at the ingest step. Previously (v5.3) these were
+            excluded only from the Empty bucket filter; now they don't
+            exist in the dashboard's data at all. KPI counts, FTE math,
+            Trends, and every search/render path are unaffected by them.
+            Footer disclaimer added so users know totals reflect this
+            exclusion. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -1373,6 +1375,19 @@
     color: var(--ink-mute);
     display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
   }
+  /* Quiet disclaimer in the footer — sits on its own line below the
+     dashboard name + timestamp on narrow viewports, or pushes to the end
+     of the flex row on wide ones. Italic + lowercase to read as a note
+     rather than a section title. */
+  footer .footer-note {
+    flex-basis: 100%;
+    text-align: right;
+    text-transform: none;
+    letter-spacing: 0.02em;
+    font-style: italic;
+    color: var(--ink-mute);
+    margin-top: 2px;
+  }
 
   @media (max-width: 880px) {
     .kpi-strip,
@@ -1419,8 +1434,9 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.7</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.8</span>
     <span id="footerStamp"></span>
+    <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
 </div>
 
@@ -1736,6 +1752,12 @@
   function ingestRowsSilent(rawRows, filename, manifestDate) {
     const fall = rawRows.filter(r => {
       const term = String(r.Term || '').toUpperCase();
+      // Drop -295 (Special Project) and -299 (Internship) sections entirely
+      // at the ingest step. The dashboard never sees these, so KPI totals,
+      // FTE math, Trends, and every render path are unaffected by them.
+      // Use a local pattern check rather than calling isIndependentEnrollment
+      // because at ingest time r is the raw row, not a normalized row yet.
+      if (r.Course && /-29[59]$/.test(String(r.Course))) return false;
       return r.Course && term.includes('FA');
     }).map(r => {
       const prefix = getCoursePrefix(r.Course);
@@ -1791,6 +1813,8 @@
   function ingestRows(rawRows, filename) {
     const fall = rawRows.filter(r => {
       const term = String(r.Term || '').toUpperCase();
+      // Drop -295 / -299 sections at ingest. See note in ingestRowsSilent.
+      if (r.Course && /-29[59]$/.test(String(r.Course))) return false;
       return r.Course && term.includes('FA');
     }).map(r => {
       const prefix = getCoursePrefix(r.Course);
