@@ -2,13 +2,13 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.6
+  Version:  v5.7
   Date:     May 18, 2026
-  Features: Fix: FTE tooltip now uses a custom CSS tooltip instead of the
-            native HTML title attribute. The native tooltip was unreliable
-            (browser-delayed, OS-styled, sometimes failed to appear).
-            Custom tooltip is immediate, persists while cursor is on the
-            trigger, and matches dashboard styling. Built on v4.9 baseline.
+  Features: Adds a top Apply/Clear All action bar to the discipline picker
+            modal. The bar stays sticky while scrolling so users don't have
+            to scroll to the bottom of a long discipline list to apply their
+            selection. Selected-count label is synced between the top and
+            bottom. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -295,6 +295,30 @@
     border-top: 1px solid var(--rule);
     display: flex; justify-content: space-between; gap: 8px;
     background: var(--surface-2);
+  }
+  /* Top action bar — same buttons as the bottom modal-foot, sticky so they
+     stay visible while scrolling a long discipline list. Long lists made
+     the bottom Apply invisible; this puts the actions within reach from
+     the top of the modal regardless of scroll position. */
+  .modal .modal-action-bar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface-2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .modal .modal-action-count {
+    color: var(--ink-mute);
+    font-size: 12px;
+  }
+  .modal .modal-action-buttons {
+    display: flex;
+    gap: 8px;
   }
   .modal .close { background: none; border: none; cursor: pointer; color: var(--ink-mute); font-size: 24px; }
 
@@ -1395,7 +1419,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.6</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.7</span>
     <span id="footerStamp"></span>
   </footer>
 </div>
@@ -3772,6 +3796,13 @@
             <h2>Choose Your Disciplines</h2>
             <button class="close" id="modalClose">×</button>
           </div>
+          <div class="modal-action-bar">
+            <span class="modal-action-count" id="selectedCountTop">${state.selectedDisciplines.size} selected</span>
+            <div class="modal-action-buttons">
+              <button class="btn ghost" id="clearAllDiscTop" type="button">Clear All</button>
+              <button class="btn primary" id="applyDiscTop" type="button">Apply</button>
+            </div>
+          </div>
           <div class="modal-body">
             <p style="color:var(--ink-soft);font-size:13px;margin-bottom:18px">Select any course prefixes you want to track. Counts shown reflect sections across all your snapshots.</p>
 
@@ -3810,13 +3841,25 @@
       if (e.target.id === 'modalOverlay') closeModal();
     });
 
+    // Helper: update both the top and bottom selected-count labels in lockstep.
+    // Both labels show the same value; they just live in two places so a long
+    // scrollable modal still shows the count near whichever action bar the
+    // user is looking at.
+    const updateCount = () => {
+      const text = state.selectedDisciplines.size + ' selected';
+      const top = el('selectedCountTop');
+      const bot = el('selectedCount');
+      if (top) top.textContent = text;
+      if (bot) bot.textContent = text;
+    };
+
     document.querySelectorAll('[data-discipline]').forEach(chip => {
       chip.addEventListener('click', () => {
         const code = chip.dataset.discipline;
         if (state.selectedDisciplines.has(code)) state.selectedDisciplines.delete(code);
         else state.selectedDisciplines.add(code);
         chip.classList.toggle('selected');
-        el('selectedCount').textContent = state.selectedDisciplines.size + ' selected';
+        updateCount();
       });
     });
 
@@ -3874,12 +3917,19 @@
       openDisciplineModal();
     });
 
-    el('clearAllDisc').addEventListener('click', () => {
+    // Shared Clear All handler — bound to both the top and bottom buttons
+    // so users don't have to scroll to find one or the other.
+    const clearAllChoices = () => {
       state.selectedDisciplines.clear();
       openDisciplineModal();
-    });
+    };
+    el('clearAllDisc').addEventListener('click', clearAllChoices);
+    if (el('clearAllDiscTop')) el('clearAllDiscTop').addEventListener('click', clearAllChoices);
 
-    el('applyDisc').addEventListener('click', () => {
+    // Shared Apply handler — likewise bound to both top and bottom Apply
+    // buttons. Long discipline lists make the bottom button invisible, so
+    // the top button removes the scroll-to-apply tax.
+    const applyChoices = () => {
       saveStorage();
       closeModal();
       // Reset sub-filters that no longer apply
@@ -3887,7 +3937,9 @@
         [...state.activeDisciplineFilter].filter(p => state.selectedDisciplines.has(p))
       );
       render();
-    });
+    };
+    el('applyDisc').addEventListener('click', applyChoices);
+    if (el('applyDiscTop')) el('applyDiscTop').addEventListener('click', applyChoices);
   }
 
   /* =========================================================================
