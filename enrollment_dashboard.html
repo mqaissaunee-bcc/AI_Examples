@@ -2,22 +2,20 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.12
+  Version:  v5.13
   Date:     May 28, 2026
-  Features: Extends combined-class linking (MATH only this iteration) into
-            the List view of the Section Detail table. When two MATH
-            sections co-meet (same campus, days, time, instructor), they
-            now appear adjacent in any bucket (All, Empty, Almost, Under,
-            Full) — sorted so the higher-fill section reads first, with a
-            "Combined class" summary row above carrying the headline
-            combined-enrollment number. A purple left-edge marker connects
-            the rows visually. If only one half is in the user's current
-            scope (e.g., filtered to Empty and only the XL is empty), the
-            partner is pulled in so the chair sees the full picture; the
-            match count is unchanged so the pull-in doesn't inflate it.
-            Bucket assignment is still untouched — this is a display-layer
-            change only. Course coverage remains MATH-only (ENGL, AUTO,
-            CULA later). Built on v4.9 canonical baseline.
+  Features: Expands combined-class detection scope to include ENGL
+            (Composition I co-meeting pairs) alongside MATH. Detects 37
+            ENGL pairs in the current snapshot — all ENGL-121, mostly at
+            LINC with XL/RL suffix pattern, plus three WALL pairs using
+            XW/RW and one CECAP pair using CU01R/CU01X. Confirmed by the
+            chair that English pairs have two distinct student
+            populations, so summing enrollment is correct. No visual or
+            behavioral change beyond the scope expansion — same Option A
+            list-view treatment (purple-edge linked rows with combined
+            summary) and same grouped-view treatment as v5.11/v5.12. AUTO,
+            CULA, and other prefixes still deferred pending IR
+            cross-list confirmation. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -1568,7 +1566,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.12</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.13</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -2100,10 +2098,12 @@
   // so the renderer can display linked sections together with a combined
   // enrollment subtotal.
   //
-  // SCOPE THIS ITERATION: MATH only. English, AUTO, and culinary will be
-  // added in later iterations once this design is validated. Restricting
-  // the detector by course-prefix keeps the change contained and
-  // reversible.
+  // SCOPE: MATH and ENGL (Composition I co-meeting pairs at LINC, WALL,
+  // ORLV, ONLH, CECAP). AUTO (GM program), CULA (block scheduling), and
+  // other programs are deferred — they need cross-list confirmation from
+  // IR and, for CULA, block-aware detection to avoid grouping sections
+  // that meet in different three-week blocks. Restricting the detector by
+  // course-prefix keeps the change contained and reversible.
   //
   // Caching: the result depends only on the snapshot's row identities, so
   // we memo-cache on the snapshot id to avoid recomputing on every render.
@@ -2120,8 +2120,14 @@
     // generically-staffed sections.
     const groups = new Map();
     snap.rows.forEach(r => {
-      // SCOPE GATE: math only this iteration
-      if (!String(r.Course || '').toUpperCase().startsWith('MATH')) return;
+      // SCOPE GATE: MATH and ENGL this iteration. Both have confirmed
+      // co-meeting patterns with two distinct student populations per
+      // pair (so summing enrollment is correct, not double-counting).
+      // Other prefixes — AUTO (GM program), CULA (block scheduling),
+      // BIOL/CHEM (online repeats) — are deferred pending IR
+      // clarification on cross-list IDs and block-aware detection.
+      const coursePrefix = String(r.Course || '').toUpperCase();
+      if (!coursePrefix.startsWith('MATH') && !coursePrefix.startsWith('ENGL')) return;
 
       const days = norm(r['Meeting Days']);
       const time = norm(r['Section Start Time']);
