@@ -236,4 +236,85 @@
     ctx.beginPath();ctx.ellipse(boulder.x,boulder.y,rx,ry,0,0,Math.PI*2);
     ctx.fillStyle=crushing?"#fb923c":"#94a3b8";ctx.fill();
     ctx.strokeStyle=crushing?"#c2410c":"#475569";ctx.lineWidth=3;ctx.stroke();
-    if(squish>0.2){ctx.strokeStyle="#7c2d12";ctx.lineWi
+    if(squish>0.2){ctx.strokeStyle="#7c2d12";ctx.lineWidth=2;ctx.beginPath();
+      ctx.moveTo(boulder.x-12,boulder.y-14);ctx.lineTo(boulder.x+6,boulder.y+2);
+      ctx.moveTo(boulder.x+12,boulder.y-10);ctx.lineTo(boulder.x-4,boulder.y+12);ctx.stroke();}
+    ctx.restore();
+    lbl("boulder",boulder.x,boulder.y+boulder.radius+22);
+    if(crushing&&running){ctx.strokeStyle="#f43f5e";ctx.lineWidth=4;ctx.lineCap="round";
+      for(let i=-1;i<=1;i++){const y=boulder.y+i*10,sx=tipX+2,ex=tipX+26;
+        ctx.beginPath();ctx.moveTo(sx,y);ctx.lineTo(ex,y);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(ex-7,y-5);ctx.lineTo(ex,y);ctx.lineTo(ex-7,y+5);ctx.stroke();}}
+    return crushing;
+  }
+
+  // ---- Motion-profile plot ----
+  function drawPlot(){
+    const mL=48,mR=16,mT=18,mB=30, pw=PW-mL-mR, ph=PH-mT-mB;
+    pctx.clearRect(0,0,PW,PH);
+    // grid + axes
+    pctx.strokeStyle="#e5eaf1";pctx.lineWidth=1;
+    for(let k=0;k<=4;k++){const x=mL+pw*k/4;pctx.beginPath();pctx.moveTo(x,mT);pctx.lineTo(x,mT+ph);pctx.stroke();}
+    pctx.strokeStyle="#cbd5e1";pctx.lineWidth=1.5;
+    pctx.beginPath();pctx.moveTo(mL,mT);pctx.lineTo(mL,mT+ph);pctx.lineTo(mL+pw,mT+ph);pctx.stroke();
+    pctx.fillStyle="#64748b";pctx.font="11px system-ui,sans-serif";pctx.textAlign="center";
+    ["0°","90°","180°","270°","360°"].forEach(function(t,k){pctx.fillText(t,mL+pw*k/4,mT+ph+16);});
+    pctx.save();pctx.translate(14,mT+ph/2);pctx.rotate(-Math.PI/2);pctx.fillText("displacement / velocity",0,0);pctx.restore();
+    // zero-velocity line
+    const yMid=mT+ph/2;
+    pctx.strokeStyle="rgba(244,63,94,.25)";pctx.setLineDash([4,4]);
+    pctx.beginPath();pctx.moveTo(mL,yMid);pctx.lineTo(mL+pw,yMid);pctx.stroke();pctx.setLineDash([]);
+    const dispY=function(i){const f=(disp[i]-sMin)/((sMax-sMin)||1);return mT+ph-f*ph;};
+    const velY=function(i){return yMid-(vel[i]/velMax)*(ph/2*0.92);};
+    const xAt=function(i){return mL+pw*i/N;};
+    // displacement curve
+    pctx.strokeStyle="#3b82f6";pctx.lineWidth=2.5;pctx.beginPath();
+    for(let i=0;i<=N;i++){i?pctx.lineTo(xAt(i),dispY(i)):pctx.moveTo(xAt(i),dispY(i));}pctx.stroke();
+    // velocity curve
+    pctx.strokeStyle="#f43f5e";pctx.lineWidth=2;pctx.beginPath();
+    for(let i=0;i<=N;i++){i?pctx.lineTo(xAt(i),velY(i)):pctx.moveTo(xAt(i),velY(i));}pctx.stroke();
+    // current-angle marker
+    const am=((angle%(Math.PI*2))+Math.PI*2)%(Math.PI*2), idx=Math.round(am/(Math.PI*2)*N);
+    const mx=xAt(idx);
+    pctx.strokeStyle="#94a3b8";pctx.setLineDash([3,3]);pctx.lineWidth=1.5;
+    pctx.beginPath();pctx.moveTo(mx,mT);pctx.lineTo(mx,mT+ph);pctx.stroke();pctx.setLineDash([]);
+    pctx.fillStyle="#3b82f6";pctx.beginPath();pctx.arc(mx,dispY(idx),4,0,Math.PI*2);pctx.fill();
+    pctx.fillStyle="#f43f5e";pctx.beginPath();pctx.arc(mx,velY(idx),4,0,Math.PI*2);pctx.fill();
+    // legend
+    pctx.textAlign="left";pctx.font="600 11px system-ui,sans-serif";
+    pctx.fillStyle="#3b82f6";pctx.fillText("■ displacement",mL+8,mT+12);
+    pctx.fillStyle="#f43f5e";pctx.fillText("■ velocity",mL+108,mT+12);
+  }
+
+  function render(){
+    ctx.clearRect(0,0,W,H);drawGrid();
+    const {pin,sliderX,tipX}=solve();
+    drawGround();drawCrank(pin);drawRod(pin,sliderX);drawSlider(sliderX);
+    const crushing=drawBoulder(tipX);
+    drawPlot();
+    return crushing;
+  }
+  function setStatus(c){if(!running)return;
+    statusEl.textContent=c?"Crushing — peak force at dead center.":"Running — ram on the return stroke.";
+    canvas.setAttribute("aria-label","Slider-crank running. Crank angle "+Math.round((angle*180/Math.PI)%360)+"°. "+(c?"Crushing the boulder.":"Ram retracting."));}
+  function loop(){angle+=0.05*speedMul;setStatus(render());rafId=requestAnimationFrame(loop);}
+  function play(){if(running)return;running=true;playBtn.textContent="⏸ Pause";playBtn.setAttribute("aria-pressed","true");statusEl.textContent="Running — crank rotating.";loop();}
+  function pause(){running=false;playBtn.textContent="▶ Play";playBtn.setAttribute("aria-pressed","false");if(rafId){cancelAnimationFrame(rafId);rafId=null;}statusEl.textContent="Paused.";}
+  function reset(){pause();angle=0;render();statusEl.textContent="Reset — press Play to drive the crank.";}
+  function step(){if(running)pause();angle+=0.12;const c=render();statusEl.textContent=c?"Stepped — ram contacting the boulder.":"Stepped one increment.";}
+
+  playBtn.addEventListener("click",function(){running?pause():play();});
+  stepBtn.addEventListener("click",step);
+  resetBtn.addEventListener("click",reset);
+  speed.addEventListener("input",function(){speedMul=parseFloat(this.value);speedVal.textContent=speedMul.toFixed(1)+"×";});
+  crankR.addEventListener("input",function(){r=parseFloat(this.value);crankRVal.textContent=this.value;recompute();if(!running)render();});
+  rodL.addEventListener("input",function(){L=parseFloat(this.value);rodLVal.textContent=this.value;recompute();if(!running)render();});
+  labelsChk.addEventListener("change",function(){if(!running)render();});
+  document.addEventListener("keydown",function(e){if(e.key===" "&&document.activeElement!==speed&&document.activeElement!==crankR&&document.activeElement!==rodL){e.preventDefault();running?pause():play();}});
+  window.addEventListener("resize",function(){setup();render();});
+
+  recompute();render();
+})();
+</script>
+</body>
+</html>
