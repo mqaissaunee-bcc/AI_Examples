@@ -2,21 +2,22 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.14
+  Version:  v5.15
   Date:     May 28, 2026
-  Features: Two-pass combined-class detection. The schedule-fingerprint
-            rule (v5.11-v5.13) caught all in-person co-meeting pairs but
-            missed async DE pairs that have no days/time. v5.14 adds a
-            fallback pass that uses the Brookdale ENGL convention: an XL
-            section at number N pairs with its RL partner at N+1, same
-            instructor and location. Detects 8 additional ENGL-121 DE
-            pairs in the current snapshot. The 4 standalone DE sections
-            (DE01A through DE04A) are correctly excluded — they don't
-            follow the XL/RL role pattern. Total combined groups now: 3
-            MATH + 45 ENGL = 48 groups across 96 sections. The MATH-only
-            convention difference is documented: MATH numbering doesn't
-            follow N/N+1, but Pass 1 still catches all 3 MATH pairs via
-            their schedules. Built on v4.9 canonical baseline.
+  Features: "By Discipline" summary table now supports per-discipline
+            accordion expansion to a course-level breakdown. Each row has
+            a chevron (▶/▼) that toggles expansion in place; clicking the
+            row itself toggles BOTH the discipline filter and the
+            expansion state in sync. Expanded rows show one nested row
+            per course code (e.g., under ENGL: ENGL-121, ENGL-122,
+            ENGL-220) with sections, enrolled, fill, and course title.
+            Course rows are sorted alphabetically for predictable
+            position. Bulk Expand all / Collapse all toggle in the
+            section header mirrors the pattern used in "Sections at a
+            Glance." Expansion state persists in localStorage. The prior
+            auto-hide-when-one-discipline behavior was removed because
+            the new expansion makes the table valuable even at
+            single-discipline scope. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -707,6 +708,99 @@
   }
   .discipline-table .ds-bench {
     font-size: 11px;
+  }
+
+  /* Accordion expansion of discipline rows. The chevron in the first
+     column toggles only the expansion state; clicking elsewhere on the
+     row toggles both the discipline filter AND expansion together. */
+  .discipline-table .ds-chev-th {
+    width: 28px;
+    padding: 0 4px;
+  }
+  .discipline-table .ds-chev-cell {
+    width: 28px;
+    padding: 6px 4px 6px 12px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  .discipline-table .ds-chev-cell:hover .ds-chev {
+    color: var(--ink);
+  }
+  .discipline-table .ds-chev {
+    color: var(--ink-mute);
+    font-family: 'Helvetica Neue', monospace;
+    font-size: 10px;
+    transition: color 0.15s;
+    display: inline-block;
+  }
+  .discipline-table .ds-chev.open {
+    color: var(--ink);
+  }
+  /* Hover-cursor on the rest of the row signals it is clickable too. */
+  .discipline-table tr.ds-row {
+    cursor: pointer;
+  }
+  .discipline-table tr.ds-row.expanded > td:not(.ds-chev-cell) {
+    background: rgba(0, 0, 0, 0.025);
+  }
+  /* Course-level sub-rows. Indented, dimmed, monospace-ish code cell so
+     the eye reads them as nested children of the discipline above. */
+  .discipline-table tr.ds-course-row {
+    background: rgba(0, 0, 0, 0.015);
+    cursor: default;
+  }
+  .discipline-table tr.ds-course-row:hover {
+    background: rgba(0, 0, 0, 0.035);
+  }
+  .discipline-table tr.ds-course-row > td {
+    font-size: 12px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    color: var(--ink-soft);
+  }
+  .discipline-table tr.ds-course-row > td:first-child {
+    /* leave the chevron column empty visually so sub-rows look indented */
+    width: 28px;
+    padding: 0;
+  }
+  .discipline-table .ds-course-code {
+    font-weight: 600;
+    color: var(--ink);
+    padding-left: 24px;
+    position: relative;
+  }
+  .discipline-table .ds-course-code::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    width: 8px;
+    height: 1px;
+    background: var(--ink-mute);
+  }
+  .discipline-table .ds-course-title {
+    color: var(--ink-mute);
+    font-style: italic;
+    font-size: 11px;
+  }
+  /* Soften the row-divider between consecutive course sub-rows so the group
+     reads as one nested cluster, not as several stacked rows. The full
+     border stays between the last course row of a group and the next
+     discipline row. */
+  .discipline-table tr.ds-course-row + tr.ds-course-row {
+    border-top: 1px dashed rgba(0, 0, 0, 0.06);
+  }
+  .discipline-table tr.ds-course-row {
+    border-bottom: none;
+  }
+  .discipline-table tr.ds-course-row:last-child {
+    border-bottom: 1px solid var(--rule);
+  }
+  /* When a course row is followed by another discipline row (i.e., the
+     last course in a group), restore the divider on the course row. */
+  .discipline-table tr.ds-course-row:has(+ tr.ds-row) {
+    border-bottom: 1px solid var(--rule);
   }
 
   .panel {
@@ -1567,7 +1661,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.14</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.15</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -1605,6 +1699,7 @@
     BENCHMARKS: 'enroll-benchmarks',
     CARD_EXPANSION: 'enroll-card-expansion',
     GROUPED_VIEW: 'enroll-grouped-view',
+    DISCIPLINE_ROW_EXPANSION: 'enroll-disc-row-expansion',
   };
 
   const state = {
@@ -1629,6 +1724,15 @@
     fillBucket: 'all',      // 'all' | 'full' | 'almost' | 'under' | 'empty'
     cardExpansion: {},      // explicit per-discipline overrides: { ELEC: true, MATH: false }
                             //   missing key => use smart default (expand if <20 sections)
+
+    // Per-discipline expansion state for the "By Discipline" summary table.
+    // When expanded, a discipline row shows nested per-course breakdown rows
+    // beneath it. Keys are course-prefix strings ('ENGL', 'MATH'); values
+    // are booleans. Missing key => collapsed. Persisted to localStorage so
+    // the user's chosen view sticks across sessions. Separate from
+    // cardExpansion (which controls the "Sections at a Glance" cards) so
+    // the two tables have independent expand/collapse state.
+    disciplineRowExpansion: {},
 
     // Per-course expansion state for the grouped table view. Keys are
     // "{courseCode}:{group}" where group is 'triggered', 'priority', or 'room'.
@@ -1733,6 +1837,9 @@
 
       const gv = localStorage.getItem(STORAGE.GROUPED_VIEW);
       if (gv !== null) state.groupedView = gv === 'true';
+
+      const dre = localStorage.getItem(STORAGE.DISCIPLINE_ROW_EXPANSION);
+      if (dre) state.disciplineRowExpansion = JSON.parse(dre);
     } catch (err) {
       console.error('Storage load error:', err);
     }
@@ -1746,6 +1853,7 @@
       localStorage.setItem(STORAGE.BENCHMARKS, String(state.showBenchmarks));
       localStorage.setItem(STORAGE.CARD_EXPANSION, JSON.stringify(state.cardExpansion));
       localStorage.setItem(STORAGE.GROUPED_VIEW, String(state.groupedView));
+      localStorage.setItem(STORAGE.DISCIPLINE_ROW_EXPANSION, JSON.stringify(state.disciplineRowExpansion));
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
     }
@@ -2799,11 +2907,12 @@
         <p style="color:var(--ink-mute);font-style:italic;padding:14px 0">None of your selected disciplines appear in this snapshot.</p>`;
     }
 
-    // Auto-hide: with only one discipline in view, the KPI strip above already
-    // shows everything this section would. Skipping it removes redundant noise.
-    if (present.length === 1) {
-      return '';
-    }
+    // Note: the auto-hide-when-single-discipline behavior was removed when
+    // the per-discipline accordion expansion was added. With expansion, the
+    // table provides unique value even at single-discipline scope (it shows
+    // the per-course breakdown that the KPI strip cannot). The redundancy
+    // concern that motivated the auto-hide is now outweighed by the new
+    // information layer.
 
     const inFilter = (r) =>
       (state.activeDisciplineFilter.size === 0 || state.activeDisciplineFilter.has(r._prefix)) &&
@@ -2830,14 +2939,25 @@
     }).filter(d => d.sections > 0);
 
     if (tableRows.length === 0) {
-      // Active filters eliminated every row — show a clear message instead
-      // of an empty table
       return `<div class="section-title">By Discipline <span class="meta">no matches</span></div>
         <p style="color:var(--ink-mute);font-style:italic;padding:14px 0">No discipline has any sections matching the current filters.</p>`;
     }
 
+    // Determine bulk-toggle label. If ANY discipline is currently expanded,
+    // the bulk button collapses everything; otherwise it expands. The button
+    // operates on the currently-visible discipline set (tableRows), so it
+    // doesn't touch state for disciplines not on screen.
+    const visiblePrefixes = tableRows.map(d => d.p);
+    const anyExpanded = visiblePrefixes.some(p => state.disciplineRowExpansion[p] === true);
+    const bulkLabel = anyExpanded ? 'Collapse all' : 'Expand all';
+    const bulkAction = anyExpanded ? 'collapse' : 'expand';
+
     const renderedRows = tableRows.map(d => {
       const { p, rows, prevRows, sections, enrolled, capacity, fill } = d;
+      const isExpanded = state.disciplineRowExpansion[p] === true;
+      const chevron = isExpanded
+        ? '<span class="ds-chev open" aria-hidden="true">▼</span>'
+        : '<span class="ds-chev" aria-hidden="true">▶</span>';
 
       let dFill = '';
       if (prevRows && prevRows.length > 0) {
@@ -2847,22 +2967,14 @@
         dFill = miniDelta(fill - fPrev, 'pp', 1);
       }
 
-      // vs. College only makes sense if this discipline has capacity to
-      // compare. If capacity is 0 (e.g. all sections are placeholder-cap
-      // independent study), suppress the delta — comparing 0% to the
-      // college fill rate produces a misleading "-X.Xpp behind."
       const vsCollegeCell = (cw && capacity > 0)
         ? `<span class="ds-bench">${miniDelta(fill - cw.fill, 'pp', 1, 'Compared to the college-wide fill rate right now.')}</span>`
         : '<span style="color:var(--ink-mute)">—</span>';
 
-      // Honest flag for fill > 100% from placeholder-capacity sections.
-      // ACAD-089 independent study sections have cap=1, enr=7 → 700% fill.
-      // The math is true but the display is confusing without context.
       const fillDisplay = fill > 200
         ? `<strong title="High fill % typically indicates placeholder-capacity sections (e.g., independent study) where ‘capacity’ is set to 1">${fill.toFixed(1)}%</strong>`
         : `<strong>${fill.toFixed(1)}%</strong>`;
 
-      // Sparkline of total enrollment for this discipline across snapshots
       const enrSeries = state.snapshots.map(s =>
         sum(s.rows.filter(r => r._prefix === p && inFilter(r)), 'Enrolled Students')
       );
@@ -2870,8 +2982,12 @@
         ? renderSparkline(enrSeries, colorFor(p), 100, 22)
         : '<span style="color:var(--ink-mute)">—</span>';
 
-      return `
-        <tr>
+      // Click target: the row itself toggles both filter and expansion.
+      // The chevron toggles only expansion (no filter side-effect). Both
+      // are wired up in the event-binding section.
+      const disciplineRow = `
+        <tr class="ds-row ${isExpanded ? 'expanded' : ''}" data-disc-row="${escapeHtml(p)}">
+          <td class="ds-chev-cell" data-disc-chev="${escapeHtml(p)}" title="${isExpanded ? 'Hide course breakdown' : 'Show course breakdown'}">${chevron}</td>
           <td class="ds-disc"><span class="swatch" style="background:${colorFor(p)}"></span><strong>${escapeHtml(p)}</strong></td>
           <td class="right">${sections}</td>
           <td class="right">${enrolled} / ${capacity}</td>
@@ -2880,14 +2996,71 @@
           <td class="ds-trend">${sparkCell}</td>
         </tr>
       `;
+
+      // Course sub-rows. Only computed when expanded — for collapsed rows
+      // we just emit the discipline row alone, keeping render cost down on
+      // pages with many disciplines.
+      let subRows = '';
+      if (isExpanded) {
+        // Group this discipline's filtered rows by course code (e.g.
+        // 'ENGL-121'). Course rows show the same Sections/Enrolled/Fill
+        // columns as the parent so numbers align vertically. The Trend
+        // column at course-level is repurposed to show the course title
+        // (computing course-level historical trends would require a deeper
+        // refactor and isn't yet justified by the use case).
+        const byCourse = new Map();
+        rows.forEach(r => {
+          const c = r.Course;
+          if (!byCourse.has(c)) byCourse.set(c, []);
+          byCourse.get(c).push(r);
+        });
+
+        // Sort alphabetically for predictable position. The
+        // higher-volume-first sort that the grouped-view uses isn't
+        // appropriate here — chairs scanning the per-course breakdown
+        // tend to look for specific courses by code.
+        const courseOrder = [...byCourse.keys()].sort((a, b) => a.localeCompare(b));
+
+        subRows = courseOrder.map(courseCode => {
+          const courseRows = byCourse.get(courseCode);
+          const cSec = courseRows.length;
+          const cEnr = sum(courseRows, 'Enrolled Students');
+          const cCap = sum(courseRows, 'Capacity');
+          const cFill = cCap > 0 ? (cEnr / cCap * 100) : 0;
+          const cTitle = courseRows[0]['Course Title'] || '';
+          // Suppress fill display for placeholder-capacity oddities (same
+          // logic the parent row uses, but inline for course rows).
+          const cFillDisplay = cFill > 200
+            ? `<strong title="High fill % typically indicates placeholder-capacity sections">${cFill.toFixed(1)}%</strong>`
+            : `<strong>${cFill.toFixed(1)}%</strong>`;
+          return `
+            <tr class="ds-course-row">
+              <td></td>
+              <td class="ds-course-code">${escapeHtml(courseCode)}</td>
+              <td class="right">${cSec}</td>
+              <td class="right">${cEnr} / ${cCap}</td>
+              <td class="right">${cFillDisplay}</td>
+              <td></td>
+              <td class="ds-course-title">${escapeHtml(cTitle)}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      return disciplineRow + subRows;
     }).join('');
 
     return `
-      <div class="section-title">By Discipline <span class="meta">${filteredRows().length} sections in view</span></div>
+      <div class="section-title">
+        By Discipline
+        <span class="meta">${filteredRows().length} sections in view</span>
+        <button type="button" class="bulk-toggle" id="bulkDiscRowToggle" data-bulk-action="${bulkAction}" title="${anyExpanded ? 'Collapse course breakdown on every discipline' : 'Expand course breakdown on every discipline'}">${bulkLabel}</button>
+      </div>
       <div class="discipline-table-wrap">
         <table class="discipline-table">
           <thead>
             <tr>
+              <th class="ds-chev-th"></th>
               <th>Discipline</th>
               <th class="right">Sections</th>
               <th class="right">Enrolled</th>
@@ -4607,6 +4780,65 @@
         filteredRows().forEach(r => inScopePrefixes.add(r._prefix));
         inScopePrefixes.forEach(prefix => {
           state.cardExpansion[prefix] = targetValue;
+        });
+        saveStorage();
+        render();
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // "By Discipline" table — accordion behavior
+    // -------------------------------------------------------------------
+    // Three interactions, all coordinated:
+    //   1. Chevron click  -> toggles expansion only (no filter side-effect).
+    //                        Lets users drill into a discipline's course
+    //                        breakdown without committing to a filter.
+    //   2. Row click      -> toggles BOTH the discipline filter AND the
+    //                        expansion state, keeping them in sync. If the
+    //                        filter is being turned ON, the row expands. If
+    //                        the filter is being turned OFF, the row
+    //                        collapses. Confirmed user-preferred behavior.
+    //   3. Bulk toggle    -> Expand all / Collapse all the visible rows.
+    //                        Mirrors the "Sections at a Glance" bulk toggle.
+    //
+    // The chevron's click handler calls stopPropagation so it doesn't also
+    // trigger the row's click handler.
+    document.querySelectorAll('[data-disc-chev]').forEach(cell => {
+      cell.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const code = cell.dataset.discChev;
+        state.disciplineRowExpansion[code] = !state.disciplineRowExpansion[code];
+        saveStorage();
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-disc-row]').forEach(row => {
+      row.addEventListener('click', () => {
+        const code = row.dataset.discRow;
+        // Toggle filter and expansion together so the two states move in
+        // sync. If filter was OFF, turn it ON and expand. If filter was
+        // ON, turn it OFF and collapse.
+        if (state.activeDisciplineFilter.has(code)) {
+          state.activeDisciplineFilter.delete(code);
+          state.disciplineRowExpansion[code] = false;
+        } else {
+          state.activeDisciplineFilter.add(code);
+          state.disciplineRowExpansion[code] = true;
+        }
+        saveStorage();
+        render();
+      });
+    });
+
+    const bulkDiscRowBtn = el('bulkDiscRowToggle');
+    if (bulkDiscRowBtn) {
+      bulkDiscRowBtn.addEventListener('click', () => {
+        const action = bulkDiscRowBtn.dataset.bulkAction;
+        const targetValue = action === 'expand';
+        // Only act on currently-rendered discipline rows
+        document.querySelectorAll('[data-disc-row]').forEach(row => {
+          state.disciplineRowExpansion[row.dataset.discRow] = targetValue;
         });
         saveStorage();
         render();
