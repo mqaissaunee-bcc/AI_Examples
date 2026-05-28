@@ -2,20 +2,21 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.13
+  Version:  v5.14
   Date:     May 28, 2026
-  Features: Expands combined-class detection scope to include ENGL
-            (Composition I co-meeting pairs) alongside MATH. Detects 37
-            ENGL pairs in the current snapshot — all ENGL-121, mostly at
-            LINC with XL/RL suffix pattern, plus three WALL pairs using
-            XW/RW and one CECAP pair using CU01R/CU01X. Confirmed by the
-            chair that English pairs have two distinct student
-            populations, so summing enrollment is correct. No visual or
-            behavioral change beyond the scope expansion — same Option A
-            list-view treatment (purple-edge linked rows with combined
-            summary) and same grouped-view treatment as v5.11/v5.12. AUTO,
-            CULA, and other prefixes still deferred pending IR
-            cross-list confirmation. Built on v4.9 canonical baseline.
+  Features: Two-pass combined-class detection. The schedule-fingerprint
+            rule (v5.11-v5.13) caught all in-person co-meeting pairs but
+            missed async DE pairs that have no days/time. v5.14 adds a
+            fallback pass that uses the Brookdale ENGL convention: an XL
+            section at number N pairs with its RL partner at N+1, same
+            instructor and location. Detects 8 additional ENGL-121 DE
+            pairs in the current snapshot. The 4 standalone DE sections
+            (DE01A through DE04A) are correctly excluded — they don't
+            follow the XL/RL role pattern. Total combined groups now: 3
+            MATH + 45 ENGL = 48 groups across 96 sections. The MATH-only
+            convention difference is documented: MATH numbering doesn't
+            follow N/N+1, but Pass 1 still catches all 3 MATH pairs via
+            their schedules. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -1566,7 +1567,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.13</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.14</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -2099,11 +2100,33 @@
   // enrollment subtotal.
   //
   // SCOPE: MATH and ENGL (Composition I co-meeting pairs at LINC, WALL,
-  // ORLV, ONLH, CECAP). AUTO (GM program), CULA (block scheduling), and
-  // other programs are deferred — they need cross-list confirmation from
-  // IR and, for CULA, block-aware detection to avoid grouping sections
-  // that meet in different three-week blocks. Restricting the detector by
-  // course-prefix keeps the change contained and reversible.
+  // ORLV, ONLH, CECAP, plus DE async). AUTO (GM program), CULA (block
+  // scheduling), and other programs are deferred — they need cross-list
+  // confirmation from IR and, for CULA, block-aware detection to avoid
+  // grouping sections that meet in different three-week blocks.
+  //
+  // Detection is a two-pass process:
+  //
+  //   Pass 1 — Schedule fingerprint: same course + location + days + time
+  //   + instructor (all non-empty, instructor not TBA/Staff). Catches all
+  //   in-person co-meeting pairs regardless of section-number convention.
+  //   This is the primary signal: it makes no assumption about how
+  //   registrar numbers paired sections.
+  //
+  //   Pass 2 — Consecutive-numbering fallback: only for sections with no
+  //   schedule data (no days, no time — typical of async DE offerings).
+  //   Uses the Brookdale ENGL convention where an XL section at number N
+  //   has its RL partner at N+1, same instructor, same location. Verified
+  //   conservative: the rule requires the XL-then-RL role pattern, exact
+  //   N+1 numbering, plus matching instructor + location. Unrelated DE
+  //   sections that happen to share an instructor are not paired.
+  //   Standalone DE sections (e.g., DE01A) that don't fit the XL/RL
+  //   pattern are correctly excluded.
+  //
+  //   Pass 2 only applies to ENGL in practice. MATH XL/RL numbering is
+  //   inconsistent (the 3 detected pairs use 002+003, 009+010, 008+014),
+  //   and MATH has no async DE offerings in the data. Pass 1 covers MATH
+  //   completely.
   //
   // Caching: the result depends only on the snapshot's row identities, so
   // we memo-cache on the snapshot id to avoid recomputing on every render.
@@ -2114,36 +2137,26 @@
 
     const norm = (v) => String(v == null ? '' : v).trim().toUpperCase();
 
-    // Fingerprint key: course + location + days + time + instructor.
-    // Require non-empty days+time+instructor and instructor not TBA/Staff,
-    // so we don't accidentally bucket together a pile of unscheduled or
-    // generically-staffed sections.
-    const groups = new Map();
-    snap.rows.forEach(r => {
-      // SCOPE GATE: MATH and ENGL this iteration. Both have confirmed
-      // co-meeting patterns with two distinct student populations per
-      // pair (so summing enrollment is correct, not double-counting).
-      // Other prefixes — AUTO (GM program), CULA (block scheduling),
-      // BIOL/CHEM (online repeats) — are deferred pending IR
-      // clarification on cross-list IDs and block-aware detection.
-      const coursePrefix = String(r.Course || '').toUpperCase();
-      if (!coursePrefix.startsWith('MATH') && !coursePrefix.startsWith('ENGL')) return;
+    // SCOPE GATE applied across both passes: MATH and ENGL this iteration.
+    // Both have confirmed co-meeting patterns with two distinct student
+    // populations per pair (so summing enrollment is correct, not
+    // double-counting). Other prefixes — AUTO (GM program), CULA (block
+    // scheduling), BIOL/CHEM — are deferred pending IR clarification.
+    const inScope = (r) => {
+      const cp = String(r.Course || '').toUpperCase();
+      return cp.startsWith('MATH') || cp.startsWith('ENGL');
+    };
 
-      const days = norm(r['Meeting Days']);
-      const time = norm(r['Section Start Time']);
-      const instr = norm(r['Instructor']);
-      if (!days || !time || !instr) return;
-      if (instr === 'TBA' || instr === 'STAFF') return;
-
-      const key = [norm(r.Course), norm(r.Location), days, time, instr].join('|');
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(r);
-    });
-
-    // A combined class requires at least 2 sections at the same fingerprint.
-    // Build a section -> group lookup.
+    // Track which sections have been matched so Pass 2 doesn't re-pair a
+    // section that Pass 1 already grouped.
+    const matched = new Set();
     const sectionToGroup = new Map();
-    groups.forEach((sections, key) => {
+
+    // Finalize a group: compute summed enrollment/capacity, build the
+    // shared metadata, register section -> group in the output map.
+    // Pass 1 and Pass 2 both call this so the rendering layer doesn't
+    // need to care which pass produced which group.
+    const finalizeGroup = (sections, key) => {
       if (sections.length < 2) return;
       const sorted = sections.slice().sort((a, b) =>
         String(a.Section).localeCompare(String(b.Section))
@@ -2165,7 +2178,102 @@
         combinedWaitlist: totalWait,
         combinedFill: totalCap > 0 ? (totalEnr / totalCap * 100) : 0,
       };
-      sorted.forEach(r => sectionToGroup.set(String(r.Section), groupInfo));
+      sorted.forEach(r => {
+        sectionToGroup.set(String(r.Section), groupInfo);
+        matched.add(String(r.Section));
+      });
+    };
+
+    // --- PASS 1: schedule fingerprint ---
+    // Key: course + location + days + time + instructor.
+    // Requires non-empty days+time+instructor (rules out unscheduled DE
+    // sections) and instructor not TBA/Staff (rules out filler matches).
+    // This pass catches all in-person co-meeting pairs across MATH and
+    // ENGL, regardless of section-number convention. The 3 MATH pairs use
+    // varied numbering (002+003, 009+010, 008+014); this rule catches
+    // them via the meeting fingerprint alone.
+    const scheduleGroups = new Map();
+    snap.rows.forEach(r => {
+      if (!inScope(r)) return;
+      const days = norm(r['Meeting Days']);
+      const time = norm(r['Section Start Time']);
+      const instr = norm(r['Instructor']);
+      if (!days || !time || !instr) return;
+      if (instr === 'TBA' || instr === 'STAFF') return;
+      const key = [norm(r.Course), norm(r.Location), days, time, instr].join('|');
+      if (!scheduleGroups.has(key)) scheduleGroups.set(key, []);
+      scheduleGroups.get(key).push(r);
+    });
+    scheduleGroups.forEach((sections, key) => finalizeGroup(sections, key));
+
+    // --- PASS 2: consecutive-numbering fallback for unscheduled sections ---
+    // Only applies to sections with no days AND no time (truly unscheduled,
+    // typical of async DE offerings). Looks for the Brookdale ENGL-121
+    // convention where co-meeting pairs are numbered consecutively: an
+    // XL/XW section at number N has its RL/RW partner at N+1, same
+    // instructor, same location. Verified against the May 1 snapshot:
+    // every ENGL-121 XL section paired cleanly to N+1 RL (45 of 45). This
+    // rule is conservative — it requires the XL/RL role pattern, exact
+    // N+1 numbering, AND same instructor + location, so unrelated DE
+    // sections sharing an instructor won't be falsely grouped.
+    //
+    // Note: this rule deliberately does NOT apply to MATH. MATH XL/RL
+    // numbering is inconsistent (the 3 detected pairs use 002+003,
+    // 009+010, 008+014), so consecutive numbering isn't a reliable Math
+    // signal. Pass 1 already catches all MATH combined classes via
+    // their schedules; MATH has no async DE offerings in the data.
+    const SUFFIX_RE = /^(\d+)(X[LW]|R[LW])$/i;
+    const parseSuffix = (sectionCode) => {
+      const lastDash = sectionCode.lastIndexOf('-');
+      if (lastDash < 0) return null;
+      const tail = sectionCode.slice(lastDash + 1);
+      const m = SUFFIX_RE.exec(tail);
+      if (!m) return null;
+      return {
+        number: parseInt(m[1], 10),
+        role: m[2].toUpperCase()[0],         // 'X' or 'R'
+        loc:  m[2].toUpperCase()[1],         // 'L' or 'W'
+      };
+    };
+
+    // Index unscheduled in-scope rows by (course, location, instructor)
+    // so we can pair up XL → N+1 RL in O(n) per group.
+    const unschedByCohort = new Map();
+    snap.rows.forEach(r => {
+      if (!inScope(r)) return;
+      const days = norm(r['Meeting Days']);
+      const time = norm(r['Section Start Time']);
+      const instr = norm(r['Instructor']);
+      if (days || time) return;            // scheduled — Pass 1's domain
+      if (!instr || instr === 'TBA' || instr === 'STAFF') return;
+      if (matched.has(String(r.Section))) return;
+      const cohortKey = [norm(r.Course), norm(r.Location), instr].join('|');
+      if (!unschedByCohort.has(cohortKey)) unschedByCohort.set(cohortKey, []);
+      unschedByCohort.get(cohortKey).push(r);
+    });
+
+    unschedByCohort.forEach((sections, cohortKey) => {
+      // Build a number-keyed index of this cohort so we can look up N+1.
+      // Same (loc letter from the suffix) must match for a pair to count
+      // — an XL only pairs with an RL, an XW only with an RW.
+      const byNum = new Map();
+      sections.forEach(r => {
+        const parsed = parseSuffix(String(r.Section));
+        if (!parsed) return;
+        byNum.set(parsed.number + ':' + parsed.loc + ':' + parsed.role, r);
+      });
+      // Walk XL/XW sections; for each, look for its N+1 RL/RW partner.
+      sections.forEach(r => {
+        const parsed = parseSuffix(String(r.Section));
+        if (!parsed || parsed.role !== 'X') return;
+        if (matched.has(String(r.Section))) return;
+        const partnerKey = (parsed.number + 1) + ':' + parsed.loc + ':R';
+        const partner = byNum.get(partnerKey);
+        if (!partner) return;
+        if (matched.has(String(partner.Section))) return;
+        const key = 'unsched|' + cohortKey + '|' + parsed.number;
+        finalizeGroup([r, partner], key);
+      });
     });
 
     _combinedClassCache.set(snap.id, sectionToGroup);
