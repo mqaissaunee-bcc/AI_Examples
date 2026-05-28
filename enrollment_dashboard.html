@@ -2,20 +2,22 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.11
+  Version:  v5.12
   Date:     May 28, 2026
-  Features: Combined-class detection and grouped display in the grouped
-            Empty/Full course panels. When two MATH sections meet at the
-            same campus + days + time + instructor (and instructor is not
-            TBA/Staff), the renderer groups them under a "Combined class"
-            header showing summed enrollment and capacity. Both sections
-            remain visible as sub-rows with a small "linked" tag. Prevents
-            false-positive "empty section" alarms when a paired XL or RL
-            section is in fact half of a healthy combined class. Scope is
-            MATH-only this iteration (ENGL, AUTO, CULA later, pending IR
-            cross-list confirmation). Bucket assignment is unchanged —
-            this is a display-layer change only.
-            Built on v4.9 canonical baseline.
+  Features: Extends combined-class linking (MATH only this iteration) into
+            the List view of the Section Detail table. When two MATH
+            sections co-meet (same campus, days, time, instructor), they
+            now appear adjacent in any bucket (All, Empty, Almost, Under,
+            Full) — sorted so the higher-fill section reads first, with a
+            "Combined class" summary row above carrying the headline
+            combined-enrollment number. A purple left-edge marker connects
+            the rows visually. If only one half is in the user's current
+            scope (e.g., filtered to Empty and only the XL is empty), the
+            partner is pulled in so the chair sees the full picture; the
+            match count is unchanged so the pull-in doesn't inflate it.
+            Bucket assignment is still untouched — this is a display-layer
+            change only. Course coverage remains MATH-only (ENGL, AUTO,
+            CULA later). Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -1215,6 +1217,63 @@
     cursor: help;
   }
 
+  /* List-view combined-class treatment (Option A in mockup).
+     A synthetic summary <tr> sits above each linked group, followed by
+     the group members as ordinary <tr> rows with a purple left-edge
+     marker. The summary row carries combined-enrollment info; the
+     members render at their normal level of detail. The left-edge bar
+     visually connects the rows so a chair can see at a glance that
+     they belong together. */
+  tr.cg-list-summary > td {
+    background: rgba(74, 59, 122, 0.08);
+    border-top: 1px solid rgba(74, 59, 122, 0.25);
+    border-bottom: 1px solid rgba(74, 59, 122, 0.25);
+    padding: 6px 12px;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11.5px;
+    color: #2c2c2a;
+    box-shadow: inset 3px 0 0 0 #6a5fa8;
+  }
+  .cg-list-summary-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #4a3b7a;
+    font-weight: 700;
+    margin-right: 10px;
+  }
+  .cg-list-summary-pair {
+    font-weight: 700;
+    color: var(--ink);
+    margin-right: 12px;
+  }
+  .cg-list-summary-meta {
+    color: var(--ink-mute);
+    margin-right: 12px;
+  }
+  .cg-list-summary-fill {
+    font-weight: 700;
+    color: #4a3b7a;
+    float: right;
+  }
+  /* Linked sub-row in the list view: subtle background tint plus the same
+     purple left-edge marker as the summary, so the whole group reads as
+     one visual unit. The :first-of-type / :last-of-type aren't useful
+     here since the group is broken up by the summary row, so we use
+     explicit cg-list-linked-last on the final member. */
+  tr.cg-list-linked > td {
+    background: rgba(74, 59, 122, 0.035);
+  }
+  tr.cg-list-linked > td:first-child {
+    /* Augment the existing per-row colored left-border with the linked
+       group's purple inset bar. The existing border-left (course color)
+       is preserved; the inset shadow draws purple just inside it. */
+    box-shadow: inset 3px 0 0 0 #6a5fa8;
+  }
+  tr.cg-list-linked-last > td {
+    border-bottom: 1px solid rgba(74, 59, 122, 0.25);
+  }
+
   /* Alternatives section */
   .cg-alt-group {
     margin-bottom: 10px;
@@ -1509,7 +1568,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.11</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.12</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -3089,6 +3148,72 @@
       return av.localeCompare(bv) * state.sortDir;
     });
 
+    // Combined-class enrichment for the list view (Option A treatment):
+    // - For any row in `sorted` that's part of a combined class (MATH only
+    //   this iteration), find its partner(s) in the snapshot. If a partner
+    //   isn't already in `sorted` (e.g., user filtered to Empty and only
+    //   one half of the pair is empty), we pull it in so the chair sees
+    //   the full combined picture.
+    // - The pair is positioned where the first-encountered member naturally
+    //   sorted to; the partner is inserted immediately after, with the
+    //   higher-enrolled member sorting to the top of the pair (so the
+    //   visual reads "this section is carrying enrollment, this one isn't").
+    // - A synthetic summary row is inserted above the pair carrying the
+    //   combined-class header information.
+    // - Counts ("N of M sections in view") are based on `sorted` BEFORE
+    //   this enrichment, so pulled-in partners don't inflate the count.
+    const snapForLinked = currentSnapshot();
+    const combinedMapList = getCombinedClassMap(snapForLinked);
+    const sortedBySection = {};
+    snapForLinked && snapForLinked.rows.forEach(r => { sortedBySection[String(r.Section)] = r; });
+    const inSortedSet = new Set(sorted.map(r => String(r.Section)));
+
+    // Build the rendering sequence: a list of objects with a type and payload.
+    // type='row' carries a single section row; type='linked' carries a group
+    // header plus its members. Walk `sorted` in order, but skip subsequent
+    // members of a group once it's been emitted.
+    const renderSeq = [];
+    const emittedLinkedGroups = new Set();
+    sorted.forEach(r => {
+      const code = String(r.Section);
+      const group = combinedMapList.get(code);
+      if (!group) {
+        renderSeq.push({ type: 'row', row: r });
+        return;
+      }
+      if (emittedLinkedGroups.has(group.key)) return;
+      emittedLinkedGroups.add(group.key);
+      // Resolve every member of the group to its enriched-row form. If a
+      // member is already in `sorted`, use that (carries _delta). Otherwise
+      // synthesize a delta from prevByCode the same way `enriched` did.
+      const members = group.sections.map(m => {
+        const mCode = String(m.Section);
+        const inSorted = sorted.find(x => String(x.Section) === mCode);
+        if (inSorted) return inSorted;
+        // Pulled-in partner — build a comparable enriched object
+        const prev = prevByCode[mCode];
+        return {
+          ...m,
+          _delta: prev != null
+            ? ((Number(m['Enrolled Students']) || 0) - (Number(prev['Enrolled Students']) || 0))
+            : null,
+        };
+      });
+      // Sort group members: higher-fill first so the row that's carrying
+      // enrollment reads first, the partner that looks "empty" sits below.
+      members.sort((a, b) => {
+        const fa = Number(a['Section Fill %']) || 0;
+        const fb = Number(b['Section Fill %']) || 0;
+        if (fb !== fa) return fb - fa;
+        // Tie-breaker: enrollment desc, then section code asc
+        const ea = Number(a['Enrolled Students']) || 0;
+        const eb = Number(b['Enrolled Students']) || 0;
+        if (eb !== ea) return eb - ea;
+        return String(a.Section).localeCompare(String(b.Section));
+      });
+      renderSeq.push({ type: 'linked', group, members });
+    });
+
     // Sibling map: Course code -> all sections of that course (in current snapshot).
     // Used when a fill-status bucket is active to surface context the filter hides:
     // "this section is full — are there alternative sections?" or
@@ -3193,7 +3318,12 @@
       return `<div class="sibling-row">${label} ${items}</div>`;
     }
 
-    const rows = sorted.map(r => {
+    // Single-row renderer. Extracted so we can call it for standalone rows
+    // and for the sub-rows of a combined-class group. The linkedClass param
+    // is empty for standalone rows or 'cg-list-linked' for sub-rows; the
+    // linkedTagHTML param is empty for standalone or carries the small
+    // "linked" tag with tooltip for sub-rows.
+    function renderListRow(r, linkedClass, linkedTagHTML) {
       const fill = r['Section Fill %'];
       const fillBadge =
         fill >= 100 ? `<span class="badge full">FULL</span>` :
@@ -3216,10 +3346,11 @@
       }
 
       const siblingHTML = showSiblings ? renderSiblingIndicator(r) : '';
+      const trClass = linkedClass ? ` class="${linkedClass}"` : '';
 
       return `
-        <tr>
-          <td style="border-left:3px solid ${color}"><strong>${escapeHtml(r.Section)}</strong>${siblingHTML}</td>
+        <tr${trClass}>
+          <td style="border-left:3px solid ${color}"><strong>${escapeHtml(r.Section)}</strong>${linkedTagHTML || ''}${siblingHTML}</td>
           <td>${escapeHtml(r['Course Title'] || '')}</td>
           <td>${escapeHtml(r.Location || '')}</td>
           <td class="right">${r.Capacity}</td>
@@ -3234,7 +3365,50 @@
           <td>${escapeHtml(instructor) || '<em style="color:var(--ink-mute)">TBA</em>'}</td>
         </tr>
       `;
+    }
+
+    // Walk the render sequence. Standalone rows render as one <tr>; linked
+    // groups emit a colspan summary <tr> followed by their member <tr>s.
+    const rows = renderSeq.map(item => {
+      if (item.type === 'row') {
+        return renderListRow(item.row, '', '');
+      }
+      // type === 'linked'
+      const g = item.group;
+      const memberCodes = g.sectionCodes
+        .map(c => c.split('-').slice(-1)[0])
+        .join(' + ');
+      const fillStr = g.combinedCapacity > 0
+        ? `${g.combinedEnrolled}/${g.combinedCapacity} · ${g.combinedFill.toFixed(0)}%`
+        : `${g.combinedEnrolled} enrolled (capacity not set)`;
+      const days = cleanCell(g.days, '—');
+      const time = cleanCell(g.time, '—');
+      const instr = cleanCell(g.instructor, '');
+      const courseShort = String(g.course);
+      const summaryRow = `
+        <tr class="cg-list-summary">
+          <td colspan="13">
+            <span class="cg-list-summary-label">Combined class</span>
+            <span class="cg-list-summary-pair">${escapeHtml(courseShort)} · ${escapeHtml(memberCodes)}</span>
+            <span class="cg-list-summary-meta">${escapeHtml(days)} ${escapeHtml(time)} · ${escapeHtml(instr)}</span>
+            <span class="cg-list-summary-fill">${escapeHtml(fillStr)} combined</span>
+          </td>
+        </tr>
+      `;
+      const memberRows = item.members.map((m, idx) => {
+        const partners = g.sectionCodes
+          .filter(c => String(c) !== String(m.Section))
+          .map(c => c.split('-').slice(-1)[0])
+          .join(', ');
+        const tag = ` <span class="cg-linked-tag" title="Co-meets with ${escapeHtml(partners)} — combined ${escapeHtml(fillStr)}">linked</span>`;
+        const cls = idx === item.members.length - 1
+          ? 'cg-list-linked cg-list-linked-last'
+          : 'cg-list-linked';
+        return renderListRow(m, cls, tag);
+      }).join('');
+      return summaryRow + memberRows;
     }).join('');
+
 
     const arrow = (k) => state.sortKey === k ? `<span class="arrow">${state.sortDir === 1 ? '▲' : '▼'}</span>` : '';
 
