@@ -2,15 +2,20 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.10
-  Date:     May 21, 2026
-  Features: Fix: double row divider in the "By Discipline" table. The
-            v5.9 fix moved the divider from <td> to <tr>, but a generic
-            "tbody td { border-bottom }" rule from the section detail
-            table was still applying — producing two stacked lines.
-            Explicitly null the td border on the discipline table so only
-            the row-level border renders. Purely cosmetic; no layout or
-            behavior change. Built on v4.9 canonical baseline.
+  Version:  v5.11
+  Date:     May 28, 2026
+  Features: Combined-class detection and grouped display in the grouped
+            Empty/Full course panels. When two MATH sections meet at the
+            same campus + days + time + instructor (and instructor is not
+            TBA/Staff), the renderer groups them under a "Combined class"
+            header showing summed enrollment and capacity. Both sections
+            remain visible as sub-rows with a small "linked" tag. Prevents
+            false-positive "empty section" alarms when a paired XL or RL
+            section is in fact half of a healthy combined class. Scope is
+            MATH-only this iteration (ENGL, AUTO, CULA later, pending IR
+            cross-list confirmation). Bucket assignment is unchanged —
+            this is a display-layer change only.
+            Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -1152,6 +1157,64 @@
   .cg-triggered-row .code { font-weight: 700; }
   .cg-instr-tba { color: var(--ink-mute); font-style: italic; }
 
+  /* Combined-class linked block. When two sections co-meet (same course,
+     room, day, time, instructor — confirmed two distinct student populations),
+     we group their rows under a single "Combined class" header showing the
+     summed enrollment. Prevents false-positive "empty section" alarms when a
+     paired section is in fact half of a healthy combined class. */
+  .cg-linked-block {
+    margin: 8px 0;
+    background: rgba(74, 59, 122, 0.045);
+    border-left: 2px solid #6a5fa8;
+    padding: 6px 8px 8px;
+  }
+  .cg-linked-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    padding: 2px 2px 6px;
+    border-bottom: 1px dashed rgba(74, 59, 122, 0.3);
+    margin-bottom: 4px;
+  }
+  .cg-linked-label {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #4a3b7a;
+    font-weight: 700;
+  }
+  .cg-linked-fill {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .cg-triggered-row.cg-linked-row {
+    /* sub-rows beneath a linked header sit slightly indented inside the
+       block; the block's left border carries the linkage cue */
+    padding-left: 4px;
+  }
+  /* Small neutral "linked" tag next to a section code that's part of a
+     combined class. Hover tooltip lists the partner section(s). */
+  .cg-linked-tag {
+    display: inline-block;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: rgba(74, 59, 122, 0.12);
+    color: #4a3b7a;
+    padding: 1px 5px;
+    border-radius: 8px;
+    margin-left: 4px;
+    font-weight: 600;
+    vertical-align: 1px;
+    cursor: help;
+  }
+
   /* Alternatives section */
   .cg-alt-group {
     margin-bottom: 10px;
@@ -1446,7 +1509,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.10</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.11</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -1964,6 +2027,87 @@
     const course = String(r.Course || '');
     return /-295$/.test(course) || /-299$/.test(course);
   }
+
+  // -----------------------------------------------------------------------
+  // Combined-class detection
+  // -----------------------------------------------------------------------
+  // Some courses run two sections as a single co-meeting class: same course
+  // code, same room, same days, same time, same instructor. Confirmed by
+  // the chair that the two rosters are DIFFERENT students (so summing
+  // enrollment is a true count, not a double-count). False-positive risk
+  // for the dashboard: a paired section can look "empty" (e.g., 0/11) on
+  // its own when in reality it's the second half of a healthy combined
+  // class. This helper builds a map of section -> combined-group metadata
+  // so the renderer can display linked sections together with a combined
+  // enrollment subtotal.
+  //
+  // SCOPE THIS ITERATION: MATH only. English, AUTO, and culinary will be
+  // added in later iterations once this design is validated. Restricting
+  // the detector by course-prefix keeps the change contained and
+  // reversible.
+  //
+  // Caching: the result depends only on the snapshot's row identities, so
+  // we memo-cache on the snapshot id to avoid recomputing on every render.
+  const _combinedClassCache = new Map();
+  function getCombinedClassMap(snap) {
+    if (!snap || !snap.rows) return new Map();
+    if (_combinedClassCache.has(snap.id)) return _combinedClassCache.get(snap.id);
+
+    const norm = (v) => String(v == null ? '' : v).trim().toUpperCase();
+
+    // Fingerprint key: course + location + days + time + instructor.
+    // Require non-empty days+time+instructor and instructor not TBA/Staff,
+    // so we don't accidentally bucket together a pile of unscheduled or
+    // generically-staffed sections.
+    const groups = new Map();
+    snap.rows.forEach(r => {
+      // SCOPE GATE: math only this iteration
+      if (!String(r.Course || '').toUpperCase().startsWith('MATH')) return;
+
+      const days = norm(r['Meeting Days']);
+      const time = norm(r['Section Start Time']);
+      const instr = norm(r['Instructor']);
+      if (!days || !time || !instr) return;
+      if (instr === 'TBA' || instr === 'STAFF') return;
+
+      const key = [norm(r.Course), norm(r.Location), days, time, instr].join('|');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+
+    // A combined class requires at least 2 sections at the same fingerprint.
+    // Build a section -> group lookup.
+    const sectionToGroup = new Map();
+    groups.forEach((sections, key) => {
+      if (sections.length < 2) return;
+      const sorted = sections.slice().sort((a, b) =>
+        String(a.Section).localeCompare(String(b.Section))
+      );
+      const totalEnr = sorted.reduce((s, r) => s + (Number(r['Enrolled Students']) || 0), 0);
+      const totalCap = sorted.reduce((s, r) => s + (Number(r.Capacity) || 0), 0);
+      const totalWait = sorted.reduce((s, r) => s + (Number(r['Wait List']) || 0), 0);
+      const groupInfo = {
+        key,
+        sections: sorted,
+        sectionCodes: sorted.map(r => String(r.Section)),
+        course: sorted[0].Course,
+        location: sorted[0].Location,
+        days: sorted[0]['Meeting Days'],
+        time: sorted[0]['Section Start Time'],
+        instructor: sorted[0].Instructor,
+        combinedEnrolled: totalEnr,
+        combinedCapacity: totalCap,
+        combinedWaitlist: totalWait,
+        combinedFill: totalCap > 0 ? (totalEnr / totalCap * 100) : 0,
+      };
+      sorted.forEach(r => sectionToGroup.set(String(r.Section), groupInfo));
+    });
+
+    _combinedClassCache.set(snap.id, sectionToGroup);
+    return sectionToGroup;
+  }
+  // Clear cache when snapshots change
+  function invalidateCombinedClassCache() { _combinedClassCache.clear(); }
 
   function rowInFillBucket(r, bucket) {
     if (bucket === 'all') return true;
@@ -3160,6 +3304,12 @@
     const prevByCode = {};
     if (prevSnap) prevSnap.rows.forEach(r => { prevByCode[r.Section] = r; });
 
+    // Combined-class lookup for this snapshot. Maps section code -> group
+    // metadata when the section is part of a co-meeting class (MATH only
+    // this iteration). Renderer uses this to draw a "linked" header above
+    // sections that belong together, with combined enrollment shown.
+    const combinedMap = getCombinedClassMap(snap);
+
     // Get the filtered rows (respects discipline/location/sub-filter selection
     // AND the active fill bucket). These are the "triggered" sections — what
     // the user is currently filtering to.
@@ -3286,7 +3436,12 @@
       const showAllTriggered = triggeredExpanded || naturallyFits;
       const triggeredVisible = showAllTriggered ? triggeredSections : triggeredSections.slice(0, 6);
 
-      const triggeredRowsHTML = triggeredVisible.map(s => {
+      // Render a single section row. Factored out so we can call it both
+      // for standalone (non-linked) sections and for sub-rows of a
+      // combined-class block. The inLinked flag adds the cg-linked-row
+      // class for subtle indentation/styling and adds the neutral linked
+      // tag next to the section code.
+      const renderSectionRow = (s, inLinked) => {
         const sectionCode = s.Section.split('-').slice(-1)[0] || s.Section;
         const days = cleanCell(s['Meeting Days'], '—');
         const time = cleanCell(s['Section Start Time'], 'TBA');
@@ -3299,14 +3454,12 @@
         const wait = Number(s['Wait List']) || 0;
         const fillPct = cap > 0 ? (enr / cap * 100) : 0;
         const formatTag = formatTagFor(s);
-        // Location is IR's literal location code from the data (LINC, WALL,
-        // DE, ONLH, ORLV, CECAP, TCNJ). Same vocabulary as the Location
-        // filter chips above the table.
         const locationCode = cleanCell(s.Location, '—');
+        const linkedClass = inLinked ? ' cg-linked-row' : '';
 
         if (bucket === 'empty') {
           return `
-            <div class="cg-triggered-row cg-row-empty">
+            <div class="cg-triggered-row cg-row-empty${linkedClass}">
               <span class="code">${escapeHtml(sectionCode)}</span>
               <span>${escapeHtml(locationCode)}</span>
               <span>${formatTag}</span>
@@ -3316,15 +3469,11 @@
             </div>
           `;
         } else {
-          // Full bucket: show fill % and waitlist alongside day/time so
-          // chairs can see *why* students might not be switching to an
-          // open alternative ("the full section meets MWF at 10am but the
-          // alternative is M only at 4pm — schedule mismatch")
           const waitCell = wait > 0
             ? `<span style="color:var(--warn);font-weight:600">${wait} waiting</span>`
             : '<span style="color:var(--ink-mute)">—</span>';
           return `
-            <div class="cg-triggered-row cg-row-full">
+            <div class="cg-triggered-row cg-row-full${linkedClass}">
               <span class="code">${escapeHtml(sectionCode)}</span>
               <span>${escapeHtml(locationCode)}</span>
               <span>${formatTag}</span>
@@ -3336,7 +3485,105 @@
             </div>
           `;
         }
-      }).join('');
+      };
+
+      // Build the ordered list of items to render. Walk triggeredVisible
+      // in order; when a section belongs to a combined-class group, emit a
+      // combined-block (header + all group members, even those not in the
+      // triggered subset, so the chair sees the full picture) and skip
+      // past the other group members. Sections not in any group emit as
+      // standalone rows.
+      const triggeredCodeSet = new Set(triggeredVisible.map(r => String(r.Section)));
+      const emittedGroups = new Set();
+      const triggeredRowsHTML = triggeredVisible.map(s => {
+        const sectionCode = String(s.Section);
+        const group = combinedMap.get(sectionCode);
+
+        if (!group) {
+          // Standalone (not part of any combined class)
+          return renderSectionRow(s, false);
+        }
+        // Combined class — emit the group block once, on the first
+        // visible member encountered.
+        if (emittedGroups.has(group.key)) return '';
+        emittedGroups.add(group.key);
+
+        const combinedEnr = group.combinedEnrolled;
+        const combinedCap = group.combinedCapacity;
+        const combinedFill = group.combinedFill;
+        const fillStr = combinedCap > 0
+          ? `${combinedEnr}/${combinedCap} · ${combinedFill.toFixed(0)}%`
+          : `${combinedEnr} enrolled (capacity not set)`;
+        const partnerCodes = group.sectionCodes
+          .map(c => c.split('-').slice(-1)[0])
+          .join(' + ');
+        // Render every member of the group as a sub-row, with a small
+        // "linked · co-meets with X" tag pointing at the partner(s) other
+        // than this section itself. Show all members even if some weren't
+        // in triggeredVisible — the full combined picture is the point.
+        const subRows = group.sections.map(member => {
+          const memberCode = String(member.Section).split('-').slice(-1)[0];
+          const partners = group.sectionCodes
+            .filter(c => String(c) !== String(member.Section))
+            .map(c => c.split('-').slice(-1)[0])
+            .join(', ');
+          const tag = `<span class="cg-linked-tag" title="Co-meets with ${escapeHtml(partners)}">linked</span>`;
+          // Wrap with the linked-tag inline: we accomplish this by
+          // replacing the section-code cell post-render. Cleaner to just
+          // build the row markup ourselves, mirroring renderSectionRow:
+          const days = cleanCell(member['Meeting Days'], '—');
+          const time = cleanCell(member['Section Start Time'], 'TBA');
+          const instructor = cleanCell(member.Instructor, '');
+          const instructorHTML = instructor
+            ? escapeHtml(instructor)
+            : '<span class="cg-instr-tba">TBA</span>';
+          const enr = Number(member['Enrolled Students']) || 0;
+          const cap = Number(member.Capacity) || 0;
+          const wait = Number(member['Wait List']) || 0;
+          const fillPct = cap > 0 ? (enr / cap * 100) : 0;
+          const formatTag = formatTagFor(member);
+          const locationCode = cleanCell(member.Location, '—');
+
+          if (bucket === 'empty') {
+            return `
+              <div class="cg-triggered-row cg-row-empty cg-linked-row">
+                <span class="code">${escapeHtml(memberCode)} ${tag}</span>
+                <span>${escapeHtml(locationCode)}</span>
+                <span>${formatTag}</span>
+                <span>${escapeHtml(days)}</span>
+                <span>${escapeHtml(time)}</span>
+                <span>${instructorHTML}</span>
+              </div>
+            `;
+          } else {
+            const waitCell = wait > 0
+              ? `<span style="color:var(--warn);font-weight:600">${wait} waiting</span>`
+              : '<span style="color:var(--ink-mute)">—</span>';
+            return `
+              <div class="cg-triggered-row cg-row-full cg-linked-row">
+                <span class="code">${escapeHtml(memberCode)} ${tag}</span>
+                <span>${escapeHtml(locationCode)}</span>
+                <span>${formatTag}</span>
+                <span>${enr}/${cap} (${fillPct.toFixed(0)}%)</span>
+                <span>${waitCell}</span>
+                <span>${escapeHtml(days)}</span>
+                <span>${escapeHtml(time)}</span>
+                <span>${instructorHTML}</span>
+              </div>
+            `;
+          }
+        }).join('');
+
+        return `
+          <div class="cg-linked-block">
+            <div class="cg-linked-header">
+              <span class="cg-linked-label">Combined class · ${escapeHtml(partnerCodes)}</span>
+              <span class="cg-linked-fill">${fillStr} combined</span>
+            </div>
+            ${subRows}
+          </div>
+        `;
+      }).filter(Boolean).join('');
 
       const triggeredHeaderRow = bucket === 'empty'
         ? `<div class="cg-triggered-row cg-row-empty cg-row-header">
