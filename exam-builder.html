@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Build traditional show-your-work STEM &amp; engineering exams: slot one problem per chapter, generate with an LLM, attach figures (including auto-drawn four-bar / slider-crank mechanisms), verify the answer key, and export a printable student exam, an instructor answer key, and a Canvas submission page.">
+<meta name="description" content="Build traditional show-your-work STEM &amp; engineering exams and weekly homework: slot one problem per chapter, generate with an LLM, turn figures into copyable image-generation prompts, upload the results, verify the answer key, and export a printable student exam, an instructor answer key, and a Canvas submission page.">
 <title>Quantitative Exam Builder [Alpha]</title>
 
 <!-- KaTeX (math rendering) -->
@@ -232,17 +232,20 @@ label{cursor:pointer;}
 .seg-btn+.seg-btn{border-left:1px solid var(--border);}
 .seg-btn.on{background:var(--cyan);color:#fff;}
 .seg-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px;}
-.ai-fig{border:1px solid color-mix(in srgb,var(--violet) 32%,transparent);background:color-mix(in srgb,var(--violet) 6%,transparent);border-radius:6px;padding:11px 13px;margin-bottom:10px;}
-.ai-fig .lab{color:var(--violet);}
-.ai-fig-row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:6px;}
-.ai-fig-row .field{flex:1;min-width:180px;gap:4px;}
-.btn-ai{background:var(--violet);color:#fff;}
-.btn-ai:hover:not(:disabled){background:color-mix(in srgb,var(--violet) 85%,#fff);}
-.svg-edit{font-family:var(--mono);font-size:.74rem;width:100%;min-height:90px;resize:vertical;}
-.ai-status{font-size:.78rem;margin-top:7px;min-height:1em;}
-.ai-status.err{color:var(--red);} .ai-status.ok{color:var(--green);} .ai-status.busy{color:var(--violet);}
-.keyrow{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}
-.keyrow input{flex:1;min-width:200px;}
+.img-prompt{font-family:var(--body);font-size:.82rem;width:100%;resize:vertical;line-height:1.5;}
+.img-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;}
+.upload-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:var(--radius);font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;border:1px solid var(--cyan);color:var(--cyan);background:transparent;min-height:40px;}
+.upload-btn:hover{background:color-mix(in srgb,var(--cyan) 9%,transparent);}
+.figws-bulk{display:block;border:2px dashed var(--border);border-radius:8px;padding:18px;text-align:center;color:var(--ink-2);font-size:.86rem;margin-bottom:16px;cursor:pointer;}
+.figws-bulk:hover{border-color:var(--cyan-2);}
+.figws-bulk.drag{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 6%,transparent);}
+.figws-item{display:flex;gap:14px;border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:12px;background:var(--surface);flex-wrap:wrap;}
+.figws-item .fw-main{flex:1;min-width:240px;}
+.figws-item .fw-num{font-family:var(--mono);font-size:.66rem;font-weight:700;color:var(--cyan);}
+.figws-item .fw-thumb{width:150px;flex:0 0 auto;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;min-height:96px;overflow:hidden;}
+.figws-item .fw-thumb img{max-width:100%;max-height:150px;}
+.figws-item .fw-thumb .hint{padding:8px;font-size:.72rem;text-align:center;}
+.fw-attached{color:var(--green);} .fw-pending{color:var(--amber);}
 .fig-preview{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;display:flex;justify-content:center;min-height:60px;}
 .fig-preview svg{max-width:100%;height:auto;}
 .fig-preview img{max-width:100%;height:auto;border-radius:4px;}
@@ -319,7 +322,8 @@ footer .program{color:var(--cyan);font-weight:600;}
   <button class="tab" role="tab" aria-selected="true" aria-controls="tab-config" id="t-config" tabindex="0">&#9881; 1. Configure</button>
   <button class="tab" role="tab" aria-selected="false" aria-controls="tab-prompt" id="t-prompt" tabindex="-1">&#128203; 2. Prompt</button>
   <button class="tab" role="tab" aria-selected="false" aria-controls="tab-review" id="t-review" tabindex="-1">&#128300; 3. Review &amp; Assemble <span id="reviewCount" style="font-size:.65rem;opacity:.7;"></span></button>
-  <button class="tab" role="tab" aria-selected="false" aria-controls="tab-export" id="t-export" tabindex="-1">&#11015; 4. Export</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="tab-figures" id="t-figures" tabindex="-1">&#129518; 4. Figures</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="tab-export" id="t-export" tabindex="-1">&#11015; 5. Export</button>
   <button class="tab" role="tab" aria-selected="false" aria-controls="tab-guide" id="t-guide" tabindex="-1">&#128214; Guide</button>
 </nav>
 
@@ -373,7 +377,7 @@ footer .program{color:var(--cyan);font-weight:600;}
     <div id="slotList"></div>
     <div class="btnrow">
       <button class="btn btn-ghost" id="addSlot">+ Add Problem Slot</button>
-      <button class="btn btn-ghost" id="addFourEng" title="Adds four mechanism-ready slots">&#9881; Quick: 4 engineering slots</button>
+      <button class="btn btn-ghost" id="addFourEng" title="Adds four engineering problem slots">&#9881; Quick: 4 engineering slots</button>
     </div>
   </div>
 
@@ -423,7 +427,7 @@ footer .program{color:var(--cyan);font-weight:600;}
 <!-- ══ TAB 3: REVIEW ══ -->
 <section class="panel" id="tab-review" role="tabpanel" aria-labelledby="t-review">
 <div class="wrap">
-  <div class="head"><h2>Review &amp; Assemble</h2><p>Paste the LLM's JSON, validate, then review and edit each problem. Verify every numeric answer with the computation check, attach or generate figures, read each worked solution, and mark problems verified.</p></div>
+  <div class="head"><h2>Review &amp; Assemble</h2><p>Paste the LLM's JSON, validate, then review and edit each problem. Verify every numeric answer with the computation check, set up figures (copy each image prompt and upload the result, or use the Figures tab), read each worked solution, and mark problems verified.</p></div>
   <div class="card">
     <h3>&#128229; Paste LLM Response</h3>
     <textarea class="json-area" id="jsonPaste" placeholder='Paste the JSON array of exam problems from your LLM here.'></textarea>
@@ -441,6 +445,30 @@ footer .program{color:var(--cyan);font-weight:600;}
 </section>
 
 <!-- ══ TAB 4: EXPORT ══ -->
+<section class="panel" id="tab-figures" role="tabpanel" aria-labelledby="t-figures">
+<div class="wrap">
+  <div class="head"><h2>Figures</h2><p>Every problem set to an image figure shows its generation prompt here. Copy a prompt (or all of them at once), create the figures in your image tool of choice, then drop the finished images back in — they embed into the student exam, answer key, and Canvas page.</p></div>
+  <div id="figuresEmpty" class="empty"><div class="ico">&#129518;</div><div style="font-family:var(--mono);font-size:.8rem;">Validate problems in Step 3 first.</div></div>
+  <div id="figuresWrap" style="display:none;">
+    <div class="card">
+      <h3>&#127912; Shared image style</h3>
+      <div class="field"><label class="lab" for="imgStyle">Appended to every prompt for a consistent look across figures</label>
+        <textarea id="imgStyle" rows="2">Clean black-and-white technical line diagram, schematic style, white background, dark linework, clearly labeled with short text only, no shading, no photorealism.</textarea></div>
+    </div>
+    <div class="vbar" id="figBar" role="status" aria-live="polite">
+      <span class="vcount" id="figCount">0/0 images attached</span>
+      <span>Copy each prompt, generate the figure, then upload it.</span>
+      <button class="btn btn-ghost" id="figCopyAll" style="margin-left:auto;padding:6px 12px;min-height:34px;font-size:.68rem;">&#128203; Copy all prompts</button>
+    </div>
+    <label class="figws-bulk" id="figDrop" for="figBulk">
+      &#11015; <b>Bulk upload</b> — drop or choose multiple images and they're assigned to the figures below <b>in filename order</b>.
+      <input id="figBulk" type="file" accept="image/*" multiple hidden>
+    </label>
+    <div id="figList"></div>
+  </div>
+</div>
+</section>
+
 <section class="panel" id="tab-export" role="tabpanel" aria-labelledby="t-export">
 <div class="wrap">
   <div class="head"><h2>Export</h2><p>Three artifacts from one exam: a printable student exam (work space, no answers), an instructor answer key (worked solutions + checks), and a Canvas page formatted for an assignment with file-upload submission. Plus a JSON backup you can reload.</p></div>
@@ -487,14 +515,13 @@ footer .program{color:var(--cyan);font-weight:600;}
     </ol>
   </div>
   <div class="card"><h3>&#129518; Figures</h3>
-    <p style="font-size:.85rem;color:var(--ink-2);line-height:1.7;margin-bottom:10px;">Each problem can carry one figure, chosen per problem in the review step:</p>
+    <p style="font-size:.85rem;color:var(--ink-2);line-height:1.7;margin-bottom:10px;">Each problem can carry one figure. There are three modes, chosen per problem in Review:</p>
     <ul class="glist">
-      <li><b>Mechanism (auto-drawn)</b> — four-bar linkage or slider-crank. Enter link lengths and the input angle; the tool solves the position and draws it. The same values must appear in the problem, so the picture and answer key stay locked. If the links can't physically close, it shows a notice instead of a wrong figure.</li>
-      <li><b>SVG / AI (any figure, on the fly)</b> — describe a figure (&ldquo;cantilever beam, 8 kN tip load, label the moment&rdquo;) and generate it with AI, then hand-edit the SVG with a live preview; or paste your own. The LLM that writes the problem can also emit the figure directly. Markup is sanitized and baked into exports as static SVG. Uses your own Anthropic API key, stored only in your browser.</li>
-      <li><b>Image upload</b> — embed any diagram (free-body, gear train, 3D, photo) directly in the file as a self-contained image.</li>
-      <li><b>Exhibit block</b> — a monospace panel for a router config, code snippet, packet table, or text topology. Best for networking and cybersecurity problems.</li>
-      <li><b>None / caption</b> — no figure, or a caption describing one you'll provide separately.</li>
+      <li><b>Figure (image)</b> — the workhorse. The LLM writes a precise <em>image-generation prompt</em> for the figure; you copy it (one at a time in Review, or all at once from the Figures tab), generate the picture in your image tool of choice, then upload it. The image embeds into the student exam, answer key, and Canvas page. The Figures tab also takes a bulk drop of images and assigns them to the prompts in filename order.</li>
+      <li><b>Exhibit block</b> — a monospace panel for a router config, code snippet, packet table, or text topology. Rendered as text, not an image. Best for networking and cybersecurity problems.</li>
+      <li><b>None</b> — no figure.</li>
     </ul>
+    <p style="font-size:.82rem;color:var(--ink-3);line-height:1.6;margin-top:10px;">A shared style line on the Figures tab is appended to every prompt so your figures look consistent. Image models render text and exact numbers unreliably, so prompts keep labels short and leave the given values in the problem text — always check each generated figure against the problem before exporting.</p>
   </div>
   <div class="card"><h3>&#128202; LLM accuracy for quantitative work</h3>
     <div style="overflow-x:auto;"><table class="gtable">
@@ -579,7 +606,7 @@ function typeset(el){
 })();
 
 /* ════════════════ tabs ════════════════ */
-const TABS=['config','prompt','review','export','guide'];
+const TABS=['config','prompt','review','figures','export','guide'];
 function switchTab(name){
   TABS.forEach(n=>{
     const tab=$('t-'+n), panel=$('tab-'+n), on=(n===name);
@@ -587,6 +614,7 @@ function switchTab(name){
     tab.tabIndex=on?0:-1;
     panel.classList.toggle('active',on);
   });
+  if(name==='figures') renderFigures();
 }
 TABS.forEach((n,idx)=>{
   $('t-'+n).addEventListener('click',()=>switchTab(n));
@@ -645,7 +673,7 @@ function renderSlots(){
         '<div class="field"><label class="lab">Parts (a,b,c…)</label><input type="number" data-f="parts" value="'+s.parts+'" min="1" max="6" step="1"></div>'+
       '</div>'+
       '<div class="field" style="margin-top:10px;"><label class="lab">Likely figure</label><select data-f="figure">'+
-        [['auto','Let the LLM decide / propose a spec'],['mechanism','Mechanism (four-bar / slider-crank)'],['upload','I will upload an image'],['exhibit','Exhibit block (code / config / table)'],['none','No figure / text only']].map(o=>'<option value="'+o[0]+'"'+(o[0]===s.figure?' selected':'')+'>'+o[1]+'</option>').join('')+
+        [['auto','Let the LLM decide'],['image','Figure (image prompt)'],['exhibit','Exhibit block (code / config / table)'],['none','No figure / text only']].map(o=>'<option value="'+o[0]+'"'+(o[0]===s.figure?' selected':'')+'>'+o[1]+'</option>').join('')+
       '</select></div>';
     list.appendChild(div);
     div.querySelectorAll('[data-f]').forEach(el=>{
@@ -676,8 +704,8 @@ $('addSlot').addEventListener('click',()=>{slots.push(newSlot());renderSlots();}
 $('addFourEng').addEventListener('click',()=>{
   slots=[
     newSlot({label:'Ch. 1',subject:'engtech-kinematics',figure:'auto'}),
-    newSlot({label:'Ch. 2',subject:'engtech-kinematics',figure:'mechanism'}),
-    newSlot({label:'Ch. 3',subject:'engtech-kinematics',figure:'mechanism'}),
+    newSlot({label:'Ch. 2',subject:'engtech-kinematics',figure:'image'}),
+    newSlot({label:'Ch. 3',subject:'engtech-kinematics',figure:'image'}),
     newSlot({label:'Ch. 4',subject:'engtech-kinematics',figure:'auto'}),
   ];
   renderSlots(); toast('Added 4 engineering slots.','success');
@@ -749,11 +777,10 @@ function buildPrompt(){
   const slotSpecs=slots.map((s,i)=>{
     const subj=SUBJECT_NAMES[s.subject]||s.subject;
     let figNote='';
-    if(s.figure==='mechanism') figNote=' This problem REQUIRES a mechanism figure — emit a "figure" object (see figure schema), with link lengths and input angle that MATCH the given values in the stem.';
-    else if(s.figure==='upload') figNote=' A figure will be supplied separately by the instructor; describe the needed figure in a "figure" object with mode "caption".';
+    if(s.figure==='image') figNote=' This problem needs a figure: emit a "figure" object with mode "image", a precise "imagePrompt" (a text-to-image prompt that draws it), and a short "caption".';
     else if(s.figure==='exhibit') figNote=' Provide any code/config/table/topology as a "figure" object with mode "exhibit".';
     else if(s.figure==='none') figNote=' No figure needed (mode "none").';
-    else figNote=' Include a figure only if the problem genuinely needs one; if a diagram helps, prefer mode "svg" and draw it, or "mechanism" for a four-bar / slider-crank.';
+    else figNote=' If a figure would help, emit mode "image" with an "imagePrompt"; otherwise mode "none".';
     const urlNote=(!hw&&s.sourceUrl)?' Source: '+s.sourceUrl+'.':'';
     return '  Problem '+(i+1)+' ['+(s.label||('Item '+(i+1)))+']: subject = '+subj+'; type/coverage = '+(s.topic||'instructor\'s choice within the subject')+'; difficulty = '+s.difficulty+'; total points = '+s.points+'; parts = '+s.parts+' (label them a, b, c… with points summing to '+s.points+').'+figNote+urlNote;
   }).join('\n');
@@ -772,13 +799,13 @@ function buildPrompt(){
 '- Use $...$ / $$...$$ for ALL math. Never use $ as a currency symbol (write "500 dollars"). For networking, write IP addresses and CIDR (e.g. 192.168.1.0/24) as plain text, never inside $...$.\n\n'+
 'FIGURE SCHEMA — set the "figure" field on each problem to one of:\n'+
 '  {"mode":"none"}\n'+
-'  {"mode":"caption","caption":"Describe the figure the instructor should supply"}\n'+
 '  {"mode":"exhibit","caption":"optional","text":"verbatim monospace block (config / code / table / topology)"}\n'+
-'  {"mode":"mechanism","mechanism":"fourbar","groundLength":NUM,"crankLength":NUM,"couplerLength":NUM,"rockerLength":NUM,"inputAngleDeg":NUM,"assembly":"open"}\n'+
-'  {"mode":"mechanism","mechanism":"slidercrank","crankLength":NUM,"rodLength":NUM,"offset":NUM,"inputAngleDeg":NUM,"assembly":"open"}\n'+
-'  {"mode":"svg","caption":"optional","svg":"<svg viewBox=\\"0 0 W H\\" xmlns=\\"http://www.w3.org/2000/svg\\">…</svg>"}\n'+
-'For mode "svg" draw ANY needed diagram yourself (free-body diagram, truss, beam with supports/loads, gear train, circuit, vector or coordinate diagram, geometry). Rules for svg: set a viewBox; NO <script>, no on* event attributes, no external images or links; use explicit stroke/fill colors that read on a WHITE background (black/dark strokes); label parts with <text> at >=12px; keep it self-contained and under ~6 KB. Any numeric dimensions or angles shown MUST match the stem.\n'+
-'For mechanism figures, the link lengths and input angle MUST equal the given values used in the stem and worked solution; ensure the links can physically close at the given input angle.\n\n'+
+'  {"mode":"image","caption":"short caption shown under the figure","imagePrompt":"a precise prompt for a text-to-image model to draw this figure"}\n'+
+'IMAGE-PROMPT RULES — the instructor generates each figure in an external image tool from your "imagePrompt", then drops it in. Write each imagePrompt to render reliably:\n'+
+'- Describe the figure\'s CONTENT and geometry: the object(s), their arrangement, orientation/viewpoint, and any joints, supports, forces, members, or axes. A consistent visual style is added automatically, so do NOT specify colors or "white background".\n'+
+'- Label key points with SHORT tokens only (A, B, O2, theta-2, R1). Image models garble long text, equations, and exact numbers, so keep numbers and equations OUT of the figure — the exact given values live in the stem.\n'+
+'- The geometry must match the problem (e.g., a four-bar at the stated crank angle, a beam with the stated supports), but you need not embed dimension numbers in the picture.\n'+
+'- Use "exhibit" (not "image") for anything that is literally text — code, configs, routing tables, ASCII topology.\n\n'+
 srcSection+'\n'+
 'OUTPUT: Respond with ONLY a valid JSON array — no prose, no markdown fences, nothing before "[" or after "]". No meta-commentary inside any field (no "Note:", "REVISED:", etc.). Schema:\n'+
 '[\n'+
@@ -789,7 +816,7 @@ srcSection+'\n'+
 '    "difficulty":"medium",\n'+
 '    "points":20,\n'+
 '    "stem":"Problem setup with given values in $LaTeX$.",\n'+
-'    "figure":{"mode":"mechanism","mechanism":"fourbar","groundLength":200,"crankLength":60,"couplerLength":180,"rockerLength":120,"inputAngleDeg":60,"assembly":"open"},\n'+
+'    "figure":{"mode":"image","caption":"Four-bar linkage at the given crank angle","imagePrompt":"Technical line diagram of a planar four-bar linkage. Horizontal ground link with two fixed pivots O2 on the left and O4 on the right, each a small hatched ground support. A crank from O2 angled up and to the right to a pin labeled A; a coupler link from A to a pin labeled B; a rocker from B down to O4. Mark the crank angle theta-2 with a small arc at O2. Schematic, clearly labeled, no dimension numbers."},\n'+
 '    "parts":[\n'+
 '      {"letter":"a","prompt":"Find ...","points":10,"answer":"...","units":"deg","verification_expression":"..."},\n'+
 '      {"letter":"b","prompt":"Determine ...","points":10,"answer":"...","units":"rad/s","verification_expression":"..."}\n'+
@@ -821,89 +848,12 @@ $('clearConfig').addEventListener('click',()=>{
   renderSlots(); toast('Cleared.','');
 });
 
-/* ════════════════ mechanism solver + SVG ════════════════ */
-function circleIntersect(c1,r1,c2,r2){
-  const dx=c2[0]-c1[0],dy=c2[1]-c1[1],d=Math.hypot(dx,dy);
-  if(d>r1+r2 || d<Math.abs(r1-r2) || d===0) return null;
-  const a=(r1*r1-r2*r2+d*d)/(2*d), h2=r1*r1-a*a;
-  if(h2<0) return null;
-  const h=Math.sqrt(h2), xm=c1[0]+a*dx/d, ym=c1[1]+a*dy/d, rx=-dy*h/d, ry=dx*h/d;
-  return [[xm+rx,ym+ry],[xm-rx,ym-ry]];
-}
-function solveMechanism(f){
-  const th=(f.inputAngleDeg||0)*Math.PI/180;
-  if(f.mechanism==='slidercrank'){
-    const r2=+f.crankLength,r3=+f.rodLength,e=+(f.offset||0);
-    const O2=[0,0],A=[r2*Math.cos(th),r2*Math.sin(th)],dy=A[1]-e,disc=r3*r3-dy*dy;
-    if(disc<0) return {ok:false,reason:'Connecting rod too short to reach the slider line at this crank angle.'};
-    const root=Math.sqrt(disc), xB=(f.assembly==='crossed')?(A[0]-root):(A[0]+root);
-    return {ok:true,type:'slidercrank',O2,A,B:[xB,e],guideY:e,r2,r3,th:f.inputAngleDeg||0};
-  }
-  // four-bar
-  const L1=+f.groundLength,r2=+f.crankLength,r3=+f.couplerLength,r4=+f.rockerLength;
-  const O2=[0,0],O4=[L1,0],A=[r2*Math.cos(th),r2*Math.sin(th)];
-  const sols=circleIntersect(A,r3,O4,r4);
-  if(!sols) return {ok:false,reason:'Links cannot close at this input angle — coupler/rocker circles do not intersect.'};
-  const B=(f.assembly==='crossed')?sols[1]:sols[0];
-  return {ok:true,type:'fourbar',O2,A,B,O4,L1,r2,r3,r4,th:f.inputAngleDeg||0};
-}
-function mechanismSVG(f,opts){
-  opts=opts||{}; const W=420,H=300,M=46;
-  const sol=solveMechanism(f);
-  if(!sol.ok) return '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Mechanism cannot be drawn"><rect width="'+W+'" height="'+H+'" fill="none"/><text x="'+(W/2)+'" y="'+(H/2-10)+'" text-anchor="middle" font-family="monospace" font-size="13" fill="#c0392b">&#9888; Figure not drawable</text><text x="'+(W/2)+'" y="'+(H/2+12)+'" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#a0392b">'+escH(sol.reason)+'</text></svg>';
-  const pts=[];
-  if(sol.type==='fourbar'){pts.push(sol.O2,sol.A,sol.B,sol.O4);}
-  else{pts.push(sol.O2,sol.A,sol.B,[sol.B[0]-sol.r2*0.9,sol.guideY],[sol.B[0]+sol.r2*0.6,sol.guideY]);}
-  let minX=Math.min(...pts.map(p=>p[0])),maxX=Math.max(...pts.map(p=>p[0]));
-  let minY=Math.min(...pts.map(p=>p[1])),maxY=Math.max(...pts.map(p=>p[1]));
-  const bw=Math.max(maxX-minX,1),bh=Math.max(maxY-minY,1);
-  const sc=Math.min((W-2*M)/bw,(H-2*M)/bh);
-  const offx=(W-bw*sc)/2,offy=(H-bh*sc)/2;
-  const X=x=>offx+(x-minX)*sc, Y=y=>H-(offy+(y-minY)*sc); // flip y
-  const fg=opts.dark?'#cfe0ff':'#1a2744', acc=opts.dark?'#36c8f0':'#005f80', gnd=opts.dark?'#7f93b8':'#5a6a8a', lbl=opts.dark?'#9fb3d8':'#3a4a6a', amber=opts.dark?'#f5b54a':'#8a5000';
-  function ground(cx,cy,ang){ang=ang||0;const s='translate('+cx+','+cy+') rotate('+ang+')';let h='';for(let i=-12;i<=12;i+=6)h+='<line x1="'+i+'" y1="14" x2="'+(i-6)+'" y2="22" stroke="'+gnd+'" stroke-width="1.4"/>';return '<g transform="'+s+'"><polygon points="0,0 -11,14 11,14" fill="none" stroke="'+gnd+'" stroke-width="1.8"/><line x1="-15" y1="14" x2="15" y2="14" stroke="'+gnd+'" stroke-width="1.8"/>'+h+'</g>';}
-  function pin(cx,cy){return '<circle cx="'+cx+'" cy="'+cy+'" r="5.5" fill="'+(opts.dark?'#141d31':'#fff')+'" stroke="'+fg+'" stroke-width="2"/>';}
-  function link(a,b){return '<line x1="'+X(a[0])+'" y1="'+Y(a[1])+'" x2="'+X(b[0])+'" y2="'+Y(b[1])+'" stroke="'+acc+'" stroke-width="5" stroke-linecap="round"/>';}
-  function lbltxt(x,y,t,col){return '<text x="'+x+'" y="'+y+'" font-family="monospace" font-size="12" font-weight="600" fill="'+(col||fg)+'">'+escH(t)+'</text>';}
-  function midlen(a,b,t){if(!opts.lengths)return '';const mx=X((a[0]+b[0])/2),my=Y((a[1]+b[1])/2);return '<text x="'+mx+'" y="'+(my-6)+'" font-family="monospace" font-size="10" fill="'+lbl+'" text-anchor="middle">'+escH(t)+'</text>';}
-  let svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(sol.type==='fourbar'?'Four-bar linkage':'Slider-crank')+' figure">';
-  // angle arc at O2
-  if(opts.angleArc!==false){
-    const R=24, a0=0, a1=sol.th*Math.PI/180;
-    const sx=X(sol.O2[0])+R, sy=Y(sol.O2[1]);
-    const ex=X(sol.O2[0])+R*Math.cos(a1), ey=Y(sol.O2[1])-R*Math.sin(a1);
-    const large=(sol.th>180)?1:0, sweep=(sol.th>=0)?0:1;
-    svg+='<path d="M '+sx+' '+sy+' A '+R+' '+R+' 0 '+large+' '+sweep+' '+ex+' '+ey+'" fill="none" stroke="'+amber+'" stroke-width="1.5"/>';
-    svg+=lbltxt(X(sol.O2[0])+R*0.7*Math.cos(a1/2)+6, Y(sol.O2[1])-R*0.7*Math.sin(a1/2), '\u03B8\u2082', amber);
-    // ground reference line
-    svg+='<line x1="'+X(sol.O2[0])+'" y1="'+Y(sol.O2[1])+'" x2="'+(X(sol.O2[0])+R+10)+'" y2="'+Y(sol.O2[1])+'" stroke="'+gnd+'" stroke-width="1" stroke-dasharray="3 3"/>';
-  }
-  if(sol.type==='fourbar'){
-    svg+=link(sol.O2,sol.A)+link(sol.A,sol.B)+link(sol.O4,sol.B);
-    svg+=midlen(sol.O2,sol.A,'r\u2082='+sol.r2)+midlen(sol.A,sol.B,'r\u2083='+sol.r3)+midlen(sol.O4,sol.B,'r\u2084='+sol.r4);
-    if(opts.lengths)svg+=midlen(sol.O2,sol.O4,'r\u2081='+sol.L1);
-    svg+=ground(X(sol.O2[0]),Y(sol.O2[1]))+ground(X(sol.O4[0]),Y(sol.O4[1]));
-    svg+=pin(X(sol.O2[0]),Y(sol.O2[1]))+pin(X(sol.A[0]),Y(sol.A[1]))+pin(X(sol.B[0]),Y(sol.B[1]))+pin(X(sol.O4[0]),Y(sol.O4[1]));
-    if(opts.labels!==false){
-      svg+=lbltxt(X(sol.O2[0])-22,Y(sol.O2[1])+4,'O\u2082')+lbltxt(X(sol.O4[0])+10,Y(sol.O4[1])+4,'O\u2084')+lbltxt(X(sol.A[0])-6,Y(sol.A[1])-10,'A')+lbltxt(X(sol.B[0])+8,Y(sol.B[1])-6,'B');
-    }
-  } else {
-    // guide line
-    const gy=Y(sol.guideY);
-    svg+='<line x1="20" y1="'+gy+'" x2="'+(W-20)+'" y2="'+gy+'" stroke="'+gnd+'" stroke-width="1.4"/>';
-    for(let gx=24;gx<W-20;gx+=14)svg+='<line x1="'+gx+'" y1="'+gy+'" x2="'+(gx-6)+'" y2="'+(gy+7)+'" stroke="'+gnd+'" stroke-width="1"/>';
-    svg+=link(sol.O2,sol.A)+link(sol.A,sol.B);
-    svg+=midlen(sol.O2,sol.A,'r\u2082='+sol.r2)+midlen(sol.A,sol.B,'r\u2083='+sol.r3);
-    // slider block
-    const bx=X(sol.B[0]),by=Y(sol.B[1]);
-    svg+='<rect x="'+(bx-17)+'" y="'+(by-11)+'" width="34" height="22" rx="3" fill="'+(opts.dark?'#1d2840':'#e8eefb')+'" stroke="'+fg+'" stroke-width="1.8"/>';
-    svg+=ground(X(sol.O2[0]),Y(sol.O2[1]));
-    svg+=pin(X(sol.O2[0]),Y(sol.O2[1]))+pin(X(sol.A[0]),Y(sol.A[1]))+pin(bx,by);
-    if(opts.labels!==false){
-      svg+=lbltxt(X(sol.O2[0])-22,Y(sol.O2[1])+4,'O\u2082')+lbltxt(X(sol.A[0])-6,Y(sol.A[1])-10,'A')+lbltxt(bx+20,by+4,'B');
-    }
-  }
-  return svg+'</svg>';
+/* ════════════════ legacy mechanism → image-prompt migration ════════════════ */
+function mechanismToPrompt(f){
+  const ang=(f.inputAngleDeg!=null?f.inputAngleDeg:60);
+  if((f.mechanism||'fourbar')==='slidercrank')
+    return 'Technical line diagram of a slider-crank mechanism. Fixed pivot O2 with a crank up to pin A at a crank angle theta-2 of about '+ang+' degrees from horizontal, a connecting rod from A to a slider block B riding on a horizontal guide with hatched ground. Label O2, A, B and mark theta-2 with a small arc. Schematic, clearly labeled, no dimension numbers.';
+  return 'Technical line diagram of a planar four-bar linkage. Horizontal ground link with fixed pivots O2 (left) and O4 (right) as small hatched ground supports; crank from O2 to pin A at a crank angle theta-2 of about '+ang+' degrees; coupler from A to pin B; rocker from B to O4. Label O2, A, B, O4 and mark theta-2 with a small arc. Schematic, clearly labeled, no dimension numbers.';
 }
 
 /* ════════════════ SVG sanitizer (for AI / LLM / hand-authored figures) ════════════════ */
@@ -950,17 +900,11 @@ let editIdx=-1;
 function normFigure(fig){
   if(!fig||typeof fig!=='object') return {mode:'none'};
   const m=(fig.mode||'').toLowerCase();
-  if(m==='mechanism'){
-    return {mode:'mechanism',mechanism:(fig.mechanism||'fourbar').toLowerCase(),
-      groundLength:+fig.groundLength||200,crankLength:+fig.crankLength||60,couplerLength:+fig.couplerLength||180,
-      rockerLength:+fig.rockerLength||120,rodLength:+fig.rodLength||180,offset:+fig.offset||0,
-      inputAngleDeg:fig.inputAngleDeg!=null?+fig.inputAngleDeg:60,assembly:fig.assembly==='crossed'?'crossed':'open',
-      labels:true,lengths:true,angleArc:true};
-  }
   if(m==='exhibit') return {mode:'exhibit',text:fig.text||'',caption:fig.caption||''};
-  if(m==='svg') return {mode:'svg',svg:sanitizeSVG(fig.svg||''),caption:fig.caption||''};
-  if(m==='caption'||m==='upload') return {mode:'caption',caption:fig.caption||''};
-  if(m==='image') return {mode:'image',dataUrl:fig.dataUrl||'',caption:fig.caption||'',alt:fig.alt||''};
+  if(m==='image'||m==='upload') return {mode:'image',imagePrompt:fig.imagePrompt||fig.caption||'',caption:fig.caption||'',dataUrl:fig.dataUrl||'',alt:fig.alt||fig.caption||''};
+  if(m==='caption') return {mode:'image',imagePrompt:fig.imagePrompt||fig.caption||'',caption:fig.caption||'',dataUrl:'',alt:''};
+  if(m==='mechanism') return {mode:'image',imagePrompt:mechanismToPrompt(fig),caption:fig.caption||'',dataUrl:'',alt:''};
+  if(m==='svg') return {mode:'image',imagePrompt:fig.caption||'',caption:fig.caption||'',dataUrl:'',alt:''};
   return {mode:'none'};
 }
 function normParts(p){
@@ -1067,7 +1011,7 @@ function buildCard(p,i){
           '<span class="bdg pts">'+tpts+' pts</span>'+
           '<span class="bdg diff">'+escH(p.difficulty)+'</span>'+
           (p.subject?'<span class="bdg subj">'+escH(SUBJECT_NAMES[p.subject]||p.subject)+'</span>':'')+
-          (p.figure&&p.figure.mode!=='none'?'<span class="bdg fig">'+escH(p.figure.mode)+'</span>':'')+
+          (p.figure&&p.figure.mode==='image'?'<span class="bdg fig">'+(p.figure.dataUrl?'image &#10003;':'image &middot; needs art')+'</span>':(p.figure&&p.figure.mode==='exhibit'?'<span class="bdg fig">exhibit</span>':''))+
         '</div>'+
       '</div>'+
       '<button class="vbadge '+(isV?'done':'needs')+'" data-verify="'+i+'" title="Mark verified after checking the work">'+(isV?'&#10003; Verified':'&#9888; Needs check')+'</button>'+
@@ -1113,157 +1057,123 @@ function verifyHtml(pt,p){
 /* figure editor */
 function figureEditorHtml(p,i){
   const f=p.figure||{mode:'none'};
-  const modes=[['mechanism','Mechanism'],['svg','SVG / AI'],['image','Image'],['exhibit','Exhibit'],['caption','Caption'],['none','None']];
+  const modes=[['image','Figure (image)'],['exhibit','Exhibit'],['none','None']];
   let body='';
-  if(f.mode==='mechanism'){
-    body='<div class="mech-params" data-mech="'+i+'">'+
-      field(i,'mechanism','Type','select',f.mechanism,[['fourbar','Four-bar'],['slidercrank','Slider-crank']])+
-      (f.mechanism==='slidercrank'
-        ? field(i,'crankLength','Crank r₂','num',f.crankLength)+field(i,'rodLength','Rod r₃','num',f.rodLength)+field(i,'offset','Offset e','num',f.offset)
-        : field(i,'groundLength','Ground r₁','num',f.groundLength)+field(i,'crankLength','Crank r₂','num',f.crankLength)+field(i,'couplerLength','Coupler r₃','num',f.couplerLength)+field(i,'rockerLength','Rocker r₄','num',f.rockerLength))+
-      field(i,'inputAngleDeg','Input θ₂ (°)','num',f.inputAngleDeg)+
-      field(i,'assembly','Assembly','select',f.assembly,[['open','Open'],['crossed','Crossed']])+
-      '</div>'+
-      '<div class="fig-preview" data-figprev="'+i+'">'+mechanismSVG(f,{lengths:f.lengths,labels:f.labels,angleArc:f.angleArc,dark:isDarkNow()})+'</div>';
-  } else if(f.mode==='image'){
-    body='<input type="file" accept="image/*" data-imgfile="'+i+'" style="font-size:.8rem;margin-bottom:8px;">'+
-      '<input type="text" placeholder="Caption (optional)" data-imgcap="'+i+'" value="'+escAttr(f.caption||'')+'" style="margin-bottom:8px;">'+
-      '<div class="fig-preview" data-figprev="'+i+'">'+(f.dataUrl?'<img src="'+escAttr(f.dataUrl)+'" alt="'+escAttr(f.alt||f.caption||'figure')+'">':'<span class="hint">No image yet — choose a file.</span>')+'</div>';
+  if(f.mode==='image'){
+    body='<input type="text" placeholder="Caption (shown under the figure)" data-imgcap="'+i+'" value="'+escAttr(f.caption||'')+'" style="margin-bottom:8px;">'+
+      '<label class="lab" style="display:block;margin-bottom:4px;">Image-generation prompt &mdash; edit, then copy to your image tool</label>'+
+      '<textarea class="img-prompt" data-imgprompt="'+i+'" rows="4" placeholder="Describe the figure to generate — e.g. a free-body diagram of a block on a 30-degree incline, labeled.">'+escH(f.imagePrompt||'')+'</textarea>'+
+      '<div class="img-actions"><button type="button" class="btn btn-ghost" data-copyprompt="'+i+'">&#128203; Copy prompt</button>'+
+        '<label class="upload-btn" for="imgfile-'+i+'">&#11015; Upload image</label>'+
+        '<input id="imgfile-'+i+'" type="file" accept="image/*" data-imgfile="'+i+'" hidden></div>'+
+      '<div class="fig-preview" data-figprev="'+i+'">'+(f.dataUrl?'<img src="'+escAttr(f.dataUrl)+'" alt="'+escAttr(f.alt||f.caption||'figure')+'">':'<span class="hint">No image yet — copy the prompt, generate it in your image tool, then upload it here (or use the bulk upload on the Figures tab).</span>')+'</div>';
   } else if(f.mode==='exhibit'){
     body='<input type="text" placeholder="Caption (optional)" data-excap="'+i+'" value="'+escAttr(f.caption||'')+'" style="margin-bottom:8px;">'+
       '<textarea data-extext="'+i+'" rows="4" style="font-family:var(--mono);font-size:.78rem;" placeholder="Monospace block: config / code / table / topology">'+escH(f.text||'')+'</textarea>'+
       (f.text?'<div class="fig-preview" data-figprev="'+i+'" style="justify-content:flex-start;"><pre class="exhibit-pre">'+escH(f.text)+'</pre></div>':'');
-  } else if(f.mode==='svg'){
-    body='<div class="ai-fig">'+
-        '<label class="lab">&#10024; Generate a figure with AI</label>'+
-        '<div class="ai-fig-row">'+
-          '<div class="field"><input type="text" data-aidesc="'+i+'" placeholder="e.g. simply supported beam, 6 m span, 5 kN point load at midspan, label reactions"></div>'+
-          '<button type="button" class="btn btn-ai" data-aigen="'+i+'">Generate</button>'+
-        '</div>'+
-        '<div class="keyrow"><input type="password" data-aikey="'+i+'" placeholder="Anthropic API key (sk-ant-…)" autocomplete="off"><button type="button" class="iconbtn" data-aikeysave="'+i+'">Save key</button></div>'+
-        '<div class="ai-status" data-aistatus="'+i+'"></div>'+
-        '<div class="hint" style="margin-top:4px;">Your key is stored only in this browser (localStorage) and sent directly to Anthropic. Leave the description blank to just hand-write/paste SVG below.</div>'+
-      '</div>'+
-      '<input type="text" placeholder="Caption (optional)" data-svgcap="'+i+'" value="'+escAttr(f.caption||'')+'" style="margin-bottom:8px;">'+
-      '<label class="lab" style="display:block;margin-bottom:4px;">SVG markup (editable)</label>'+
-      '<textarea class="svg-edit" data-svgtext="'+i+'" placeholder="Paste or generate &lt;svg&gt;…&lt;/svg&gt;. Scripts and event handlers are stripped automatically.">'+escH(f.svg||'')+'</textarea>'+
-      '<div class="fig-preview" data-figprev="'+i+'" style="margin-top:8px;">'+(f.svg?f.svg:'<span class="hint">No figure yet — describe one above, or paste SVG.</span>')+'</div>';
-  } else if(f.mode==='caption'){
-    body='<input type="text" placeholder="Describe the figure to supply" data-capcap="'+i+'" value="'+escAttr(f.caption||'')+'">'+
-      (f.caption?'<div class="hint" style="margin-top:6px;">Figure placeholder: '+escH(f.caption)+'</div>':'');
   } else {
     body='<div class="hint">No figure for this problem.</div>';
   }
   return '<div class="figbox"><div class="figlab">&#129518; Figure</div>'+
-    '<div class="fig-mode-row" data-figmode="'+i+'">'+modes.map(m=>'<button type="button" class="fig-mode'+(f.mode===m[0]||(m[0]==='caption'&&f.mode==='caption')?' on':'')+'" data-setmode="'+m[0]+'">'+m[1]+'</button>').join('')+'</div>'+
+    '<div class="fig-mode-row" data-figmode="'+i+'">'+modes.map(m=>'<button type="button" class="fig-mode'+(f.mode===m[0]?' on':'')+'" data-setmode="'+m[0]+'">'+m[1]+'</button>').join('')+'</div>'+
     body+'</div>';
-  function field(idx,key,label,type,val,opt){
-    if(type==='select') return '<div class="field"><label class="lab">'+label+'</label><select data-mf="'+key+'">'+opt.map(o=>'<option value="'+o[0]+'"'+(o[0]===val?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></div>';
-    return '<div class="field"><label class="lab">'+label+'</label><input type="number" step="any" data-mf="'+key+'" value="'+(val!=null?val:'')+'"></div>';
-  }
 }
 function isDarkNow(){const a=document.documentElement.getAttribute('data-theme');if(a==='dark')return true;if(a==='light')return false;return window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;}
 
 function wireFigureEditor(card,p,i){
-  // mode switch
   const modeRow=card.querySelector('[data-figmode="'+i+'"]');
   if(modeRow) modeRow.addEventListener('click',e=>{
     const b=e.target.closest('[data-setmode]'); if(!b)return;
     const m=b.dataset.setmode;
-    if(m==='mechanism') p.figure=normFigure({mode:'mechanism',mechanism:'fourbar',groundLength:200,crankLength:60,couplerLength:180,rockerLength:120,inputAngleDeg:60});
-    else if(m==='svg') p.figure={mode:'svg',svg:'',caption:''};
-    else if(m==='image') p.figure={mode:'image',dataUrl:'',caption:'',alt:''};
-    else if(m==='exhibit') p.figure={mode:'exhibit',text:'',caption:''};
-    else if(m==='caption') p.figure={mode:'caption',caption:''};
+    if(m==='image') p.figure={mode:'image',imagePrompt:(p.figure&&p.figure.imagePrompt)||'',caption:(p.figure&&p.figure.caption)||'',dataUrl:(p.figure&&p.figure.dataUrl)||'',alt:(p.figure&&p.figure.alt)||''};
+    else if(m==='exhibit') p.figure={mode:'exhibit',text:(p.figure&&p.figure.text)||'',caption:(p.figure&&p.figure.caption)||''};
     else p.figure={mode:'none'};
-    refreshCard(i);
+    refreshCard(i); renderFigures();
   });
-  // mechanism params
-  const mp=card.querySelector('[data-mech="'+i+'"]');
-  if(mp) mp.addEventListener('input',()=>{
-    mp.querySelectorAll('[data-mf]').forEach(el=>{
-      const k=el.dataset.mf; const v=el.value;
-      p.figure[k]=(el.tagName==='SELECT')?v:(parseFloat(v)||0);
-    });
-    // type change rebuilds fields
-    const typeChanged=mp.querySelector('[data-mf="mechanism"]') && mp.querySelector('[data-mf="mechanism"]').value!==p.figure.mechanism;
-    const prev=card.querySelector('[data-figprev="'+i+'"]');
-    if(prev) prev.innerHTML=mechanismSVG(p.figure,{lengths:p.figure.lengths,labels:p.figure.labels,angleArc:p.figure.angleArc,dark:isDarkNow()});
-  });
-  if(mp){
-    const typeSel=mp.querySelector('[data-mf="mechanism"]');
-    if(typeSel) typeSel.addEventListener('change',()=>{p.figure.mechanism=typeSel.value;refreshCard(i);});
-  }
-  // image upload
-  const imgf=card.querySelector('[data-imgfile="'+i+'"]');
-  if(imgf) imgf.addEventListener('change',()=>{
-    const file=imgf.files[0]; if(!file)return;
-    if(file.size>3*1024*1024){toast('Image over 3 MB — use a smaller image to keep the file light.','error');return;}
-    const r=new FileReader(); r.onload=ev=>{p.figure.dataUrl=ev.target.result;refreshCard(i);}; r.readAsDataURL(file);
-  });
+  // image mode
+  const ip=card.querySelector('[data-imgprompt="'+i+'"]'); if(ip)ip.addEventListener('input',()=>{p.figure.imagePrompt=ip.value;});
   const imgcap=card.querySelector('[data-imgcap="'+i+'"]'); if(imgcap)imgcap.addEventListener('input',()=>{p.figure.caption=imgcap.value;p.figure.alt=imgcap.value;});
-  // exhibit
+  const cp=card.querySelector('[data-copyprompt="'+i+'"]'); if(cp)cp.addEventListener('click',()=>{copyText(fullImagePrompt(p),'Prompt copied — paste it into your image tool.');});
+  const imgf=card.querySelector('[data-imgfile="'+i+'"]');
+  if(imgf) imgf.addEventListener('change',()=>{readImageInto(imgf.files[0],p,()=>{refreshCard(i);renderFigures();refreshExport();});});
+  // exhibit mode
   const ex=card.querySelector('[data-extext="'+i+'"]'); if(ex)ex.addEventListener('input',()=>{p.figure.text=ex.value;});
   const exc=card.querySelector('[data-excap="'+i+'"]'); if(exc)exc.addEventListener('input',()=>{p.figure.caption=exc.value;});
-  const exb=card.querySelector('[data-extext="'+i+'"]'); if(exb)exb.addEventListener('blur',()=>refreshCard(i));
-  // caption
-  const cc=card.querySelector('[data-capcap="'+i+'"]'); if(cc)cc.addEventListener('input',()=>{p.figure.caption=cc.value;});
-  // svg mode
-  const svgCap=card.querySelector('[data-svgcap="'+i+'"]'); if(svgCap)svgCap.addEventListener('input',()=>{p.figure.caption=svgCap.value;});
-  const svgText=card.querySelector('[data-svgtext="'+i+'"]');
-  if(svgText){
-    let svgTimer;
-    svgText.addEventListener('input',()=>{
-      clearTimeout(svgTimer);
-      svgTimer=setTimeout(()=>{
-        const clean=sanitizeSVG(svgText.value);
-        p.figure.svg=clean;
-        const prev=card.querySelector('[data-figprev="'+i+'"]');
-        if(prev) prev.innerHTML=clean||'<span class="hint">Couldn\u2019t parse SVG — check the markup.</span>';
-      },350);
-    });
-  }
-  // AI key
-  const keyInput=card.querySelector('[data-aikey="'+i+'"]');
-  if(keyInput){ try{const k=localStorage.getItem('exam_anthropic_key');if(k)keyInput.value=k;}catch(e){} }
-  const keySave=card.querySelector('[data-aikeysave="'+i+'"]');
-  if(keySave) keySave.addEventListener('click',()=>{try{localStorage.setItem('exam_anthropic_key',keyInput.value.trim());toast('API key saved in this browser.','success');}catch(e){toast('Could not save key.','error');}});
-  // AI generate
-  const aiGen=card.querySelector('[data-aigen="'+i+'"]');
-  if(aiGen) aiGen.addEventListener('click',()=>generateFigure(card,p,i));
+  if(ex)ex.addEventListener('blur',()=>refreshCard(i));
 }
 
-/* ════════════════ AI figure generation (Anthropic API, user key) ════════════════ */
-async function generateFigure(card,p,i){
-  const desc=(card.querySelector('[data-aidesc="'+i+'"]').value||'').trim();
-  const status=card.querySelector('[data-aistatus="'+i+'"]');
-  const keyInput=card.querySelector('[data-aikey="'+i+'"]');
-  const key=(keyInput.value||'').trim();
-  if(!desc){status.className='ai-status err';status.textContent='Describe the figure first.';return;}
-  if(!key||key.indexOf('sk-')!==0){status.className='ai-status err';status.textContent='Enter your Anthropic API key (sk-ant-…) above.';return;}
-  status.className='ai-status busy'; status.textContent='\u23F3 Drawing figure…';
-  const sys='You generate a single clean, self-contained SVG figure for a printed STEM/engineering exam problem. Output ONLY the SVG markup — no prose, no code fences. Requirements: a viewBox; black/dark strokes and labels that read on a WHITE background; <text> labels at 12px or larger; NO <script>, no on* attributes, no external images or links, no animation; keep it under ~6 KB. Make it accurate and clearly labeled.';
-  const ctx='Problem context: '+(p.stem? p.stem.replace(/\$+/g,'').slice(0,500):'(none)')+'\n\nFigure to draw: '+desc;
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,system:sys,messages:[{role:'user',content:ctx}]})
-    });
-    if(!r.ok){let m='HTTP '+r.status;try{const j=await r.json();if(j.error&&j.error.message)m=j.error.message;}catch(e){}throw new Error(m);}
-    const data=await r.json();
-    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
-    const clean=sanitizeSVG(text);
-    if(!clean){status.className='ai-status err';status.textContent='Model did not return usable SVG — try rephrasing.';return;}
-    p.figure.svg=clean;
-    const ta=card.querySelector('[data-svgtext="'+i+'"]'); if(ta)ta.value=clean;
-    const prev=card.querySelector('[data-figprev="'+i+'"]'); if(prev)prev.innerHTML=clean;
-    status.className='ai-status ok'; status.textContent='\u2713 Figure generated — edit the SVG or regenerate to refine.';
-  }catch(err){
-    status.className='ai-status err';
-    status.textContent='Failed: '+err.message+(/Failed to fetch/i.test(err.message)?' (network/CORS — check the key and your connection)':'');
-  }
+/* ════════════════ figure image helpers + Figures workspace ════════════════ */
+const DEFAULT_IMG_STYLE='Clean black-and-white technical line diagram, schematic style, white background, dark linework, clearly labeled with short text only, no shading, no photorealism.';
+function imageStyleSuffix(){ const el=$('imgStyle'); const s=(el?el.value:'').trim(); return s||DEFAULT_IMG_STYLE; }
+function fullImagePrompt(p){
+  const base=((p.figure&&p.figure.imagePrompt)||'').trim();
+  const style=imageStyleSuffix();
+  return (base||('Figure for: '+(p.label||'problem')))+'\n\nStyle: '+style;
 }
+function copyText(txt,msg){ navigator.clipboard.writeText(txt).then(()=>toast(msg||'Copied!','success'),()=>toast('Copy failed.','error')); }
+function readImageInto(file,p,cb){
+  if(!file)return;
+  if(file.size>3*1024*1024){toast('Image over 3 MB — use a smaller image to keep the file light.','error');return;}
+  const r=new FileReader(); r.onload=ev=>{p.figure.mode='image';p.figure.dataUrl=ev.target.result;if(cb)cb();}; r.readAsDataURL(file);
+}
+function figureProblems(){ return problems.map((p,i)=>({p,i})).filter(o=>o.p.figure&&o.p.figure.mode==='image'); }
+function renderFigures(){
+  const wrap=$('figuresWrap'), empty=$('figuresEmpty'); if(!wrap||!empty)return;
+  if(!problems.length){ wrap.style.display='none'; empty.style.display='block'; empty.innerHTML='<div class="ico">&#129518;</div><div style="font-family:var(--mono);font-size:.8rem;">Validate problems in Step 3 first.</div>'; return; }
+  const list=figureProblems();
+  if(!list.length){ wrap.style.display='none'; empty.style.display='block'; empty.innerHTML='<div class="ico">&#129518;</div><div style="font-family:var(--mono);font-size:.8rem;max-width:48ch;margin:0 auto;">No image figures yet. Set a problem\u2019s figure to &ldquo;Figure (image)&rdquo; in Review, or have the LLM emit image figures.</div>'; return; }
+  empty.style.display='none'; wrap.style.display='block';
+  const done=list.filter(o=>o.p.figure.dataUrl).length;
+  const fc=$('figCount'); fc.textContent=done+'/'+list.length+' images attached'; fc.className='vcount'+(done===list.length?' full':'');
+  const host=$('figList'); host.innerHTML='';
+  list.forEach((o,n)=>{
+    const p=o.p, has=!!p.figure.dataUrl;
+    const el=document.createElement('div'); el.className='figws-item';
+    el.innerHTML=
+      '<div class="fw-main"><div class="fw-num">Figure '+(n+1)+' &middot; Problem '+(o.i+1)+' — '+escH(p.label||'')+'</div>'+
+        '<textarea class="img-prompt" data-fwprompt="'+o.i+'" rows="3" style="margin:6px 0;">'+escH(p.figure.imagePrompt||'')+'</textarea>'+
+        '<div class="img-actions"><button type="button" class="btn btn-ghost" data-fwcopy="'+o.i+'">&#128203; Copy prompt</button>'+
+          '<label class="upload-btn" for="fwfile-'+o.i+'">&#11015; Upload image</label>'+
+          '<input id="fwfile-'+o.i+'" type="file" accept="image/*" data-fwfile="'+o.i+'" hidden>'+
+          '<span class="'+(has?'fw-attached':'fw-pending')+'" style="font-family:var(--mono);font-size:.7rem;font-weight:700;">'+(has?'\u2713 attached':'\u25CB pending')+'</span></div>'+
+      '</div>'+
+      '<div class="fw-thumb">'+(has?'<img src="'+escAttr(p.figure.dataUrl)+'" alt="'+escAttr(p.figure.caption||'figure')+'">':'<span class="hint">no image yet</span>')+'</div>';
+    host.appendChild(el);
+  });
+}
+function assignBulk(files){
+  const targets=figureProblems(); if(!targets.length){toast('No image figures to fill.','error');return;}
+  const imgs=Array.from(files).filter(f=>/^image\//.test(f.type)).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  if(!imgs.length){toast('No image files found.','error');return;}
+  let idx=0, assigned=0;
+  (function next(){
+    if(idx>=imgs.length||idx>=targets.length){ renderFigures(); refreshExport(); targets.forEach(o=>{ if($('pcard-'+o.i)) refreshCard(o.i); }); toast(assigned+' image(s) assigned in filename order.','success'); return; }
+    const file=imgs[idx], o=targets[idx];
+    if(file.size>3*1024*1024){toast('Skipped '+file.name+' (over 3 MB).','error');idx++;return next();}
+    const r=new FileReader(); r.onload=ev=>{o.p.figure.dataUrl=ev.target.result;assigned++;idx++;next();}; r.readAsDataURL(file);
+  })();
+}
+(function(){
+  const host=$('figList');
+  if(host){
+    host.addEventListener('input',e=>{const t=e.target.closest('[data-fwprompt]');if(t){const i=+t.dataset.fwprompt;if(problems[i]&&problems[i].figure)problems[i].figure.imagePrompt=t.value;}});
+    host.addEventListener('click',e=>{const c=e.target.closest('[data-fwcopy]');if(c){const i=+c.dataset.fwcopy;copyText(fullImagePrompt(problems[i]),'Prompt copied.');}});
+    host.addEventListener('change',e=>{const f=e.target.closest('[data-fwfile]');if(f){const i=+f.dataset.fwfile;readImageInto(f.files[0],problems[i],()=>{renderFigures();refreshExport();if($('pcard-'+i))refreshCard(i);});}});
+  }
+  const ca=$('figCopyAll');
+  if(ca) ca.addEventListener('click',()=>{
+    const list=figureProblems(); if(!list.length){toast('No image figures.','error');return;}
+    const txt=list.map((o,n)=>'### Figure '+(n+1)+' — Problem '+(o.i+1)+' ('+(o.p.label||'')+')\n'+fullImagePrompt(o.p)).join('\n\n----------------------------------------\n\n');
+    copyText(txt,list.length+' prompt(s) copied.');
+  });
+  const bulk=$('figBulk'); if(bulk) bulk.addEventListener('change',()=>{assignBulk(bulk.files);bulk.value='';});
+  const dz=$('figDrop');
+  if(dz){
+    ['dragover','dragenter'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+    ['dragleave','dragend'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
+    dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer&&e.dataTransfer.files)assignBulk(e.dataTransfer.files);});
+  }
+})();
 function refreshCard(i){
   const old=$('pcard-'+i); if(!old)return;
   const fresh=buildCard(problems[i],i);
@@ -1292,6 +1202,7 @@ function refreshExport(){
   if(!has)return;
   if(done===total){bar.className='vbar all';c.className='vcount full';c.textContent=done+'/'+total+' verified';m.textContent='\u2713 All verified — ready to export.';}
   else{bar.className='vbar';c.className='vcount';c.textContent=done+'/'+total+' verified';m.textContent='Verify each problem before exporting.';}
+  renderFigures();
 }
 $('verifyAll').addEventListener('click',()=>{problems.forEach((p,i)=>verified[p.id||('p'+i)]=true);renderReview();refreshExport();toast('All marked verified.','success');});
 
@@ -1330,11 +1241,11 @@ function safeName(){return (($('examTitle').value.trim()||(assignMode==='hw'?'ho
 /* figure HTML for exported docs */
 function figureExportHtml(f){
   if(!f||f.mode==='none')return '';
-  if(f.mode==='mechanism')return '<div class="fig">'+mechanismSVG(f,{lengths:f.lengths,labels:f.labels,angleArc:f.angleArc,dark:false})+'</div>';
-  if(f.mode==='svg'&&f.svg)return '<div class="fig">'+sanitizeSVG(f.svg)+(f.caption?'<div class="figcap">'+escH(f.caption)+'</div>':'')+'</div>';
-  if(f.mode==='image'&&f.dataUrl)return '<div class="fig"><img src="'+escAttr(f.dataUrl)+'" alt="'+escAttr(f.alt||f.caption||'figure')+'">'+(f.caption?'<div class="figcap">'+escH(f.caption)+'</div>':'')+'</div>';
+  if(f.mode==='image'){
+    if(f.dataUrl)return '<div class="fig"><img src="'+escAttr(f.dataUrl)+'" alt="'+escAttr(f.alt||f.caption||'figure')+'">'+(f.caption?'<div class="figcap">'+escH(f.caption)+'</div>':'')+'</div>';
+    return '<div class="figcap-only">[ Figure to insert'+(f.caption?': '+escH(f.caption):'')+' ]</div>';
+  }
   if(f.mode==='exhibit'&&f.text)return '<div class="fig">'+(f.caption?'<div class="figcap">'+escH(f.caption)+'</div>':'')+'<pre class="exhibit">'+escH(f.text)+'</pre></div>';
-  if(f.mode==='caption'&&f.caption)return '<div class="figcap-only">[ Figure: '+escH(f.caption)+' ]</div>';
   return '';
 }
 const KATEX_TAIL='<scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></scr'+'ipt><scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></scr'+'ipt><scr'+'ipt>renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],throwOnError:false});</scr'+'ipt>';
@@ -1475,7 +1386,7 @@ $('expStudent').addEventListener('click',()=>{if(!guardExport())return;dl(new Bl
 $('expKey').addEventListener('click',()=>{if(!problems.length){toast('Validate first.','error');return;}dl(new Blob([answerKeyHtml()],{type:'text/html'}),safeName()+'_answer_key.html');toast('Answer key downloaded.','success');});
 $('expCanvas').addEventListener('click',()=>{if(!guardExport())return;dl(new Blob([canvasHtml()],{type:'text/html'}),safeName()+'_canvas.html');toast('Canvas page downloaded.','success');});
 $('expJson').addEventListener('click',()=>{
-  const data={assignMode,meta:examMeta(),defaults:{unitSystem:$('unitSystem').value,sigFigs:$('sigFigs').value,defaultTol:$('defaultTol').value},lessonUrl:$('lessonUrl').value.trim(),slots:slots.map(s=>({label:s.label,subject:s.subject,topic:s.topic,difficulty:s.difficulty,points:s.points,parts:s.parts,figure:s.figure,sourceUrl:s.sourceUrl})),generated:new Date().toISOString(),problems};
+  const data={assignMode,meta:examMeta(),defaults:{unitSystem:$('unitSystem').value,sigFigs:$('sigFigs').value,defaultTol:$('defaultTol').value},imgStyle:($('imgStyle')?$('imgStyle').value:''),lessonUrl:$('lessonUrl').value.trim(),slots:slots.map(s=>({label:s.label,subject:s.subject,topic:s.topic,difficulty:s.difficulty,points:s.points,parts:s.parts,figure:s.figure,sourceUrl:s.sourceUrl})),generated:new Date().toISOString(),problems};
   dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),safeName()+(assignMode==='hw'?'_homework.json':'_exam.json'));toast('JSON saved.','success');
 });
 
@@ -1491,6 +1402,7 @@ $('loadExamInput').addEventListener('change',()=>{
       if(d.meta){$('courseTitle').value=d.meta.courseTitle||'';$('examTitle').value=d.meta.examTitle||'';$('instructor').value=d.meta.instructor||'';$('timeLimit').value=d.meta.timeLimit||'';$('dueDate').value=d.meta.dueDate||'';$('instructions').value=d.meta.instructions||'';$('honorPledge').value=d.meta.honorPledge||'';}
       if(d.defaults){$('unitSystem').value=d.defaults.unitSystem||'SI';$('sigFigs').value=d.defaults.sigFigs||'3';$('defaultTol').value=d.defaults.defaultTol||'2';}
       if(d.lessonUrl!=null)$('lessonUrl').value=d.lessonUrl;
+      if(d.imgStyle!=null&&$('imgStyle'))$('imgStyle').value=d.imgStyle;
       if(Array.isArray(d.slots)&&d.slots.length){slots=d.slots.map(s=>newSlot(s));renderSlots();applyMode();}
       const arr=Array.isArray(d)?d:(d.problems||[]);
       if(!arr.length)throw new Error('No problems in file.');
