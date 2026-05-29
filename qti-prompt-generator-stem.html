@@ -3035,6 +3035,54 @@ function buildGIFT(questions, catName){
   return {text:lines.join('\n'),exported,skipped};
 }
 
+// ── Math conversion helpers for LMS export ─────────────────────────────────
+// Different LMSs render math differently, so QTI export must transform the
+// tool's $...$/$$...$$ LaTeX into the format the target platform understands.
+
+// CANVAS: MathJax recognises \(...\) for inline and $$...$$ for display, but
+// NOT $...$ (Canvas does not define single-dollar as an inline delimiter).
+// So convert inline $...$ -> \(...\) and leave $$...$$ untouched. Unpaired
+// currency like "$5" is left alone by the split regex.
+function latexToCanvas(s){
+  if(!s) return '';
+  var plainDollar = /^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|\d+(?:\.\d+)?\/\d*|[\d.]+)\$$/;
+  return String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g).map(function(p){
+    if(p.indexOf('$$')===0) return p;                       // display: keep $$...$$
+    if(p.charAt(0)==='$' && p.charAt(p.length-1)==='$' && p.length>2){
+      if(plainDollar.test(p)) return p.slice(1,-1);         // currency/plain value
+      return '\\(' + p.slice(1,-1) + '\\)';                 // inline: $...$ -> \(...\)
+    }
+    return p;
+  }).join('');
+}
+
+// D2L BRIGHTSPACE: stores and renders all equations as MathML, and its MathJax
+// reads MathML, not raw \(...\) LaTeX in the body. So convert each math span to
+// MathML using KaTeX (already loaded). Non-math text is XML-escaped. If KaTeX is
+// unavailable for any reason, fall back to the previous plain-text stripping so
+// export never fails.
+function latexToMathML(s){
+  if(!s) return '';
+  if(!(window.katex && window.katex.renderToString)) return escXml(stripLatex(s));
+  var plainDollar = /^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|\d+(?:\.\d+)?\/\d*|[\d.]+)\$$/;
+  return String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g).map(function(p){
+    var disp = p.indexOf('$$')===0;
+    var inl  = !disp && p.charAt(0)==='$' && p.charAt(p.length-1)==='$' && p.length>2;
+    if(disp || inl){
+      if(inl && plainDollar.test(p)) return escXml(p.slice(1,-1));
+      var tex = disp ? p.slice(2,-2) : p.slice(1,-1);
+      try{
+        var html = window.katex.renderToString(tex, {output:'mathml', displayMode:disp, throwOnError:false});
+        var m = html.match(/<math[\s\S]*<\/math>/);   // emit bare MathML (D2L's native format)
+        return m ? m[0] : escXml(stripLatex(p));
+      }catch(e){
+        return escXml(stripLatex(p));
+      }
+    }
+    return escXml(p);
+  }).join('');
+}
+
 // ── QTI XML builder ────────────────────────────────────────────────────────
 function buildQTIXML(questions, bankName, pts){
   const ident=bankName.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40)||'STEM_QB';
@@ -3051,7 +3099,7 @@ function buildQTIXML(questions, bankName, pts){
 
     if(isFR){
       presentation=`<presentation>
-        <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
+        <material><mattext texttype="text/html">${escX(latexToCanvas(q.stem))}</mattext></material>
         <response_str ident="response1" rcardinality="Single"><render_fib rows="10" columns="80"/></response_str>
       </presentation>`;
       resprocessing=`<resprocessing>
@@ -3067,7 +3115,7 @@ function buildQTIXML(questions, bankName, pts){
       const correctVal=correctChoice?correctChoice.text.replace(/[^0-9.\-+eE]/g,''):'0';
       const tol=q.tolerance_pct||5;
       presentation=`<presentation>
-        <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
+        <material><mattext texttype="text/html">${escX(latexToCanvas(q.stem))}</mattext></material>
         <response_str ident="response1" rcardinality="Single"><render_fib rows="1" columns="20"/></response_str>
       </presentation>`;
       resprocessing=`<resprocessing>
@@ -3090,10 +3138,10 @@ function buildQTIXML(questions, bankName, pts){
     } else {
       // symbolic / conceptual  --  standard multichoice
       const choices=(q.choices||[]).map(c=>`          <response_label ident="${c.letter}">
-            <material><mattext texttype="text/html">${escX(c.text)}</mattext></material>
+            <material><mattext texttype="text/html">${escX(latexToCanvas(c.text))}</mattext></material>
           </response_label>`).join('\n');
       presentation=`<presentation>
-        <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
+        <material><mattext texttype="text/html">${escX(latexToCanvas(q.stem))}</mattext></material>
         <response_lid ident="response1" rcardinality="Single"><render_choice>
 ${choices}
         </render_choice></response_lid>
@@ -3337,17 +3385,17 @@ function buildD2LQTI21XML(questions, bankName){
 
   function buildChoiceItem(q, idx){
     var qid = 'q_'+(q.id||idx);
-    var stem = escXml(stripLatex(q.stem||''));
+    var stem = latexToMathML(q.stem||'');
     var choices = (q.choices||[]);
     var correctLetter = (q.correct||'A').toUpperCase();
-    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+    var feedback = q.worked_solution ? latexToMathML(q.worked_solution) : '';
 
     // Build choice identifiers
     var choiceIds = choices.map(function(c){ return 'ch_'+qid+'_'+c.letter.toUpperCase(); });
     var correctId = 'ch_'+qid+'_'+correctLetter;
 
     var choicesXml = choices.map(function(c,ci){
-      return '        <simpleChoice identifier="'+choiceIds[ci]+'">'+escXml(stripLatex(c.text))+'</simpleChoice>';
+      return '        <simpleChoice identifier="'+choiceIds[ci]+'">'+latexToMathML(c.text)+'</simpleChoice>';
     }).join('\n');
 
     var feedbackXml = feedback
@@ -3396,9 +3444,9 @@ feedbackXml+'\n'+
 
   function buildTextEntryItem(q, idx){
     var qid = 'q_'+(q.id||idx);
-    var stem = escXml(stripLatex(q.stem||''));
+    var stem = latexToMathML(q.stem||'');
     var correct = escXml(stripLatex(q.correct||''));
-    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+    var feedback = q.worked_solution ? latexToMathML(q.worked_solution) : '';
     var feedbackXml = feedback
       ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
       : '';
@@ -3428,8 +3476,8 @@ feedbackXml+'\n'+
 
   function buildExtendedTextItem(q, idx, isShort){
     var qid = 'q_'+(q.id||idx);
-    var stem = escXml(stripLatex(q.stem||''));
-    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+    var stem = latexToMathML(q.stem||'');
+    var feedback = q.worked_solution ? latexToMathML(q.worked_solution) : '';
     var feedbackXml = feedback
       ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
       : '';
@@ -3523,15 +3571,15 @@ function buildD2LItemXML(q, idx, bankName){
     return 'choice';
   })();
 
-  var stem = escXml(stripLatex(q.stem||''));
-  var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
+  var stem = latexToMathML(q.stem||'');
+  var feedback = q.worked_solution ? latexToMathML(q.worked_solution) : '';
 
   if(itype === 'choice'){
     var choices = (q.choices||[]);
     var correctLetter = (q.correct||'A').toUpperCase();
     var correctId = 'ch_'+qid+'_'+correctLetter;
     var choicesXml = choices.map(function(c){
-      return '        <simpleChoice identifier="ch_'+qid+'_'+c.letter.toUpperCase()+'">'+escXml(stripLatex(c.text))+'</simpleChoice>';
+      return '        <simpleChoice identifier="ch_'+qid+'_'+c.letter.toUpperCase()+'">'+latexToMathML(c.text)+'</simpleChoice>';
     }).join('\n');
     var feedbackXml = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
     var feedbackDecl = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
