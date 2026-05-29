@@ -1,233 +1,682 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Course Progress Bar Generator</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input, textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        textarea {
-            height: 80px;
-            resize: vertical;
-        }
-        button {
-            background: #007cba;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            width: 100%;
-        }
-        button:hover {
-            background: #005a87;
-        }
-        .output {
-            margin-top: 30px;
-            display: none;
-        }
-        .code-box {
-            background: #f8f8f8;
-            border: 1px solid #ddd;
-            padding: 15px;
-            border-radius: 4px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            overflow-x: auto;
-            position: relative;
-        }
-        .copy-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Course Progress Bar Generator</title>
+<meta name="description" content="Generate a responsive, full-width, accessible course progress bar as a self-contained HTML page ready to embed in a Canvas iframe.">
+<style>
+  :root{
+    --bg:#f4f1ea;
+    --surface:#fffdf8;
+    --surface-2:#faf6ec;
+    --ink:#23211c;
+    --muted:#6f6a5f;
+    --border:#e3ddce;
+    --field:#fffdf8;
+    --accent:#2f7d52;
+    --accent-strong:#266641;
+    --accent-ink:#ffffff;
+    --code-bg:#272521;
+    --code-ink:#e9e4d6;
+    --focus:#2f7d52;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(0,0,0,.05), 0 8px 24px -16px rgba(0,0,0,.25);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15140f;
+      --surface:#201e18;
+      --surface-2:#1a1813;
+      --ink:#f0ede4;
+      --muted:#a8a294;
+      --border:#34302a;
+      --field:#1b1914;
+      --accent:#4faf7c;
+      --accent-strong:#3f9a6b;
+      --accent-ink:#0e1410;
+      --code-bg:#100f0c;
+      --code-ink:#e9e4d6;
+      --focus:#7fd0a5;
+    }
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent-strong);}
+  .skip-link{
+    position:absolute;left:-9999px;top:0;
+    background:var(--accent);color:var(--accent-ink);
+    padding:10px 16px;border-radius:0 0 8px 0;z-index:100;
+  }
+  .skip-link:focus{left:0;}
+
+  header.site{
+    padding:clamp(20px,5vw,40px) clamp(16px,5vw,40px) 8px;
+    max-width:1180px;margin:0 auto;
+  }
+  header.site .eyebrow{
+    font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 6px;font-weight:600;
+  }
+  header.site h1{
+    font-family:var(--serif);
+    font-weight:700;
+    font-size:clamp(1.7rem,4.5vw,2.6rem);
+    line-height:1.08;
+    margin:0 0 8px;
+    letter-spacing:-.01em;
+  }
+  header.site p.lede{
+    margin:0;color:var(--muted);max-width:62ch;font-size:1rem;
+  }
+
+  main{
+    max-width:1180px;margin:0 auto;
+    padding:clamp(14px,4vw,28px) clamp(16px,5vw,40px) 48px;
+  }
+  .grid{
+    display:grid;grid-template-columns:1fr;gap:24px;align-items:start;
+  }
+  @media (min-width:900px){
+    .grid{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);}
+    .panel.sticky{position:sticky;top:20px;}
+  }
+
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .panel > .panel-head{
+    padding:16px clamp(16px,3vw,22px);
+    border-bottom:1px solid var(--border);
+    background:var(--surface-2);
+  }
+  .panel-head h2{
+    margin:0;font-family:var(--serif);font-size:1.18rem;font-weight:700;
+  }
+  .panel-head p{margin:4px 0 0;color:var(--muted);font-size:.9rem;}
+  .panel-body{padding:clamp(16px,3vw,22px);}
+
+  .field{margin-bottom:18px;}
+  .field:last-child{margin-bottom:0;}
+  label{display:block;font-weight:600;margin-bottom:6px;font-size:.92rem;}
+  .hint{color:var(--muted);font-weight:400;font-size:.82rem;margin-top:4px;}
+  input[type=text],input[type=date],textarea,select{
+    width:100%;
+    font-family:var(--sans);
+    font-size:1rem;
+    color:var(--ink);
+    background:var(--field);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:11px 12px;
+    min-height:44px;
+  }
+  textarea{min-height:88px;resize:vertical;line-height:1.45;font-family:var(--mono);font-size:.9rem;}
+  input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,
+  a:focus-visible,[tabindex]:focus-visible{
+    outline:3px solid var(--focus);outline-offset:2px;
+  }
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:460px){.two-col{grid-template-columns:1fr;}}
+
+  .options-row{display:flex;flex-wrap:wrap;gap:18px;align-items:center;}
+  .check{display:flex;align-items:center;gap:9px;min-height:44px;cursor:pointer;font-weight:600;font-size:.92rem;}
+  .check input{width:20px;height:20px;min-height:0;accent-color:var(--accent);cursor:pointer;}
+
+  .swatches{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  .swatch{
+    width:34px;height:34px;border-radius:50%;border:2px solid var(--border);
+    cursor:pointer;padding:0;min-height:0;
+  }
+  .swatch[aria-pressed="true"]{outline:3px solid var(--focus);outline-offset:2px;}
+  input[type=color]{
+    width:46px;height:34px;min-height:0;padding:2px;border-radius:8px;cursor:pointer;
+    border:1px solid var(--border);background:var(--field);
+  }
+
+  .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
+  button.btn{
+    font-family:var(--sans);font-size:.95rem;font-weight:600;
+    border-radius:9px;padding:11px 18px;min-height:44px;cursor:pointer;
+    border:1px solid transparent;
+  }
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+  button.primary:hover{background:var(--accent-strong);border-color:var(--accent-strong);}
+  button.ghost{background:transparent;color:var(--ink);border-color:var(--border);}
+  button.ghost:hover{background:var(--surface-2);}
+
+  .preview-frame-wrap{
+    border:1px dashed var(--border);border-radius:10px;
+    padding:14px;background:var(--surface-2);
+  }
+  iframe.preview{width:100%;border:0;display:block;background:transparent;}
+
+  .codewrap{position:relative;margin-top:16px;}
+  .codewrap > .label-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap;}
+  .codewrap label{margin:0;}
+  textarea.code{
+    width:100%;min-height:220px;resize:vertical;
+    background:var(--code-bg);color:var(--code-ink);
+    border:1px solid var(--border);border-radius:10px;
+    font-family:var(--mono);font-size:.8rem;line-height:1.5;
+    padding:14px;white-space:pre;overflow:auto;
+  }
+  .feedback{font-size:.85rem;color:var(--accent-strong);min-height:1.2em;font-weight:600;}
+  .warn{color:#b3541e;}
+  @media (prefers-color-scheme: dark){.warn{color:#e7a86b;}}
+
+  details.help{
+    margin-top:26px;border:1px solid var(--border);border-radius:10px;
+    background:var(--surface);overflow:hidden;
+  }
+  details.help > summary{
+    cursor:pointer;padding:14px 18px;font-weight:600;font-family:var(--serif);font-size:1.05rem;
+    list-style:none;
+  }
+  details.help > summary::-webkit-details-marker{display:none;}
+  details.help > summary::before{content:"▸ ";color:var(--accent);}
+  details.help[open] > summary::before{content:"▾ ";}
+  details.help .help-body{padding:0 18px 18px;color:var(--ink);}
+  details.help ol{margin:0 0 0 0;padding-left:1.2em;}
+  details.help li{margin-bottom:8px;}
+  details.help code{
+    background:var(--surface-2);border:1px solid var(--border);
+    border-radius:5px;padding:1px 6px;font-family:var(--mono);font-size:.85em;
+  }
+
+  footer{
+    max-width:1180px;margin:0 auto;
+    padding:8px clamp(16px,5vw,40px) 36px;color:var(--muted);font-size:.85rem;
+  }
+  footer .program{color:var(--ink);font-weight:600;}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>📅 Course Progress Bar Generator</h1>
-        
-        <div class="form-group">
-            <label>Semester/Term:</label>
-            <input type="text" id="semester" value="Summer 2025">
-        </div>
-        
-        <div class="form-group">
-            <label>Course Name:</label>
-            <input type="text" id="courseName" value="Sample Course">
-        </div>
-        
-        <div class="form-group">
-            <label>Start Date:</label>
-            <input type="date" id="startDate">
-        </div>
-        
-        <div class="form-group">
-            <label>End Date:</label>
-            <input type="date" id="endDate">
-        </div>
-        
-        <div class="form-group">
-            <label>Holidays (optional, one per line):</label>
-            <textarea id="holidays" placeholder="2025-07-04&#10;2025-12-25"></textarea>
-        </div>
-        
-        <button onclick="generate()">Generate HTML Code</button>
-        
-        <div id="output" class="output">
-            <h3>Generated HTML Code:</h3>
-            <div class="code-box">
-                <button class="copy-btn" onclick="copyCode()">Copy</button>
-                <div id="generatedCode"></div>
-            </div>
-        </div>
-    </div>
+<a href="#main" class="skip-link">Skip to main content</a>
 
-    <script>
-        function setDefaults() {
-            var today = new Date();
-            var start = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
-            var end = new Date(today.getTime() + (60 * 24 * 60 * 60 * 1000));
-            
-            document.getElementById('startDate').value = start.toISOString().substr(0, 10);
-            document.getElementById('endDate').value = end.toISOString().substr(0, 10);
-        }
-        
-        function generate() {
-            var semester = document.getElementById('semester').value;
-            var courseName = document.getElementById('courseName').value;
-            var startDate = document.getElementById('startDate').value;
-            var endDate = document.getElementById('endDate').value;
-            var holidaysText = document.getElementById('holidays').value;
-            
-            var start = new Date(startDate);
-            var end = new Date(endDate);
-            
-            var code = '';
-            code += '&lt;div style="font-family: sans-serif; max-width: 600px;"&gt;\n';
-            code += '  &lt;p&gt;&lt;strong&gt;📅 ' + semester + ' - ' + courseName + ' Progress&lt;/strong&gt;&lt;/p&gt;\n';
-            code += '  &lt;div id="progress-text"&gt;&lt;/div&gt;\n';
-            code += '  &lt;div style="background-color: #ddd; width: 100%; height: 25px; border-radius: 5px;"&gt;\n';
-            code += '    &lt;div id="progress-bar" style="background-color: #4caf50; height: 100%; border-radius: 5px;"&gt;&lt;/div&gt;\n';
-            code += '  &lt;/div&gt;\n';
-            code += '&lt;/div&gt;\n';
-            code += '&lt;script&gt;\n';
-            code += '  var startDate = Date.UTC(' + start.getFullYear() + ', ' + start.getMonth() + ', ' + start.getDate() + ');\n';
-            code += '  var endDate = Date.UTC(' + end.getFullYear() + ', ' + end.getMonth() + ', ' + end.getDate() + ');\n';
-            
-            if (holidaysText.trim()) {
-                var holidays = holidaysText.trim().split('\n');
-                code += '  var holidays = [';
-                for (var i = 0; i < holidays.length; i++) {
-                    var holiday = holidays[i].trim();
-                    if (holiday.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                        var h = new Date(holiday);
-                        if (i > 0) code += ', ';
-                        code += 'Date.UTC(' + h.getFullYear() + ', ' + h.getMonth() + ', ' + h.getDate() + ')';
-                    }
-                }
-                code += '];\n';
-            }
-            
-            code += '  var today = new Date();\n';
-            code += '  var todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());\n';
-            code += '  var totalDays = 0;\n';
-            code += '  var currentDate = startDate;\n';
-            code += '  while (currentDate &lt;= endDate) {\n';
-            
-            if (holidaysText.trim()) {
-                code += '    var isHoliday = false;\n';
-                code += '    for (var i = 0; i &lt; holidays.length; i++) {\n';
-                code += '      if (holidays[i] === currentDate) { isHoliday = true; break; }\n';
-                code += '    }\n';
-                code += '    if (!isHoliday) totalDays++;\n';
-            } else {
-                code += '    totalDays++;\n';
-            }
-            
-            code += '    currentDate += 24 * 60 * 60 * 1000;\n';
-            code += '  }\n';
-            code += '  var elapsedDays = 0;\n';
-            code += '  if (todayUTC &gt;= startDate) {\n';
-            code += '    currentDate = startDate;\n';
-            code += '    while (currentDate &lt;= Math.min(todayUTC, endDate)) {\n';
-            
-            if (holidaysText.trim()) {
-                code += '      var isHoliday = false;\n';
-                code += '      for (var i = 0; i &lt; holidays.length; i++) {\n';
-                code += '        if (holidays[i] === currentDate) { isHoliday = true; break; }\n';
-                code += '      }\n';
-                code += '      if (!isHoliday) elapsedDays++;\n';
-            } else {
-                code += '      elapsedDays++;\n';
-            }
-            
-            code += '      currentDate += 24 * 60 * 60 * 1000;\n';
-            code += '    }\n';
-            code += '  }\n';
-            code += '  var percent = totalDays &gt; 0 ? ((elapsedDays / totalDays) * 100).toFixed(1) : 0;\n';
-            code += '  document.getElementById("progress-text").innerText = "Day " + elapsedDays + " of " + totalDays + " (" + percent + "%)";\n';
-            code += '  document.getElementById("progress-bar").style.width = percent + "%";\n';
-            code += '&lt;/script&gt;';
-            
-            document.getElementById('generatedCode').innerHTML = code;
-            document.getElementById('output').style.display = 'block';
-        }
-        
-        function copyCode() {
-            var code = document.getElementById('generatedCode').textContent;
-            var textarea = document.createElement('textarea');
-            textarea.value = code;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            
-            var btn = document.querySelector('.copy-btn');
-            btn.textContent = 'Copied!';
-            setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
-        }
-        
-        setDefaults();
-    </script>
+<header class="site">
+  <p class="eyebrow">Faculty Tools</p>
+  <h1>Course Progress Bar Generator</h1>
+  <p class="lede">Build a full-width, responsive progress bar as a self-contained HTML page. Copy the code or download the file, host it, and embed it in a Canvas iframe. The bar recalculates every time a student loads the page.</p>
+</header>
+
+<main id="main">
+  <div class="grid">
+
+    <!-- INPUT PANEL -->
+    <section class="panel" aria-labelledby="settings-h">
+      <div class="panel-head">
+        <h2 id="settings-h">Settings</h2>
+        <p>The preview and code update as you type.</p>
+      </div>
+      <div class="panel-body">
+        <div class="field">
+          <label for="semester">Semester / Term</label>
+          <input type="text" id="semester" value="Fall 2026">
+        </div>
+
+        <div class="field">
+          <label for="courseName">Course Name</label>
+          <input type="text" id="courseName" value="NETW 110 — Networking Fundamentals">
+        </div>
+
+        <div class="field two-col">
+          <div>
+            <label for="startDate">Start Date</label>
+            <input type="date" id="startDate">
+          </div>
+          <div>
+            <label for="endDate">End Date</label>
+            <input type="date" id="endDate">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="holidays">Holidays / breaks (optional)</label>
+          <textarea id="holidays" placeholder="One date per line, YYYY-MM-DD&#10;A label after the date is allowed and ignored:&#10;2026-11-26  Thanksgiving"></textarea>
+          <p class="hint">Excluded from the day count. <code>YYYY-MM-DD</code> per line; anything after the date is ignored.</p>
+        </div>
+
+        <div class="field">
+          <label for="unit">Count progress in</label>
+          <select id="unit">
+            <option value="days">Days (Day X of Y)</option>
+            <option value="weeks">Weeks (Week X of Y)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <span style="display:block;font-weight:600;margin-bottom:8px;font-size:.92rem;">Options</span>
+          <div class="options-row">
+            <label class="check"><input type="checkbox" id="weekdaysOnly"> Count weekdays only (skip weekends)</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label id="colorLabel">Bar color</label>
+          <div class="swatches" role="group" aria-labelledby="colorLabel">
+            <button type="button" class="swatch" data-color="#2f7d52" style="background:#2f7d52" aria-label="Forest green" title="Forest green"></button>
+            <button type="button" class="swatch" data-color="#1f6feb" style="background:#1f6feb" aria-label="Blue" title="Blue"></button>
+            <button type="button" class="swatch" data-color="#7b3fa0" style="background:#7b3fa0" aria-label="Purple" title="Purple"></button>
+            <button type="button" class="swatch" data-color="#c2410c" style="background:#c2410c" aria-label="Burnt orange" title="Burnt orange"></button>
+            <button type="button" class="swatch" data-color="#0e7490" style="background:#0e7490" aria-label="Teal" title="Teal"></button>
+            <input type="color" id="colorPicker" value="#2f7d52" aria-label="Custom bar color">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn ghost" id="resetBtn">Reset to defaults</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- OUTPUT PANEL -->
+    <section class="panel sticky" aria-labelledby="output-h">
+      <div class="panel-head">
+        <h2 id="output-h">Preview &amp; Code</h2>
+        <p>This preview is rendered from the exact code below.</p>
+      </div>
+      <div class="panel-body">
+        <div class="preview-frame-wrap">
+          <iframe class="preview" id="preview" title="Live preview of the generated progress bar"></iframe>
+        </div>
+
+        <div class="codewrap">
+          <div class="label-row">
+            <label for="code">Generated HTML page</label>
+            <div class="actions" style="margin-top:0;">
+              <button type="button" class="btn primary" id="copyBtn">Copy code</button>
+              <button type="button" class="btn ghost" id="downloadBtn">Download .html</button>
+            </div>
+          </div>
+          <p class="feedback" id="feedback" role="status" aria-live="polite"></p>
+          <textarea class="code" id="code" readonly spellcheck="false" aria-label="Generated HTML code"></textarea>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <details class="help">
+    <summary>How to embed this in Canvas</summary>
+    <div class="help-body">
+      <ol>
+        <li><strong>Download</strong> the <code>.html</code> file (or copy the code into a new file).</li>
+        <li><strong>Host it</strong> somewhere public — your GitHub Pages site works well.</li>
+        <li>In Canvas, edit a Page and switch to the <strong>HTML editor</strong> (<code>&lt;/&gt;</code>).</li>
+        <li>Add an iframe pointing at your hosted file, e.g.
+          <br><code>&lt;iframe src="https://your-site/progress.html" width="100%" height="150" style="border:0;"&gt;&lt;/iframe&gt;</code></li>
+        <li>Save. The bar recalculates on every page load, so it stays current with no maintenance.</li>
+      </ol>
+      <p class="hint" style="margin-top:4px;">Canvas strips <code>&lt;script&gt;</code> tags from pasted page content, which is why the iframe approach is necessary — the script runs inside the framed document, not the Canvas page.</p>
+    </div>
+  </details>
+</main>
+
+<footer>
+  <p>Built for <span class="program">Engineering &amp; Technology</span> · Brookdale Community College · <span class="year">2026</span></p>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var els = {
+    semester: $("semester"),
+    courseName: $("courseName"),
+    startDate: $("startDate"),
+    endDate: $("endDate"),
+    holidays: $("holidays"),
+    unit: $("unit"),
+    weekdaysOnly: $("weekdaysOnly"),
+    colorPicker: $("colorPicker"),
+    code: $("code"),
+    preview: $("preview"),
+    feedback: $("feedback"),
+    copyBtn: $("copyBtn"),
+    downloadBtn: $("downloadBtn"),
+    resetBtn: $("resetBtn")
+  };
+
+  var DEFAULT_COLOR = "#2f7d52";
+
+  // ---- helpers ----
+  function pad(n) { return String(n).length < 2 ? "0" + n : String(n); }
+  function localISO(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // Parse a YYYY-MM-DD string into a UTC-anchored value + a Date.UTC(...) literal.
+  // Parsing the parts by hand avoids the timezone off-by-one you get from new Date("YYYY-MM-DD").
+  function parseYMD(str) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str).trim());
+    if (!m) return null;
+    var y = +m[1], mo = +m[2] - 1, d = +m[3];
+    return { utc: Date.UTC(y, mo, d), lit: "Date.UTC(" + y + ", " + mo + ", " + d + ")" };
+  }
+
+  function parseHolidays(text) {
+    var lits = [];
+    String(text).split(/\r?\n/).forEach(function (line) {
+      var m = /(\d{4})-(\d{2})-(\d{2})/.exec(line);
+      if (m) lits.push("Date.UTC(" + (+m[1]) + ", " + (+m[2] - 1) + ", " + (+m[3]) + ")");
+    });
+    return lits;
+  }
+
+  function slug(s) {
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "course";
+  }
+
+  // ---- the runtime script that lives inside the generated page ----
+  function runtimeScript(startLit, endLit, holidayLits, weekdaysOnly, unit) {
+    return [
+      "(function () {",
+      "  var startUTC = " + startLit + ";",
+      "  var endUTC = " + endLit + ";",
+      "  var holidays = [" + holidayLits.join(", ") + "];",
+      "  var weekdaysOnly = " + (weekdaysOnly ? "true" : "false") + ";",
+      "  var unit = " + JSON.stringify(unit) + ";",
+      "  var DAY = 86400000;",
+      "",
+      "  function blocked(t) {",
+      "    for (var i = 0; i < holidays.length; i++) { if (holidays[i] === t) return true; }",
+      "    if (weekdaysOnly) { var dow = new Date(t).getUTCDay(); if (dow === 0 || dow === 6) return true; }",
+      "    return false;",
+      "  }",
+      "",
+      "  var now = new Date();",
+      "  var todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());",
+      "",
+      "  var total = 0, elapsed = 0;",
+      "  for (var cur = startUTC; cur <= endUTC; cur += DAY) {",
+      "    if (blocked(cur)) continue;",
+      "    total++;",
+      "    if (todayUTC >= cur) elapsed++;",
+      "  }",
+      "  if (elapsed > total) elapsed = total;",
+      "",
+      "  var pct = total > 0 ? (elapsed / total) * 100 : 0;",
+      "  var pctStr = (Math.round(pct * 10) / 10).toFixed(1);",
+      "",
+      "  var fill = document.getElementById('cpb-fill');",
+      "  var track = document.getElementById('cpb-track');",
+      "  var text = document.getElementById('cpb-text');",
+      "",
+      "  var msg;",
+      "  if (todayUTC < startUTC) {",
+      "    pctStr = '0.0'; pct = 0;",
+      "    msg = 'Not started yet \\u00b7 0%';",
+      "  } else if (total > 0 && elapsed >= total) {",
+      "    msg = 'Complete \\u00b7 100%';",
+      "  } else if (unit === 'weeks') {",
+      "    var per = weekdaysOnly ? 5 : 7;",
+      "    var totalW = Math.max(1, Math.ceil(total / per));",
+      "    var curW = Math.max(1, Math.ceil(elapsed / per));",
+      "    msg = 'Week ' + curW + ' of ' + totalW + ' \\u00b7 ' + pctStr + '%';",
+      "  } else {",
+      "    msg = 'Day ' + elapsed + ' of ' + total + ' \\u00b7 ' + pctStr + '%';",
+      "  }",
+      "",
+      "  fill.style.width = pctStr + '%';",
+      "  track.setAttribute('aria-valuenow', String(Math.round(pct)));",
+      "  track.setAttribute('aria-valuetext', msg);",
+      "  text.textContent = msg;",
+      "})();"
+    ].join("\n");
+  }
+
+  // ---- build the full self-contained, responsive HTML document ----
+  function buildDocument(cfg) {
+    var titleText = "\uD83D\uDCC5 " + cfg.semester + (cfg.semester && cfg.courseName ? " — " : "") + cfg.courseName + " Progress";
+    var css = [
+      ":root{",
+      "  --cpb-accent:" + cfg.color + ";",
+      "  --cpb-surface:#ffffff; --cpb-border:#e4e4e7; --cpb-ink:#1c1c1e;",
+      "  --cpb-muted:#6b6b70; --cpb-track:#ececef;",
+      "}",
+      "@media (prefers-color-scheme: dark){",
+      "  :root{",
+      "    --cpb-surface:#1c1c1f; --cpb-border:#34343a; --cpb-ink:#f2f2f4;",
+      "    --cpb-muted:#a6a6ad; --cpb-track:#34343a;",
+      "  }",
+      "}",
+      "*{box-sizing:border-box;}",
+      "html,body{margin:0;padding:0;}",
+      "body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:transparent;color:var(--cpb-ink);}",
+      ".cpb-card{width:100%;max-width:100%;background:var(--cpb-surface);border:1px solid var(--cpb-border);",
+      "  border-radius:14px;padding:clamp(14px,3vw,22px);box-shadow:0 1px 2px rgba(0,0,0,.05);}",
+      ".cpb-title{margin:0 0 2px;font-size:clamp(1rem,2.6vw,1.18rem);font-weight:700;",
+      "  font-family:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;}",
+      ".cpb-status{margin:0 0 12px;font-size:.95rem;color:var(--cpb-muted);font-variant-numeric:tabular-nums;}",
+      ".cpb-track{width:100%;height:26px;background:var(--cpb-track);border-radius:999px;overflow:hidden;}",
+      ".cpb-fill{height:100%;width:0%;background:var(--cpb-accent);border-radius:999px;",
+      "  transition:width .9s cubic-bezier(.22,1,.36,1);}",
+      "@media (prefers-reduced-motion: reduce){.cpb-fill{transition:none;}}"
+    ].join("\n");
+
+    var body = [
+      '<div class="cpb-card">',
+      '  <p class="cpb-title">' + esc(titleText) + '</p>',
+      '  <p class="cpb-status" id="cpb-text">Loading\u2026</p>',
+      '  <div class="cpb-track" id="cpb-track" role="progressbar" aria-label="' + esc(cfg.courseName || "Course") + ' progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">',
+      '    <div class="cpb-fill" id="cpb-fill"></div>',
+      '  </div>',
+      '</div>'
+    ].join("\n");
+
+    var script = runtimeScript(cfg.startLit, cfg.endLit, cfg.holidayLits, cfg.weekdaysOnly, cfg.unit);
+
+    // Note: write the closing script tag with an escaped slash so this generator's
+    // own <script> block is not terminated early by the string below.
+    return [
+      "<!DOCTYPE html>",
+      '<html lang="en">',
+      "<head>",
+      '<meta charset="UTF-8">',
+      '<meta name="viewport" content="width=device-width, initial-scale=1">',
+      "<title>" + esc(titleText) + "</title>",
+      "<style>",
+      css,
+      "</style>",
+      "</head>",
+      "<body>",
+      body,
+      "<script>",
+      script,
+      "<\/script>",
+      "</body>",
+      "</html>"
+    ].join("\n");
+  }
+
+  // ---- read the form ----
+  function readConfig() {
+    var start = parseYMD(els.startDate.value);
+    var end = parseYMD(els.endDate.value);
+    return {
+      semester: els.semester.value.trim(),
+      courseName: els.courseName.value.trim(),
+      start: start,
+      end: end,
+      startLit: start ? start.lit : null,
+      endLit: end ? end.lit : null,
+      holidayLits: parseHolidays(els.holidays.value),
+      unit: els.unit.value === "weeks" ? "weeks" : "days",
+      weekdaysOnly: els.weekdaysOnly.checked,
+      color: els.colorPicker.value || DEFAULT_COLOR
+    };
+  }
+
+  function validate(cfg) {
+    if (!cfg.start) return "Enter a valid start date.";
+    if (!cfg.end) return "Enter a valid end date.";
+    if (cfg.end.utc <= cfg.start.utc) return "The end date must be after the start date.";
+    return null;
+  }
+
+  // ---- main render ----
+  var lastDoc = "";
+  function render() {
+    var cfg = readConfig();
+    var problem = validate(cfg);
+
+    if (problem) {
+      els.feedback.textContent = problem;
+      els.feedback.className = "feedback warn";
+      els.copyBtn.disabled = true;
+      els.downloadBtn.disabled = true;
+      els.preview.removeAttribute("srcdoc");
+      els.code.value = "";
+      lastDoc = "";
+      return;
+    }
+
+    els.feedback.textContent = "";
+    els.feedback.className = "feedback";
+    els.copyBtn.disabled = false;
+    els.downloadBtn.disabled = false;
+
+    var doc = buildDocument(cfg);
+    lastDoc = doc;
+    els.code.value = doc;
+    els.preview.setAttribute("srcdoc", doc);
+    // size the preview to its content once it has loaded
+    sizePreview();
+  }
+
+  function sizePreview() {
+    // Fixed comfortable height; the bar is short and the card is fluid.
+    els.preview.style.height = "150px";
+  }
+
+  // ---- copy / download ----
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        var ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        ok ? resolve() : reject();
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function flash(msg) {
+    els.feedback.textContent = msg;
+    els.feedback.className = "feedback";
+    window.setTimeout(function () {
+      if (els.feedback.textContent === msg) els.feedback.textContent = "";
+    }, 2200);
+  }
+
+  els.copyBtn.addEventListener("click", function () {
+    if (!lastDoc) return;
+    copyToClipboard(lastDoc).then(function () {
+      flash("Copied to clipboard.");
+    }).catch(function () {
+      els.feedback.textContent = "Copy failed — select the code and copy manually.";
+      els.feedback.className = "feedback warn";
+    });
+  });
+
+  els.downloadBtn.addEventListener("click", function () {
+    if (!lastDoc) return;
+    var cfg = readConfig();
+    var name = slug(cfg.courseName || cfg.semester) + "-progress.html";
+    var blob = new Blob([lastDoc], { type: "text/html;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    flash("Downloaded " + name);
+  });
+
+  // ---- color swatches ----
+  var swatches = Array.prototype.slice.call(document.querySelectorAll(".swatch"));
+  function syncSwatchPressed(color) {
+    swatches.forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-color").toLowerCase() === String(color).toLowerCase() ? "true" : "false");
+    });
+  }
+  swatches.forEach(function (b) {
+    b.addEventListener("click", function () {
+      var c = b.getAttribute("data-color");
+      els.colorPicker.value = c;
+      syncSwatchPressed(c);
+      render();
+    });
+  });
+  els.colorPicker.addEventListener("input", function () {
+    syncSwatchPressed(els.colorPicker.value);
+    render();
+  });
+
+  // ---- defaults + reset ----
+  function setDefaultDates() {
+    var today = new Date();
+    var start = new Date(today.getTime() - 14 * 86400000);
+    var end = new Date(today.getTime() + 70 * 86400000);
+    els.startDate.value = localISO(start);
+    els.endDate.value = localISO(end);
+  }
+
+  function resetAll() {
+    els.semester.value = "Fall 2026";
+    els.courseName.value = "NETW 110 — Networking Fundamentals";
+    els.holidays.value = "";
+    els.unit.value = "days";
+    els.weekdaysOnly.checked = false;
+    els.colorPicker.value = DEFAULT_COLOR;
+    setDefaultDates();
+    syncSwatchPressed(DEFAULT_COLOR);
+    render();
+  }
+  els.resetBtn.addEventListener("click", resetAll);
+
+  // ---- live updates ----
+  ["semester", "courseName", "startDate", "endDate", "holidays", "unit", "weekdaysOnly"].forEach(function (id) {
+    var el = els[id];
+    el.addEventListener("input", render);
+    el.addEventListener("change", render);
+  });
+
+  // ---- init ----
+  setDefaultDates();
+  syncSwatchPressed(DEFAULT_COLOR);
+  render();
+})();
+</script>
 </body>
 </html>
