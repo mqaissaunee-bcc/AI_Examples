@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Build traditional show-your-work STEM &amp; engineering exams: slot one problem per chapter, generate with an LLM, attach figures (including auto-drawn four-bar / slider-crank mechanisms), verify the answer key, and export a printable student exam, an instructor answer key, and a Canvas submission page.">
+<title>Quantitative Exam Builder [Alpha]</title>
+
+<!-- KaTeX (math rendering) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<!-- math.js (answer-key computation check) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&family=IBM+Plex+Serif:ital,wght@0,400;1,400&display=swap');
+
+/* ── Theme tokens (light default; dark via [data-theme=dark] or prefers-color-scheme) ── */
+:root {
+  --bg:        #f0f4ff;
+  --surface:   #ffffff;
+  --surface-2: #f8faff;
+  --border:    #b8c8e0;
+  --ink:       #1a2744;
+  --ink-2:     #3a4a6a;
+  --ink-3:     #6a7a9a;
+  --cyan:      #005f80;
+  --cyan-2:    #004060;
+  --amber:     #8a5000;
+  --green:     #006840;
+  --red:       #900000;
+  --violet:    #5028a0;
+  --header-bg: #1a2744;
+  --header-ink:#dbe6ff;
+  --header-accent:#60c8f0;
+  --header-accent2:#f5a623;
+  --radius: 6px;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
+  --body:  'IBM Plex Sans', system-ui, sans-serif;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --focus: 0 0 0 3px rgba(0,95,128,.30);
+  --shadow: 0 6px 24px rgba(0,0,0,.14);
+}
+:root[data-theme="dark"] {
+  --bg:#0d1424; --surface:#141d31; --surface-2:#0f1729; --border:#2a3a5a;
+  --ink:#e4ecff; --ink-2:#9fb3d8; --ink-3:#6a7c9e;
+  --cyan:#36c8f0; --cyan-2:#7fdcff; --amber:#f5b54a; --green:#3fd190; --red:#ff7a7a; --violet:#b79bff;
+  --header-bg:#0a1020; --focus:0 0 0 3px rgba(54,200,240,.35);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#0d1424; --surface:#141d31; --surface-2:#0f1729; --border:#2a3a5a;
+    --ink:#e4ecff; --ink-2:#9fb3d8; --ink-3:#6a7c9e;
+    --cyan:#36c8f0; --cyan-2:#7fdcff; --amber:#f5b54a; --green:#3fd190; --red:#ff7a7a; --violet:#b79bff;
+    --header-bg:#0a1020; --focus:0 0 0 3px rgba(54,200,240,.35);
+  }
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} *{transition:none !important;animation:none !important;} }
+
+body{font-family:var(--body);background:var(--bg);color:var(--ink);min-height:100vh;font-size:15px;line-height:1.6;}
+body.fs-large{font-size:17px;} body.fs-larger{font-size:19px;}
+
+.skip-link{position:absolute;left:-999px;top:0;background:var(--cyan);color:#fff;padding:10px 16px;z-index:2000;border-radius:0 0 var(--radius) 0;}
+.skip-link:focus{left:0;}
+
+a{color:var(--cyan);}
+
+/* ── Header ── */
+.site-header{background:var(--header-bg);border-bottom:3px solid var(--cyan);padding:0 20px;position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:14px;min-height:56px;flex-wrap:wrap;}
+.logo{color:var(--header-accent);font-weight:700;font-size:1rem;letter-spacing:.01em;}
+.logo span{color:var(--header-accent2);}
+.tagline{color:rgba(219,230,255,.6);border-left:1px solid rgba(255,255,255,.18);padding-left:14px;font-size:.72rem;}
+@media(max-width:720px){.tagline{display:none;}}
+.header-tools{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.beta-tag{font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:rgba(160,100,255,.18);color:#c8a8ff;border:1px solid rgba(160,100,255,.4);border-radius:4px;padding:3px 7px;}
+.hbtn{background:none;border:1px solid rgba(255,255,255,.25);border-radius:20px;color:rgba(219,230,255,.85);font-family:var(--mono);font-size:.66rem;font-weight:600;padding:5px 11px;cursor:pointer;min-height:30px;display:inline-flex;align-items:center;gap:5px;}
+.hbtn:hover{border-color:rgba(255,255,255,.6);color:#fff;}
+.hbtn:focus-visible{outline:2px solid var(--header-accent);outline-offset:2px;}
+.fontgrp{display:flex;align-items:center;gap:3px;}
+.fontgrp .hbtn{padding:5px 9px;border-radius:5px;}
+
+/* ── Warn banner ── */
+.warn{background:color-mix(in srgb,var(--amber) 9%,transparent);border-top:3px solid var(--amber);border-bottom:1px solid color-mix(in srgb,var(--amber) 25%,transparent);padding:9px 20px;display:flex;gap:11px;font-size:.82rem;color:var(--amber);line-height:1.5;}
+.warn b{font-weight:700;}
+.warn .ico{font-size:1.05rem;flex-shrink:0;}
+
+/* ── Tabs ── */
+.tabnav{background:var(--surface-2);border-bottom:1px solid var(--border);display:flex;padding:0 12px;gap:2px;overflow-x:auto;}
+.tab{font-family:var(--mono);font-size:.71rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;background:none;border:none;color:var(--ink-2);padding:14px 16px 12px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;min-height:44px;}
+.tab:hover{color:var(--ink);}
+.tab[aria-selected="true"]{color:var(--cyan);border-bottom-color:var(--cyan);}
+.tab:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px;}
+.panel{display:none;}
+.panel.active{display:block;}
+
+.wrap{max-width:1040px;margin:0 auto;padding:26px 20px 80px;}
+.head h2{font-family:var(--mono);font-size:1rem;font-weight:600;color:var(--cyan);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;}
+.head p{font-size:.86rem;color:var(--ink-2);max-width:80ch;}
+.head{margin-bottom:22px;}
+
+/* ── Cards / fields ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px 22px;margin-bottom:18px;position:relative;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--cyan),transparent);border-radius:8px 8px 0 0;}
+.card h3{font-family:var(--mono);font-size:.72rem;font-weight:600;color:var(--cyan);letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid.full{grid-template-columns:1fr;}
+@media(max-width:640px){.grid{grid-template-columns:1fr;}}
+.field{display:flex;flex-direction:column;gap:6px;}
+.lab{font-family:var(--mono);font-size:.66rem;font-weight:600;color:var(--ink-2);letter-spacing:.07em;text-transform:uppercase;}
+.hint{font-size:.75rem;color:var(--ink-3);line-height:1.5;}
+input[type=text],input[type=number],select,textarea{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);color:var(--ink);font-family:var(--body);font-size:.87rem;padding:9px 11px;width:100%;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--cyan);box-shadow:var(--focus);}
+textarea{resize:vertical;font-family:var(--body);}
+select option{background:var(--surface);color:var(--ink);}
+label{cursor:pointer;}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:var(--radius);font-family:var(--mono);font-size:.74rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;border:none;min-height:44px;}
+.btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+.btn-primary{background:var(--cyan);color:#fff;}
+.btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--cyan) 85%,#fff);}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--ink-2);}
+.btn-ghost:hover:not(:disabled){border-color:var(--cyan);color:var(--cyan);}
+.btn-amber{background:var(--amber);color:#fff;}
+.btn-amber:hover:not(:disabled){background:color-mix(in srgb,var(--amber) 85%,#fff);}
+.btn-danger{background:transparent;border:1px solid var(--red);color:var(--red);}
+.btn-danger:hover:not(:disabled){background:color-mix(in srgb,var(--red) 10%,transparent);}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+
+/* ── Slots (Configure) ── */
+.slot{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--cyan);border-radius:8px;padding:16px 18px;margin-bottom:14px;}
+.slot-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.slot-tag{font-family:var(--mono);font-size:.66rem;font-weight:700;color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent);border:1px solid var(--cyan-2);border-radius:4px;padding:3px 8px;white-space:nowrap;}
+.slot-grip{cursor:grab;color:var(--ink-3);font-size:1rem;user-select:none;}
+.slot-del{margin-left:auto;background:none;border:1px solid var(--border);border-radius:4px;color:var(--ink-3);cursor:pointer;font-size:.85rem;padding:4px 9px;min-height:32px;}
+.slot-del:hover{border-color:var(--red);color:var(--red);}
+.slot-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;}
+@media(max-width:640px){.slot-grid{grid-template-columns:1fr;}}
+.slot-mini{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+@media(max-width:560px){.slot-mini{grid-template-columns:1fr;}}
+
+.check-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.chk{display:flex;align-items:center;gap:7px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:7px 12px;cursor:pointer;font-size:.82rem;color:var(--ink-2);min-height:36px;}
+.chk:hover{border-color:var(--cyan-2);color:var(--ink);}
+.chk.on{border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 7%,transparent);}
+.chk input{accent-color:var(--cyan);width:15px;height:15px;}
+
+/* ── Prompt output ── */
+#promptBox{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;font-family:var(--mono);font-size:.74rem;color:var(--ink-2);white-space:pre-wrap;word-break:break-word;max-height:460px;overflow-y:auto;line-height:1.7;}
+.tokrow{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:.74rem;color:var(--ink-3);flex-wrap:wrap;}
+.pill{font-family:var(--mono);font-size:.66rem;padding:2px 9px;border-radius:10px;font-weight:600;}
+.pill.ok{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 30%,transparent);}
+.pill.warn{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 30%,transparent);}
+.pill.over{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 30%,transparent);}
+.jumprow{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.jump{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:20px;border:1.5px solid var(--jc,var(--border));color:var(--jc,var(--ink-2));background:transparent;font-family:var(--mono);font-size:.72rem;font-weight:700;text-decoration:none;min-height:38px;}
+.jump:hover{background:color-mix(in srgb,var(--jc) 12%,transparent);}
+
+/* ── JSON / status ── */
+.json-area{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;font-family:var(--mono);font-size:.78rem;color:var(--ink-2);resize:vertical;min-height:200px;width:100%;line-height:1.6;}
+.json-area:focus{outline:none;border-color:var(--cyan);box-shadow:var(--focus);}
+.status{display:none;align-items:flex-start;gap:10px;padding:11px 15px;border-radius:var(--radius);font-size:.84rem;margin-top:13px;line-height:1.55;}
+.status.show{display:flex;}
+.status.ok{background:color-mix(in srgb,var(--green) 9%,transparent);border:1px solid color-mix(in srgb,var(--green) 28%,transparent);color:var(--green);}
+.status.err{background:color-mix(in srgb,var(--red) 8%,transparent);border:1px solid color-mix(in srgb,var(--red) 25%,transparent);color:var(--red);}
+.status.warn{background:color-mix(in srgb,var(--amber) 9%,transparent);border:1px solid color-mix(in srgb,var(--amber) 28%,transparent);color:var(--amber);}
+
+/* ── Problem cards (Review) ── */
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.stat{font-family:var(--mono);font-size:.7rem;font-weight:600;padding:5px 11px;border-radius:20px;border:1px solid var(--border);color:var(--ink-2);}
+.pcard{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:8px;margin-bottom:16px;overflow:hidden;}
+.pcard.verified{border-left-color:var(--green);}
+.pc-head{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;flex-wrap:wrap;}
+.pc-num{font-family:var(--mono);font-size:.68rem;font-weight:700;color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent);border:1px solid var(--cyan-2);border-radius:4px;padding:3px 8px;white-space:nowrap;}
+.pc-title{flex:1;min-width:200px;}
+.pc-label{font-weight:700;font-size:.95rem;color:var(--ink);}
+.pc-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;}
+.bdg{font-family:var(--mono);font-size:.6rem;font-weight:600;padding:2px 7px;border-radius:3px;letter-spacing:.03em;text-transform:uppercase;}
+.bdg.diff{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 25%,transparent);}
+.bdg.pts{background:color-mix(in srgb,var(--cyan) 12%,transparent);color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 25%,transparent);}
+.bdg.subj{background:color-mix(in srgb,var(--violet) 13%,transparent);color:var(--violet);border:1px solid color-mix(in srgb,var(--violet) 28%,transparent);}
+.bdg.fig{background:color-mix(in srgb,var(--green) 11%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 24%,transparent);}
+.pc-acts{display:flex;gap:6px;}
+.iconbtn{background:none;border:1px solid var(--border);border-radius:4px;color:var(--ink-2);font-family:var(--mono);font-size:.78rem;padding:5px 9px;cursor:pointer;min-height:36px;}
+.iconbtn:hover{border-color:var(--cyan);color:var(--cyan);}
+.iconbtn.del:hover{border-color:var(--red);color:var(--red);}
+.vbadge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:.64rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;border-radius:4px;cursor:pointer;border:1px solid;min-height:36px;}
+.vbadge.needs{background:color-mix(in srgb,var(--amber) 12%,transparent);color:var(--amber);border-color:color-mix(in srgb,var(--amber) 42%,transparent);}
+.vbadge.done{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);border-color:color-mix(in srgb,var(--green) 38%,transparent);}
+
+.pc-body{padding:0 16px 16px;}
+.pc-stem{font-size:.9rem;color:var(--ink);line-height:1.65;margin-bottom:12px;}
+.part{border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:10px;background:var(--surface-2);}
+.part-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;}
+.part-letter{font-family:var(--mono);font-weight:700;color:var(--cyan);}
+.part-pts{font-family:var(--mono);font-size:.7rem;color:var(--ink-3);margin-left:auto;}
+.part-ans{font-size:.85rem;margin-top:6px;color:var(--ink-2);}
+.part-ans b{color:var(--green);}
+
+/* verification widget */
+.vw{margin-top:9px;padding:9px 12px;border-radius:var(--radius);border:1px solid;font-size:.82rem;}
+.vw.pass{background:color-mix(in srgb,var(--green) 8%,transparent);border-color:color-mix(in srgb,var(--green) 28%,transparent);color:var(--green);}
+.vw.near{background:color-mix(in srgb,var(--amber) 8%,transparent);border-color:color-mix(in srgb,var(--amber) 28%,transparent);color:var(--amber);}
+.vw.fail{background:color-mix(in srgb,var(--red) 7%,transparent);border-color:color-mix(in srgb,var(--red) 24%,transparent);color:var(--red);}
+.vw.skip{background:color-mix(in srgb,var(--cyan) 6%,transparent);border-color:color-mix(in srgb,var(--cyan) 22%,transparent);color:var(--ink-2);}
+.vw .expr{font-family:var(--mono);font-size:.76rem;background:color-mix(in srgb,var(--cyan) 7%,transparent);border-radius:3px;padding:2px 7px;display:inline-block;margin:4px 0;word-break:break-all;color:var(--cyan);}
+.vw ol{margin:6px 0 2px 18px;line-height:1.7;font-size:.8rem;}
+
+.soltog{font-family:var(--mono);font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--amber);background:color-mix(in srgb,var(--amber) 8%,transparent);border:1.5px solid color-mix(in srgb,var(--amber) 40%,transparent);border-radius:5px;padding:8px 14px;cursor:pointer;margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;min-height:42px;}
+.soltog:hover{background:color-mix(in srgb,var(--amber) 16%,transparent);}
+.solbox{display:none;background:color-mix(in srgb,var(--amber) 6%,transparent);border:2px solid color-mix(in srgb,var(--amber) 30%,transparent);border-radius:6px;padding:14px 16px;margin-top:8px;font-size:.88rem;line-height:1.85;color:var(--ink);}
+.solbox.open{display:block;}
+.solbox .sh{font-family:var(--mono);font-size:.66rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);margin-bottom:8px;border-bottom:1px solid color-mix(in srgb,var(--amber) 22%,transparent);padding-bottom:7px;}
+
+/* figure editor */
+.figbox{border:1px dashed var(--border);border-radius:6px;padding:12px 14px;margin:8px 0 12px;background:var(--surface-2);}
+.figbox .figlab{font-family:var(--mono);font-size:.64rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px;}
+.fig-mode-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.fig-mode{font-family:var(--mono);font-size:.68rem;font-weight:600;padding:6px 11px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--ink-2);cursor:pointer;min-height:34px;}
+.fig-mode.on{border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 8%,transparent);}
+.mech-params{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px;margin-bottom:10px;}
+.mech-params .field{gap:3px;}
+.mech-params .lab{font-size:.6rem;}
+.mech-params input,.mech-params select{padding:6px 8px;font-size:.8rem;}
+.fig-preview{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;display:flex;justify-content:center;min-height:60px;}
+.fig-preview svg{max-width:100%;height:auto;}
+.fig-preview img{max-width:100%;height:auto;border-radius:4px;}
+.exhibit-pre{font-family:var(--mono);font-size:.78rem;white-space:pre;overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:10px 12px;color:var(--ink);line-height:1.5;margin:0;}
+.mech-note{font-size:.8rem;color:var(--red);font-weight:600;padding:8px;text-align:center;}
+
+/* export */
+.exp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:600px){.exp-grid{grid-template-columns:1fr;}}
+.vbar{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--radius);font-size:.82rem;margin-bottom:14px;flex-wrap:wrap;background:color-mix(in srgb,var(--amber) 8%,transparent);border:1px solid color-mix(in srgb,var(--amber) 26%,transparent);color:var(--amber);}
+.vbar.all{background:color-mix(in srgb,var(--green) 8%,transparent);border-color:color-mix(in srgb,var(--green) 26%,transparent);color:var(--green);}
+.vcount{font-family:var(--mono);font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:10px;background:color-mix(in srgb,var(--amber) 15%,transparent);color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 32%,transparent);}
+.vcount.full{background:color-mix(in srgb,var(--green) 15%,transparent);color:var(--green);border-color:color-mix(in srgb,var(--green) 32%,transparent);}
+.exp-list{display:flex;flex-direction:column;gap:12px;}
+.exp-item{display:flex;align-items:center;gap:14px;border:1px solid var(--border);border-radius:8px;padding:14px 16px;background:var(--surface-2);flex-wrap:wrap;}
+.exp-item .ei-ico{font-size:1.4rem;}
+.exp-item .ei-txt{flex:1;min-width:180px;}
+.exp-item .ei-name{font-weight:700;font-size:.9rem;}
+.exp-item .ei-desc{font-size:.78rem;color:var(--ink-3);margin-top:2px;line-height:1.5;}
+
+/* toast */
+#toast{position:fixed;bottom:22px;right:22px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px 18px;font-family:var(--mono);font-size:.76rem;color:var(--ink);box-shadow:var(--shadow);transform:translateY(80px);opacity:0;transition:all .25s;z-index:999;max-width:340px;}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.ok{border-color:var(--green);color:var(--green);}
+#toast.err{border-color:var(--red);color:var(--red);}
+
+/* modal */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center;padding:18px;}
+.overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow);}
+.modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.modal-h h3{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--cyan);letter-spacing:.06em;text-transform:uppercase;}
+.modal-x{background:none;border:none;color:var(--ink-2);font-size:1.3rem;cursor:pointer;min-height:36px;min-width:36px;}
+.modal-x:hover{color:var(--ink);}
+.modal-b{padding:20px;display:flex;flex-direction:column;gap:14px;}
+.modal-f{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;}
+
+/* guide table */
+.gtable{width:100%;border-collapse:collapse;font-size:.82rem;}
+.gtable th{text-align:left;padding:9px 11px;font-family:var(--mono);font-size:.66rem;color:var(--ink-2);letter-spacing:.05em;border-bottom:2px solid var(--border);}
+.gtable td{padding:9px 11px;border-bottom:1px solid var(--border);}
+.glist{font-size:.85rem;color:var(--ink-2);line-height:1.95;padding-left:20px;}
+
+.katex{font-size:1em;}
+.empty{text-align:center;padding:56px 20px;color:var(--ink-3);}
+.empty .ico{font-size:2.4rem;margin-bottom:12px;}
+footer{text-align:center;padding:28px 20px;font-size:.76rem;color:var(--ink-3);border-top:1px solid var(--border);}
+footer .program{color:var(--cyan);font-weight:600;}
+.feat-desc{font-size:.83rem;color:var(--ink-3);line-height:1.6;background:color-mix(in srgb,var(--cyan) 5%,transparent);padding:10px 14px;border-radius:var(--radius);border-left:3px solid var(--cyan);}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<header class="site-header" role="banner">
+  <div class="logo">Quantitative <span>Exam</span> Builder</div>
+  <div class="tagline">Show-your-work STEM &amp; engineering exams &middot; print + Canvas</div>
+  <div class="header-tools">
+    <span class="beta-tag">&alpha; Alpha</span>
+    <div class="fontgrp" role="group" aria-label="Text size">
+      <button class="hbtn" id="fontDown" aria-label="Decrease text size">A&minus;</button>
+      <button class="hbtn" id="fontUp" aria-label="Increase text size">A+</button>
+    </div>
+    <button class="hbtn" id="themeToggle" aria-label="Toggle dark mode"><span id="themeIcon">&#9789;</span> <span id="themeText">Dark</span></button>
+  </div>
+</header>
+
+<div class="warn" role="alert">
+  <span class="ico">&#9888;</span>
+  <div><b>Accuracy notice:</b> AI-generated problems and worked solutions require human verification before use on an exam. Check every figure, given value, worked step, and final answer. Use the built-in computation check and the answer-key preview, and mark each problem verified before exporting.</div>
+</div>
+
+<nav class="tabnav" role="tablist" aria-label="Exam builder steps">
+  <button class="tab" role="tab" aria-selected="true" aria-controls="tab-config" id="t-config" tabindex="0">&#9881; 1. Configure</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="tab-prompt" id="t-prompt" tabindex="-1">&#128203; 2. Prompt</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="tab-review" id="t-review" tabindex="-1">&#128300; 3. Review &amp; Assemble <span id="reviewCount" style="font-size:.65rem;opacity:.7;"></span></button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="tab-export" id="t-export" tabindex="-1">&#11015; 4. Export</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="tab-guide" id="t-guide" tabindex="-1">&#128214; Guide</button>
+</nav>
+
+<main id="main">
+
+<!-- ══ TAB 1: CONFIGURE ══ -->
+<section class="panel active" id="tab-config" role="tabpanel" aria-labelledby="t-config">
+<div class="wrap">
+  <div class="head"><h2>Configure Your Exam</h2><p>Set the exam header, then add one problem slot per chapter or topic. Each slot becomes a single traditional show-your-work problem (with optional multi-part a/b/c). For a first engineering exam covering four chapters, add four slots and pick the problem type for each.</p></div>
+
+  <div class="card">
+    <h3>&#128209; Exam Header</h3>
+    <div class="grid">
+      <div class="field"><label class="lab" for="courseTitle">Course Title</label><input type="text" id="courseTitle" placeholder="e.g. Kinematics &amp; Dynamics of Machines"></div>
+      <div class="field"><label class="lab" for="examTitle">Exam Title</label><input type="text" id="examTitle" placeholder="e.g. Exam 1 — Chapters 1–4"></div>
+      <div class="field"><label class="lab" for="instructor">Instructor / Section</label><input type="text" id="instructor" placeholder="e.g. Prof. Qaissaunee · ENGI 201"></div>
+      <div class="field"><label class="lab" for="timeLimit">Time Limit</label><input type="text" id="timeLimit" placeholder="e.g. 75 minutes"></div>
+    </div>
+    <div class="grid full" style="margin-top:14px;">
+      <div class="field"><label class="lab" for="instructions">Instructions to Students</label><textarea id="instructions" rows="2" placeholder="e.g. Show all work for full credit. Box your final answers. Calculators permitted; no notes.">Show all work for full credit. Clearly box each final answer and include units. Partial credit is awarded for correct method.</textarea></div>
+      <div class="field"><label class="lab" for="honorPledge">Honor Pledge (optional)</label><input type="text" id="honorPledge" placeholder="e.g. I pledge that I have neither given nor received unauthorized aid on this exam."></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>&#127919; Defaults</h3>
+    <div class="grid">
+      <div class="field"><label class="lab" for="unitSystem">Unit System</label>
+        <select id="unitSystem"><option value="SI">SI (metric)</option><option value="US">US Customary</option><option value="both">Both — specify per problem</option></select></div>
+      <div class="field"><label class="lab" for="sigFigs">Significant Figures</label>
+        <select id="sigFigs"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="any">Problem-appropriate</option></select></div>
+      <div class="field"><label class="lab" for="defaultTol">Default Tolerance (±%)</label><input type="number" id="defaultTol" value="2" min="0.1" max="50" step="0.5"><span class="hint">Used by the computation check on numeric parts.</span></div>
+      <div class="field"><label class="lab" for="targetLLM">Target LLM</label>
+        <select id="targetLLM"><option value="claude" selected>Claude (recommended for LaTeX + figures)</option><option value="gpt">GPT-4o / 4.1</option><option value="gemini">Gemini 2.x</option><option value="other">Other</option></select></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>&#128221; Problem Slots <span id="slotCount" style="font-family:var(--mono);font-size:.66rem;color:var(--ink-3);margin-left:auto;text-transform:none;letter-spacing:0;"></span></h3>
+    <div id="slotList"></div>
+    <div class="btnrow">
+      <button class="btn btn-ghost" id="addSlot">+ Add Problem Slot</button>
+      <button class="btn btn-ghost" id="addFourEng" title="Adds four mechanism-ready slots">&#9881; Quick: 4 engineering slots</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>&#128196; Source Content (optional)</h3>
+    <div class="field"><label class="lab" for="sourceContent">Paste notes, a worked example, or a URL</label>
+      <textarea id="sourceContent" rows="4" placeholder="Paste lecture notes or a textbook excerpt to align problems to your notation, or a URL for LLMs with web access. You can also upload a PDF/PPTX directly to your LLM alongside the copied prompt."></textarea>
+      <span class="hint" id="urlHint" style="display:none;color:var(--cyan);font-weight:600;">&#128279; URL detected — will be fetched by LLMs with web access.</span></div>
+  </div>
+
+  <div class="btnrow">
+    <button class="btn btn-primary" id="genPrompt">&#9881; Generate Prompt</button>
+    <button class="btn btn-ghost" id="loadExamBtn">&#8593; Load Saved Exam (JSON)</button>
+    <input type="file" id="loadExamInput" accept=".json" hidden>
+    <button class="btn btn-ghost" id="clearConfig">&#8634; Clear</button>
+  </div>
+</div>
+</section>
+
+<!-- ══ TAB 2: PROMPT ══ -->
+<section class="panel" id="tab-prompt" role="tabpanel" aria-labelledby="t-prompt">
+<div class="wrap">
+  <div class="head"><h2>Generated Prompt</h2><p>Copy this into your LLM. It will return a JSON array of exam problems — one per slot, with multi-part structure, worked solutions, figure specs, and computation-check expressions. Paste that JSON into Step 3.</p></div>
+  <div id="promptWrap" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <h3 style="font-family:var(--mono);font-size:.75rem;color:var(--cyan);letter-spacing:.06em;text-transform:uppercase;">&#128203; Prompt Ready</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="copyPrompt">&#128203; Copy</button>
+        <button class="btn btn-ghost" id="dlPrompt">&#11015; .txt</button>
+      </div>
+    </div>
+    <pre id="promptBox" aria-live="polite" aria-label="Generated prompt"></pre>
+    <div class="tokrow"><span>Estimated tokens:</span><span class="pill ok" id="tokPill">—</span><span id="tokMsg" style="font-size:.72rem;"></span></div>
+    <div class="jumprow">
+      <a class="jump" href="https://claude.ai" target="_blank" rel="noopener" style="--jc:#c97b3a;">&#9670; Claude</a>
+      <a class="jump" href="https://chatgpt.com" target="_blank" rel="noopener" style="--jc:#10a37f;">&#11041; ChatGPT</a>
+      <a class="jump" href="https://gemini.google.com" target="_blank" rel="noopener" style="--jc:#4285f4;">&#10022; Gemini</a>
+    </div>
+  </div>
+  <div class="empty" id="noPrompt"><div class="ico">&#9881;</div><div style="font-family:var(--mono);font-size:.8rem;">Configure your exam in Step 1 first.</div></div>
+</div>
+</section>
+
+<!-- ══ TAB 3: REVIEW ══ -->
+<section class="panel" id="tab-review" role="tabpanel" aria-labelledby="t-review">
+<div class="wrap">
+  <div class="head"><h2>Review &amp; Assemble</h2><p>Paste the LLM's JSON, validate, then review and edit each problem. Verify every numeric answer with the computation check, attach or generate figures, read each worked solution, and mark problems verified.</p></div>
+  <div class="card">
+    <h3>&#128229; Paste LLM Response</h3>
+    <textarea class="json-area" id="jsonPaste" placeholder='Paste the JSON array of exam problems from your LLM here.'></textarea>
+    <div class="btnrow">
+      <button class="btn btn-primary" id="validateBtn">&#10003; Validate &amp; Build</button>
+      <button class="btn btn-ghost" id="clearJson">&#10005; Clear</button>
+    </div>
+    <div class="status" id="validateMsg" role="alert" aria-live="polite"></div>
+  </div>
+  <div id="reviewWrap" style="display:none;">
+    <div class="stats" id="reviewStats" aria-live="polite"></div>
+    <div id="problemList"></div>
+  </div>
+</div>
+</section>
+
+<!-- ══ TAB 4: EXPORT ══ -->
+<section class="panel" id="tab-export" role="tabpanel" aria-labelledby="t-export">
+<div class="wrap">
+  <div class="head"><h2>Export</h2><p>Three artifacts from one exam: a printable student exam (work space, no answers), an instructor answer key (worked solutions + checks), and a Canvas page formatted for an assignment with file-upload submission. Plus a JSON backup you can reload.</p></div>
+  <div id="exportEmpty" class="empty"><div class="ico">&#11015;</div><div style="font-family:var(--mono);font-size:.8rem;">Validate problems in Step 3 first.</div></div>
+  <div id="exportReady" style="display:none;">
+    <div class="vbar" id="vbar" role="status" aria-live="polite">
+      <span class="vcount" id="vcount">0/0 verified</span>
+      <span id="vmsg">Verify each problem before exporting.</span>
+      <button class="btn btn-ghost" id="verifyAll" style="margin-left:auto;padding:6px 12px;min-height:34px;font-size:.68rem;">&#10003; Verify All</button>
+    </div>
+    <div class="card">
+      <h3>&#9881; Options</h3>
+      <div class="exp-grid">
+        <div class="field"><label class="lab" for="includeRationale">Answer-key detail</label>
+          <select id="includeRationale"><option value="full" selected>Full worked solutions + rationale</option><option value="answers">Final answers only</option></select></div>
+        <div class="field"><label class="lab" for="workSpace">Student work space</label>
+          <select id="workSpace"><option value="medium" selected>Medium box per part</option><option value="large">Large box per part</option><option value="lines">Ruled lines</option><option value="none">None (upload work)</option></select></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>&#11015; Download</h3>
+      <div class="exp-list">
+        <div class="exp-item"><span class="ei-ico">&#128196;</span><div class="ei-txt"><div class="ei-name">Student Exam (HTML &middot; print to PDF)</div><div class="ei-desc">Header, figures, problems, work space. No answers. Open in a browser and Print &rarr; Save as PDF.</div></div><button class="btn btn-amber" id="expStudent">Download</button></div>
+        <div class="exp-item"><span class="ei-ico">&#128273;</span><div class="ei-txt"><div class="ei-name">Instructor Answer Key (HTML)</div><div class="ei-desc">Every part with final answer, worked solution, and computation-check result.</div></div><button class="btn btn-amber" id="expKey">Download</button></div>
+        <div class="exp-item"><span class="ei-ico">&#127891;</span><div class="ei-txt"><div class="ei-name">Canvas Submission Page (HTML)</div><div class="ei-desc">Problems + figures formatted to paste into a Canvas Assignment description. Pair with a File Upload submission so students upload their work.</div></div><button class="btn btn-amber" id="expCanvas">Download</button></div>
+        <div class="exp-item"><span class="ei-ico">&#128190;</span><div class="ei-txt"><div class="ei-name">Exam JSON (backup / reload)</div><div class="ei-desc">Save the full exam — reload it later in Step 1 to keep editing.</div></div><button class="btn btn-ghost" id="expJson">Download</button></div>
+      </div>
+      <div class="status" id="exportMsg" role="alert" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ══ TAB 5: GUIDE ══ -->
+<section class="panel" id="tab-guide" role="tabpanel" aria-labelledby="t-guide">
+<div class="wrap">
+  <div class="head"><h2>How This Tool Works</h2><p>A workflow for turning chapter coverage into a verified, traditional exam.</p></div>
+  <div class="card"><h3>&#128260; Workflow</h3>
+    <ol class="glist">
+      <li><b>Configure</b> — set the exam header and add one slot per chapter/topic. Choose the problem type, points, parts, and figure mode for each.</li>
+      <li><b>Generate &amp; run the prompt</b> — copy the prompt into your LLM (Claude recommended for LaTeX and figure specs). It returns one structured problem per slot.</li>
+      <li><b>Review &amp; verify</b> — validate the JSON, then check each problem: confirm the computation check passes, the figure matches the given values, and the worked solution is correct. Mark each verified.</li>
+      <li><b>Export</b> — download the student exam, answer key, and Canvas page.</li>
+    </ol>
+  </div>
+  <div class="card"><h3>&#129518; Figures</h3>
+    <p style="font-size:.85rem;color:var(--ink-2);line-height:1.7;margin-bottom:10px;">Each problem can carry one of four figure modes, chosen per problem in the review step:</p>
+    <ul class="glist">
+      <li><b>Mechanism (auto-drawn)</b> — four-bar linkage or slider-crank. Enter link lengths and the input angle; the tool solves the position and draws it. The same values must appear in the problem, so the picture and answer key stay locked. If the links can't physically close, it shows a notice instead of a wrong figure.</li>
+      <li><b>Image upload</b> — embed any diagram (free-body, gear train, 3D, photo) directly in the file as a self-contained image.</li>
+      <li><b>Exhibit block</b> — a monospace panel for a router config, code snippet, packet table, or text topology. Best for networking and cybersecurity problems.</li>
+      <li><b>None / text</b> — no figure, or a caption describing one you'll provide separately.</li>
+    </ul>
+  </div>
+  <div class="card"><h3>&#128202; LLM accuracy for quantitative work</h3>
+    <div style="overflow-x:auto;"><table class="gtable">
+      <thead><tr><th>Model</th><th>LaTeX</th><th>Arithmetic</th><th>Figure specs</th><th>Valid JSON</th></tr></thead>
+      <tbody>
+        <tr><td><b>Claude</b></td><td>&#9733;&#9733;&#9733;&#9733;&#9733;</td><td>&#9733;&#9733;&#9733;&#9733;</td><td>&#9733;&#9733;&#9733;&#9733;</td><td>&#9733;&#9733;&#9733;&#9733;&#9733;</td></tr>
+        <tr><td><b>GPT-4o / 4.1</b></td><td>&#9733;&#9733;&#9733;&#9733;</td><td>&#9733;&#9733;&#9733;&#9733;</td><td>&#9733;&#9733;&#9733;</td><td>&#9733;&#9733;&#9733;&#9733;</td></tr>
+        <tr><td><b>Gemini 2.x</b></td><td>&#9733;&#9733;&#9733;&#9733;</td><td>&#9733;&#9733;&#9733;</td><td>&#9733;&#9733;&#9733;</td><td>&#9733;&#9733;&#9733;&#9733;</td></tr>
+      </tbody>
+    </table></div>
+    <p style="font-size:.82rem;color:var(--ink-3);line-height:1.6;margin-top:12px;">No model produces reliably correct quantitative exams without review. The computation check (math.js) re-evaluates the answer expression in your browser — but a passing check only confirms the expression matches the marked answer, not that the expression models the right physics. Always read the worked solution.</p>
+  </div>
+</div>
+</section>
+
+</main>
+
+<footer>
+  <p>Quantitative Exam Builder &middot; built for <span class="program">Engineering &amp; Technology</span> &middot; Brookdale Community College &middot; <span class="year">2026</span></p>
+</footer>
+
+<!-- edit modal -->
+<div class="overlay" id="editOverlay" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+  <div class="modal">
+    <div class="modal-h"><h3 id="editTitle">Edit Problem</h3><button class="modal-x" id="editClose" aria-label="Close">&times;</button></div>
+    <div class="modal-b">
+      <div class="field"><label class="lab" for="editLabel">Problem Label</label><input type="text" id="editLabel"></div>
+      <div class="field"><label class="lab" for="editStem">Problem Stem / Setup (LaTeX OK)</label><textarea id="editStem" rows="4"></textarea></div>
+      <div class="field"><label class="lab" for="editParts">Parts (one per line: <code>letter | prompt | points | answer | units | verification_expr</code>)</label><textarea id="editParts" rows="6" style="font-family:var(--mono);font-size:.78rem;"></textarea><span class="hint">Leave answer/expr blank for non-numeric parts. Example: <code>a | Find the angular velocity of link 3 | 10 | 4.2 | rad/s | 60*0.05/0.18</code></span></div>
+      <div class="field"><label class="lab" for="editSolution">Worked Solution (problem-level, LaTeX OK)</label><textarea id="editSolution" rows="5"></textarea></div>
+    </div>
+    <div class="modal-f"><button class="btn btn-ghost" id="editCancel">Cancel</button><button class="btn btn-primary" id="editSave">&#10003; Save</button></div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ════════════════ utilities ════════════════ */
+const $ = id => document.getElementById(id);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escAttr(s){return escH(s).replace(/'/g,'&#39;');}
+
+let toastTimer;
+function toast(msg,type){const t=$('toast');t.textContent=msg;t.className='show '+(type==='success'?'ok':type==='error'?'err':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.className='',3200);}
+
+/* render text that may contain $LaTeX$ / $$..$$; escape the prose, keep delimiters for KaTeX */
+function renderLatex(s){
+  if(!s) return '';
+  const plainDollar=/^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|[\d.,]+%?)\$$/;
+  return String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g).map(p=>{
+    if(p && p[0]==='$' && !p.startsWith('$$') && plainDollar.test(p)) p=p.slice(1,-1);
+    return escH(p);
+  }).join('');
+}
+function typeset(el){
+  if(window.renderMathInElement) try{ renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false}); }catch(e){}
+}
+
+/* ════════════════ theme + font ════════════════ */
+(function(){
+  let saved; try{ saved=localStorage.getItem('exam_theme'); }catch(e){}
+  if(saved) document.documentElement.setAttribute('data-theme',saved);
+  function isDark(){
+    const a=document.documentElement.getAttribute('data-theme');
+    if(a==='dark') return true; if(a==='light') return false;
+    return window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function syncBtn(){ const d=isDark(); $('themeIcon').innerHTML=d?'&#9728;':'&#9789;'; $('themeText').textContent=d?'Light':'Dark'; }
+  $('themeToggle').addEventListener('click',()=>{const next=isDark()?'light':'dark';document.documentElement.setAttribute('data-theme',next);try{localStorage.setItem('exam_theme',next);}catch(e){}syncBtn();});
+  document.addEventListener('DOMContentLoaded',syncBtn); syncBtn();
+})();
+(function(){
+  const steps=['','fs-large','fs-larger']; let i=0;
+  try{ i=parseInt(localStorage.getItem('exam_font')||'0'); }catch(e){}
+  function apply(){ steps.forEach(s=>s&&document.body.classList.remove(s)); if(steps[i])document.body.classList.add(steps[i]); try{localStorage.setItem('exam_font',i);}catch(e){} }
+  document.addEventListener('DOMContentLoaded',apply); 
+  $('fontUp').addEventListener('click',()=>{i=Math.min(2,i+1);apply();});
+  $('fontDown').addEventListener('click',()=>{i=Math.max(0,i-1);apply();});
+})();
+
+/* ════════════════ tabs ════════════════ */
+const TABS=['config','prompt','review','export','guide'];
+function switchTab(name){
+  TABS.forEach(n=>{
+    const tab=$('t-'+n), panel=$('tab-'+n), on=(n===name);
+    tab.setAttribute('aria-selected',on?'true':'false');
+    tab.tabIndex=on?0:-1;
+    panel.classList.toggle('active',on);
+  });
+}
+TABS.forEach((n,idx)=>{
+  $('t-'+n).addEventListener('click',()=>switchTab(n));
+  $('t-'+n).addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+      e.preventDefault();
+      const d=e.key==='ArrowRight'?1:-1;
+      const next=TABS[(idx+d+TABS.length)%TABS.length];
+      switchTab(next); $('t-'+next).focus();
+    }
+  });
+});
+
+/* ════════════════ subject taxonomy ════════════════ */
+const SUBJECTS=[
+  ['Engineering','eng-statics:Statics','eng-dynamics:Dynamics','eng-circuits:Electric Circuits','eng-thermo:Thermodynamics','eng-fluids:Fluid Mechanics','eng-materials:Mechanics of Materials'],
+  ['Engineering Technology','engtech-kinematics:Kinematics &amp; Dynamics of Machines','engtech-machinedesign:Machine Design','engtech-manufacturing:Manufacturing Processes','engtech-instrumentation:Instrumentation &amp; Control'],
+  ['Electronics','elec-dc:DC Circuits','elec-ac:AC Circuits','elec-digital:Digital Electronics','elec-devices:Devices &amp; Semiconductors','elec-power:Power &amp; Motors'],
+  ['Physics','physics-mechanics:Physics — Mechanics','physics-em:Physics — E&amp;M','physics-thermo:Physics — Thermodynamics','physics-waves:Physics — Waves &amp; Optics'],
+  ['Mathematics','math-algebra:College Algebra / Precalc','math-trig:Trigonometry','math-calc1:Calculus I','math-calc2:Calculus II','math-calc3:Calculus III','math-diffeq:Differential Equations','math-linalg:Linear Algebra','math-stats:Statistics &amp; Probability'],
+  ['Chemistry','chem-gen1:General Chemistry I','chem-gen2:General Chemistry II'],
+  ['Networking &amp; Cybersecurity','tech-networking:Computer Networking','tech-security:Cybersecurity','tech-signals:Data &amp; Signals'],
+  ['Computing','cs-programming:Programming I','cs-datastructures:Data Structures &amp; Algorithms','it-linux:Linux / Sysadmin'],
+];
+const SUBJECT_NAMES={};
+SUBJECTS.forEach(g=>g.slice(1).forEach(s=>{const[v,n]=s.split(':');SUBJECT_NAMES[v]=n.replace(/&amp;/g,'&').replace(/—/g,'—');}));
+function subjectOptions(sel){
+  return SUBJECTS.map(g=>'<optgroup label="'+g[0]+'">'+g.slice(1).map(s=>{const[v,n]=s.split(':');return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+n+'</option>';}).join('')+'</optgroup>').join('');
+}
+
+/* ════════════════ slots (Configure) ════════════════ */
+let slots=[];
+let slotSeq=0;
+function newSlot(opts){
+  opts=opts||{};
+  return {uid:++slotSeq,label:opts.label||'',subject:opts.subject||'engtech-kinematics',topic:opts.topic||'',difficulty:opts.difficulty||'medium',points:opts.points||20,parts:opts.parts||2,figure:opts.figure||'auto'};
+}
+function renderSlots(){
+  const list=$('slotList'); list.innerHTML='';
+  slots.forEach((s,i)=>{
+    const div=document.createElement('div');
+    div.className='slot'; div.dataset.uid=s.uid;
+    div.innerHTML=
+      '<div class="slot-head"><span class="slot-grip" title="Drag to reorder" draggable="true" data-grip="'+s.uid+'">&#8942;&#8942;</span>'+
+      '<span class="slot-tag">Problem '+(i+1)+'</span>'+
+      '<button class="slot-del" data-del="'+s.uid+'" aria-label="Remove problem '+(i+1)+'">Remove</button></div>'+
+      '<div class="slot-grid">'+
+        '<div class="field"><label class="lab">Label (chapter / topic)</label><input type="text" data-f="label" value="'+escAttr(s.label)+'" placeholder="e.g. Ch. 3 — Position Analysis"></div>'+
+        '<div class="field"><label class="lab">Subject area</label><select data-f="subject">'+subjectOptions(s.subject)+'</select></div>'+
+      '</div>'+
+      '<div class="field" style="margin-top:10px;"><label class="lab">Problem type / what to test</label><input type="text" data-f="topic" value="'+escAttr(s.topic)+'" placeholder="e.g. four-bar linkage position + angular velocity of the coupler"></div>'+
+      '<div class="slot-mini" style="margin-top:10px;">'+
+        '<div class="field"><label class="lab">Difficulty</label><select data-f="difficulty">'+['easy','medium','hard'].map(d=>'<option value="'+d+'"'+(d===s.difficulty?' selected':'')+'>'+d+'</option>').join('')+'</select></div>'+
+        '<div class="field"><label class="lab">Points</label><input type="number" data-f="points" value="'+s.points+'" min="1" max="100" step="1"></div>'+
+        '<div class="field"><label class="lab">Parts (a,b,c…)</label><input type="number" data-f="parts" value="'+s.parts+'" min="1" max="6" step="1"></div>'+
+      '</div>'+
+      '<div class="field" style="margin-top:10px;"><label class="lab">Likely figure</label><select data-f="figure">'+
+        [['auto','Let the LLM decide / propose a spec'],['mechanism','Mechanism (four-bar / slider-crank)'],['upload','I will upload an image'],['exhibit','Exhibit block (code / config / table)'],['none','No figure / text only']].map(o=>'<option value="'+o[0]+'"'+(o[0]===s.figure?' selected':'')+'>'+o[1]+'</option>').join('')+
+      '</select></div>';
+    list.appendChild(div);
+    div.querySelectorAll('[data-f]').forEach(el=>{
+      el.addEventListener('change',()=>{
+        const f=el.dataset.f;
+        s[f]=(f==='points'||f==='parts')?(parseInt(el.value)||1):el.value;
+      });
+    });
+  });
+  $('slotCount').textContent=slots.length+(slots.length===1?' slot':' slots');
+}
+$('slotList').addEventListener('click',e=>{
+  const del=e.target.closest('[data-del]');
+  if(del){ slots=slots.filter(s=>s.uid!=del.dataset.del); renderSlots(); }
+});
+/* drag reorder */
+let dragUid=null;
+$('slotList').addEventListener('dragstart',e=>{const g=e.target.closest('[data-grip]');if(g){dragUid=g.dataset.grip;e.dataTransfer.effectAllowed='move';}});
+$('slotList').addEventListener('dragover',e=>{e.preventDefault();});
+$('slotList').addEventListener('drop',e=>{
+  e.preventDefault();
+  const target=e.target.closest('.slot'); if(!target||dragUid==null)return;
+  const from=slots.findIndex(s=>s.uid==dragUid), to=slots.findIndex(s=>s.uid==target.dataset.uid);
+  if(from<0||to<0)return;
+  const [m]=slots.splice(from,1); slots.splice(to,0,m); dragUid=null; renderSlots();
+});
+$('addSlot').addEventListener('click',()=>{slots.push(newSlot());renderSlots();});
+$('addFourEng').addEventListener('click',()=>{
+  slots=[
+    newSlot({label:'Ch. 1',subject:'engtech-kinematics',figure:'auto'}),
+    newSlot({label:'Ch. 2',subject:'engtech-kinematics',figure:'mechanism'}),
+    newSlot({label:'Ch. 3',subject:'engtech-kinematics',figure:'mechanism'}),
+    newSlot({label:'Ch. 4',subject:'engtech-kinematics',figure:'auto'}),
+  ];
+  renderSlots(); toast('Added 4 engineering slots.','success');
+});
+/* seed */
+slots=[newSlot({label:'Ch. 1'}),newSlot({label:'Ch. 2'}),newSlot({label:'Ch. 3'}),newSlot({label:'Ch. 4'})];
+document.addEventListener('DOMContentLoaded',renderSlots);
+
+/* url hint */
+(function(){const ta=$('sourceContent'),h=$('urlHint');ta.addEventListener('input',()=>{h.style.display=/https?:\/\/[^\s]+/i.test(ta.value)?'inline':'none';});})();
+
+/* ════════════════ prompt builder ════════════════ */
+const LLM_INTRO={
+  claude:'You are Claude. Use LaTeX ($...$ inline, $$...$$ display) for all math. Compute every numeric value before writing it, and double-check arithmetic.',
+  gpt:'You are GPT-4. Use LaTeX ($...$ inline, $$...$$ display) for all math. Double-check every calculation before writing answers.',
+  gemini:'Use LaTeX ($...$ inline, $$...$$ display) for all math. Verify each numeric answer against the worked solution.',
+  other:'Use LaTeX ($...$ inline, $$...$$ display) for all math. Verify all calculations. Output only valid JSON.'
+};
+function buildPrompt(){
+  if(!slots.length){toast('Add at least one problem slot.','error');return null;}
+  const course=$('courseTitle').value.trim()||'Engineering Course';
+  const examTitle=$('examTitle').value.trim()||'Exam';
+  const unit=$('unitSystem').value, sig=$('sigFigs').value, tol=$('defaultTol').value||'2';
+  const llm=$('targetLLM').value;
+  const src=$('sourceContent').value.trim();
+  const urls=(src.match(/https?:\/\/[^\s"'<>]+/gi)||[]);
+
+  let srcSection='';
+  if(src){
+    if(urls.length && src.split('\n').filter(l=>l.trim()).every(l=>/^https?:\/\//i.test(l.trim())))
+      srcSection='\nSOURCE — FETCH AND READ THESE URLS FIRST:\n'+urls.map(u=>'  - '+u).join('\n')+'\nBase problems on that content.\n';
+    else
+      srcSection='\nSOURCE CONTENT (primary basis for problems):\n'+src.substring(0,6000)+'\n';
+  }
+
+  const slotSpecs=slots.map((s,i)=>{
+    const subj=SUBJECT_NAMES[s.subject]||s.subject;
+    let figNote='';
+    if(s.figure==='mechanism') figNote=' This problem REQUIRES a mechanism figure — emit a "figure" object (see figure schema), with link lengths and input angle that MATCH the given values in the stem.';
+    else if(s.figure==='upload') figNote=' A figure will be supplied separately by the instructor; describe the needed figure in a "figure" object with mode "caption".';
+    else if(s.figure==='exhibit') figNote=' Provide any code/config/table/topology as a "figure" object with mode "exhibit".';
+    else if(s.figure==='none') figNote=' No figure needed (mode "none").';
+    else figNote=' Include a figure only if the problem genuinely needs one; choose the appropriate mode.';
+    return '  Problem '+(i+1)+' ['+(s.label||('Item '+(i+1)))+']: subject = '+subj+'; type/coverage = '+(s.topic||'instructor\'s choice within the subject')+'; difficulty = '+s.difficulty+'; total points = '+s.points+'; parts = '+s.parts+' (label them a, b, c… with points summing to '+s.points+').'+figNote;
+  }).join('\n');
+
+  const totalPts=slots.reduce((a,s)=>a+(s.points||0),0);
+
+  return (LLM_INTRO[llm]||LLM_INTRO.other)+'\n\n'+
+'You are writing a traditional, show-your-work '+course+' exam titled "'+examTitle+'". These are calculation problems where students must show their work on paper — NOT multiple choice. Produce exactly '+slots.length+' problems, one per specification below, totaling '+totalPts+' points.\n\n'+
+'PROBLEM SPECIFICATIONS:\n'+slotSpecs+'\n\n'+
+'GLOBAL REQUIREMENTS:\n'+
+'- Unit system: '+(unit==='SI'?'SI':unit==='US'?'US Customary':'specify clearly per problem')+'. Report numeric answers to '+(sig==='any'?'an appropriate number of':sig)+' significant figures.\n'+
+'- Every problem is self-contained: all values needed appear in the stem. State any standard constants used.\n'+
+'- For each part with a numeric answer, give the final value, its units, and a "verification_expression": a self-contained arithmetic expression (numbers and functions only, no variable names) that evaluates to that answer. Examples: "60*0.05/0.18", "sqrt(2*9.81*1.5)", "1/(1/10+1/20)". Use radians inside trig, or write degrees as (30*pi/180).\n'+
+'- Each part also gets a default tolerance of '+tol+'% for the computation check.\n'+
+'- Provide a complete problem-level "worked_solution" (LaTeX) showing given values, formulas, substitution, and unit/dimensional analysis, ending at each part\'s final answer.\n'+
+'- Use $...$ / $$...$$ for ALL math. Never use $ as a currency symbol (write "500 dollars"). For networking, write IP addresses and CIDR (e.g. 192.168.1.0/24) as plain text, never inside $...$.\n\n'+
+'FIGURE SCHEMA — set the "figure" field on each problem to one of:\n'+
+'  {"mode":"none"}\n'+
+'  {"mode":"caption","caption":"Describe the figure the instructor should supply"}\n'+
+'  {"mode":"exhibit","caption":"optional","text":"verbatim monospace block (config / code / table / topology)"}\n'+
+'  {"mode":"mechanism","mechanism":"fourbar","groundLength":NUM,"crankLength":NUM,"couplerLength":NUM,"rockerLength":NUM,"inputAngleDeg":NUM,"assembly":"open"}\n'+
+'  {"mode":"mechanism","mechanism":"slidercrank","crankLength":NUM,"rodLength":NUM,"offset":NUM,"inputAngleDeg":NUM,"assembly":"open"}\n'+
+'For mechanism figures, the link lengths and input angle in the figure MUST equal the given values used in the stem and worked solution. Use consistent length units (e.g. all mm or all in). For a four-bar, ensure the links can physically close at the given input angle (coupler + rocker can reach between the crank pin and the fixed pivot O4).\n\n'+
+srcSection+'\n'+
+'OUTPUT: Respond with ONLY a valid JSON array — no prose, no markdown fences, nothing before "[" or after "]". No meta-commentary inside any field (no "Note:", "REVISED:", etc.). Schema:\n'+
+'[\n'+
+'  {\n'+
+'    "id":"p1",\n'+
+'    "label":"Ch. 1 — Position Analysis",\n'+
+'    "subject":"'+slots[0].subject+'",\n'+
+'    "difficulty":"medium",\n'+
+'    "points":20,\n'+
+'    "stem":"Problem setup with given values in $LaTeX$.",\n'+
+'    "figure":{"mode":"mechanism","mechanism":"fourbar","groundLength":200,"crankLength":60,"couplerLength":180,"rockerLength":120,"inputAngleDeg":60,"assembly":"open"},\n'+
+'    "parts":[\n'+
+'      {"letter":"a","prompt":"Find ...","points":10,"answer":"...","units":"deg","verification_expression":"..."},\n'+
+'      {"letter":"b","prompt":"Determine ...","points":10,"answer":"...","units":"rad/s","verification_expression":"..."}\n'+
+'    ],\n'+
+'    "worked_solution":"Step-by-step solution in $LaTeX$.",\n'+
+'    "rationale":"One or two sentences on the key concept."\n'+
+'  }\n'+
+']\n'+
+'For a single-part problem use one parts entry with "letter":"". For non-numeric parts (derivation/explanation) set "answer" to the model answer text and omit "verification_expression". CRITICAL: verify each numeric answer equals its verification_expression before finalizing.';
+}
+$('genPrompt').addEventListener('click',()=>{
+  const p=buildPrompt(); if(!p)return;
+  $('promptBox').textContent=p;
+  $('promptWrap').style.display='block'; $('noPrompt').style.display='none';
+  const tok=Math.round(p.length/3.8);
+  const pill=$('tokPill'); pill.textContent=tok.toLocaleString()+' tokens';
+  if(tok<6000){pill.className='pill ok';$('tokMsg').textContent='Well within limits for all models.';}
+  else if(tok<20000){pill.className='pill warn';$('tokMsg').textContent='Large — Claude or GPT-4o recommended.';}
+  else{pill.className='pill over';$('tokMsg').textContent='Very large — trim source content or slots.';}
+  switchTab('prompt');
+  toast('Prompt ready — copy it into your LLM.','success');
+});
+$('copyPrompt').addEventListener('click',()=>{navigator.clipboard.writeText($('promptBox').textContent).then(()=>toast('Copied!','success'));});
+$('dlPrompt').addEventListener('click',()=>{dl(new Blob([$('promptBox').textContent],{type:'text/plain'}),($('examTitle').value.trim()||'exam')+'_prompt.txt');});
+$('clearConfig').addEventListener('click',()=>{
+  ['courseTitle','examTitle','instructor','timeLimit','honorPledge','sourceContent'].forEach(id=>$(id).value='');
+  $('urlHint').style.display='none';
+  slots=[newSlot({label:'Ch. 1'}),newSlot({label:'Ch. 2'}),newSlot({label:'Ch. 3'}),newSlot({label:'Ch. 4'})];
+  renderSlots(); toast('Cleared.','');
+});
+
+/* ════════════════ mechanism solver + SVG ════════════════ */
+function circleIntersect(c1,r1,c2,r2){
+  const dx=c2[0]-c1[0],dy=c2[1]-c1[1],d=Math.hypot(dx,dy);
+  if(d>r1+r2 || d<Math.abs(r1-r2) || d===0) return null;
+  const a=(r1*r1-r2*r2+d*d)/(2*d), h2=r1*r1-a*a;
+  if(h2<0) return null;
+  const h=Math.sqrt(h2), xm=c1[0]+a*dx/d, ym=c1[1]+a*dy/d, rx=-dy*h/d, ry=dx*h/d;
+  return [[xm+rx,ym+ry],[xm-rx,ym-ry]];
+}
+function solveMechanism(f){
+  const th=(f.inputAngleDeg||0)*Math.PI/180;
+  if(f.mechanism==='slidercrank'){
+    const r2=+f.crankLength,r3=+f.rodLength,e=+(f.offset||0);
+    const O2=[0,0],A=[r2*Math.cos(th),r2*Math.sin(th)],dy=A[1]-e,disc=r3*r3-dy*dy;
+    if(disc<0) return {ok:false,reason:'Connecting rod too short to reach the slider line at this crank angle.'};
+    const root=Math.sqrt(disc), xB=(f.assembly==='crossed')?(A[0]-root):(A[0]+root);
+    return {ok:true,type:'slidercrank',O2,A,B:[xB,e],guideY:e,r2,r3,th:f.inputAngleDeg||0};
+  }
+  // four-bar
+  const L1=+f.groundLength,r2=+f.crankLength,r3=+f.couplerLength,r4=+f.rockerLength;
+  const O2=[0,0],O4=[L1,0],A=[r2*Math.cos(th),r2*Math.sin(th)];
+  const sols=circleIntersect(A,r3,O4,r4);
+  if(!sols) return {ok:false,reason:'Links cannot close at this input angle — coupler/rocker circles do not intersect.'};
+  const B=(f.assembly==='crossed')?sols[1]:sols[0];
+  return {ok:true,type:'fourbar',O2,A,B,O4,L1,r2,r3,r4,th:f.inputAngleDeg||0};
+}
+function mechanismSVG(f,opts){
+  opts=opts||{}; const W=420,H=300,M=46;
+  const sol=solveMechanism(f);
+  if(!sol.ok) return '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Mechanism cannot be drawn"><rect width="'+W+'" height="'+H+'" fill="none"/><text x="'+(W/2)+'" y="'+(H/2-10)+'" text-anchor="middle" font-family="monospace" font-size="13" fill="#c0392b">&#9888; Figure not drawable</text><text x="'+(W/2)+'" y="'+(H/2+12)+'" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#a0392b">'+escH(sol.reason)+'</text></svg>';
+  const pts=[];
+  if(sol.type==='fourbar'){pts.push(sol.O2,sol.A,sol.B,sol.O4);}
+  else{pts.push(sol.O2,sol.A,sol.B,[sol.B[0]-sol.r2*0.9,sol.guideY],[sol.B[0]+sol.r2*0.6,sol.guideY]);}
+  let minX=Math.min(...pts.map(p=>p[0])),maxX=Math.max(...pts.map(p=>p[0]));
+  let minY=Math.min(...pts.map(p=>p[1])),maxY=Math.max(...pts.map(p=>p[1]));
+  const bw=Math.max(maxX-minX,1),bh=Math.max(maxY-minY,1);
+  const sc=Math.min((W-2*M)/bw,(H-2*M)/bh);
+  const offx=(W-bw*sc)/2,offy=(H-bh*sc)/2;
+  const X=x=>offx+(x-minX)*sc, Y=y=>H-(offy+(y-minY)*sc); // flip y
+  const fg=opts.dark?'#cfe0ff':'#1a2744', acc=opts.dark?'#36c8f0':'#005f80', gnd=opts.dark?'#7f93b8':'#5a6a8a', lbl=opts.dark?'#9fb3d8':'#3a4a6a', amber=opts.dark?'#f5b54a':'#8a5000';
+  function ground(cx,cy,ang){ang=ang||0;const s='translate('+cx+','+cy+') rotate('+ang+')';let h='';for(let i=-12;i<=12;i+=6)h+='<line x1="'+i+'" y1="14" x2="'+(i-6)+'" y2="22" stroke="'+gnd+'" stroke-width="1.4"/>';return '<g transform="'+s+'"><polygon points="0,0 -11,14 11,14" fill="none" stroke="'+gnd+'" stroke-width="1.8"/><line x1="-15" y1="14" x2="15" y2="14" stroke="'+gnd+'" stroke-width="1.8"/>'+h+'</g>';}
+  function pin(cx,cy){return '<circle cx="'+cx+'" cy="'+cy+'" r="5.5" fill="'+(opts.dark?'#141d31':'#fff')+'" stroke="'+fg+'" stroke-width="2"/>';}
+  function link(a,b){return '<line x1="'+X(a[0])+'" y1="'+Y(a[1])+'" x2="'+X(b[0])+'" y2="'+Y(b[1])+'" stroke="'+acc+'" stroke-width="5" stroke-linecap="round"/>';}
+  function lbltxt(x,y,t,col){return '<text x="'+x+'" y="'+y+'" font-family="monospace" font-size="12" font-weight="600" fill="'+(col||fg)+'">'+escH(t)+'</text>';}
+  function midlen(a,b,t){if(!opts.lengths)return '';const mx=X((a[0]+b[0])/2),my=Y((a[1]+b[1])/2);return '<text x="'+mx+'" y="'+(my-6)+'" font-family="monospace" font-size="10" fill="'+lbl+'" text-anchor="middle">'+escH(t)+'</text>';}
+  let svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(sol.type==='fourbar'?'Four-bar linkage':'Slider-crank')+' figure">';
+  // angle arc at O2
+  if(opts.angleArc!==false){
+    const R=24, a0=0, a1=sol.th*Math.PI/180;
+    const sx=X(sol.O2[0])+R, sy=Y(sol.O2[1]);
+    const ex=X(sol.O2[0])+R*Math.cos(a1), ey=Y(sol.O2[1])-R*Math.sin(a1);
+    const large=(sol.th>180)?1:0, sweep=(sol.th>=0)?0:1;
+    svg+='<path d="M '+sx+' '+sy+' A '+R+' '+R+' 0 '+large+' '+sweep+' '+ex+' '+ey+'" fill="none" stroke="'+amber+'" stroke-width="1.5"/>';
+    svg+=lbltxt(X(sol.O2[0])+R*0.7*Math.cos(a1/2)+6, Y(sol.O2[1])-R*0.7*Math.sin(a1/2), '\u03B8\u2082', amber);
+    // ground reference line
+    svg+='<line x1="'+X(sol.O2[0])+'" y1="'+Y(sol.O2[1])+'" x2="'+(X(sol.O2[0])+R+10)+'" y2="'+Y(sol.O2[1])+'" stroke="'+gnd+'" stroke-width="1" stroke-dasharray="3 3"/>';
+  }
+  if(sol.type==='fourbar'){
+    svg+=link(sol.O2,sol.A)+link(sol.A,sol.B)+link(sol.O4,sol.B);
+    svg+=midlen(sol.O2,sol.A,'r\u2082='+sol.r2)+midlen(sol.A,sol.B,'r\u2083='+sol.r3)+midlen(sol.O4,sol.B,'r\u2084='+sol.r4);
+    if(opts.lengths)svg+=midlen(sol.O2,sol.O4,'r\u2081='+sol.L1);
+    svg+=ground(X(sol.O2[0]),Y(sol.O2[1]))+ground(X(sol.O4[0]),Y(sol.O4[1]));
+    svg+=pin(X(sol.O2[0]),Y(sol.O2[1]))+pin(X(sol.A[0]),Y(sol.A[1]))+pin(X(sol.B[0]),Y(sol.B[1]))+pin(X(sol.O4[0]),Y(sol.O4[1]));
+    if(opts.labels!==false){
+      svg+=lbltxt(X(sol.O2[0])-22,Y(sol.O2[1])+4,'O\u2082')+lbltxt(X(sol.O4[0])+10,Y(sol.O4[1])+4,'O\u2084')+lbltxt(X(sol.A[0])-6,Y(sol.A[1])-10,'A')+lbltxt(X(sol.B[0])+8,Y(sol.B[1])-6,'B');
+    }
+  } else {
+    // guide line
+    const gy=Y(sol.guideY);
+    svg+='<line x1="20" y1="'+gy+'" x2="'+(W-20)+'" y2="'+gy+'" stroke="'+gnd+'" stroke-width="1.4"/>';
+    for(let gx=24;gx<W-20;gx+=14)svg+='<line x1="'+gx+'" y1="'+gy+'" x2="'+(gx-6)+'" y2="'+(gy+7)+'" stroke="'+gnd+'" stroke-width="1"/>';
+    svg+=link(sol.O2,sol.A)+link(sol.A,sol.B);
+    svg+=midlen(sol.O2,sol.A,'r\u2082='+sol.r2)+midlen(sol.A,sol.B,'r\u2083='+sol.r3);
+    // slider block
+    const bx=X(sol.B[0]),by=Y(sol.B[1]);
+    svg+='<rect x="'+(bx-17)+'" y="'+(by-11)+'" width="34" height="22" rx="3" fill="'+(opts.dark?'#1d2840':'#e8eefb')+'" stroke="'+fg+'" stroke-width="1.8"/>';
+    svg+=ground(X(sol.O2[0]),Y(sol.O2[1]));
+    svg+=pin(X(sol.O2[0]),Y(sol.O2[1]))+pin(X(sol.A[0]),Y(sol.A[1]))+pin(bx,by);
+    if(opts.labels!==false){
+      svg+=lbltxt(X(sol.O2[0])-22,Y(sol.O2[1])+4,'O\u2082')+lbltxt(X(sol.A[0])-6,Y(sol.A[1])-10,'A')+lbltxt(bx+20,by+4,'B');
+    }
+  }
+  return svg+'</svg>';
+}
+
+/* ════════════════ validate + build ════════════════ */
+let problems=[];
+let verified={};
+let editIdx=-1;
+
+function normFigure(fig){
+  if(!fig||typeof fig!=='object') return {mode:'none'};
+  const m=(fig.mode||'').toLowerCase();
+  if(m==='mechanism'){
+    return {mode:'mechanism',mechanism:(fig.mechanism||'fourbar').toLowerCase(),
+      groundLength:+fig.groundLength||200,crankLength:+fig.crankLength||60,couplerLength:+fig.couplerLength||180,
+      rockerLength:+fig.rockerLength||120,rodLength:+fig.rodLength||180,offset:+fig.offset||0,
+      inputAngleDeg:fig.inputAngleDeg!=null?+fig.inputAngleDeg:60,assembly:fig.assembly==='crossed'?'crossed':'open',
+      labels:true,lengths:true,angleArc:true};
+  }
+  if(m==='exhibit') return {mode:'exhibit',text:fig.text||'',caption:fig.caption||''};
+  if(m==='caption'||m==='upload') return {mode:'caption',caption:fig.caption||''};
+  if(m==='image') return {mode:'image',dataUrl:fig.dataUrl||'',caption:fig.caption||'',alt:fig.alt||''};
+  return {mode:'none'};
+}
+function normParts(p){
+  if(!Array.isArray(p)||!p.length) return [{letter:'',prompt:'',points:0,answer:'',units:'',verification_expression:''}];
+  return p.map(x=>({letter:(x.letter||'').toString(),prompt:x.prompt||'',points:+x.points||0,answer:x.answer!=null?String(x.answer):'',units:x.units||'',verification_expression:x.verification_expression||x.verificationExpression||''}));
+}
+$('validateBtn').addEventListener('click',()=>{
+  const raw=$('jsonPaste').value.trim(); const vm=$('validateMsg');
+  vm.className='status'; 
+  if(!raw){vm.className='status err show';vm.textContent='Paste JSON first.';return;}
+  try{
+    let arr=JSON.parse(raw.replace(/^```(?:json)?\n?/,'').replace(/\n?```\s*$/,''));
+    if(!Array.isArray(arr)) arr=arr.problems||arr.questions||arr.data||Object.values(arr);
+    if(!Array.isArray(arr)) throw new Error('Expected a JSON array of problems.');
+    problems=arr.map((q,i)=>({
+      id:q.id||'p'+(i+1),
+      label:q.label||q.title||('Problem '+(i+1)),
+      subject:q.subject||(slots[i]?slots[i].subject:''),
+      difficulty:(q.difficulty||'medium').toLowerCase(),
+      points:+q.points||0,
+      stem:q.stem||'',
+      figure:normFigure(q.figure),
+      parts:normParts(q.parts),
+      worked_solution:q.worked_solution||q.workedSolution||'',
+      rationale:q.rationale||''
+    }));
+    verified={};
+    vm.className='status ok show';
+    vm.innerHTML='&#9989; <b>'+problems.length+' problems built.</b> Review each below, verify the numbers, then export.';
+    renderReview(); refreshExport();
+    $('reviewWrap').style.display='block';
+    $('reviewCount').textContent='('+problems.length+')';
+    toast(problems.length+' problems built.','success');
+  }catch(e){
+    vm.className='status err show'; vm.textContent='JSON error: '+e.message;
+    problems=[]; $('reviewWrap').style.display='none'; refreshExport();
+  }
+});
+$('clearJson').addEventListener('click',()=>{$('jsonPaste').value='';problems=[];$('validateMsg').className='status';$('reviewWrap').style.display='none';$('reviewCount').textContent='';refreshExport();});
+
+/* ════════════════ verification math ════════════════ */
+function cleanExpr(e){
+  if(!e)return null;let s=String(e);
+  s=s.replace(/\$\$([^$]+)\$\$/g,'$1').replace(/\$([^$]+)\$/g,'$1');
+  s=s.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)').replace(/\\sqrt\{([^}]+)\}/g,'sqrt($1)').replace(/\\sqrt\b/g,'sqrt');
+  s=s.replace(/\\sin\b/g,'sin').replace(/\\cos\b/g,'cos').replace(/\\tan\b/g,'tan').replace(/\\pi\b/g,'pi');
+  s=s.replace(/\\times\b/g,'*').replace(/\\cdot\b/g,'*').replace(/\\div\b/g,'/');
+  s=s.replace(/\\text\{([^}]*)\}/g,'').replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1').replace(/\\[a-zA-Z]+/g,'').replace(/[{}]/g,'');
+  s=s.replace(/(\d+\.?\d*)\s*°/g,'($1*pi/180)').replace(/(\d+\.?\d*)\s*degrees?/gi,'($1*pi/180)');
+  s=s.replace(/(\d{1,3}),(\d{3})/g,'$1$2').replace(/(\d{1,3}),(\d{3})/g,'$1$2');
+  return s.trim()||null;
+}
+function evalExpr(e){
+  const c=cleanExpr(e); if(!c)return{ok:false};
+  if(typeof math==='undefined')return{ok:false,reason:'math.js not loaded'};
+  try{const r=math.evaluate(c);if(typeof r!=='number'||!isFinite(r))return{ok:false,reason:'non-numeric',clean:c};return{ok:true,val:r,clean:c};}
+  catch(err){return{ok:false,reason:err.message,clean:c};}
+}
+function parseAns(a){
+  if(a==null)return null;let t=String(a).replace(/\u2212/g,'-').replace(/\u2013/g,'-');
+  t=t.replace(/\$\$([^$]+)\$\$/g,'$1').replace(/\$([^$]+)\$/g,'$1');
+  t=t.replace(/(\d{1,3}),(\d{3})/g,'$1$2').replace(/(\d{1,3}),(\d{3})/g,'$1$2');
+  t=t.replace(/(\d)([eE])([+\-]?\d)/g,'$1~$3');
+  t=t.replace(/[A-Za-z]+/g,' ').replace(/~/g,'e');
+  const nums=(t.match(/-?\d*\.?\d+(?:e[+\-]?\d+)?/gi)||[]).map(parseFloat).filter(isFinite);
+  return nums.length?nums[nums.length-1]:null;
+}
+
+/* ════════════════ render review ════════════════ */
+function renderReview(){
+  const total=problems.length;
+  const tpts=problems.reduce((a,p)=>a+(p.points||p.parts.reduce((b,x)=>b+(x.points||0),0)),0);
+  const figs=problems.filter(p=>p.figure&&p.figure.mode!=='none').length;
+  $('reviewStats').innerHTML=['Problems: '+total,'Total points: '+tpts,'With figures: '+figs].map(s=>'<span class="stat">'+escH(s)+'</span>').join('');
+  const list=$('problemList'); list.innerHTML='';
+  problems.forEach((p,i)=>list.appendChild(buildCard(p,i)));
+  setTimeout(()=>typeset(list),60);
+}
+function buildCard(p,i){
+  const div=document.createElement('div');
+  const isV=!!verified[p.id||('p'+i)];
+  div.className='pcard'+(isV?' verified':''); div.id='pcard-'+i;
+  const tpts=p.points||p.parts.reduce((a,x)=>a+(x.points||0),0);
+
+  // figure block
+  let figHtml=figureEditorHtml(p,i);
+
+  // parts
+  const partsHtml=p.parts.map((pt,pi)=>{
+    const ve=pt.verification_expression?verifyHtml(pt,p):'';
+    return '<div class="part">'+
+      '<div class="part-head"><span class="part-letter">'+(pt.letter?'('+escH(pt.letter)+')':'')+'</span>'+
+      '<span style="flex:1;">'+renderLatex(pt.prompt||'')+'</span>'+
+      (pt.points?'<span class="part-pts">'+pt.points+' pt</span>':'')+'</div>'+
+      (pt.answer?'<div class="part-ans">Answer: <b>'+renderLatex(pt.answer)+'</b>'+(pt.units?' '+escH(pt.units):'')+'</div>':'')+
+      ve+'</div>';
+  }).join('');
+
+  div.innerHTML=
+    '<div class="pc-head">'+
+      '<span class="pc-num">#'+(i+1)+'</span>'+
+      '<div class="pc-title"><div class="pc-label">'+escH(p.label)+'</div>'+
+        '<div class="pc-badges">'+
+          '<span class="bdg pts">'+tpts+' pts</span>'+
+          '<span class="bdg diff">'+escH(p.difficulty)+'</span>'+
+          (p.subject?'<span class="bdg subj">'+escH(SUBJECT_NAMES[p.subject]||p.subject)+'</span>':'')+
+          (p.figure&&p.figure.mode!=='none'?'<span class="bdg fig">'+escH(p.figure.mode)+'</span>':'')+
+        '</div>'+
+      '</div>'+
+      '<button class="vbadge '+(isV?'done':'needs')+'" data-verify="'+i+'" title="Mark verified after checking the work">'+(isV?'&#10003; Verified':'&#9888; Needs check')+'</button>'+
+      '<div class="pc-acts"><button class="iconbtn" data-edit="'+i+'" aria-label="Edit problem '+(i+1)+'">&#9998;</button><button class="iconbtn del" data-delp="'+i+'" aria-label="Delete problem '+(i+1)+'">&#10005;</button></div>'+
+    '</div>'+
+    '<div class="pc-body">'+
+      (p.stem?'<div class="pc-stem">'+renderLatex(p.stem)+'</div>':'')+
+      figHtml+
+      partsHtml+
+      (p.worked_solution?
+        '<button class="soltog" data-soltog="'+i+'" aria-expanded="false">&#9654; Show Worked Solution (answer key)</button>'+
+        '<div class="solbox" id="sol-'+i+'"><div class="sh">Worked Solution</div><div>'+renderLatex(p.worked_solution)+'</div></div>'
+        :'')+
+    '</div>';
+  // wire figure editor
+  setTimeout(()=>wireFigureEditor(div,p,i),0);
+  return div;
+}
+
+function verifyHtml(pt,p){
+  const expr=pt.verification_expression.trim();
+  const er=evalExpr(expr);
+  const ans=parseAns(pt.answer);
+  const tol=(parseFloat($('defaultTol').value)||2)/100;
+  if(!er.ok){
+    const wa='https://www.wolframalpha.com/input?i='+encodeURIComponent(expr.substring(0,200));
+    return '<div class="vw skip"><b>&#9881; Check:</b> couldn\'t evaluate in-browser. <span class="expr">'+escH(expr)+'</span> '+
+      '<a href="'+wa+'" target="_blank" rel="noopener">Verify on Wolfram Alpha &#8599;</a></div>';
+  }
+  const computed=Math.round(er.val*1e6)/1e6;
+  if(ans==null){
+    return '<div class="vw pass"><b>&#9881; Check:</b> <span class="expr">'+escH(expr)+'</span> = <b>'+computed+'</b> (confirm this matches the answer)</div>';
+  }
+  let margin=Math.abs(ans)*tol; if(margin<1e-6)margin=Math.max(1e-6,Math.abs(computed)*1e-4);
+  const pass=Math.abs(computed-ans)<=margin;
+  if(pass) return '<div class="vw pass"><b>&#10003; Check passed:</b> <span class="expr">'+escH(expr)+'</span> = <b>'+computed+'</b> &middot; matches '+ans+' within &plusmn;'+(tol*100)+'%</div>';
+  const pct=Math.abs(computed-ans)/(Math.abs(ans)||1)*100;
+  const near=pct<=20;
+  return '<div class="vw '+(near?'near':'fail')+'"><b>'+(near?'&#128310; Near miss':'&#9888; Mismatch')+':</b> <span class="expr">'+escH(expr)+'</span> = <b>'+computed+'</b> vs answer '+ans+' ('+pct.toFixed(1)+'% off)'+
+    '<ol><li>Does the expression compute what the part asks?</li><li>Is the stated answer correct?</li><li>Does the worked solution agree?</li>'+(near?'<li>If rounding, widen tolerance or fix the answer.</li>':'')+'</ol></div>';
+}
+
+/* figure editor */
+function figureEditorHtml(p,i){
+  const f=p.figure||{mode:'none'};
+  const modes=[['mechanism','Mechanism'],['image','Image'],['exhibit','Exhibit'],['caption','Caption'],['none','None']];
+  let body='';
+  if(f.mode==='mechanism'){
+    body='<div class="mech-params" data-mech="'+i+'">'+
+      field(i,'mechanism','Type','select',f.mechanism,[['fourbar','Four-bar'],['slidercrank','Slider-crank']])+
+      (f.mechanism==='slidercrank'
+        ? field(i,'crankLength','Crank r₂','num',f.crankLength)+field(i,'rodLength','Rod r₃','num',f.rodLength)+field(i,'offset','Offset e','num',f.offset)
+        : field(i,'groundLength','Ground r₁','num',f.groundLength)+field(i,'crankLength','Crank r₂','num',f.crankLength)+field(i,'couplerLength','Coupler r₃','num',f.couplerLength)+field(i,'rockerLength','Rocker r₄','num',f.rockerLength))+
+      field(i,'inputAngleDeg','Input θ₂ (°)','num',f.inputAngleDeg)+
+      field(i,'assembly','Assembly','select',f.assembly,[['open','Open'],['crossed','Crossed']])+
+      '</div>'+
+      '<div class="fig-preview" data-figprev="'+i+'">'+mechanismSVG(f,{lengths:f.lengths,labels:f.labels,angleArc:f.angleArc,dark:isDarkNow()})+'</div>';
+  } else if(f.mode==='image'){
+    body='<input type="file" accept="image/*" data-imgfile="'+i+'" style="font-size:.8rem;margin-bottom:8px;">'+
+      '<input type="text" placeholder="Caption (optional)" data-imgcap="'+i+'" value="'+escAttr(f.caption||'')+'" style="margin-bottom:8px;">'+
+      '<div class="fig-preview" data-figprev="'+i+'">'+(f.dataUrl?'<img src="'+escAttr(f.dataUrl)+'" alt="'+escAttr(f.alt||f.caption||'figure')+'">':'<span class="hint">No image yet — choose a file.</span>')+'</div>';
+  } else if(f.mode==='exhibit'){
+    body='<input type="text" placeholder="Caption (optional)" data-excap="'+i+'" value="'+escAttr(f.caption||'')+'" style="margin-bottom:8px;">'+
+      '<textarea data-extext="'+i+'" rows="4" style="font-family:var(--mono);font-size:.78rem;" placeholder="Monospace block: config / code / table / topology">'+escH(f.text||'')+'</textarea>'+
+      (f.text?'<div class="fig-preview" data-figprev="'+i+'" style="justify-content:flex-start;"><pre class="exhibit-pre">'+escH(f.text)+'</pre></div>':'');
+  } else if(f.mode==='caption'){
+    body='<input type="text" placeholder="Describe the figure to supply" data-capcap="'+i+'" value="'+escAttr(f.caption||'')+'">'+
+      (f.caption?'<div class="hint" style="margin-top:6px;">Figure placeholder: '+escH(f.caption)+'</div>':'');
+  } else {
+    body='<div class="hint">No figure for this problem.</div>';
+  }
+  return '<div class="figbox"><div class="figlab">&#129518; Figure</div>'+
+    '<div class="fig-mode-row" data-figmode="'+i+'">'+modes.map(m=>'<button type="button" class="fig-mode'+(f.mode===m[0]||(m[0]==='caption'&&f.mode==='caption')?' on':'')+'" data-setmode="'+m[0]+'">'+m[1]+'</button>').join('')+'</div>'+
+    body+'</div>';
+  function field(idx,key,label,type,val,opt){
+    if(type==='select') return '<div class="field"><label class="lab">'+label+'</label><select data-mf="'+key+'">'+opt.map(o=>'<option value="'+o[0]+'"'+(o[0]===val?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></div>';
+    return '<div class="field"><label class="lab">'+label+'</label><input type="number" step="any" data-mf="'+key+'" value="'+(val!=null?val:'')+'"></div>';
+  }
+}
+function isDarkNow(){const a=document.documentElement.getAttribute('data-theme');if(a==='dark')return true;if(a==='light')return false;return window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;}
+
+function wireFigureEditor(card,p,i){
+  // mode switch
+  const modeRow=card.querySelector('[data-figmode="'+i+'"]');
+  if(modeRow) modeRow.addEventListener('click',e=>{
+    const b=e.target.closest('[data-setmode]'); if(!b)return;
+    const m=b.dataset.setmode;
+    if(m==='mechanism') p.figure=normFigure({mode:'mechanism',mechanism:'fourbar',groundLength:200,crankLength:60,couplerLength:180,rockerLength:120,inputAngleDeg:60});
+    else if(m==='image') p.figure={mode:'image',dataUrl:'',caption:'',alt:''};
+    else if(m==='exhibit') p.figure={mode:'exhibit',text:'',caption:''};
+    else if(m==='caption') p.figure={mode:'caption',caption:''};
+    else p.figure={mode:'none'};
+    refreshCard(i);
+  });
+  // mechanism params
+  const mp=card.querySelector('[data-mech="'+i+'"]');
+  if(mp) mp.addEventListener('input',()=>{
+    mp.querySelectorAll('[data-mf]').forEach(el=>{
+      const k=el.dataset.mf; const v=el.value;
+      p.figure[k]=(el.tagName==='SELECT')?v:(parseFloat(v)||0);
+    });
+    // type change rebuilds fields
+    const typeChanged=mp.querySelector('[data-mf="mechanism"]') && mp.querySelector('[data-mf="mechanism"]').value!==p.figure.mechanism;
+    const prev=card.querySelector('[data-figprev="'+i+'"]');
+    if(prev) prev.innerHTML=mechanismSVG(p.figure,{lengths:p.figure.lengths,labels:p.figure.labels,angleArc:p.figure.angleArc,dark:isDarkNow()});
+  });
+  if(mp){
+    const typeSel=mp.querySelector('[data-mf="mechanism"]');
+    if(typeSel) typeSel.addEventListener('change',()=>{p.figure.mechanism=typeSel.value;refreshCard(i);});
+  }
+  // image upload
+  const imgf=card.querySelector('[data-imgfile="'+i+'"]');
+  if(imgf) imgf.addEventListener('change',()=>{
+    const file=imgf.files[0]; if(!file)return;
+    if(file.size>3*1024*1024){toast('Image over 3 MB — use a smaller image to keep the file light.','error');return;}
+    const r=new FileReader(); r.onload=ev=>{p.figure.dataUrl=ev.target.result;refreshCard(i);}; r.readAsDataURL(file);
+  });
+  const imgcap=card.querySelector('[data-imgcap="'+i+'"]'); if(imgcap)imgcap.addEventListener('input',()=>{p.figure.caption=imgcap.value;p.figure.alt=imgcap.value;});
+  // exhibit
+  const ex=card.querySelector('[data-extext="'+i+'"]'); if(ex)ex.addEventListener('input',()=>{p.figure.text=ex.value;});
+  const exc=card.querySelector('[data-excap="'+i+'"]'); if(exc)exc.addEventListener('input',()=>{p.figure.caption=exc.value;});
+  const exb=card.querySelector('[data-extext="'+i+'"]'); if(exb)exb.addEventListener('blur',()=>refreshCard(i));
+  // caption
+  const cc=card.querySelector('[data-capcap="'+i+'"]'); if(cc)cc.addEventListener('input',()=>{p.figure.caption=cc.value;});
+}
+function refreshCard(i){
+  const old=$('pcard-'+i); if(!old)return;
+  const fresh=buildCard(problems[i],i);
+  old.replaceWith(fresh);
+  setTimeout(()=>typeset(fresh),40);
+}
+
+/* review delegation: verify / edit / delete / solution toggle */
+$('problemList').addEventListener('click',e=>{
+  const v=e.target.closest('[data-verify]'); if(v){toggleVerify(+v.dataset.verify);return;}
+  const ed=e.target.closest('[data-edit]'); if(ed){openEdit(+ed.dataset.edit);return;}
+  const dp=e.target.closest('[data-delp]'); if(dp){const i=+dp.dataset.delp;if(confirm('Delete problem '+(i+1)+'?')){problems.splice(i,1);renderReview();refreshExport();toast('Deleted.','');}return;}
+  const st=e.target.closest('[data-soltog]'); if(st){const i=+st.dataset.soltog;const box=$('sol-'+i);const open=box.classList.toggle('open');st.setAttribute('aria-expanded',open);st.innerHTML=(open?'&#9660; Hide':'&#9654; Show')+' Worked Solution (answer key)';if(open)setTimeout(()=>typeset(box),40);return;}
+});
+function toggleVerify(i){
+  const p=problems[i],id=p.id||('p'+i);
+  verified[id]=!verified[id];
+  refreshCard(i); refreshExport();
+}
+function refreshExport(){
+  const has=problems.length>0;
+  $('exportReady').style.display=has?'block':'none';
+  $('exportEmpty').style.display=has?'none':'block';
+  const total=problems.length, done=problems.filter((p,i)=>verified[p.id||('p'+i)]).length;
+  const bar=$('vbar'),c=$('vcount'),m=$('vmsg');
+  if(!has)return;
+  if(done===total){bar.className='vbar all';c.className='vcount full';c.textContent=done+'/'+total+' verified';m.textContent='\u2713 All verified — ready to export.';}
+  else{bar.className='vbar';c.className='vcount';c.textContent=done+'/'+total+' verified';m.textContent='Verify each problem before exporting.';}
+}
+$('verifyAll').addEventListener('click',()=>{problems.forEach((p,i)=>verified[p.id||('p'+i)]=true);renderReview();refreshExport();toast('All marked verified.','success');});
+
+/* edit modal */
+function openEdit(i){
+  editIdx=i; const p=problems[i];
+  $('editLabel').value=p.label||'';
+  $('editStem').value=p.stem||'';
+  $('editParts').value=p.parts.map(pt=>[pt.letter,pt.prompt,pt.points,pt.answer,pt.units,pt.verification_expression].join(' | ')).join('\n');
+  $('editSolution').value=p.worked_solution||'';
+  $('editOverlay').classList.add('open'); $('editLabel').focus();
+}
+function closeEdit(){$('editOverlay').classList.remove('open');}
+$('editClose').addEventListener('click',closeEdit);
+$('editCancel').addEventListener('click',closeEdit);
+$('editOverlay').addEventListener('click',e=>{if(e.target===$('editOverlay'))closeEdit();});
+$('editSave').addEventListener('click',()=>{
+  if(editIdx<0)return; const p=problems[editIdx];
+  p.label=$('editLabel').value.trim()||p.label;
+  p.stem=$('editStem').value;
+  p.worked_solution=$('editSolution').value;
+  const lines=$('editParts').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(lines.length){
+    p.parts=lines.map(l=>{const c=l.split('|').map(x=>x.trim());return{letter:c[0]||'',prompt:c[1]||'',points:parseFloat(c[2])||0,answer:c[3]||'',units:c[4]||'',verification_expression:c[5]||''};});
+  }
+  closeEdit(); refreshCard(editIdx); refreshExport(); toast('Saved.','success');
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeEdit();});
+
+/* ════════════════ export ════════════════ */
+function dl(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);}
+function examMeta(){return{courseTitle:$('courseTitle').value.trim(),examTitle:$('examTitle').value.trim()||'Exam',instructor:$('instructor').value.trim(),timeLimit:$('timeLimit').value.trim(),instructions:$('instructions').value.trim(),honorPledge:$('honorPledge').value.trim()};}
+function totalPoints(){return problems.reduce((a,p)=>a+(p.points||p.parts.reduce((b,x)=>b+(x.points||0),0)),0);}
+function safeName(){return (($('examTitle').value.trim()||'exam')).replace(/[^a-z0-9]+/gi,'_');}
+
+/* figure HTML for exported docs */
+function figureExportHtml(f){
+  if(!f||f.mode==='none')return '';
+  if(f.mode==='mechanism')return '<div class="fig">'+mechanismSVG(f,{lengths:f.lengths,labels:f.labels,angleArc:f.angleArc,dark:false})+'</div>';
+  if(f.mode==='image'&&f.dataUrl)return '<div class="fig"><img src="'+escAttr(f.dataUrl)+'" alt="'+escAttr(f.alt||f.caption||'figure')+'">'+(f.caption?'<div class="figcap">'+escH(f.caption)+'</div>':'')+'</div>';
+  if(f.mode==='exhibit'&&f.text)return '<div class="fig">'+(f.caption?'<div class="figcap">'+escH(f.caption)+'</div>':'')+'<pre class="exhibit">'+escH(f.text)+'</pre></div>';
+  if(f.mode==='caption'&&f.caption)return '<div class="figcap-only">[ Figure: '+escH(f.caption)+' ]</div>';
+  return '';
+}
+const KATEX_TAIL='<scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></scr'+'ipt><scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></scr'+'ipt><scr'+'ipt>renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],throwOnError:false});</scr'+'ipt>';
+const KATEX_CSS='<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">';
+
+const DOC_CSS=`*{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;line-height:1.6;font-size:12pt}
+.page{max-width:760px;margin:0 auto;padding:36px 30px}
+.cover{border-bottom:3px solid #003366;padding-bottom:18px;margin-bottom:22px}
+.cover h1{font-size:1.5rem;color:#003366;margin-bottom:4px}
+.cover .sub{font-size:1rem;color:#006666;margin-bottom:8px}
+.cover .meta{font-size:.85rem;color:#555;display:flex;flex-wrap:wrap;gap:18px}
+.namebar{display:flex;gap:28px;margin:14px 0;font-size:.9rem}
+.namebar .blank{border-bottom:1px solid #333;flex:1;min-width:120px;display:inline-block}
+.instr{background:#f4f4ee;border-left:4px solid #006666;padding:11px 15px;font-size:.88rem;margin-bottom:8px;border-radius:3px}
+.pledge{font-size:.82rem;font-style:italic;color:#444;margin-bottom:20px;padding-left:4px}
+.prob{margin-bottom:26px;page-break-inside:avoid;border-bottom:1px solid #ddd;padding-bottom:16px}
+.prob:last-child{border-bottom:none}
+.prob-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.prob-h .pn{font-weight:700;color:#003366;font-size:1.05rem}
+.prob-h .pp{font-size:.82rem;color:#666}
+.prob-label{font-size:.82rem;color:#006666;font-style:italic;margin-bottom:6px}
+.stem{margin-bottom:12px}
+.fig{margin:12px 0;text-align:center}
+.fig svg,.fig img{max-width:90%;height:auto}
+.figcap{font-size:.8rem;color:#666;font-style:italic;margin-top:5px}
+.figcap-only{font-size:.85rem;color:#888;font-style:italic;border:1px dashed #bbb;padding:8px;text-align:center;margin:10px 0}
+.exhibit{font-family:'Courier New',monospace;font-size:.82rem;white-space:pre;overflow-x:auto;background:#f6f6f2;border:1px solid #ccc;border-radius:4px;padding:10px 13px;text-align:left;display:inline-block}
+.part{margin:10px 0 10px 6px}
+.part-q{font-weight:600}
+.pl{font-size:.8rem;color:#888;margin-left:8px}
+.work-box{border:1px solid #bbb;border-radius:4px;margin-top:8px;background:#fcfcfa}
+.work-box.medium{height:130px}.work-box.large{height:230px}
+.work-lines{margin-top:8px}.work-lines .ln{border-bottom:1px solid #ccc;height:26px}
+.ans-line{margin-top:8px;font-size:.9rem}.ans-box{border:1.5px solid #333;display:inline-block;min-width:130px;padding:5px 10px;border-radius:3px}
+.key-ans{margin-top:6px;font-size:.92rem;background:#eef6ee;border-left:3px solid #006840;padding:6px 11px;border-radius:0 3px 3px 0}
+.key-ans b{color:#006840}
+.key-check{font-family:'Courier New',monospace;font-size:.78rem;color:#444;margin-top:4px}
+.key-check.fail{color:#a30000}
+.sol{margin-top:10px;background:#fff8ee;border:1px solid #e0c080;border-radius:5px;padding:11px 14px;font-size:.9rem}
+.sol .sh{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a5000;margin-bottom:6px}
+.footer{margin-top:30px;padding-top:14px;border-top:2px solid #003366;text-align:center;font-size:.78rem;color:#666}
+.canvas-note{background:#e8f3ff;border:1px solid #9cc6ef;border-radius:6px;padding:12px 15px;font-size:.86rem;margin-bottom:20px}
+@media print{.page{padding:0;max-width:none}.prob{page-break-inside:avoid}.no-print{display:none}@page{margin:.85in}}`;
+
+function workSpaceHtml(){
+  const m=$('workSpace').value;
+  if(m==='none')return '';
+  if(m==='lines')return '<div class="work-lines">'+Array(4).fill('<div class="ln"></div>').join('')+'</div>';
+  return '<div class="work-box '+m+'"></div>';
+}
+
+function studentExamHtml(){
+  const meta=examMeta();
+  const probs=problems.map((p,i)=>{
+    const tpts=p.points||p.parts.reduce((a,x)=>a+(x.points||0),0);
+    const parts=p.parts.map(pt=>
+      '<div class="part"><div><span class="part-q">'+(pt.letter?'('+escH(pt.letter)+') ':'')+'</span>'+renderLatex(pt.prompt||'')+(pt.points?'<span class="pl">['+pt.points+' pts]</span>':'')+'</div>'+
+      workSpaceHtml()+
+      ($('workSpace').value==='none'?'':'<div class="ans-line">Answer: <span class="ans-box">&nbsp;</span>'+(pt.units?' '+escH(pt.units):'')+'</div>')+
+      '</div>'
+    ).join('');
+    return '<div class="prob"><div class="prob-h"><span class="pn">Problem '+(i+1)+'</span><span class="pp">'+tpts+' points</span></div>'+
+      (p.label?'<div class="prob-label">'+escH(p.label)+'</div>':'')+
+      (p.stem?'<div class="stem">'+renderLatex(p.stem)+'</div>':'')+
+      figureExportHtml(p.figure)+parts+'</div>';
+  }).join('');
+  return docShell(meta.examTitle+' — Student Exam',
+    coverHtml(meta,true)+probs+
+    '<div class="footer">'+escH(meta.examTitle)+(meta.courseTitle?' &middot; '+escH(meta.courseTitle):'')+' &middot; '+problems.length+' problems &middot; '+totalPoints()+' points</div>');
+}
+function answerKeyHtml(){
+  const meta=examMeta(); const full=$('includeRationale').value==='full';
+  const probs=problems.map((p,i)=>{
+    const tpts=p.points||p.parts.reduce((a,x)=>a+(x.points||0),0);
+    const parts=p.parts.map(pt=>{
+      let check='';
+      if(pt.verification_expression){
+        const er=evalExpr(pt.verification_expression), ans=parseAns(pt.answer);
+        if(er.ok){const c=Math.round(er.val*1e6)/1e6;const ok=(ans==null)||Math.abs(c-ans)<=Math.abs(ans)*((parseFloat($('defaultTol').value)||2)/100)+1e-9;
+          check='<div class="key-check'+(ok?'':' fail')+'">check: '+escH(pt.verification_expression)+' = '+c+(ok?' \u2713':' \u2717 (answer '+ans+')')+'</div>';}
+        else check='<div class="key-check">check: '+escH(pt.verification_expression)+' (evaluate manually)</div>';
+      }
+      return '<div class="part"><div><span class="part-q">'+(pt.letter?'('+escH(pt.letter)+') ':'')+'</span>'+renderLatex(pt.prompt||'')+(pt.points?'<span class="pl">['+pt.points+' pts]</span>':'')+'</div>'+
+        (pt.answer?'<div class="key-ans">Answer: <b>'+renderLatex(pt.answer)+'</b>'+(pt.units?' '+escH(pt.units):'')+'</div>':'')+check+'</div>';
+    }).join('');
+    return '<div class="prob"><div class="prob-h"><span class="pn">Problem '+(i+1)+'</span><span class="pp">'+tpts+' points</span></div>'+
+      (p.label?'<div class="prob-label">'+escH(p.label)+'</div>':'')+
+      (p.stem?'<div class="stem">'+renderLatex(p.stem)+'</div>':'')+
+      figureExportHtml(p.figure)+parts+
+      (full&&p.worked_solution?'<div class="sol"><div class="sh">Worked Solution</div>'+renderLatex(p.worked_solution)+'</div>':'')+
+      (full&&p.rationale?'<div class="key-check" style="margin-top:6px;font-style:italic;">'+renderLatex(p.rationale)+'</div>':'')+
+      '</div>';
+  }).join('');
+  return docShell(meta.examTitle+' — Answer Key',
+    coverHtml(meta,false,'ANSWER KEY')+probs+
+    '<div class="footer">Answer Key &middot; '+escH(meta.examTitle)+' &middot; '+totalPoints()+' points</div>');
+}
+function canvasHtml(){
+  const meta=examMeta();
+  const probs=problems.map((p,i)=>{
+    const tpts=p.points||p.parts.reduce((a,x)=>a+(x.points||0),0);
+    const parts=p.parts.map(pt=>'<div class="part"><span class="part-q">'+(pt.letter?'('+escH(pt.letter)+') ':'')+'</span>'+renderLatex(pt.prompt||'')+(pt.points?'<span class="pl">['+pt.points+' pts]</span>':'')+'</div>').join('');
+    return '<div class="prob"><div class="prob-h"><span class="pn">Problem '+(i+1)+'</span><span class="pp">'+tpts+' points</span></div>'+
+      (p.label?'<div class="prob-label">'+escH(p.label)+'</div>':'')+
+      (p.stem?'<div class="stem">'+renderLatex(p.stem)+'</div>':'')+
+      figureExportHtml(p.figure)+parts+'</div>';
+  }).join('');
+  const note='<div class="canvas-note"><b>How to submit:</b> Work each problem on paper (or a tablet), showing all steps. Then scan or photograph your complete work and upload it as your submission. Be sure your name is on every page and your final answers are clearly boxed.</div>';
+  return docShell(meta.examTitle+' — Canvas',
+    '<div class="cover"><h1>'+escH(meta.examTitle)+'</h1>'+(meta.courseTitle?'<div class="sub">'+escH(meta.courseTitle)+'</div>':'')+
+    '<div class="meta">'+(meta.timeLimit?'<span>Time: '+escH(meta.timeLimit)+'</span>':'')+'<span>'+totalPoints()+' points</span><span>'+problems.length+' problems</span></div></div>'+
+    (meta.instructions?'<div class="instr">'+escH(meta.instructions)+'</div>':'')+note+probs+
+    '<div class="footer" style="font-style:italic;">Paste the body of this page into a Canvas Assignment set to "File Upload" submission. Students upload their worked solutions.</div>');
+}
+function coverHtml(meta,student,tag){
+  return '<div class="cover"><h1>'+escH(meta.examTitle)+(tag?' — '+tag:'')+'</h1>'+
+    (meta.courseTitle?'<div class="sub">'+escH(meta.courseTitle)+'</div>':'')+
+    '<div class="meta">'+(meta.instructor?'<span>'+escH(meta.instructor)+'</span>':'')+(meta.timeLimit?'<span>Time: '+escH(meta.timeLimit)+'</span>':'')+'<span>'+totalPoints()+' points</span></div></div>'+
+    (student?'<div class="namebar"><span>Name: <span class="blank">&nbsp;</span></span><span>Date: <span class="blank" style="max-width:140px;">&nbsp;</span></span></div>':'')+
+    (meta.instructions?'<div class="instr">'+escH(meta.instructions)+'</div>':'')+
+    (student&&meta.honorPledge?'<div class="pledge">'+escH(meta.honorPledge)+' &nbsp;&nbsp; Signature: ____________________</div>':'');
+}
+function docShell(title,inner){
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escH(title)+'</title>'+KATEX_CSS+'<style>'+DOC_CSS+'</style></head><body><div class="page">'+inner+
+    '<div class="no-print" style="margin-top:28px;padding:14px;background:#f0f8ff;border:1px solid #b0d4f0;border-radius:6px;font-family:sans-serif;font-size:.85rem;"><b>&#128161; To make a PDF:</b> use your browser&rsquo;s Print &rarr; &ldquo;Save as PDF&rdquo;.</div></div>'+KATEX_TAIL+'</body></html>';
+}
+
+function guardExport(){
+  if(!problems.length){toast('Validate problems first.','error');return false;}
+  const total=problems.length,done=problems.filter((p,i)=>verified[p.id||('p'+i)]).length;
+  if(done<total){ if(!confirm((total-done)+' problem(s) are not yet marked verified. Export anyway?')) return false; }
+  return true;
+}
+$('expStudent').addEventListener('click',()=>{if(!guardExport())return;dl(new Blob([studentExamHtml()],{type:'text/html'}),safeName()+'_student.html');toast('Student exam downloaded.','success');});
+$('expKey').addEventListener('click',()=>{if(!problems.length){toast('Validate first.','error');return;}dl(new Blob([answerKeyHtml()],{type:'text/html'}),safeName()+'_answer_key.html');toast('Answer key downloaded.','success');});
+$('expCanvas').addEventListener('click',()=>{if(!guardExport())return;dl(new Blob([canvasHtml()],{type:'text/html'}),safeName()+'_canvas.html');toast('Canvas page downloaded.','success');});
+$('expJson').addEventListener('click',()=>{
+  const data={meta:examMeta(),defaults:{unitSystem:$('unitSystem').value,sigFigs:$('sigFigs').value,defaultTol:$('defaultTol').value},generated:new Date().toISOString(),problems};
+  dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),safeName()+'_exam.json');toast('JSON saved.','success');
+});
+
+/* load saved exam */
+$('loadExamBtn').addEventListener('click',()=>$('loadExamInput').click());
+$('loadExamInput').addEventListener('change',()=>{
+  const file=$('loadExamInput').files[0]; if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(d.meta){$('courseTitle').value=d.meta.courseTitle||'';$('examTitle').value=d.meta.examTitle||'';$('instructor').value=d.meta.instructor||'';$('timeLimit').value=d.meta.timeLimit||'';$('instructions').value=d.meta.instructions||'';$('honorPledge').value=d.meta.honorPledge||'';}
+      if(d.defaults){$('unitSystem').value=d.defaults.unitSystem||'SI';$('sigFigs').value=d.defaults.sigFigs||'3';$('defaultTol').value=d.defaults.defaultTol||'2';}
+      const arr=Array.isArray(d)?d:(d.problems||[]);
+      if(!arr.length)throw new Error('No problems in file.');
+      $('jsonPaste').value=JSON.stringify(arr);
+      $('validateBtn').click();
+      switchTab('review');
+      toast('Exam loaded — '+arr.length+' problems.','success');
+    }catch(e){toast('Could not load: '+e.message,'error');}
+  };
+  r.readAsText(file); $('loadExamInput').value='';
+});
+
+</script>
+</body>
+</html>
