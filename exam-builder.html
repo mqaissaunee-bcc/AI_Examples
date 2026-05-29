@@ -665,7 +665,7 @@ function renderSlots(){
         '<div class="field"><label class="lab">Label (chapter / topic)</label><input type="text" data-f="label" value="'+escAttr(s.label)+'" placeholder="e.g. Ch. 3 — Position Analysis"></div>'+
         '<div class="field"><label class="lab">Subject area</label><select data-f="subject">'+subjectOptions(s.subject)+'</select></div>'+
       '</div>'+
-      '<div class="field" style="margin-top:10px;"><label class="lab">Problem type / what to test</label><input type="text" data-f="topic" value="'+escAttr(s.topic)+'" placeholder="e.g. four-bar linkage position + angular velocity of the coupler"></div>'+
+      '<div class="field" style="margin-top:10px;"><label class="lab">Problem type / what to test <span style="color:var(--ink-3);font-weight:400;text-transform:none;letter-spacing:0;">— leave blank to let the LLM pick from the source</span></label><input type="text" data-f="topic" value="'+escAttr(s.topic)+'" placeholder="e.g. four-bar linkage position + angular velocity of the coupler — or blank to derive from the URL"></div>'+
       '<div class="field slot-url-field" style="margin-top:10px;'+(assignMode==='hw'?'display:none;':'')+'"><label class="lab">&#128279; Reference URL for this problem</label><input type="text" data-f="sourceUrl" value="'+escAttr(s.sourceUrl)+'" placeholder="https://… chapter/lesson this problem draws from (optional)"></div>'+
       '<div class="slot-mini" style="margin-top:10px;">'+
         '<div class="field"><label class="lab">Difficulty</label><select data-f="difficulty">'+['easy','medium','hard'].map(d=>'<option value="'+d+'"'+(d===s.difficulty?' selected':'')+'>'+d+'</option>').join('')+'</select></div>'+
@@ -782,15 +782,19 @@ function buildPrompt(){
     else if(s.figure==='none') figNote=' No figure needed (mode "none").';
     else figNote=' If a figure would help, emit mode "image" with an "imagePrompt"; otherwise mode "none".';
     const urlNote=(!hw&&s.sourceUrl)?' Source: '+s.sourceUrl+'.':'';
-    return '  Problem '+(i+1)+' ['+(s.label||('Item '+(i+1)))+']: subject = '+subj+'; type/coverage = '+(s.topic||'instructor\'s choice within the subject')+'; difficulty = '+s.difficulty+'; total points = '+s.points+'; parts = '+s.parts+' (label them a, b, c… with points summing to '+s.points+').'+figNote+urlNote;
+    const hasSrc=hw?(!!lessonUrl||!!src):(!!s.sourceUrl||!!src);
+    const topicClause=s.topic?s.topic:(hasSrc?'choose an appropriate problem type yourself from the provided source — a distinct, representative quantitative skill drawn from that material':'instructor\'s choice within the subject');
+    return '  Problem '+(i+1)+' ['+(s.label||('Item '+(i+1)))+']: subject = '+subj+'; type/coverage = '+topicClause+'; difficulty = '+s.difficulty+'; total points = '+s.points+'; parts = '+s.parts+' (label them a, b, c… with points summing to '+s.points+').'+figNote+urlNote;
   }).join('\n');
 
   const totalPts=slots.reduce((a,s)=>a+(s.points||0),0);
+  const autoTopic=slots.some(s=>!s.topic&&(hw?(!!lessonUrl||!!src):(!!s.sourceUrl||!!src)));
 
   return (LLM_INTRO[llm]||LLM_INTRO.other)+'\n\n'+
 'You are writing a traditional, show-your-work '+course+' '+kind+' titled "'+examTitle+'". These are calculation problems where students must show their work on paper — NOT multiple choice. Produce exactly '+slots.length+' problems, one per specification below, totaling '+totalPts+' points.'+(hw?' Keep difficulty and scope appropriate for weekly practice on a single lesson.':'')+'\n\n'+
 'PROBLEM SPECIFICATIONS:\n'+slotSpecs+'\n\n'+
 'GLOBAL REQUIREMENTS:\n'+
+(autoTopic?'- For any problem whose type is left for you to choose, read the provided source(s) and select distinct, representative quantitative skills from that material so the problem set spans the lesson/chapter without overlapping — do not repeat the same problem type, and make each problem clearly different from the others.\n':'')+
 '- Unit system: '+(unit==='SI'?'SI':unit==='US'?'US Customary':'specify clearly per problem')+'. Report numeric answers to '+(sig==='any'?'an appropriate number of':sig)+' significant figures.\n'+
 '- Every problem is self-contained: all values needed appear in the stem. State any standard constants used.\n'+
 '- For each part with a numeric answer, give the final value, its units, and a "verification_expression": a self-contained arithmetic expression (numbers and functions only, no variable names) that evaluates to that answer. Examples: "60*0.05/0.18", "sqrt(2*9.81*1.5)", "1/(1/10+1/20)". Use radians inside trig, or write degrees as (30*pi/180).\n'+
