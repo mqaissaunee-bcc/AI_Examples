@@ -2551,13 +2551,70 @@ $('btnClearForm').addEventListener('click',()=>{
 let parsedQuestions = [];
 let editingIdx = -1;
 
+// ── LLM JSON repair (LaTeX-aware) ───────────────────────────────────────────
+// LLMs routinely emit JSON that is invalid *because of LaTeX*:
+//   (1) single backslashes before a command, e.g. "$\frac{1}{2}$" — in JSON a
+//       lone \f \t \n... is a control escape and \s \l \a... is illegal, so the
+//       math is silently corrupted or the parse fails outright.
+//   (2) raw line breaks (LF/CR) inside a string value, which JSON forbids.
+//   (3) trailing commas before } or ].
+// This walks the text tracking whether we are inside a string and fixes all
+// three. It runs ONLY as a fallback after strict JSON.parse fails, so valid
+// JSON (including correctly \\-escaped LaTeX) is never altered.
+function repairLLMJson(src){
+  var out = '';
+  var inStr = false;
+  for(var i=0; i<src.length; i++){
+    var ch = src[i];
+    if(!inStr){
+      if(ch === '"'){ inStr = true; out += ch; continue; }
+      if(ch === ','){                                   // drop a trailing comma
+        var j = i+1;
+        while(j < src.length && /\s/.test(src[j])) j++;
+        if(src[j] === '}' || src[j] === ']') continue;
+      }
+      out += ch; continue;
+    }
+    // ---- inside a double-quoted string ----
+    if(ch === '"'){ inStr = false; out += ch; continue; }
+    if(ch === '\\'){
+      var nx = src[i+1];
+      if(nx === undefined){ out += '\\\\'; continue; }
+      // keep the JSON escapes LaTeX does NOT overload:  \"  \\  \/  and \uXXXX
+      if(nx === '"' || nx === '\\' || nx === '/'){ out += ch + nx; i++; continue; }
+      if(nx === 'u' && /^[0-9a-fA-F]{4}$/.test(src.substr(i+2,4))){ out += ch + nx; i++; continue; }
+      // everything else (\frac, \theta, \nu, \sqrt, stray) -> escape the backslash
+      out += '\\\\'; continue;
+    }
+    if(ch === '\n'){ out += '\\n'; continue; }          // raw control chars -> escapes
+    if(ch === '\r'){ out += '\\r'; continue; }
+    if(ch === '\t'){ out += '\\t'; continue; }
+    out += ch;
+  }
+  return out;
+}
+
 $('btnValidate').addEventListener('click',()=>{
   const raw = $('jsonPaste').value.trim();
   const vm = $('validationMsg');
   vm.className='status-msg'; vm.style.display='none';
   if(!raw){ vm.className='status-msg err show'; vm.textContent='Paste JSON from your LLM first.'; return; }
   try{
-    let arr = JSON.parse(raw.replace(/^```(?:json)?\n?/,'').replace(/\n?```$/,''));
+    let arr, repaired=false;
+    let cleaned = raw.replace(/^```(?:json)?\n?/,'').replace(/\n?```$/,'');
+    try{
+      arr = JSON.parse(cleaned);
+    }catch(err1){
+      // Salvage: strip surrounding prose, then repair LaTeX backslashes,
+      // raw line breaks, and trailing commas, then retry.
+      let salvage = cleaned;
+      var s0 = salvage.search(/[\[{]/);
+      var e0 = Math.max(salvage.lastIndexOf(']'), salvage.lastIndexOf('}'));
+      if(s0 >= 0 && e0 >= s0) salvage = salvage.slice(s0, e0+1);
+      salvage = repairLLMJson(salvage);
+      arr = JSON.parse(salvage);
+      repaired = true;
+    }
     if(!Array.isArray(arr)) arr = arr.questions || arr.data || Object.values(arr);
     if(!Array.isArray(arr)) throw new Error('Expected a JSON array.');
     // Normalise fields
@@ -2580,14 +2637,14 @@ $('btnValidate').addEventListener('click',()=>{
     }));
     parsedQuestions = arr;
     vm.className='status-msg ok show';
-    vm.innerHTML='✅ <strong>'+arr.length+' questions validated.</strong> Review each question below  --  verify all worked solutions and numerical answers before exporting.';
+    vm.innerHTML=(repaired?'🔧 <strong>Auto-repaired LaTeX backslashes / formatting in your JSON.</strong> ':'')+'✅ <strong>'+arr.length+' questions validated.</strong> Review each question below  --  verify all worked solutions and numerical answers before exporting.';
     renderReview();
     $('reviewWrap').style.display='block';
     $('exportCard').style.display='block';
     toast('✅ '+arr.length+' questions validated!','success');
   } catch(e){
     vm.className='status-msg err show';
-    vm.textContent='❌ JSON parse error: '+e.message;
+    vm.innerHTML='❌ <strong>JSON parse error:</strong> '+escH(e.message)+'<br><span style="font-size:.86em;opacity:.85">Usually caused by LaTeX backslashes that are not doubled, or a line break inside a value. The validator already auto-repairs these — if it still fails, check for an unmatched quote or bracket.</span>';
     parsedQuestions=[];
     $('reviewWrap').style.display='none';
     $('exportCard').style.display='none';
@@ -3084,6 +3141,14 @@ function latexToMathML(s){
 }
 
 // ── QTI XML builder ────────────────────────────────────────────────────────
+// CANVAS feedback as HTML: convert $...$ -> \(...\) so MathJax renders it,
+// HTML-escape the surrounding text, and turn newlines into <br/>. Feedback is
+// emitted as text/html (NOT text/plain) because Canvas wraps text/plain content
+// in <pre> tags, which block MathJax from typesetting the math.
+function fbHtml(s){
+  return escX(latexToCanvas(String(s||'')).replace(/\n/g,'<br/>'));
+}
+
 function buildQTIXML(questions, bankName, pts){
   const ident=bankName.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40)||'STEM_QB';
   const items=questions.map((q,i)=>{
@@ -3107,7 +3172,7 @@ function buildQTIXML(questions, bankName, pts){
         <respcondition continue="Yes"><conditionvar><other/></conditionvar></respcondition>
       </resprocessing>
       <itemfeedback ident="fb"><flow_mat><material>
-        <mattext texttype="text/plain">Model answer: ${escX(q.worked_solution||q.correct||'')}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
+        <mattext texttype="text/html">${fbHtml('Model answer: '+(q.worked_solution||q.correct||'')+(q.rationale?'\n\n'+q.rationale:''))}</mattext>
       </material></flow_mat></itemfeedback>`;
     } else if(isNum){
       // calculated_question: answer + tolerance
@@ -3130,10 +3195,10 @@ function buildQTIXML(questions, bankName, pts){
         </respcondition>
       </resprocessing>
       <itemfeedback ident="fb_correct"><flow_mat><material>
-        <mattext texttype="text/plain">Correct! ${escX(q.worked_solution||'')}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
+        <mattext texttype="text/html">${fbHtml('Correct! '+(q.worked_solution||'')+(q.rationale?'\n\n'+q.rationale:''))}</mattext>
       </material></flow_mat></itemfeedback>
       <itemfeedback ident="fb_incorrect"><flow_mat><material>
-        <mattext texttype="text/plain">Incorrect. Correct answer: ${escX(correctVal)}${q.units?' '+escX(q.units):''}${q.worked_solution?'\n\nWorked solution:\n'+escX(q.worked_solution):''}</mattext>
+        <mattext texttype="text/html">${fbHtml('Incorrect. Correct answer: '+correctVal+(q.units?' '+q.units:'')+(q.worked_solution?'\n\nWorked solution:\n'+q.worked_solution:''))}</mattext>
       </material></flow_mat></itemfeedback>`;
     } else {
       // symbolic / conceptual  --  standard multichoice
@@ -3155,7 +3220,7 @@ ${choices}
         </respcondition>
       </resprocessing>
       <itemfeedback ident="fb"><flow_mat><material>
-        <mattext texttype="text/plain">${escX(q.rationale||'Correct!')}${q.worked_solution?'\n\nWorked solution:\n'+escX(q.worked_solution):''}</mattext>
+        <mattext texttype="text/html">${fbHtml((q.rationale||'Correct!')+(q.worked_solution?'\n\nWorked solution:\n'+q.worked_solution:''))}</mattext>
       </material></flow_mat></itemfeedback>`;
     }
 
