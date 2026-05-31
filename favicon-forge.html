@@ -111,6 +111,29 @@
   .color-field{display:flex; align-items:center; gap:8px}
   .color-field input[type=text]{flex:1; font-family:ui-monospace,Menlo,Consolas,monospace; text-transform:lowercase}
 
+  input[type=file]{
+    width:100%; font:inherit; color:var(--ink);
+    background:var(--surface-2); border:1px solid var(--line-strong);
+    border-radius:var(--radius-sm); padding:8px; cursor:pointer;
+  }
+  input[type=file]::file-selector-button{
+    font:inherit; font-weight:600; cursor:pointer; margin-right:10px;
+    background:var(--accent); color:var(--accent-ink); border:none;
+    border-radius:7px; padding:8px 12px; min-height:34px;
+  }
+  input[type=file]::-webkit-file-upload-button{
+    font:inherit; font-weight:600; cursor:pointer; margin-right:10px;
+    background:var(--accent); color:var(--accent-ink); border:none;
+    border-radius:7px; padding:8px 12px;
+  }
+  .img-thumb-wrap{display:flex; align-items:center; gap:12px; margin-top:10px}
+  .img-thumb-wrap img{
+    width:88px; height:88px; object-fit:contain; border-radius:8px;
+    border:1px solid var(--line-strong);
+    background-image:var(--checker); background-size:14px 14px;
+    background-position:0 0,0 7px,7px -7px,-7px 0;
+  }
+
   button{
     font:inherit; cursor:pointer; border-radius:var(--radius-sm);
     border:1px solid var(--line-strong); background:var(--surface-2); color:var(--ink);
@@ -368,6 +391,7 @@
         <button role="tab" id="tab-emoji"  aria-selected="true"  aria-controls="panel-emoji"  tabindex="0">Emoji</button>
         <button role="tab" id="tab-letter" aria-selected="false" aria-controls="panel-letter" tabindex="-1">Letters</button>
         <button role="tab" id="tab-shape"  aria-selected="false" aria-controls="panel-shape"  tabindex="-1">Shapes</button>
+        <button role="tab" id="tab-image"  aria-selected="false" aria-controls="panel-image"  tabindex="-1">Image</button>
         <button role="tab" id="tab-draw"   aria-selected="false" aria-controls="panel-draw"   tabindex="-1">Draw</button>
       </div>
 
@@ -429,6 +453,20 @@
             <input type="text" id="shapeColorHex" value="#fffaf6" aria-label="Symbol colour hex">
           </div>
         </div>
+      </div>
+
+      <!-- Image panel -->
+      <div role="tabpanel" id="panel-image" aria-labelledby="tab-image" tabindex="0" hidden>
+        <div class="field">
+          <label for="imgInput">Upload an image</label>
+          <input type="file" id="imgInput" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif">
+        </div>
+        <p class="hint" style="margin-top:0">Your image stays in your browser — nothing is uploaded anywhere. A logo or mark with a transparent background works best; pair it with the <strong>Transparent</strong> fill for a clean icon. Large images are scaled down automatically.</p>
+        <div id="imgThumbWrap" class="img-thumb-wrap" hidden>
+          <img id="imgThumb" alt="Preview of your uploaded image">
+          <button type="button" id="imgRemove">Remove image</button>
+        </div>
+        <div class="status" id="imgStatus" role="status" aria-live="polite"></div>
       </div>
 
       <!-- Draw panel -->
@@ -591,6 +629,8 @@
   };
   var brush = { size:28, color:'#fffaf6' };
   var inlineFormat = 'both';
+  var uploadedImage = null;     /* HTMLImageElement (downscaled, export-safe) */
+  var uploadedDataUrl = null;   /* its data URL, used for SVG embedding */
   var history = [];   /* snapshots for undo */
 
   function snapshot(){
@@ -753,6 +793,16 @@
       ctx.fillStyle=fg.shapeColor;
       ctx.fill(new Path2D(SHAPES[fg.shape].d),'evenodd');
       ctx.restore();
+    } else if(fg.type==='image' && uploadedImage){
+      var iw=uploadedImage.naturalWidth||uploadedImage.width, ih=uploadedImage.naturalHeight||uploadedImage.height;
+      if(iw && ih){
+        var box=2*R, sc=Math.min(box/iw, box/ih), dw=iw*sc, dh=ih*sc;
+        ctx.save();
+        ctx.translate(cx,cy); ctx.rotate(fg.rot*Math.PI/180);
+        ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+        ctx.drawImage(uploadedImage, -dw/2, -dh/2, dw, dh);
+        ctx.restore();
+      }
     }
   }
   function drawStrokes(ctx){
@@ -875,6 +925,10 @@
       inner+='<text x="'+cx+'" y="'+cy+'" font-size="'+(R*1.5).toFixed(0)+'" font-weight="'+fg.weight+'" fill="'+fg.letterColor+'" text-anchor="middle" dominant-baseline="central" font-family="'+esc(resolveFont(fg.font).replace(/"/g,"'"))+'"'+rotAttr+'>'+esc(fg.text.toUpperCase())+'</text>';
     } else if(fg.type==='shape' && SHAPES[fg.shape]){
       inner+='<g transform="translate('+cx+' '+cy+') rotate('+rot+') scale('+R.toFixed(2)+')"><path d="'+SHAPES[fg.shape].d+'" fill="'+fg.shapeColor+'" fill-rule="evenodd"/></g>';
+    } else if(fg.type==='image' && uploadedImage && uploadedDataUrl){
+      var iw=uploadedImage.naturalWidth||uploadedImage.width, ih=uploadedImage.naturalHeight||uploadedImage.height;
+      var box=2*R, sc=Math.min(box/iw, box/ih), dw=iw*sc, dh=ih*sc;
+      inner+='<g transform="translate('+cx+' '+cy+') rotate('+rot+')"><image x="'+(-dw/2).toFixed(2)+'" y="'+(-dh/2).toFixed(2)+'" width="'+dw.toFixed(2)+'" height="'+dh.toFixed(2)+'" preserveAspectRatio="xMidYMid meet" href="'+uploadedDataUrl+'"/></g>';
     }
     state.strokes.forEach(function(st){
       if(!st.points.length) return;
@@ -1055,8 +1109,70 @@
     syncControlsFromState(); render();
   }
 
+  /* ---------- user image upload ---------- */
+  var IMG_MAX = 512; /* cap stored resolution: favicons never exceed this */
+  function exportSafe(img){
+    /* a tainted (cross-origin) image would break every export; test on a throwaway canvas */
+    try{
+      var t=document.createElement('canvas'); t.width=t.height=2;
+      t.getContext('2d').drawImage(img,0,0,2,2); t.toDataURL();
+      return true;
+    }catch(e){ return false; }
+  }
+  function setImage(img, outType){
+    /* downscale to <= IMG_MAX on the long edge, re-encode to a compact data URL */
+    var w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+    if(!w || !h){ setStatus('imgStatus','That image has no readable dimensions.','err'); return; }
+    var scale=Math.min(1, IMG_MAX/Math.max(w,h));
+    var cw=Math.max(1,Math.round(w*scale)), ch=Math.max(1,Math.round(h*scale));
+    var c=document.createElement('canvas'); c.width=cw; c.height=ch;
+    var x=c.getContext('2d'); x.imageSmoothingEnabled=true; x.imageSmoothingQuality='high';
+    x.drawImage(img,0,0,cw,ch);
+    var url;
+    try{ url=(outType==='image/jpeg') ? c.toDataURL('image/jpeg',0.85) : c.toDataURL('image/png'); }
+    catch(e){ setStatus('imgStatus','This image can’t be exported due to browser security limits. Try a PNG or JPG copy.','err'); return; }
+    var ready=new Image();
+    ready.addEventListener('load',function(){
+      uploadedImage=ready; uploadedDataUrl=url;
+      var tw=document.getElementById('imgThumbWrap'), th=document.getElementById('imgThumb');
+      th.src=url; tw.hidden=false;
+      snapshot();
+      state.fg.type='image'; state.mode='image';
+      selectTab('image'); render(); updateInlineSnippet();
+      setStatus('imgStatus','Image added. Use Size & position under the preview to place it.','ok');
+    });
+    ready.addEventListener('error',function(){ setStatus('imgStatus','Could not process that image.','err'); });
+    ready.src=url;
+  }
+  function handleImageFile(file){
+    if(!file){ return; }
+    if(!/^image\//.test(file.type||'')){ setStatus('imgStatus','Please choose an image file (PNG, JPG, SVG, WebP, or GIF).','err'); return; }
+    setStatus('imgStatus','Reading image…','work');
+    var reader=new FileReader();
+    reader.addEventListener('load',function(){
+      var probe=new Image();
+      probe.addEventListener('load',function(){
+        if(!exportSafe(probe)){ setStatus('imgStatus','This image can’t be used for export due to browser security limits. Try a PNG or JPG copy.','err'); return; }
+        setImage(probe, file.type==='image/jpeg' ? 'image/jpeg' : 'image/png');
+      });
+      probe.addEventListener('error',function(){ setStatus('imgStatus','That file could not be read as an image.','err'); });
+      probe.src=reader.result;
+    });
+    reader.addEventListener('error',function(){ setStatus('imgStatus','Could not read that file.','err'); });
+    reader.readAsDataURL(file);
+  }
+  function removeImage(){
+    uploadedImage=null; uploadedDataUrl=null;
+    document.getElementById('imgThumbWrap').hidden=true;
+    document.getElementById('imgThumb').removeAttribute('src');
+    var inp=document.getElementById('imgInput'); if(inp) inp.value='';
+    if(state.fg.type==='image'){ snapshot(); state.fg.type='none'; }
+    setStatus('imgStatus','','');
+    render(); updateInlineSnippet();
+  }
+
   /* ---------- tabs ---------- */
-  var TABS=['emoji','letter','shape','draw'];
+  var TABS=['emoji','letter','shape','image','draw'];
   function selectTab(name){
     state.mode=name;
     if(name!=='draw'){ state.fg.type=name; }
@@ -1239,6 +1355,10 @@
     document.getElementById('undoStrokeBtn').addEventListener('click',function(){ if(state.strokes.length){ snapshot(); state.strokes.pop(); render(); } });
     document.getElementById('clearDrawBtn').addEventListener('click',function(){ if(state.strokes.length){ snapshot(); state.strokes=[]; render(); } });
 
+    /* image upload */
+    document.getElementById('imgInput').addEventListener('change',function(){ handleImageFile(this.files && this.files[0]); });
+    document.getElementById('imgRemove').addEventListener('click',removeImage);
+
     /* foreground transform */
     document.getElementById('fgScale').addEventListener('input',function(){ state.fg.scale=+this.value/100; render(); });
     document.getElementById('fgX').addEventListener('input',function(){ state.fg.x=+this.value; render(); });
@@ -1256,7 +1376,12 @@
       state.fg={ type:'emoji', emoji:'🌐', text:'AB', font:'var(--serif)', weight:'600',
                  letterColor:'#fffaf6', shape:'star', shapeColor:'#fffaf6', scale:0.62, x:0, y:0, rot:0 };
       state.strokes=[]; state.mode='emoji';
-      syncControlsFromState(); selectTab('emoji'); render();
+      uploadedImage=null; uploadedDataUrl=null;
+      document.getElementById('imgThumbWrap').hidden=true;
+      document.getElementById('imgThumb').removeAttribute('src');
+      var ii=document.getElementById('imgInput'); if(ii) ii.value='';
+      setStatus('imgStatus','','');
+      syncControlsFromState(); selectTab('emoji'); render(); updateInlineSnippet();
     });
 
     /* export */
