@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Favicon Forge — Topic-to-Favicon Designer</title>
+<meta name="description" content="Design browser-tab favicons from a topic. Suggest emoji, letters, shapes, or draw freehand, then export SVG, .ico, multi-size PNG, and the HTML snippet.">
+<style>
+  :root{
+    --paper:#f7f3ec; --surface:#fffdf8; --surface-2:#f1ebdf;
+    --ink:#23201b; --muted:#6f665a; --line:#e3dbcd; --line-strong:#cfc4b1;
+    --accent:#bf4d2e; --accent-ink:#fffaf6; --accent-soft:#f3ddd2;
+    --teal:#2e6f7a; --focus:#1f5b66;
+    --ok:#3c7d4f; --warn:#9a5a13;
+    --shadow:0 1px 2px rgba(40,30,20,.06), 0 8px 24px rgba(40,30,20,.08);
+    --radius:14px; --radius-sm:9px;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --checker:
+      linear-gradient(45deg,#d9d2c4 25%,transparent 25%),
+      linear-gradient(-45deg,#d9d2c4 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#d9d2c4 75%),
+      linear-gradient(-45deg,transparent 75%,#d9d2c4 75%);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#15130e; --surface:#1f1c15; --surface-2:#262119;
+      --ink:#efe9dd; --muted:#a89e8d; --line:#322d24; --line-strong:#463f33;
+      --accent:#e0764f; --accent-ink:#1a120c; --accent-soft:#3a261c;
+      --teal:#7fd0db; --focus:#9fe0ea;
+      --ok:#7fc08f; --warn:#e0a85a;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.45);
+      --checker:
+        linear-gradient(45deg,#2c2820 25%,transparent 25%),
+        linear-gradient(-45deg,#2c2820 25%,transparent 25%),
+        linear-gradient(45deg,transparent 75%,#2c2820 75%),
+        linear-gradient(-45deg,transparent 75%,#2c2820 75%);
+    }
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .skip-link{
+    position:absolute; left:8px; top:-48px; z-index:50;
+    background:var(--accent); color:var(--accent-ink);
+    padding:10px 14px; border-radius:var(--radius-sm); font-weight:600;
+    transition:top .15s ease;
+  }
+  .skip-link:focus{top:8px}
+
+  a{color:var(--teal)}
+  :focus-visible{outline:3px solid var(--focus); outline-offset:2px; border-radius:4px}
+
+  header.app{
+    padding:26px 20px 8px; max-width:1180px; margin:0 auto;
+  }
+  header.app .eyebrow{
+    font-family:var(--sans); text-transform:uppercase; letter-spacing:.16em;
+    font-size:.72rem; font-weight:700; color:var(--accent);
+  }
+  header.app h1{
+    font-family:var(--serif); font-weight:600; font-size:clamp(1.9rem,4.5vw,2.9rem);
+    margin:.15em 0 .1em; line-height:1.05; letter-spacing:-.01em;
+  }
+  header.app p.lede{color:var(--muted); max-width:60ch; margin:.2em 0 0}
+
+  main{max-width:1180px; margin:0 auto; padding:14px 20px 40px;
+    display:grid; grid-template-columns:minmax(0,1fr) minmax(0,420px); gap:22px; align-items:start;}
+  @media (max-width:880px){ main{grid-template-columns:1fr} }
+
+  .col-right{position:sticky; top:14px}
+  @media (max-width:880px){ .col-right{position:static} }
+
+  section.card{
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:18px 18px 20px; margin-bottom:22px;
+  }
+  .col-right section.card:last-child{margin-bottom:0}
+  .step{display:flex; align-items:baseline; gap:10px; margin:0 0 12px}
+  .step .num{
+    font-family:var(--serif); font-size:1rem; font-weight:700;
+    color:var(--accent-ink); background:var(--accent);
+    width:26px; height:26px; min-width:26px; border-radius:50%;
+    display:grid; place-items:center; line-height:1;
+  }
+  .step h2{font-family:var(--serif); font-weight:600; font-size:1.18rem; margin:0}
+  .hint{color:var(--muted); font-size:.86rem; margin:.1em 0 0}
+
+  label{display:block; font-weight:600; font-size:.82rem; margin:0 0 5px; color:var(--ink)}
+  .field{margin:0 0 14px}
+  .row{display:flex; gap:10px; flex-wrap:wrap}
+  .row > *{flex:1 1 0; min-width:0}
+
+  input[type=text], select{
+    width:100%; font:inherit; color:var(--ink);
+    background:var(--surface-2); border:1px solid var(--line-strong);
+    border-radius:var(--radius-sm); padding:11px 12px; min-height:44px;
+  }
+  input[type=text]::placeholder{color:var(--muted)}
+  input[type=range]{width:100%; accent-color:var(--accent); min-height:30px}
+  input[type=color]{
+    width:46px; height:44px; padding:2px; border:1px solid var(--line-strong);
+    border-radius:var(--radius-sm); background:var(--surface-2); cursor:pointer;
+  }
+  .color-field{display:flex; align-items:center; gap:8px}
+  .color-field input[type=text]{flex:1; font-family:ui-monospace,Menlo,Consolas,monospace; text-transform:lowercase}
+
+  button{
+    font:inherit; cursor:pointer; border-radius:var(--radius-sm);
+    border:1px solid var(--line-strong); background:var(--surface-2); color:var(--ink);
+    padding:10px 14px; min-height:44px; font-weight:600;
+    transition:transform .06s ease, background .15s ease, border-color .15s ease;
+  }
+  button:hover{border-color:var(--accent)}
+  button:active{transform:translateY(1px)}
+  button.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+  button.primary:hover{filter:brightness(1.05)}
+  button.ghost{background:transparent}
+  button.block{width:100%}
+  .btn-row{display:flex; gap:8px; flex-wrap:wrap}
+
+  /* segmented control */
+  .seg{display:flex; gap:6px; flex-wrap:wrap}
+  .seg button{flex:1 1 auto; min-width:64px}
+  .seg button[aria-pressed=true]{
+    background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
+  }
+
+  /* tabs */
+  [role=tablist]{display:flex; gap:6px; border-bottom:1px solid var(--line); margin-bottom:14px; flex-wrap:wrap}
+  [role=tab]{
+    background:transparent; border:1px solid transparent; border-bottom:none;
+    border-radius:var(--radius-sm) var(--radius-sm) 0 0; padding:9px 12px; min-height:42px;
+    color:var(--muted); font-weight:600;
+  }
+  [role=tab][aria-selected=true]{
+    color:var(--ink); background:var(--surface-2);
+    border-color:var(--line); border-bottom:1px solid var(--surface-2);
+    margin-bottom:-1px;
+  }
+  [role=tabpanel]{outline:none}
+  [hidden]{display:none !important}
+
+  /* chips */
+  .chips{display:flex; flex-wrap:wrap; gap:6px}
+  .chip{
+    border:1px solid var(--line-strong); background:var(--surface-2);
+    border-radius:999px; padding:6px 10px; min-height:40px; min-width:40px;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    font-weight:600; line-height:1;
+  }
+  .chip.emoji{font-size:1.25rem; padding:5px 9px}
+  .chip[aria-pressed=true]{border-color:var(--accent); background:var(--accent-soft)}
+  .cat-label{font-size:.74rem; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:10px 0 5px; font-weight:700}
+
+  .swatches{display:flex; gap:8px; flex-wrap:wrap}
+  .swatch{
+    width:42px; height:42px; border-radius:var(--radius-sm); border:1px solid rgba(0,0,0,.18);
+    cursor:pointer; position:relative;
+  }
+  .swatch:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
+
+  /* suggestion panel */
+  .panel{
+    border:1px dashed var(--line-strong); border-radius:var(--radius-sm);
+    padding:12px; margin-top:10px; background:var(--surface-2);
+  }
+  .panel .sub{font-size:.8rem; color:var(--muted); margin:0 0 8px}
+  details.ai{margin-top:12px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 12px}
+  details.ai summary{cursor:pointer; padding:11px 0; font-weight:600; list-style:none}
+  details.ai summary::-webkit-details-marker{display:none}
+  details.ai summary::before{content:"✦ "; color:var(--accent)}
+  details.ai[open] summary{border-bottom:1px solid var(--line)}
+  details.ai .body{padding:12px 0}
+  .note{font-size:.78rem; color:var(--muted); margin:8px 0 0}
+
+  /* preview */
+  .stage{
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+  }
+  .canvas-wrap{
+    position:relative; width:100%; max-width:340px;
+    border-radius:var(--radius-sm); overflow:hidden;
+    background-image:var(--checker);
+    background-size:20px 20px;
+    background-position:0 0,0 10px,10px -10px,-10px 0;
+    border:1px solid var(--line-strong);
+    touch-action:none;
+  }
+  #stageCanvas{display:block; width:100%; height:auto; cursor:crosshair}
+  #stageCanvas.nodraw{cursor:default}
+
+  .tabmock{
+    width:100%; max-width:340px; background:var(--surface-2);
+    border:1px solid var(--line); border-radius:10px 10px 6px 6px; padding:8px 8px 0;
+  }
+  .tabmock .bar{display:flex; gap:6px; align-items:flex-end}
+  .tabmock .tab{
+    display:flex; align-items:center; gap:7px; background:var(--surface);
+    border:1px solid var(--line); border-bottom:none;
+    border-radius:8px 8px 0 0; padding:8px 12px; max-width:78%;
+  }
+  .tabmock .tab canvas{width:16px; height:16px; display:block; flex:0 0 16px; image-rendering:auto}
+  .tabmock .tab .ttl{
+    font-size:.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--ink);
+  }
+  .tabmock .plus{color:var(--muted); padding:0 8px 6px; font-size:1.1rem}
+  .tabmock .addr{
+    margin:0 -8px; padding:8px 12px; background:var(--surface);
+    border-top:1px solid var(--line); border-radius:0;
+    font-size:.78rem; color:var(--muted); display:flex; align-items:center; gap:8px;
+  }
+  .tabmock .addr canvas{width:16px;height:16px;flex:0 0 16px}
+  .tabmock .addr .url{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+
+  .px-row{display:flex; gap:18px; align-items:flex-end; justify-content:center}
+  .px-item{display:flex; flex-direction:column; align-items:center; gap:5px}
+  .px-item canvas{
+    background-image:var(--checker); background-size:8px 8px;
+    background-position:0 0,0 4px,4px -4px,-4px 0;
+    border:1px solid var(--line-strong); border-radius:4px; image-rendering:auto;
+  }
+  .px-item .cap{font-size:.72rem; color:var(--muted); font-weight:600}
+
+  /* export */
+  .export-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  @media (max-width:480px){ .export-grid{grid-template-columns:1fr} }
+  .png-sizes{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+  .png-sizes button{flex:1 1 auto; min-width:60px; font-size:.86rem; padding:8px 6px}
+  pre.snippet{
+    margin:10px 0 0; background:var(--surface-2); border:1px solid var(--line-strong);
+    border-radius:var(--radius-sm); padding:12px; overflow:auto; font-size:.78rem;
+    font-family:ui-monospace,Menlo,Consolas,monospace; line-height:1.5; white-space:pre;
+    color:var(--ink);
+  }
+  pre.snippet.wrap{white-space:pre-wrap; word-break:break-all}
+
+  .status{
+    margin-top:10px; min-height:1.2em; font-size:.84rem; font-weight:600;
+  }
+  .status.ok{color:var(--ok)} .status.err{color:var(--accent)} .status.work{color:var(--teal)}
+
+  .divider{height:1px; background:var(--line); border:none; margin:16px 0}
+  .small-label{font-size:.78rem; color:var(--muted); font-weight:600; margin:0 0 6px}
+
+  footer.app{
+    max-width:1180px; margin:0 auto; padding:18px 20px 34px; color:var(--muted);
+    font-size:.82rem; border-top:1px solid var(--line);
+  }
+  footer.app .program{color:var(--ink); font-weight:600}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms !important; transition-duration:.001ms !important}
+  }
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<header class="app">
+  <div class="eyebrow">Favicon Forge</div>
+  <h1>Design a favicon from a topic</h1>
+  <p class="lede">Type what your site is about, borrow an idea, then tweak it by hand — emoji, initials, a shape, or freehand. Export the SVG, <code>.ico</code>, sized PNGs, and the ready-to-paste HTML.</p>
+</header>
+
+<main id="main">
+  <!-- LEFT COLUMN: controls -->
+  <div class="col-left">
+
+    <!-- STEP 1 -->
+    <section class="card" aria-labelledby="s1h">
+      <div class="step"><span class="num" aria-hidden="true">1</span><h2 id="s1h">Topic &amp; ideas</h2></div>
+      <p class="hint">Suggestions are a starting point — pick what you like, then adjust everything in Step 2.</p>
+
+      <div class="field" style="margin-top:12px">
+        <label for="topic">Site topic or name</label>
+        <div class="row" style="gap:8px">
+          <input type="text" id="topic" placeholder="e.g. Cybersecurity course, Coffee roastery, Marine biology" autocomplete="off" style="flex:3 1 200px">
+          <button type="button" id="suggestBtn" class="primary" style="flex:1 1 120px">Suggest ideas</button>
+        </div>
+      </div>
+
+      <div class="panel" id="suggestPanel" hidden>
+        <p class="sub" id="suggestSub">Ideas for your topic — click to apply:</p>
+        <div class="cat-label">Emoji</div>
+        <div class="chips" id="sugEmoji"></div>
+        <div class="cat-label">Initials</div>
+        <div class="chips" id="sugInitials"></div>
+        <div class="cat-label">Symbols</div>
+        <div class="chips" id="sugSymbols"></div>
+        <div class="cat-label">Palette</div>
+        <div class="swatches" id="sugPalette"></div>
+      </div>
+
+      <details class="ai">
+        <summary>Richer ideas with Claude (optional)</summary>
+        <div class="body">
+          <p class="hint" style="margin-top:0">Ask Claude for tailored emoji, initials, symbols, and a colour palette for unusual topics.</p>
+          <div class="field">
+            <label for="apiKey">Anthropic API key</label>
+            <input type="text" id="apiKey" placeholder="sk-ant-…  (leave blank when running inside Claude)" autocomplete="off" spellcheck="false" inputmode="text" style="font-family:ui-monospace,Menlo,Consolas,monospace">
+          </div>
+          <button type="button" id="aiBtn" class="block">Get richer ideas</button>
+          <p class="note" id="aiNote">Your key is held only in this page for the session — never stored or sent anywhere except directly to Anthropic. If you’re using this inside Claude’s artifact preview you can leave it blank.</p>
+          <div class="status" id="aiStatus" role="status" aria-live="polite"></div>
+        </div>
+      </details>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="card" aria-labelledby="s2h">
+      <div class="step"><span class="num" aria-hidden="true">2</span><h2 id="s2h">Design</h2></div>
+
+      <!-- Background -->
+      <p class="small-label">Background</p>
+      <div class="field">
+        <label id="shapeLbl">Tile shape</label>
+        <div class="seg" role="group" aria-labelledby="shapeLbl" id="bgShape">
+          <button type="button" data-shape="rounded" aria-pressed="true">Rounded</button>
+          <button type="button" data-shape="square" aria-pressed="false">Square</button>
+          <button type="button" data-shape="circle" aria-pressed="false">Circle</button>
+        </div>
+      </div>
+      <div class="field" id="radiusField">
+        <label for="bgRadius">Corner roundness</label>
+        <input type="range" id="bgRadius" min="0" max="50" value="24" step="1">
+      </div>
+      <div class="field">
+        <label id="fillLbl">Fill</label>
+        <div class="seg" role="group" aria-labelledby="fillLbl" id="bgFill">
+          <button type="button" data-fill="solid" aria-pressed="false">Solid</button>
+          <button type="button" data-fill="gradient" aria-pressed="true">Gradient</button>
+          <button type="button" data-fill="none" aria-pressed="false">Transparent</button>
+        </div>
+      </div>
+      <div class="row" id="colorRow">
+        <div class="field" id="color1Field">
+          <label for="bgColor1">Colour 1</label>
+          <div class="color-field">
+            <input type="color" id="bgColor1" value="#2e6f7a" aria-label="Background colour 1 picker">
+            <input type="text" id="bgColor1Hex" value="#2e6f7a" aria-label="Background colour 1 hex">
+          </div>
+        </div>
+        <div class="field" id="color2Field">
+          <label for="bgColor2">Colour 2</label>
+          <div class="color-field">
+            <input type="color" id="bgColor2" value="#1f2d3d" aria-label="Background colour 2 picker">
+            <input type="text" id="bgColor2Hex" value="#1f2d3d" aria-label="Background colour 2 hex">
+          </div>
+        </div>
+      </div>
+      <div class="field" id="angleField">
+        <label for="bgAngle">Gradient angle</label>
+        <input type="range" id="bgAngle" min="0" max="360" value="135" step="5">
+      </div>
+
+      <hr class="divider">
+
+      <!-- Foreground tabs -->
+      <p class="small-label">Foreground</p>
+      <div role="tablist" aria-label="Foreground design mode" id="tablist">
+        <button role="tab" id="tab-emoji"  aria-selected="true"  aria-controls="panel-emoji"  tabindex="0">Emoji</button>
+        <button role="tab" id="tab-letter" aria-selected="false" aria-controls="panel-letter" tabindex="-1">Letters</button>
+        <button role="tab" id="tab-shape"  aria-selected="false" aria-controls="panel-shape"  tabindex="-1">Shapes</button>
+        <button role="tab" id="tab-draw"   aria-selected="false" aria-controls="panel-draw"   tabindex="-1">Draw</button>
+      </div>
+
+      <!-- Emoji panel -->
+      <div role="tabpanel" id="panel-emoji" aria-labelledby="tab-emoji" tabindex="0">
+        <div class="field">
+          <label for="emojiInput">Type or paste an emoji</label>
+          <input type="text" id="emojiInput" maxlength="8" value="🌐" autocomplete="off">
+        </div>
+        <div id="emojiCats"></div>
+      </div>
+
+      <!-- Letter panel -->
+      <div role="tabpanel" id="panel-letter" aria-labelledby="tab-letter" tabindex="0" hidden>
+        <div class="field">
+          <label for="letterText">Letters (1–3)</label>
+          <input type="text" id="letterText" maxlength="3" value="AB" autocomplete="off" style="text-transform:uppercase">
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="letterFont">Font</label>
+            <select id="letterFont">
+              <option value='var(--serif)'>Serif (editorial)</option>
+              <option value='var(--sans)'>Sans-serif</option>
+              <option value='ui-monospace,Menlo,Consolas,monospace'>Monospace</option>
+              <option value='Georgia,serif'>Georgia</option>
+              <option value='"Trebuchet MS",sans-serif'>Trebuchet</option>
+              <option value='Impact,"Arial Black",sans-serif'>Impact</option>
+            </select>
+          </div>
+          <div class="field" style="flex:0 0 auto">
+            <label for="letterWeight">Weight</label>
+            <select id="letterWeight">
+              <option value="400">Regular</option>
+              <option value="600" selected>Semibold</option>
+              <option value="800">Bold</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="letterColor">Letter colour</label>
+          <div class="color-field">
+            <input type="color" id="letterColor" value="#fffaf6" aria-label="Letter colour picker">
+            <input type="text" id="letterColorHex" value="#fffaf6" aria-label="Letter colour hex">
+          </div>
+        </div>
+      </div>
+
+      <!-- Shape panel -->
+      <div role="tabpanel" id="panel-shape" aria-labelledby="tab-shape" tabindex="0" hidden>
+        <div class="field">
+          <label id="shapePickLbl">Pick a symbol</label>
+          <div class="chips" id="shapePicker" role="group" aria-labelledby="shapePickLbl"></div>
+        </div>
+        <div class="field">
+          <label for="shapeColor">Symbol colour</label>
+          <div class="color-field">
+            <input type="color" id="shapeColor" value="#fffaf6" aria-label="Symbol colour picker">
+            <input type="text" id="shapeColorHex" value="#fffaf6" aria-label="Symbol colour hex">
+          </div>
+        </div>
+      </div>
+
+      <!-- Draw panel -->
+      <div role="tabpanel" id="panel-draw" aria-labelledby="tab-draw" tabindex="0" hidden>
+        <p class="hint" style="margin-top:0">Draw directly on the preview canvas in Step 3 with your mouse, finger, or pen. Strokes sit on top of the background and any foreground element.</p>
+        <div class="row">
+          <div class="field">
+            <label for="brushSize">Brush size</label>
+            <input type="range" id="brushSize" min="4" max="80" value="28" step="2">
+          </div>
+          <div class="field" style="flex:0 0 auto">
+            <label for="brushColor">Brush colour</label>
+            <div class="color-field">
+              <input type="color" id="brushColor" value="#fffaf6" aria-label="Brush colour picker">
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="button" id="undoStrokeBtn">Undo last stroke</button>
+          <button type="button" id="clearDrawBtn">Clear drawing</button>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <!-- shared foreground transform (emoji/letter/shape) -->
+      <div id="fgTransform">
+        <div class="field">
+          <label for="fgScale">Size</label>
+          <input type="range" id="fgScale" min="20" max="135" value="62" step="1">
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="fgX">Nudge horizontal</label>
+            <input type="range" id="fgX" min="-120" max="120" value="0" step="2">
+          </div>
+          <div class="field">
+            <label for="fgY">Nudge vertical</label>
+            <input type="range" id="fgY" min="-120" max="120" value="0" step="2">
+          </div>
+        </div>
+        <div class="field">
+          <label for="fgRot">Rotation</label>
+          <input type="range" id="fgRot" min="-180" max="180" value="0" step="5">
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:4px">
+        <button type="button" id="undoBtn">Undo</button>
+        <button type="button" id="clearFgBtn">Remove foreground</button>
+        <button type="button" id="resetBtn" class="ghost">Reset all</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- RIGHT COLUMN: preview + export -->
+  <div class="col-right">
+    <section class="card" aria-labelledby="s3h">
+      <div class="step"><span class="num" aria-hidden="true">3</span><h2 id="s3h">Preview</h2></div>
+      <div class="stage">
+        <div class="canvas-wrap">
+          <canvas id="stageCanvas" width="512" height="512" role="img" aria-label="Favicon design canvas. Use the controls to edit, or switch to Draw mode to paint on it."></canvas>
+        </div>
+
+        <div class="tabmock" aria-label="How it looks in a browser tab">
+          <div class="bar">
+            <div class="tab">
+              <canvas id="tabCanvas16" width="16" height="16" aria-hidden="true"></canvas>
+              <span class="ttl" id="tabTitle">My Website</span>
+            </div>
+            <span class="plus" aria-hidden="true">+</span>
+          </div>
+          <div class="addr">
+            <canvas id="addrCanvas16" width="16" height="16" aria-hidden="true"></canvas>
+            <span class="url" id="addrUrl">example.com</span>
+          </div>
+        </div>
+
+        <div class="px-row" aria-label="Actual export sizes">
+          <div class="px-item">
+            <canvas id="px16" width="16" height="16"></canvas>
+            <span class="cap">16 px</span>
+          </div>
+          <div class="px-item">
+            <canvas id="px32" width="32" height="32"></canvas>
+            <span class="cap">32 px</span>
+          </div>
+          <div class="px-item">
+            <canvas id="px64" width="64" height="64"></canvas>
+            <span class="cap">64 px</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="s4h">
+      <div class="step"><span class="num" aria-hidden="true">4</span><h2 id="s4h">Export</h2></div>
+
+      <div class="export-grid">
+        <button type="button" id="dlSvg" class="primary">Download SVG</button>
+        <button type="button" id="dlIco" class="primary">Download .ico</button>
+      </div>
+
+      <p class="small-label" style="margin-top:14px">PNG sizes</p>
+      <div class="png-sizes" id="pngButtons"></div>
+      <button type="button" id="dlAllPng" class="block" style="margin-top:8px">Download all PNG sizes</button>
+
+      <hr class="divider">
+      <p class="small-label">HTML snippet — links to the files above (paste in <code>&lt;head&gt;</code>)</p>
+      <pre class="snippet" id="snippet" aria-label="HTML snippet to copy"></pre>
+      <button type="button" id="copySnippet" class="block" style="margin-top:8px">Copy HTML snippet</button>
+      <p class="note">Save the downloaded files at your site’s root (or change the paths in the snippet to match). The <code>.ico</code> bundles 16/32/48&nbsp;px; the SVG scales crisply; PNGs cover modern browsers and mobile home-screens.</p>
+
+      <hr class="divider">
+      <p class="small-label">Inline HTML — embeds the icon, nothing to upload</p>
+      <div class="seg" role="group" aria-label="Inline format" id="inlineFormat" style="margin-bottom:8px">
+        <button type="button" data-inline="both" aria-pressed="true">SVG + PNG fallback</button>
+        <button type="button" data-inline="svg" aria-pressed="false">SVG only</button>
+        <button type="button" data-inline="png" aria-pressed="false">PNG only</button>
+      </div>
+      <pre class="snippet wrap" id="inlineSnippet" aria-label="Inline HTML snippet to copy"></pre>
+      <button type="button" id="copyInline" class="block" style="margin-top:8px">Copy inline HTML</button>
+      <p class="note">The icon is encoded as a data URI right in the tag, so you can paste it into any page and host no image files. Modern browsers use the crisp vector SVG; the optional PNG line covers older browsers (e.g. some Safari versions). Reflects your current design — recopy after edits.</p>
+
+      <div class="status" id="exportStatus" role="status" aria-live="polite"></div>
+    </section>
+  </div>
+</main>
+
+<footer class="app">
+  <p>Built for <span class="program">Engineering &amp; Technology · School of STEAM</span> · Brookdale Community College · <span class="year">2026</span></p>
+</footer>
+
+<script>
+"use strict";
+(function(){
+  /* ---------- constants ---------- */
+  var MASTER = 512;
+  var PNG_SIZES = [16,32,48,64,180,192,512];
+  var ICO_SIZES = [16,32,48];
+  var EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Segoe UI Symbol",sans-serif';
+
+  /* resolve CSS-variable font names to real stacks for canvas */
+  function rootVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function resolveFont(f){
+    if(f === 'var(--serif)') return rootVar('--serif') || 'Georgia, serif';
+    if(f === 'var(--sans)')  return rootVar('--sans')  || 'system-ui, sans-serif';
+    return f;
+  }
+
+  /* ---------- state ---------- */
+  var state = {
+    bg:{ shape:'rounded', fill:'gradient', c1:'#2e6f7a', c2:'#1f2d3d', angle:135, radius:24 },
+    mode:'emoji',
+    fg:{ type:'emoji', emoji:'🌐', text:'AB', font:'var(--serif)', weight:'600',
+         letterColor:'#fffaf6', shape:'star', shapeColor:'#fffaf6',
+         scale:0.62, x:0, y:0, rot:0 },
+    strokes:[]   /* {points:[{x,y}...], color, width} */
+  };
+  var brush = { size:28, color:'#fffaf6' };
+  var inlineFormat = 'both';
+  var history = [];   /* snapshots for undo */
+
+  function snapshot(){
+    history.push(JSON.stringify({bg:state.bg, fg:state.fg, strokes:state.strokes}));
+    if(history.length > 40) history.shift();
+  }
+  function undo(){
+    if(!history.length) return;
+    var snap = JSON.parse(history.pop());
+    state.bg = snap.bg; state.fg = snap.fg; state.strokes = snap.strokes;
+    syncControlsFromState();
+    render();
+  }
+
+  /* ---------- shape geometry (unit space, centred at origin, radius ~1) ---------- */
+  function polygonD(n, startDeg, r){
+    r = r||1; var d='', a;
+    for(var i=0;i<n;i++){
+      a = (startDeg + i*360/n) * Math.PI/180;
+      d += (i===0?'M':'L') + (Math.cos(a)*r).toFixed(4) + ' ' + (Math.sin(a)*r).toFixed(4) + ' ';
+    }
+    return d + 'Z';
+  }
+  function starD(points, outer, inner, startDeg){
+    var d='', a, r;
+    for(var i=0;i<points*2;i++){
+      a = (startDeg + i*180/points) * Math.PI/180;
+      r = (i%2===0)?outer:inner;
+      d += (i===0?'M':'L') + (Math.cos(a)*r).toFixed(4) + ' ' + (Math.sin(a)*r).toFixed(4) + ' ';
+    }
+    return d + 'Z';
+  }
+  var SHAPES = {
+    circle:  { label:'Circle',   d:'M 0 -1 A 1 1 0 1 0 0 1 A 1 1 0 1 0 0 -1 Z' },
+    square:  { label:'Square',   d:'M -0.92 -0.92 H 0.92 V 0.92 H -0.92 Z' },
+    triangle:{ label:'Triangle', d: polygonD(3,-90,1) },
+    diamond: { label:'Diamond',  d:'M 0 -1 L 1 0 L 0 1 L -1 0 Z' },
+    hexagon: { label:'Hexagon',  d: polygonD(6,-90,1) },
+    pentagon:{ label:'Pentagon', d: polygonD(5,-90,1) },
+    star:    { label:'Star',     d: starD(5,1,0.45,-90) },
+    heart:   { label:'Heart',    d:'M 0 0.85 C -1.25 -0.15 -0.7 -1.05 0 -0.45 C 0.7 -1.05 1.25 -0.15 0 0.85 Z' },
+    shield:  { label:'Shield',   d:'M 0 -1 L 0.82 -0.62 L 0.82 0.18 C 0.82 0.66 0.45 0.95 0 1.04 C -0.45 0.95 -0.82 0.66 -0.82 0.18 L -0.82 -0.62 Z' },
+    bolt:    { label:'Bolt',     d:'M 0.18 -1 L -0.55 0.12 L -0.05 0.12 L -0.2 1 L 0.55 -0.18 L 0.02 -0.18 Z' },
+    plus:    { label:'Plus',     d:'M -0.34 -1 H 0.34 V -0.34 H 1 V 0.34 H 0.34 V 1 H -0.34 V 0.34 H -1 V -0.34 H -0.34 Z' },
+    ring:    { label:'Ring',     d:'M 0 -1 A 1 1 0 1 0 0 1 A 1 1 0 1 0 0 -1 Z M 0 -0.5 A 0.5 0.5 0 1 1 0 0.5 A 0.5 0.5 0 1 1 0 -0.5 Z' }
+  };
+
+  /* ---------- suggestion dictionary (local engine) ---------- */
+  var DICT = [
+    { k:['cyber','security','secure','hacking','hacker','infosec','privacy','password'], e:['🔒','🛡️','🔐','🗝️','👾','⚠️'], s:['shield','bolt','ring'], p:['#1f8a52','#0b3d24','#caf0d8','#2e6f7a'] },
+    { k:['network','networking','netw','router','routing','switch','switching','internet','intranet','web','cloud','server','cisco','ccna','ccnp','packet','ethernet','lan','wan','vpn','firewall','dns','subnet','protocol','fiber','wifi','wireless'], e:['🌐','📡','🔌','☁️','🛰️','🔗'], s:['ring','hexagon','circle'], p:['#2e6f7a','#13343b','#cfe9ee','#bf4d2e'] },
+    { k:['code','coding','programming','programmer','developer','software','script','linux','bash','python','javascript'], e:['💻','⌨️','🖥️','🐧','⚙️','💾'], s:['bolt','hexagon','plus'], p:['#3b4cca','#161a3a','#dfe3ff','#e0764f'] },
+    { k:['ai','artificial','intelligence','machine learning','deep learning','neural','llm','chatbot','genai','generative','algorithm'], e:['🤖','🧠','✨','📊','🔮','🧩'], s:['hexagon','star','ring'], p:['#6c3fd1','#241043','#e7dcff','#2ec4b6'] },
+    { k:['engineer','engineering','engi','mechanical','electrical','civil','structural','statics','dynamics','cad','drafting','blueprint','prototype','machine','machining','gear','fabricate','technical','technology','manufactur','project'], e:['⚙️','🔧','🛠️','📐','🏗️','🔩'], s:['hexagon','bolt','triangle'], p:['#b5651d','#3a2410','#f6e0c6','#2e6f7a'] },
+    { k:['electronic','electronics','eleng','elcmp','circuit','pcb','breadboard','solder','microcontroller','arduino','raspberry','sensor','signal','voltage','current','resistor','transistor','semiconductor','embedded','iot','robotics','robot','drone'], e:['⚡','🔌','💡','🔋','📟','🤖'], s:['bolt','plus','circle'], p:['#0f8f78','#08332b','#cdeee6','#e0a800'] },
+    { k:['certification','certificate','certified','credential','badge','comptia','cisco','ccna','ccnp','security+','network+','a+','linux+','rhcsa','rhce','red hat','redhat','rha','bootcamp','exam prep','license','licensure'], e:['🏅','📜','🎖️','✅','🔑','🏆'], s:['shield','star','ring'], p:['#b8860b','#3a2a05','#f6e7c2','#1d3461'] },
+    { k:['faculty','teaching','teacher','instructor','professor','lecturer','adjunct','pedagogy','professional development','workshop','training','seminar','curriculum','syllabus','lesson','lecture','assessment','rubric','accreditation','department','program review'], e:['🎓','🍎','📋','🧑‍🏫','📚','📝'], s:['shield','hexagon','star'], p:['#1d3461','#0f1d33','#dfe6f2','#c9a227'] },
+    { k:['student','students','learner','classroom','advising','advisor','tutor','tutoring','enrollment','registration','campus','undergraduate','scholarship','homework','assignment','quiz','exam','study','orientation','alumni','success'], e:['🎒','📚','✏️','🧑‍🎓','💡','📝'], s:['star','hexagon','plus'], p:['#1f8a52','#0b3d24','#d3f0df','#2a7de1'] },
+    { k:['stem','steam','makerspace','maker','fab lab','fablab','fabrication','3d print','3d printing','printer','tinker','invention','innovation','hackathon'], e:['🛠️','🧪','🖨️','🤖','⚗️','🧩'], s:['hexagon','bolt','triangle'], p:['#2ec4b6','#0c3a36','#d4f5f0','#e0764f'] },
+    { k:['science','lab','research','chemistry','physics','biology','genetic'], e:['🔬','🧪','⚗️','🧬','🔭','⚛️'], s:['circle','hexagon','star'], p:['#2a7de1','#0c2c52','#d6e8ff','#3cba54'] },
+    { k:['coffee','cafe','espresso','roast','roastery','tea'], e:['☕','🫖','🍵','🫘','🥐','🧋'], s:['circle','heart','ring'], p:['#6f4e37','#2e1f16','#e9dccb','#c08a3e'] },
+    { k:['food','restaurant','kitchen','cook','recipe','bakery','pizza'], e:['🍕','🍔','🥗','🍞','🧁','🍩'], s:['circle','heart','star'], p:['#d1442f','#3a120c','#ffe0d6','#3c8d3c'] },
+    { k:['nature','forest','plant','garden','tree','eco','green','leaf'], e:['🌿','🌱','🍃','🌳','🌸','🍄'], s:['circle','heart','triangle'], p:['#2f8f46','#103a1d','#d6f0d9','#b5651d'] },
+    { k:['water','ocean','sea','wave','marine','fish','river'], e:['🌊','🐟','🐬','⚓','🐚','🩵'], s:['circle','diamond','triangle'], p:['#1591b5','#063444','#cdeef6','#0f8f78'] },
+    { k:['music','audio','song','band','sound','podcast'], e:['🎵','🎧','🎸','🎹','🎤','🎶'], s:['circle','bolt','star'], p:['#8e2de2','#2a0a45','#ecd9ff','#e0764f'] },
+    { k:['art','design','creative','paint','draw','studio','gallery'], e:['🎨','🖌️','🖼️','✏️','🧑‍🎨','🌈'], s:['star','heart','diamond'], p:['#d6336c','#43102a','#ffd9e6','#2e6f7a'] },
+    { k:['photo','photography','camera','film','video','movie'], e:['📷','🎬','📸','🎥','🖼️','🎞️'], s:['circle','diamond','ring'], p:['#222831','#0c0e12','#d4d8df','#e0a800'] },
+    { k:['game','gaming','play','arcade','esports','quest'], e:['🎮','🕹️','👾','🎲','🏆','⚔️'], s:['star','plus','hexagon'], p:['#6c3fd1','#1c0c3f','#e7dcff','#3cba54'] },
+    { k:['business','finance','money','startup','market','invest','bank'], e:['💼','📈','💰','🪙','🏦','🤝'], s:['triangle','diamond','plus'], p:['#16586b','#08252e','#cfe3e9','#caa24a'] },
+    { k:['school','education','educational','learn','learning','academic','academy','college','university','community college','knowledge','literacy'], e:['🎓','📚','✏️','📝','🍎','🧮'], s:['star','shield','hexagon'], p:['#bf4d2e','#3a160c','#f6ddd2','#2e6f7a'] },
+    { k:['health','medical','doctor','fitness','wellness','care'], e:['🩺','💊','❤️','🏥','🧘','🥗'], s:['plus','heart','circle'], p:['#d1495b','#3a0f17','#ffd9df','#0f8f78'] },
+    { k:['travel','trip','adventure','map','explore','tour','journey'], e:['✈️','🗺️','🧭','⛰️','🌍','🧳'], s:['triangle','star','diamond'], p:['#e0764f','#3a1c0e','#ffe2d4','#16586b'] },
+    { k:['sport','fitness','run','team','soccer','ball','gym'], e:['⚽','🏀','🏃','🏆','🥇','💪'], s:['circle','star','shield'], p:['#1f8a52','#0b3d24','#d3f0df','#e0a800'] },
+    { k:['weather','sun','star','space','moon','astro','sky'], e:['☀️','🌙','⭐','🪐','☁️','🌈'], s:['star','circle','bolt'], p:['#2a4d9b','#0a1840','#dfe6ff','#e0a800'] },
+    { k:['book','write','writing','author','blog','publish','story'], e:['📖','✍️','📚','🖊️','📜','📝'], s:['shield','star','square'], p:['#7a4419','#311a09','#efdcc6','#2e6f7a'] },
+    { k:['fire','energy','power','spark','flame'], e:['🔥','⚡','💥','✨','🌟','🕯️'], s:['bolt','star','triangle'], p:['#d1442f','#3a120c','#ffd9c6','#e0a800'] }
+  ];
+  var GENERIC = { e:['⭐','✨','🔖','📌','🌐','✅'], s:['star','hexagon','circle','bolt'] };
+
+  function hashStr(str){ var h=2166136261; for(var i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0); }
+  function hslHex(h,s,l){
+    s/=100; l/=100;
+    var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2, r=0,g=0,b=0;
+    if(h<60){r=c;g=x;} else if(h<120){r=x;g=c;} else if(h<180){g=c;b=x;}
+    else if(h<240){g=x;b=c;} else if(h<300){r=x;b=c;} else {r=c;b=x;}
+    function to(v){ return ('0'+Math.round((v+m)*255).toString(16)).slice(-2); }
+    return '#'+to(r)+to(g)+to(b);
+  }
+  function paletteFromTopic(topic){
+    var h = hashStr(topic||'favicon') % 360;
+    return [ hslHex(h,58,42), hslHex(h,42,18), hslHex(h,55,90), hslHex((h+155)%360,60,48) ];
+  }
+  function initialsFromTopic(topic){
+    var words = (topic||'').trim().split(/\s+/).filter(Boolean);
+    if(!words.length) return ['FX','★'];
+    var two = (words[0][0] + (words[1]?words[1][0]:'')).toUpperCase();
+    var one = words[0][0].toUpperCase();
+    var out = [one]; if(two!==one) out.push(two);
+    return out;
+  }
+  function suggest(topic){
+    var t = ' ' + (topic||'').toLowerCase().replace(/[_/]+/g,' ') + ' ';
+    var hit=null;
+    for(var i=0;i<DICT.length && !hit;i++){
+      for(var j=0;j<DICT[i].k.length;j++){ if(t.indexOf(' '+DICT[i].k[j])>=0){ hit=DICT[i]; break; } }
+    }
+    var emoji = hit? hit.e.slice() : GENERIC.e.slice();
+    var symbols = hit? hit.s.slice() : GENERIC.s.slice();
+    var palette = hit? hit.p.slice() : paletteFromTopic(topic);
+    return { emoji:emoji, symbols:symbols, palette:palette, initials:initialsFromTopic(topic) };
+  }
+
+  /* ---------- rendering ---------- */
+  var stage = document.getElementById('stageCanvas');
+  var sctx = stage.getContext('2d');
+
+  function bgFillStyle(ctx){
+    var b = state.bg;
+    if(b.fill==='solid') return b.c1;
+    var a=b.angle*Math.PI/180, x=Math.cos(a), y=Math.sin(a), half=MASTER/2*Math.SQRT2, c=MASTER/2;
+    var g=ctx.createLinearGradient(c-x*half, c-y*half, c+x*half, c+y*half);
+    g.addColorStop(0,b.c1); g.addColorStop(1,b.c2);
+    return g;
+  }
+  function clipPath(ctx){
+    var b=state.bg;
+    ctx.beginPath();
+    if(b.shape==='circle'){ ctx.arc(MASTER/2,MASTER/2,MASTER/2,0,Math.PI*2); }
+    else if(b.shape==='rounded'){ roundRectPath(ctx,0,0,MASTER,MASTER,b.radius/100*MASTER/2); }
+    else { ctx.rect(0,0,MASTER,MASTER); }
+    ctx.closePath();
+  }
+  function roundRectPath(ctx,x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+  }
+  function drawForeground(ctx){
+    var fg=state.fg, cx=MASTER/2+fg.x, cy=MASTER/2+fg.y, R=fg.scale*MASTER/2;
+    if(fg.type==='emoji' && fg.emoji){
+      ctx.save();
+      ctx.translate(cx,cy); ctx.rotate(fg.rot*Math.PI/180);
+      ctx.font = (R*1.7).toFixed(0)+'px '+EMOJI_FONT;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(fg.emoji,0,4);
+      ctx.restore();
+    } else if(fg.type==='letter' && fg.text){
+      ctx.save();
+      ctx.translate(cx,cy); ctx.rotate(fg.rot*Math.PI/180);
+      ctx.font = fg.weight+' '+(R*1.5).toFixed(0)+'px '+resolveFont(fg.font);
+      ctx.fillStyle=fg.letterColor; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(fg.text.toUpperCase(),0,4);
+      ctx.restore();
+    } else if(fg.type==='shape' && SHAPES[fg.shape]){
+      ctx.save();
+      ctx.translate(cx,cy); ctx.rotate(fg.rot*Math.PI/180); ctx.scale(R,R);
+      ctx.fillStyle=fg.shapeColor;
+      ctx.fill(new Path2D(SHAPES[fg.shape].d),'evenodd');
+      ctx.restore();
+    }
+  }
+  function drawStrokes(ctx){
+    state.strokes.forEach(function(st){
+      if(!st.points.length) return;
+      ctx.save();
+      ctx.strokeStyle=st.color; ctx.lineWidth=st.width;
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.beginPath();
+      ctx.moveTo(st.points[0].x, st.points[0].y);
+      if(st.points.length===1){ ctx.lineTo(st.points[0].x+0.1, st.points[0].y+0.1); }
+      for(var i=1;i<st.points.length;i++) ctx.lineTo(st.points[i].x, st.points[i].y);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+  function render(){
+    sctx.clearRect(0,0,MASTER,MASTER);
+    sctx.save();
+    clipPath(sctx); sctx.clip();
+    if(state.bg.fill!=='none'){ sctx.fillStyle=bgFillStyle(sctx); sctx.fillRect(0,0,MASTER,MASTER); }
+    drawForeground(sctx);
+    drawStrokes(sctx);
+    sctx.restore();
+    updatePreviews();
+    updateSnippet();
+  }
+
+  /* ---------- small previews ---------- */
+  function blitTo(id){
+    var c=document.getElementById(id), x=c.getContext('2d');
+    x.clearRect(0,0,c.width,c.height);
+    x.imageSmoothingEnabled=true; x.imageSmoothingQuality='high';
+    x.drawImage(stage,0,0,c.width,c.height);
+  }
+  function updatePreviews(){
+    ['px16','px32','px64','tabCanvas16','addrCanvas16'].forEach(blitTo);
+  }
+
+  /* ---------- export: sized PNG ---------- */
+  function renderSize(size){
+    var c=document.createElement('canvas'); c.width=size; c.height=size;
+    var x=c.getContext('2d'); x.imageSmoothingEnabled=true; x.imageSmoothingQuality='high';
+    x.drawImage(stage,0,0,size,size);
+    return c;
+  }
+  function sizeToBlob(size){
+    return new Promise(function(res){ renderSize(size).toBlob(function(b){ res(b); },'image/png'); });
+  }
+  function downloadBlob(blob,name){
+    var url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download=name; document.body.appendChild(a); a.click();
+    a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); },1500);
+  }
+  function pngName(size){
+    if(size===180) return 'apple-touch-icon.png';
+    return 'favicon-'+size+'x'+size+'.png';
+  }
+
+  /* ---------- export: ICO (PNG-in-ICO, Vista+) ---------- */
+  function buildIco(buffers,sizes){
+    var count=buffers.length, head=6+count*16, total=head;
+    for(var i=0;i<count;i++) total+=buffers[i].length;
+    var out=new Uint8Array(total), dv=new DataView(out.buffer);
+    dv.setUint16(0,0,true); dv.setUint16(2,1,true); dv.setUint16(4,count,true);
+    var off=head;
+    for(var k=0;k<count;k++){
+      var e=6+k*16, s=sizes[k], len=buffers[k].length;
+      out[e]   = s>=256?0:s;
+      out[e+1] = s>=256?0:s;
+      out[e+2] = 0; out[e+3] = 0;
+      dv.setUint16(e+4,1,true);   /* planes */
+      dv.setUint16(e+6,32,true);  /* bpp */
+      dv.setUint32(e+8,len,true);
+      dv.setUint32(e+12,off,true);
+      out.set(buffers[k],off); off+=len;
+    }
+    return new Blob([out],{type:'image/x-icon'});
+  }
+  function exportIco(){
+    setStatus('exportStatus','Building .ico…','work');
+    Promise.all(ICO_SIZES.map(sizeToBlob))
+      .then(function(blobs){ return Promise.all(blobs.map(function(b){ return b.arrayBuffer(); })); })
+      .then(function(bufs){
+        var arrs=bufs.map(function(b){ return new Uint8Array(b); });
+        downloadBlob(buildIco(arrs,ICO_SIZES),'favicon.ico');
+        setStatus('exportStatus','Downloaded favicon.ico (16·32·48 px bundled).','ok');
+      })
+      .catch(function(){ setStatus('exportStatus','Could not build the .ico file.','err'); });
+  }
+
+  /* ---------- export: SVG (vector from state) ---------- */
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function svgShapeEl(shape,fill){
+    var b=state.bg;
+    if(shape==='circle') return '<circle cx="256" cy="256" r="256" fill="'+fill+'"/>';
+    if(shape==='rounded'){ var r=(b.radius/100*256).toFixed(1); return '<rect x="0" y="0" width="512" height="512" rx="'+r+'" ry="'+r+'" fill="'+fill+'"/>'; }
+    return '<rect x="0" y="0" width="512" height="512" fill="'+fill+'"/>';
+  }
+  function buildSVG(){
+    var b=state.bg, fg=state.fg, defs='', fill='none', bgEl='';
+    if(b.fill==='gradient'){
+      var a=b.angle*Math.PI/180, x=Math.cos(a), y=Math.sin(a);
+      var x1=(0.5-x*0.5).toFixed(4), y1=(0.5-y*0.5).toFixed(4), x2=(0.5+x*0.5).toFixed(4), y2=(0.5+y*0.5).toFixed(4);
+      defs+='<linearGradient id="bgg" x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'">'+
+            '<stop offset="0" stop-color="'+b.c1+'"/><stop offset="1" stop-color="'+b.c2+'"/></linearGradient>';
+      fill='url(#bgg)';
+    } else if(b.fill==='solid'){ fill=b.c1; }
+
+    /* clip uses the bg shape */
+    defs+='<clipPath id="bgclip">'+svgShapeEl(b.shape,'#000').replace(/ fill="[^"]*"/,'')+'</clipPath>';
+    if(b.fill!=='none'){ bgEl=svgShapeEl(b.shape,fill); }
+
+    var inner='';
+    var cx=(256+fg.x).toFixed(2), cy=(256+fg.y).toFixed(2), R=(fg.scale*256), rot=fg.rot;
+    var rotAttr = rot? ' transform="rotate('+rot+' '+cx+' '+cy+')"' : '';
+    if(fg.type==='emoji' && fg.emoji){
+      inner+='<text x="'+cx+'" y="'+cy+'" font-size="'+(R*1.7).toFixed(0)+'" text-anchor="middle" dominant-baseline="central" font-family="'+esc(EMOJI_FONT.replace(/"/g,"'"))+'"'+rotAttr+'>'+esc(fg.emoji)+'</text>';
+    } else if(fg.type==='letter' && fg.text){
+      inner+='<text x="'+cx+'" y="'+cy+'" font-size="'+(R*1.5).toFixed(0)+'" font-weight="'+fg.weight+'" fill="'+fg.letterColor+'" text-anchor="middle" dominant-baseline="central" font-family="'+esc(resolveFont(fg.font).replace(/"/g,"'"))+'"'+rotAttr+'>'+esc(fg.text.toUpperCase())+'</text>';
+    } else if(fg.type==='shape' && SHAPES[fg.shape]){
+      inner+='<g transform="translate('+cx+' '+cy+') rotate('+rot+') scale('+R.toFixed(2)+')"><path d="'+SHAPES[fg.shape].d+'" fill="'+fg.shapeColor+'" fill-rule="evenodd"/></g>';
+    }
+    state.strokes.forEach(function(st){
+      if(!st.points.length) return;
+      var d='M '+st.points[0].x.toFixed(1)+' '+st.points[0].y.toFixed(1);
+      for(var i=1;i<st.points.length;i++) d+=' L '+st.points[i].x.toFixed(1)+' '+st.points[i].y.toFixed(1);
+      if(st.points.length===1) d+=' L '+(st.points[0].x+0.1).toFixed(1)+' '+(st.points[0].y+0.1).toFixed(1);
+      inner+='<path d="'+d+'" fill="none" stroke="'+st.color+'" stroke-width="'+st.width+'" stroke-linecap="round" stroke-linejoin="round"/>';
+    });
+
+    return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">\n'+
+      '<defs>'+defs+'</defs>\n'+
+      (bgEl?bgEl+'\n':'')+
+      '<g clip-path="url(#bgclip)">'+inner+'</g>\n</svg>\n';
+  }
+  function exportSVG(){
+    var blob=new Blob([buildSVG()],{type:'image/svg+xml'});
+    downloadBlob(blob,'favicon.svg');
+    setStatus('exportStatus','Downloaded favicon.svg (scales to any size).','ok');
+  }
+
+  /* ---------- HTML snippet ---------- */
+  function updateSnippet(){
+    var lines=[
+      '<link rel="icon" href="/favicon.ico" sizes="any">',
+      '<link rel="icon" type="image/svg+xml" href="/favicon.svg">',
+      '<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">',
+      '<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">',
+      '<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">'
+    ];
+    document.getElementById('snippet').textContent=lines.join('\n');
+  }
+
+  /* ---------- inline (data-URI) snippet ---------- */
+  function toB64(str){
+    var bytes=new TextEncoder().encode(str), bin='', i;
+    for(i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function svgDataUri(){ return 'data:image/svg+xml;base64,'+toB64(buildSVG()); }
+  function pngDataUri(size){ return renderSize(size).toDataURL('image/png'); }
+  function buildInlineSnippet(fmt){
+    var svgLine='<link rel="icon" type="image/svg+xml" href="'+svgDataUri()+'">';
+    var pngLine='<link rel="icon" type="image/png" sizes="32x32" href="'+pngDataUri(32)+'">';
+    if(fmt==='svg') return '<!-- Inline favicon (SVG, no files). Paste in <head>. -->\n'+svgLine;
+    if(fmt==='png') return '<!-- Inline favicon (PNG, no files). Paste in <head>. -->\n'+pngLine;
+    return '<!-- Inline favicon \u2014 no files to upload. Paste in <head>. -->\n'+
+           '<!-- Crisp vector for modern browsers: -->\n'+svgLine+'\n'+
+           '<!-- PNG fallback for older browsers (optional, delete if not needed): -->\n'+pngLine;
+  }
+  function updateInlineSnippet(){
+    document.getElementById('inlineSnippet').textContent=buildInlineSnippet(inlineFormat);
+  }
+
+  /* ---------- status helper ---------- */
+  function setStatus(id,msg,kind){
+    var el=document.getElementById(id);
+    el.textContent=msg||'';
+    el.className='status'+(kind?' '+kind:'');
+  }
+
+  /* ---------- AI (optional richer ideas) ---------- */
+  function aiPrompt(topic){
+    return 'You are helping design a website favicon for the topic: "'+topic+'". '+
+      'Respond with ONLY a JSON object, no markdown, no preamble, of the form '+
+      '{"emojis":["..."],"initials":["AB"],"symbols":["star"],"palette":["#aabbcc","#..","#..","#.."]}. '+
+      'emojis: 6 single emoji that evoke the topic. '+
+      'initials: 1-2 short uppercase letter ideas. '+
+      'symbols: choose 3 from this list only: '+Object.keys(SHAPES).join(', ')+'. '+
+      'palette: 4 hex colours that work as favicon background/foreground.';
+  }
+  function parseAI(data){
+    var text=(data.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('\n');
+    text=text.replace(/```json/gi,'').replace(/```/g,'').trim();
+    var m=text.match(/\{[\s\S]*\}/); if(m) text=m[0];
+    return JSON.parse(text);
+  }
+  function runAI(){
+    var topic=document.getElementById('topic').value.trim();
+    if(!topic){ setStatus('aiStatus','Enter a topic first.','err'); return; }
+    var key=document.getElementById('apiKey').value.trim();
+    setStatus('aiStatus','Asking Claude…','work');
+    var headers={'content-type':'application/json'}, body;
+    if(key){
+      headers['x-api-key']=key;
+      headers['anthropic-version']='2023-06-01';
+      headers['anthropic-dangerous-direct-browser-access']='true';
+      body={ model:'claude-haiku-4-5-20251001', max_tokens:500,
+        system:'Reply with only valid JSON. No prose, no code fences.',
+        messages:[{role:'user',content:aiPrompt(topic)}] };
+    } else {
+      body={ model:'claude-sonnet-4-20250514', max_tokens:500,
+        messages:[{role:'user',content:'Reply with ONLY valid JSON, no code fences. '+aiPrompt(topic)}] };
+    }
+    fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:headers,body:JSON.stringify(body)})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(data){
+        var j=parseAI(data);
+        var sug={
+          emoji:(j.emojis||[]).filter(Boolean).slice(0,8),
+          initials:(j.initials||[]).filter(Boolean).slice(0,3),
+          symbols:(j.symbols||[]).filter(function(s){return SHAPES[s];}).slice(0,5),
+          palette:(j.palette||[]).filter(function(c){return /^#?[0-9a-f]{3,8}$/i.test(c);}).map(function(c){return c[0]==='#'?c:'#'+c;}).slice(0,5)
+        };
+        if(!sug.emoji.length && !sug.symbols.length && !sug.palette.length) throw new Error('empty');
+        renderSuggestions(sug,'Claude’s ideas for “'+topic+'” — click to apply:');
+        document.getElementById('suggestPanel').hidden=false;
+        setStatus('aiStatus','Ideas added above.','ok');
+      })
+      .catch(function(err){
+        var msg = key ? 'Request failed ('+err.message+'). Check the key, or use the built-in Suggest button.'
+                      : 'No key provided and the in-app route isn’t available here. Add an API key, or use the Suggest button above.';
+        setStatus('aiStatus',msg,'err');
+      });
+  }
+
+  /* ---------- suggestion rendering ---------- */
+  function chip(text,cls){
+    var b=document.createElement('button');
+    b.type='button'; b.className='chip'+(cls?' '+cls:''); b.textContent=text; return b;
+  }
+  function renderSuggestions(sug,subtitle){
+    document.getElementById('suggestSub').textContent=subtitle||'Ideas for your topic — click to apply:';
+    var e=document.getElementById('sugEmoji'); e.innerHTML='';
+    sug.emoji.forEach(function(em){
+      var c=chip(em,'emoji'); c.setAttribute('aria-label','Use emoji '+em);
+      c.addEventListener('click',function(){ applyEmoji(em); });
+      e.appendChild(c);
+    });
+    var ini=document.getElementById('sugInitials'); ini.innerHTML='';
+    sug.initials.forEach(function(t){
+      var c=chip(t); c.setAttribute('aria-label','Use initials '+t);
+      c.addEventListener('click',function(){ applyLetters(t); });
+      ini.appendChild(c);
+    });
+    var sym=document.getElementById('sugSymbols'); sym.innerHTML='';
+    sug.symbols.forEach(function(s){
+      var c=chip(SHAPES[s]?SHAPES[s].label:s); c.setAttribute('aria-label','Use symbol '+s);
+      c.addEventListener('click',function(){ applyShape(s); });
+      sym.appendChild(c);
+    });
+    var pal=document.getElementById('sugPalette'); pal.innerHTML='';
+    sug.palette.forEach(function(col,idx){
+      var sw=document.createElement('button');
+      sw.type='button'; sw.className='swatch'; sw.style.background=col;
+      sw.setAttribute('aria-label','Apply colour '+col+(idx===0?' as background':''));
+      sw.title=col;
+      sw.addEventListener('click',function(){ applyPaletteColor(col,idx,sug.palette); });
+      pal.appendChild(sw);
+    });
+  }
+
+  /* ---------- apply suggestion actions ---------- */
+  function applyEmoji(em){
+    snapshot();
+    state.mode='emoji'; state.fg.type='emoji'; state.fg.emoji=em;
+    document.getElementById('emojiInput').value=em;
+    selectTab('emoji'); render();
+  }
+  function applyLetters(t){
+    snapshot();
+    state.mode='letter'; state.fg.type='letter'; state.fg.text=t.toUpperCase();
+    document.getElementById('letterText').value=t.toUpperCase();
+    selectTab('letter'); render();
+  }
+  function applyShape(s){
+    snapshot();
+    state.mode='shape'; state.fg.type='shape'; state.fg.shape=s;
+    selectTab('shape'); markShapePicker(); render();
+  }
+  function applyPaletteColor(col,idx,palette){
+    snapshot();
+    if(idx===0){ state.bg.c1=col; if(palette[1]) state.bg.c2=palette[1]; }
+    else if(idx===1){ state.bg.c2=col; }
+    else { /* lighter/accent → foreground colour */
+      state.fg.letterColor=col; state.fg.shapeColor=col;
+    }
+    syncControlsFromState(); render();
+  }
+
+  /* ---------- tabs ---------- */
+  var TABS=['emoji','letter','shape','draw'];
+  function selectTab(name){
+    state.mode=name;
+    if(name!=='draw'){ state.fg.type=name; }
+    TABS.forEach(function(t){
+      var tab=document.getElementById('tab-'+t), panel=document.getElementById('panel-'+t);
+      var on=(t===name);
+      tab.setAttribute('aria-selected',on?'true':'false');
+      tab.tabIndex=on?0:-1;
+      panel.hidden=!on;
+    });
+    /* hide transform controls in draw mode */
+    document.getElementById('fgTransform').style.display=(name==='draw')?'none':'';
+    stage.classList.toggle('nodraw', name!=='draw');
+    if(name!=='draw') render();
+  }
+  function initTabs(){
+    TABS.forEach(function(t){
+      var tab=document.getElementById('tab-'+t);
+      tab.addEventListener('click',function(){ selectTab(t); tab.focus(); });
+      tab.addEventListener('keydown',function(ev){
+        var i=TABS.indexOf(t), ni=-1;
+        if(ev.key==='ArrowRight'||ev.key==='ArrowDown') ni=(i+1)%TABS.length;
+        else if(ev.key==='ArrowLeft'||ev.key==='ArrowUp') ni=(i-1+TABS.length)%TABS.length;
+        else if(ev.key==='Home') ni=0; else if(ev.key==='End') ni=TABS.length-1;
+        if(ni>=0){ ev.preventDefault(); var nt=document.getElementById('tab-'+TABS[ni]); selectTab(TABS[ni]); nt.focus(); }
+      });
+    });
+  }
+
+  /* ---------- emoji palette in panel ---------- */
+  var EMOJI_CATS=[
+    ['Popular','⭐ ✨ ❤️ 🔥 ⚡ 💡 🎯 🏆 🚀 🌟 🔖 📌 ✅ 🎨 🧩 ♻️'],
+    ['Tech & security','💻 🖥️ 📱 ⌨️ 🔒 🔐 🔑 🛡️ 🐛 🌐 📡 🔌 ⚙️ 🤖 🧠 💾'],
+    ['Science & study','🔬 🧪 ⚗️ 🧬 🔭 📚 📖 🎓 ✏️ 📐 📊 📈 🧮 ⚛️ 🪐 🌍'],
+    ['Nature','🌱 🌿 🍃 🌳 🌸 🌊 ❄️ ☀️ 🌙 🍄 🐝 🦋 🌈 🪵 🐚 🌵'],
+    ['Food & drink','☕ 🍵 🍕 🍔 🍎 🥑 🍩 🧁 🍷 🌶️ 🍫 🥐 🫖 🍪 🥗 🍋'],
+    ['Work & money','💼 📈 💰 💵 🏦 🪙 🤝 📦 🏷️ 🧾 📋 🗂️ 📅 ✉️ 📞 🖇️'],
+    ['Arts & media','🎵 🎸 🎹 🎤 🎧 🎬 🖌️ 🖼️ 📷 🎭 🎲 🕹️ 🎮 ♟️ 🎻 📺'],
+    ['Travel & sport','✈️ 🚗 🗺️ 🧭 ⛵ 🏔️ ⚽ 🏀 🏈 🎿 🏕️ 🧳 🚲 ⚓ 🪂 🏝️']
+  ];
+  function initEmojiCats(){
+    var host=document.getElementById('emojiCats');
+    EMOJI_CATS.forEach(function(cat){
+      var lbl=document.createElement('div'); lbl.className='cat-label'; lbl.textContent=cat[0]; host.appendChild(lbl);
+      var wrap=document.createElement('div'); wrap.className='chips';
+      cat[1].split(' ').forEach(function(em){
+        var c=chip(em,'emoji'); c.setAttribute('aria-label','Use emoji '+em);
+        c.addEventListener('click',function(){ applyEmoji(em); });
+        wrap.appendChild(c);
+      });
+      host.appendChild(wrap);
+    });
+  }
+
+  /* ---------- shape picker in panel ---------- */
+  function initShapePicker(){
+    var host=document.getElementById('shapePicker');
+    Object.keys(SHAPES).forEach(function(key){
+      var c=document.createElement('button');
+      c.type='button'; c.className='chip'; c.dataset.shape=key;
+      c.setAttribute('aria-pressed','false'); c.setAttribute('aria-label','Use '+SHAPES[key].label+' shape');
+      /* tiny inline svg preview */
+      c.innerHTML='<svg width="22" height="22" viewBox="-1.15 -1.15 2.3 2.3" aria-hidden="true">'+
+        '<path d="'+SHAPES[key].d+'" fill="currentColor" fill-rule="evenodd"/></svg>';
+      c.addEventListener('click',function(){ applyShape(key); });
+      host.appendChild(c);
+    });
+  }
+  function markShapePicker(){
+    document.querySelectorAll('#shapePicker button').forEach(function(b){
+      b.setAttribute('aria-pressed', b.dataset.shape===state.fg.shape ? 'true':'false');
+    });
+  }
+
+  /* ---------- freehand drawing ---------- */
+  var drawing=false, current=null;
+  function evtToMaster(ev){
+    var r=stage.getBoundingClientRect();
+    return { x:(ev.clientX-r.left)/r.width*MASTER, y:(ev.clientY-r.top)/r.height*MASTER };
+  }
+  function startDraw(ev){
+    if(state.mode!=='draw') return;
+    ev.preventDefault();
+    drawing=true;
+    current={ points:[evtToMaster(ev)], color:brush.color, width:brush.size };
+    state.strokes.push(current);
+    if(stage.setPointerCapture && ev.pointerId!=null){ try{ stage.setPointerCapture(ev.pointerId); }catch(e){} }
+    render();
+  }
+  function moveDraw(ev){
+    if(!drawing||!current) return;
+    ev.preventDefault();
+    var p=evtToMaster(ev), last=current.points[current.points.length-1];
+    if(Math.hypot(p.x-last.x,p.y-last.y) >= 2){ current.points.push(p); render(); }
+  }
+  function endDraw(){
+    if(!drawing) return;
+    drawing=false;
+    /* commit: snapshot reflects post-stroke; for undo we want pre-stroke,
+       so we pop the just-added stroke, snapshot, then re-add */
+    var added=state.strokes.pop();
+    snapshot();
+    state.strokes.push(added);
+    current=null;
+    render();
+  }
+  function initDrawing(){
+    stage.addEventListener('pointerdown',startDraw);
+    stage.addEventListener('pointermove',moveDraw);
+    window.addEventListener('pointerup',endDraw);
+    stage.addEventListener('pointercancel',endDraw);
+  }
+
+  /* ---------- control wiring ---------- */
+  function bindColorPair(pickerId,hexId,setter){
+    var picker=document.getElementById(pickerId), hex=document.getElementById(hexId);
+    picker.addEventListener('input',function(){ hex.value=picker.value; setter(picker.value); render(); });
+    hex.addEventListener('change',function(){
+      var v=hex.value.trim(); if(!/^#?[0-9a-f]{6}$/i.test(v)) { hex.value=picker.value; return; }
+      if(v[0]!=='#') v='#'+v; v=v.toLowerCase(); picker.value=v; hex.value=v; setter(v); render();
+    });
+  }
+  function segGroup(groupId,attr,apply){
+    var g=document.getElementById(groupId);
+    g.addEventListener('click',function(ev){
+      var btn=ev.target.closest('button[data-'+attr+']'); if(!btn) return;
+      g.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed','false'); });
+      btn.setAttribute('aria-pressed','true');
+      apply(btn.dataset[attr]); render();
+    });
+  }
+  function applyFillVisibility(v){
+    document.getElementById('color1Field').style.display=(v==='none')?'none':'';
+    document.getElementById('color2Field').style.display=(v==='gradient')?'':'none';
+    document.getElementById('angleField').style.display=(v==='gradient')?'':'none';
+  }
+
+  function initControls(){
+    /* topic / suggest */
+    document.getElementById('suggestBtn').addEventListener('click',function(){
+      var topic=document.getElementById('topic').value.trim();
+      renderSuggestions(suggest(topic), topic?('Ideas for “'+topic+'” — click to apply:'):'General ideas — click to apply:');
+      document.getElementById('suggestPanel').hidden=false;
+      var t=document.getElementById('tabTitle'); if(topic){ t.textContent=topic; document.getElementById('addrUrl').textContent=topic.toLowerCase().replace(/[^a-z0-9]+/g,'')+'.com'; }
+    });
+    document.getElementById('topic').addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); document.getElementById('suggestBtn').click(); } });
+    document.getElementById('aiBtn').addEventListener('click',runAI);
+
+    /* background segmented */
+    segGroup('bgShape','shape',function(v){
+      state.bg.shape=v;
+      document.getElementById('radiusField').style.display=(v==='rounded')?'':'none';
+    });
+    segGroup('bgFill','fill',function(v){
+      state.bg.fill=v;
+      applyFillVisibility(v);
+    });
+    document.getElementById('bgRadius').addEventListener('input',function(){ state.bg.radius=+this.value; render(); });
+    document.getElementById('bgAngle').addEventListener('input',function(){ state.bg.angle=+this.value; render(); });
+    bindColorPair('bgColor1','bgColor1Hex',function(v){ state.bg.c1=v; });
+    bindColorPair('bgColor2','bgColor2Hex',function(v){ state.bg.c2=v; });
+
+    /* emoji */
+    document.getElementById('emojiInput').addEventListener('input',function(){
+      state.fg.type='emoji'; state.fg.emoji=Array.from(this.value)[0]||''; if(state.mode==='emoji') render();
+    });
+
+    /* letters */
+    document.getElementById('letterText').addEventListener('input',function(){ state.fg.text=this.value.toUpperCase(); if(state.mode==='letter') render(); });
+    document.getElementById('letterFont').addEventListener('change',function(){ state.fg.font=this.value; render(); });
+    document.getElementById('letterWeight').addEventListener('change',function(){ state.fg.weight=this.value; render(); });
+    bindColorPair('letterColor','letterColorHex',function(v){ state.fg.letterColor=v; });
+
+    /* shapes */
+    bindColorPair('shapeColor','shapeColorHex',function(v){ state.fg.shapeColor=v; });
+
+    /* draw */
+    document.getElementById('brushSize').addEventListener('input',function(){ brush.size=+this.value; });
+    document.getElementById('brushColor').addEventListener('input',function(){ brush.color=this.value; });
+    document.getElementById('undoStrokeBtn').addEventListener('click',function(){ if(state.strokes.length){ snapshot(); state.strokes.pop(); render(); } });
+    document.getElementById('clearDrawBtn').addEventListener('click',function(){ if(state.strokes.length){ snapshot(); state.strokes=[]; render(); } });
+
+    /* foreground transform */
+    document.getElementById('fgScale').addEventListener('input',function(){ state.fg.scale=+this.value/100; render(); });
+    document.getElementById('fgX').addEventListener('input',function(){ state.fg.x=+this.value; render(); });
+    document.getElementById('fgY').addEventListener('input',function(){ state.fg.y=+this.value; render(); });
+    document.getElementById('fgRot').addEventListener('input',function(){ state.fg.rot=+this.value; render(); });
+
+    /* global buttons */
+    document.getElementById('undoBtn').addEventListener('click',undo);
+    document.getElementById('clearFgBtn').addEventListener('click',function(){
+      snapshot(); state.fg.type='none'; render();
+    });
+    document.getElementById('resetBtn').addEventListener('click',function(){
+      snapshot();
+      state.bg={ shape:'rounded', fill:'gradient', c1:'#2e6f7a', c2:'#1f2d3d', angle:135, radius:24 };
+      state.fg={ type:'emoji', emoji:'🌐', text:'AB', font:'var(--serif)', weight:'600',
+                 letterColor:'#fffaf6', shape:'star', shapeColor:'#fffaf6', scale:0.62, x:0, y:0, rot:0 };
+      state.strokes=[]; state.mode='emoji';
+      syncControlsFromState(); selectTab('emoji'); render();
+    });
+
+    /* export */
+    document.getElementById('dlSvg').addEventListener('click',exportSVG);
+    document.getElementById('dlIco').addEventListener('click',exportIco);
+    var pb=document.getElementById('pngButtons');
+    PNG_SIZES.forEach(function(s){
+      var b=document.createElement('button'); b.type='button'; b.textContent=s+'px';
+      b.setAttribute('aria-label','Download '+s+' by '+s+' pixel PNG');
+      b.addEventListener('click',function(){
+        sizeToBlob(s).then(function(blob){ downloadBlob(blob,pngName(s)); setStatus('exportStatus','Downloaded '+pngName(s)+'.','ok'); });
+      });
+      pb.appendChild(b);
+    });
+    document.getElementById('dlAllPng').addEventListener('click',function(){
+      setStatus('exportStatus','Preparing PNG files… your browser may ask to allow multiple downloads.','work');
+      var i=0;
+      (function next(){
+        if(i>=PNG_SIZES.length){ setStatus('exportStatus','Downloaded '+PNG_SIZES.length+' PNG files.','ok'); return; }
+        var s=PNG_SIZES[i++];
+        sizeToBlob(s).then(function(blob){ downloadBlob(blob,pngName(s)); setTimeout(next,350); });
+      })();
+    });
+    document.getElementById('copySnippet').addEventListener('click',function(){
+      var txt=document.getElementById('snippet').textContent;
+      copyText(txt).then(function(ok){ setStatus('exportStatus', ok?'HTML snippet copied to clipboard.':'Copy failed — select the text manually.', ok?'ok':'err'); });
+    });
+
+    /* inline (data-URI) export */
+    segGroup('inlineFormat','inline',function(v){ inlineFormat=v; updateInlineSnippet(); });
+    document.getElementById('copyInline').addEventListener('click',function(){
+      updateInlineSnippet();
+      var txt=document.getElementById('inlineSnippet').textContent;
+      copyText(txt).then(function(ok){ setStatus('exportStatus', ok?'Inline HTML copied — paste it into your page’s <head>, no files needed.':'Copy failed — select the text manually.', ok?'ok':'err'); });
+    });
+  }
+
+  function copyText(t){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(t).then(function(){return true;},function(){return fallbackCopy(t);});
+    }
+    return Promise.resolve(fallbackCopy(t));
+  }
+  function fallbackCopy(t){
+    var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); var ok=false;
+    try{ ok=document.execCommand('copy'); }catch(e){} ta.remove(); return ok;
+  }
+
+  /* ---------- keep controls in sync after programmatic state changes ---------- */
+  function syncControlsFromState(){
+    var b=state.bg, fg=state.fg;
+    document.querySelectorAll('#bgShape button').forEach(function(x){ x.setAttribute('aria-pressed', x.dataset.shape===b.shape?'true':'false'); });
+    document.querySelectorAll('#bgFill button').forEach(function(x){ x.setAttribute('aria-pressed', x.dataset.fill===b.fill?'true':'false'); });
+    document.getElementById('radiusField').style.display=(b.shape==='rounded')?'':'none';
+    applyFillVisibility(b.fill);
+    document.getElementById('bgRadius').value=b.radius;
+    document.getElementById('bgAngle').value=b.angle;
+    document.getElementById('bgColor1').value=b.c1; document.getElementById('bgColor1Hex').value=b.c1;
+    document.getElementById('bgColor2').value=b.c2; document.getElementById('bgColor2Hex').value=b.c2;
+    document.getElementById('emojiInput').value=fg.emoji||'';
+    document.getElementById('letterText').value=fg.text||'';
+    document.getElementById('letterFont').value=fg.font;
+    document.getElementById('letterWeight').value=fg.weight;
+    document.getElementById('letterColor').value=fg.letterColor; document.getElementById('letterColorHex').value=fg.letterColor;
+    document.getElementById('shapeColor').value=fg.shapeColor; document.getElementById('shapeColorHex').value=fg.shapeColor;
+    document.getElementById('fgScale').value=Math.round(fg.scale*100);
+    document.getElementById('fgX').value=fg.x; document.getElementById('fgY').value=fg.y; document.getElementById('fgRot').value=fg.rot;
+    markShapePicker();
+  }
+
+  /* ---------- boot ---------- */
+  function init(){
+    initTabs(); initEmojiCats(); initShapePicker(); initDrawing(); initControls();
+    selectTab('emoji'); syncControlsFromState(); render(); updateInlineSnippet();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
+</script>
+</body>
+</html>
