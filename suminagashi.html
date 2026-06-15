@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Suminagashi — Floating Ink</title>
+<meta name="description" content="A real-time fluid suminagashi surface. Trace to flow ink across the water, listen to generative ambience, and capture the pattern as wallpaper.">
+<style>
+  :root{
+    --paper:#efeae0;
+    --sumi:#1a1a1f;
+    --ai:#16407a;
+    --shu:#c8372d;
+    --matsuba:#2e6e52;
+    --text:#34322d;
+    --muted:#6f685c;
+    --line:rgba(26,26,31,.16);
+    --bar:rgba(239,234,224,.66);
+    --chip:rgba(255,255,255,.5);
+    --gold:#a8843e;
+    --gold-soft:rgba(168,132,62,.18);
+    --shadow:0 8px 30px rgba(40,30,16,.18);
+    --serif:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Songti SC","Noto Serif JP",Georgia,"Times New Roman",serif;
+    --sans:"Helvetica Neue","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  html[data-theme="sumi"]{
+    --paper:#0d0e12;
+    --text:#e7e2d4;
+    --muted:#9a958a;
+    --line:rgba(231,226,212,.16);
+    --bar:rgba(18,18,22,.6);
+    --chip:rgba(255,255,255,.07);
+    --shadow:0 8px 34px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overflow:hidden;background:var(--paper);transition:background .8s ease}
+  body{font-family:var(--sans);color:var(--text);-webkit-tap-highlight-color:transparent}
+  canvas#gl{display:block;width:100vw;height:100vh;touch-action:none;cursor:crosshair}
+
+  .skip-link{position:fixed;left:8px;top:-50px;z-index:60;background:var(--paper);color:var(--text);
+    padding:10px 14px;border-radius:8px;border:1px solid var(--line);transition:top .2s ease;text-decoration:none}
+  .skip-link:focus{top:8px}
+
+  /* Title */
+  header.title{position:fixed;top:0;left:0;z-index:20;padding:clamp(16px,3vw,30px);pointer-events:none;transition:opacity 1.4s ease}
+  header.title.dim{opacity:.3}
+  header.title .row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  header.title h1{font-family:var(--serif);font-weight:500;margin:0;font-size:clamp(1.5rem,4.4vw,2.6rem);letter-spacing:.18em;line-height:1}
+  header.title .romaji{font-family:var(--sans);text-transform:uppercase;letter-spacing:.42em;font-size:clamp(.62rem,1.4vw,.78rem);color:var(--muted);font-weight:600}
+  header.title .gloss{margin:.7em 0 0;font-family:var(--serif);font-style:italic;font-size:clamp(.78rem,1.7vw,.95rem);letter-spacing:.04em;color:var(--muted)}
+
+  /* Hint */
+  .hint{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);z-index:18;pointer-events:none;text-align:center;
+    font-family:var(--serif);font-style:italic;font-size:clamp(.95rem,2.4vw,1.25rem);letter-spacing:.06em;color:rgba(26,26,31,.5);transition:opacity 1.6s ease}
+  .hint.gone{opacity:0}
+
+  /* Dock */
+  footer.dock{position:fixed;left:50%;bottom:clamp(14px,2.4vw,24px);transform:translateX(-50%);z-index:30;
+    display:flex;align-items:center;gap:clamp(8px,1.4vw,16px);padding:clamp(9px,1.4vw,12px) clamp(12px,1.8vw,20px);
+    background:var(--bar);backdrop-filter:blur(12px) saturate(1.1);-webkit-backdrop-filter:blur(12px) saturate(1.1);
+    border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow);max-width:calc(100vw - 20px);flex-wrap:wrap;justify-content:center}
+  .inks{display:flex;align-items:center;gap:clamp(8px,1.2vw,14px)}
+  .ink{appearance:none;border:none;cursor:pointer;position:relative;width:30px;height:34px;background:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
+  .ink .dot{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25),0 1px 3px rgba(26,26,31,.3);transition:transform .2s cubic-bezier(.2,.9,.3,1.4)}
+  .ink .lbl{font-family:var(--serif);font-size:.6rem;color:var(--muted);line-height:1}
+  .ink:hover .dot{transform:scale(1.16)}
+  .ink:focus-visible{outline:none}
+  .ink:focus-visible .dot{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--gold)}
+  .ink[aria-pressed="true"] .dot{box-shadow:0 0 0 2px var(--paper),0 0 0 4px rgba(26,26,31,.5)}
+  .ink-cycle .dot{background:conic-gradient(var(--sumi),var(--ai),var(--matsuba),var(--shu),var(--sumi))}
+  .ink-sumi .dot{background:radial-gradient(circle at 35% 30%,#3a3a42,var(--sumi))}
+  .ink-ai .dot{background:radial-gradient(circle at 35% 30%,#2c62ab,var(--ai))}
+  .ink-shu .dot{background:radial-gradient(circle at 35% 30%,#e25a4c,var(--shu))}
+  .ink-matsuba .dot{background:radial-gradient(circle at 35% 30%,#4c9374,var(--matsuba))}
+
+  .sep{width:1px;align-self:stretch;background:var(--line);margin:2px 0}
+
+  .act{appearance:none;background:none;border:none;cursor:pointer;font-family:var(--sans);font-size:.78rem;letter-spacing:.1em;
+    color:var(--text);min-height:44px;padding:6px 4px;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;position:relative}
+  .act::after{content:"";position:absolute;left:10%;right:10%;bottom:4px;height:1px;background:var(--text);transform:scaleX(0);transform-origin:center;transition:transform .3s ease}
+  .act:hover::after,.act:focus-visible::after{transform:scaleX(1)}
+  .act:focus-visible{outline:none}
+  .act .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ai);box-shadow:0 0 6px rgba(22,64,122,.5);transition:background .3s,box-shadow .3s}
+  .act[aria-pressed="false"] .dot{background:transparent;box-shadow:none;border:1px solid rgba(26,26,31,.4)}
+  input[type="range"]{width:64px;accent-color:var(--gold);height:24px;cursor:pointer}
+  input[type="range"]:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gold-soft);border-radius:8px}
+
+  /* Dialogs */
+  dialog{border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--text);max-width:540px;width:calc(100vw - 40px);padding:0;box-shadow:var(--shadow)}
+  dialog::backdrop{background:rgba(20,16,10,.42);backdrop-filter:blur(3px)}
+  .dlg{padding:26px 28px 24px}
+  dialog h2{font-family:var(--serif);font-weight:500;letter-spacing:.06em;margin:0 0 4px;font-size:1.5rem}
+  dialog .sub{color:var(--muted);font-size:.86rem;margin:0 0 18px;letter-spacing:.04em}
+  dialog p{line-height:1.6;font-size:.94rem}
+  dialog h3{font-size:.72rem;text-transform:uppercase;letter-spacing:.16em;color:var(--muted);margin:18px 0 8px}
+  .kbd{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.88rem;align-items:center}
+  kbd{font-family:var(--sans);font-size:.74rem;background:var(--chip);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:2px 7px;min-width:22px;text-align:center;display:inline-block}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+  .btn{appearance:none;cursor:pointer;font-family:var(--sans);font-weight:600;font-size:.9rem;border-radius:11px;padding:11px 18px;border:1px solid var(--line);background:var(--chip);color:var(--text);min-height:44px;transition:border-color .2s,transform .15s}
+  .btn:hover{transform:translateY(-1px);border-color:var(--gold)}
+  .btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gold-soft);border-color:var(--gold)}
+  .btn.primary{background:var(--gold);border-color:var(--gold);color:#fff}
+  .field{margin:14px 0}
+  .field label{display:block;font-size:.74rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:7px;font-weight:600}
+  select{font-family:var(--sans);font-size:.92rem;width:100%;padding:11px 12px;border-radius:11px;border:1px solid var(--line);background:var(--chip);color:var(--text);min-height:44px}
+  .checkrow{display:flex;align-items:center;gap:10px;margin:14px 0;font-size:.92rem}
+  .checkrow input{width:20px;height:20px;accent-color:var(--gold)}
+  .close-x{position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--chip);font-size:1.1rem;line-height:1;cursor:pointer;color:var(--text)}
+  .close-x:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gold-soft)}
+  .tip{font-size:.82rem;color:var(--muted);margin-top:14px;line-height:1.5}
+  .credit{margin-top:22px;padding-top:16px;border-top:1px solid var(--line);font-size:.78rem;color:var(--muted);line-height:1.5}
+
+  .act .glyph{font-family:var(--serif);font-size:1.1rem;line-height:1}
+  .act .txt{font-size:.78rem;letter-spacing:.1em}
+
+  /* Time overlay (clock / timer) */
+  #timeOverlay{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:16;pointer-events:none;
+    display:none;font-family:var(--serif);font-weight:500;letter-spacing:.08em;color:var(--text);opacity:.6;
+    font-size:clamp(3.2rem,15vw,8.5rem);line-height:1;font-variant-numeric:tabular-nums;text-align:center;
+    text-shadow:0 1px 24px rgba(0,0,0,.12);transition:opacity .6s ease}
+  #timeOverlay.on{display:block}
+  #timeOverlay .meridiem{font-size:.28em;letter-spacing:.2em;vertical-align:.2em;margin-left:.15em;opacity:.7}
+  #timeOverlay .caption{display:block;font-style:italic;font-size:.16em;letter-spacing:.2em;opacity:.7;margin-top:.5em}
+  html[data-theme="sumi"] #timeOverlay{text-shadow:0 1px 28px rgba(0,0,0,.5)}
+  #timeOverlay.pulse{animation:timePulse 1.6s ease-out}
+  @keyframes timePulse{0%{opacity:.6;transform:translate(-50%,-50%) scale(1)}18%{opacity:.95;transform:translate(-50%,-50%) scale(1.06)}100%{opacity:.6;transform:translate(-50%,-50%) scale(1)}}
+  @media (prefers-reduced-motion: reduce){ #timeOverlay.pulse{animation:none} }
+
+  /* Focus (immersive) mode: hide the controls for a clean, distraction-free view */
+  footer.dock{transition:opacity .6s ease, transform .6s ease}
+  body.immersive .dock{opacity:0;pointer-events:none;transform:translate(-50%,18px)}
+  body.immersive header.title{opacity:0}
+  body.immersive .hint{opacity:0}
+  body.immersive.peek .dock{opacity:1;pointer-events:auto;transform:translateX(-50%)}
+  #revealTab{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:31;display:none;
+    border:1px solid var(--line);background:var(--bar);backdrop-filter:blur(10px) saturate(1.1);-webkit-backdrop-filter:blur(10px) saturate(1.1);
+    color:var(--muted);font-size:1rem;line-height:1;letter-spacing:.22em;padding:5px 16px;border-radius:999px;cursor:pointer;opacity:.5;transition:opacity .3s ease}
+  #revealTab:hover,#revealTab:focus-visible{opacity:.95;outline:none}
+  body.immersive #revealTab{display:block}
+  body.immersive.peek #revealTab{opacity:0;pointer-events:none}
+
+
+  .nogl{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:30px;text-align:center;z-index:50;background:var(--paper)}
+  .nogl p{max-width:34ch;font-family:var(--serif);font-size:1.05rem;line-height:1.6;color:var(--text)}
+
+  .hidden-label{position:fixed;left:-9999px}
+
+  @media (max-width:560px){ .act .txt{display:none} .sep{display:none} }
+  @media (prefers-reduced-motion: reduce){ *{transition-duration:.001ms !important} }
+</style>
+</head>
+<body>
+<a href="#gl" class="skip-link">Skip to the ink surface</a>
+
+<header class="title" id="titleBar">
+  <div class="row">
+    <h1 lang="ja">墨流し</h1>
+    <span class="romaji">Suminagashi</span>
+  </div>
+  <p class="gloss">Suminagashi · the art of floating ink</p>
+</header>
+
+<div class="hint" id="hint">Trace the surface to flow the ink</div>
+
+<canvas id="gl" aria-label="Suminagashi fluid ink surface. Trace with a pointer to flow ink across the water, or turn on Auto to watch it unfold."></canvas>
+
+<p class="hidden-label" id="status" role="status" aria-live="polite"></p>
+
+<footer class="dock" role="toolbar" aria-label="Suminagashi controls">
+  <div class="inks" id="inks" role="group" aria-label="Ink color">
+    <button class="ink ink-cycle" data-ink="cycle" aria-pressed="true" aria-label="Cycle through colors (0)"><span class="dot"></span><span class="lbl" lang="ja" aria-hidden="true">巡</span></button>
+    <button class="ink ink-sumi" data-ink="sumi" aria-pressed="false" aria-label="Sumi ink (1)"><span class="dot"></span><span class="lbl" lang="ja" aria-hidden="true">墨</span></button>
+    <button class="ink ink-ai" data-ink="ai" aria-pressed="false" aria-label="Ai indigo (2)"><span class="dot"></span><span class="lbl" lang="ja" aria-hidden="true">藍</span></button>
+    <button class="ink ink-shu" data-ink="shu" aria-pressed="false" aria-label="Shu vermilion (3)"><span class="dot"></span><span class="lbl" lang="ja" aria-hidden="true">朱</span></button>
+    <button class="ink ink-matsuba" data-ink="matsuba" aria-pressed="false" aria-label="Matsuba pine (4)"><span class="dot"></span><span class="lbl" lang="ja" aria-hidden="true">松葉</span></button>
+  </div>
+  <div class="sep" aria-hidden="true"></div>
+  <button class="act" id="autoBtn" aria-pressed="true" title="Drops and gentle currents when the surface is idle"><span class="dot" aria-hidden="true"></span><span class="txt">Auto</span></button>
+  <button class="act" id="washBtn" title="Gradually rinse the ink away"><span class="glyph" lang="ja" aria-hidden="true">洗</span><span class="txt">Wash</span></button>
+  <div class="sep" aria-hidden="true"></div>
+  <button class="act" id="timeBtn" title="Clock or timer"><span class="glyph" aria-hidden="true">◷</span><span class="txt">Time</span></button>
+  <button class="act" id="captureBtn" title="Save the surface as an image"><span class="glyph" aria-hidden="true">⤓</span><span class="txt">Capture</span></button>
+  <button class="act" id="themeBtn" title="Light paper or dark water" aria-pressed="false"><span class="glyph" aria-hidden="true">◐</span><span class="txt">Theme</span></button>
+  <button class="act" id="focusBtn" title="Hide the controls for a clean view (H)" aria-pressed="false"><span class="glyph" aria-hidden="true">⤢</span><span class="txt">Focus</span></button>
+  <button class="act" id="helpBtn" title="Guide" aria-label="Guide"><span class="glyph" aria-hidden="true">?</span></button>
+</footer>
+
+<button id="revealTab" aria-label="Show controls" hidden>⋯</button>
+<div id="timeOverlay" aria-hidden="true"></div>
+
+<div class="nogl" id="nogl"><p>This surface needs WebGL, which isn't available in this browser. Try a recent version of Chrome, Safari, Firefox, or Edge.</p></div>
+
+<!-- Guide -->
+<dialog id="helpDlg" aria-labelledby="helpTitle">
+  <div class="dlg">
+    <button class="close-x" id="helpClose" aria-label="Close guide">×</button>
+    <h2 id="helpTitle">墨流し · Suminagashi</h2>
+    <p class="sub">The old Japanese art of floating ink on water</p>
+    <p>Drops of ink rest on still water and unfurl into rivers and woodgrain. Here the water is a live fluid simulation, and your pointer is the current. The ink mixes subtractively, the way real pigment darkens paper.</p>
+    <h3>How to play</h3>
+    <p style="margin-top:0"><strong>Tap</strong> to drop a bead of ink. <strong>Drag</strong> to pour a ribbon and stir the water — moving across existing ink drags it into swirls. <strong>Auto</strong> lets the surface paint itself when you step away. <strong>Wash</strong> rinses it clean.</p>
+    <h3>Keyboard</h3>
+    <div class="kbd">
+      <span><kbd>1</kbd>–<kbd>4</kbd></span><span>Choose ink · <kbd>0</kbd> cycles colors</span>
+      <span><kbd>Space</kbd></span><span>Drop a bead of ink</span>
+      <span><kbd>A</kbd></span><span>Auto performance on/off</span>
+      <span><kbd>D</kbd></span><span>Light paper / dark water</span>
+      <span><kbd>T</kbd></span><span>Clock &amp; timer</span>
+      <span><kbd>H</kbd></span><span>Hide the controls (focus view)</span>
+      <span><kbd>P</kbd></span><span>Capture wallpaper</span>
+      <span><kbd>X</kbd> / <kbd>W</kbd></span><span>Wash the surface</span>
+    </div>
+    <div class="credit">A real-time fluid simulation rendered live in your browser. 2026</div>
+  </div>
+</dialog>
+
+<!-- Capture -->
+<dialog id="capDlg" aria-labelledby="capTitle">
+  <div class="dlg">
+    <button class="close-x" id="capClose" aria-label="Close capture">×</button>
+    <h2 id="capTitle">Capture the surface</h2>
+    <p class="sub">Save the current pattern as an image</p>
+    <div class="field">
+      <label for="capSize">Size</label>
+      <select id="capSize">
+        <option value="screen">This screen</option>
+        <option value="2560x1440">Desktop wallpaper · 2560 × 1440</option>
+        <option value="3840x2160">Desktop wallpaper · 3840 × 2160 (4K)</option>
+        <option value="1290x2796">Phone wallpaper · 1290 × 2796</option>
+        <option value="1080x1920">Phone wallpaper · 1080 × 1920</option>
+        <option value="2048x2048">Square · 2048 × 2048</option>
+      </select>
+    </div>
+    <div class="checkrow"><input type="checkbox" id="capSeal"><label for="capSeal" style="margin:0;text-transform:none;letter-spacing:0;font-size:.92rem;color:var(--text)">Add a small vermilion seal in the corner</label></div>
+    <div class="actions">
+      <button class="btn primary" id="capDownload">Download PNG</button>
+      <button class="btn" id="capCopy">Copy to clipboard</button>
+    </div>
+    <p class="tip">A browser can't set your wallpaper directly. After downloading, open it from your device's wallpaper or lock-screen settings.</p>
+  </div>
+</dialog>
+
+<!-- Time -->
+<dialog id="timeDlg" aria-labelledby="timeTitle">
+  <div class="dlg">
+    <button class="close-x" id="timeClose" aria-label="Close time">×</button>
+    <h2 id="timeTitle">Clock &amp; timer</h2>
+    <p class="sub">A quiet readout over the water</p>
+    <div class="field">
+      <label>Display</label>
+      <div class="actions" role="group" aria-label="Display mode" id="timeModes" style="margin-top:0">
+        <button class="btn" data-mode="off" aria-pressed="true">Off</button>
+        <button class="btn" data-mode="clock" aria-pressed="false">Clock</button>
+        <button class="btn" data-mode="timer" aria-pressed="false">Timer</button>
+      </div>
+    </div>
+    <div class="checkrow" id="clockOpts" hidden><input type="checkbox" id="clockSeconds"><label for="clockSeconds" style="margin:0;text-transform:none;letter-spacing:0;font-size:.92rem;color:var(--text)">Show seconds</label></div>
+    <div id="timerOpts" hidden>
+      <div class="field">
+        <label>Minutes</label>
+        <div class="actions" role="group" aria-label="Timer length" id="timerPresets" style="margin-top:0">
+          <button class="btn" data-min="1">1</button>
+          <button class="btn" data-min="3">3</button>
+          <button class="btn" data-min="5" aria-pressed="true">5</button>
+          <button class="btn" data-min="10">10</button>
+          <button class="btn" data-min="25">25</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="timerStart">Start</button>
+        <button class="btn" id="timerPause">Pause</button>
+        <button class="btn" id="timerReset">Reset</button>
+      </div>
+      <p class="tip">When the timer ends, the readout pulses and a drop of ink blooms at the center of the surface.</p>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     Suminagashi — GPU fluid simulation (vanilla WebGL2)
+     Stable Fluids: advect -> vorticity confinement -> divergence
+       -> Jacobi pressure -> gradient subtract.
+     Ink is stored as ABSORPTION and composited subtractively:
+       paper * exp(-A), so pigment darkens the washi.
+     ============================================================ */
+
+  var canvas = document.getElementById('gl');
+  var status = document.getElementById('status');
+  function announce(m){ status.textContent = m; }
+
+  var gl = canvas.getContext('webgl2', {alpha:false, depth:false, stencil:false, antialias:false, preserveDrawingBuffer:false, premultipliedAlpha:false});
+  if(!gl || !gl.getExtension('EXT_color_buffer_float')){
+    document.getElementById('nogl').style.display = 'flex';
+    return;
+  }
+  gl.getExtension('OES_texture_float_linear'); // half-float linear is core in WebGL2; harmless if absent
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  var config = {
+    SIM_RES: 256,
+    DYE_RES: 1280,
+    PRESSURE_ITER: 28,
+    VEL_DISSIPATION: 0.16,
+    DYE_DISSIPATION: 0.07,
+    CURL: 14,
+    SPLAT_RADIUS: 0.0026,
+    SPLAT_FORCE: 5200
+  };
+
+  /* ---------- Inks (display color) and paper ---------- */
+  function hexRGB(h){ h=h.replace('#',''); return [parseInt(h.substr(0,2),16)/255, parseInt(h.substr(2,2),16)/255, parseInt(h.substr(4,2),16)/255]; }
+  var INKS = {
+    sumi: hexRGB('1a1a1f'), ai: hexRGB('16407a'), shu: hexRGB('c8372d'), matsuba: hexRGB('2e6e52')
+  };
+  var INK_KEYS = ['sumi','ai','shu','matsuba'];
+  var PAPER = hexRGB('efeae0');
+
+  // Convert a display color into an absorption vector: darker channels absorb more.
+  function inkAbsorption(c, strength){
+    var e = 0.012;
+    return [ -Math.log(Math.max(c[0],e))*strength, -Math.log(Math.max(c[1],e))*strength, -Math.log(Math.max(c[2],e))*strength ];
+  }
+
+  /* ---------- GL plumbing ---------- */
+  function compile(type, src){
+    var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  var VERT = 'attribute vec2 aPosition; varying vec2 vUv; void main(){ vUv = aPosition*0.5+0.5; gl_Position = vec4(aPosition,0.0,1.0); }';
+  var vsh = compile(gl.VERTEX_SHADER, VERT);
+  function program(fsrc){
+    var p = gl.createProgram();
+    gl.attachShader(p, vsh); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fsrc));
+    gl.bindAttribLocation(p, 0, 'aPosition');
+    gl.linkProgram(p);
+    if(!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return {prog:p, u:{}};
+  }
+  function loc(p,n){ var l=p.u[n]; if(l===undefined){ l=gl.getUniformLocation(p.prog,n); p.u[n]=l; } return l; }
+
+  // fullscreen quad
+  var quadBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.disable(gl.BLEND);
+
+  function createFBO(w,h){
+    var tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    var fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    return {tex:tex, fbo:fbo, w:w, h:h, texelX:1/w, texelY:1/h,
+      resize:function(nw,nh){ gl.bindTexture(gl.TEXTURE_2D, this.tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, nw, nh, 0, gl.RGBA, gl.HALF_FLOAT, null);
+        this.w=nw; this.h=nh; this.texelX=1/nw; this.texelY=1/nh; } };
+  }
+  function createDouble(w,h){
+    return {a:createFBO(w,h), b:createFBO(w,h),
+      get read(){ return this.a; }, get write(){ return this.b; },
+      swap:function(){ var t=this.a; this.a=this.b; this.b=t; },
+      resize:function(nw,nh){ this.a.resize(nw,nh); this.b.resize(nw,nh); } };
+  }
+
+  function simSizes(){
+    var aspect = canvas.width / canvas.height;
+    var sim = config.SIM_RES;
+    var dye = Math.min(config.DYE_RES, Math.max(canvas.width, canvas.height));
+    if(aspect >= 1) return {sw:Math.round(sim*aspect), sh:sim, dw:dye, dh:Math.round(dye/aspect)};
+    return {sw:sim, sh:Math.round(sim/aspect), dw:Math.round(dye*aspect), dh:dye};
+  }
+
+  function sizeCanvas(){
+    canvas.width = Math.round(window.innerWidth * DPR);
+    canvas.height = Math.round(window.innerHeight * DPR);
+  }
+  sizeCanvas();
+  var S = simSizes();
+  var velocity = createDouble(S.sw, S.sh);
+  var dye = createDouble(S.dw, S.dh);
+  var pressure = createDouble(S.sw, S.sh);
+  var curlFBO = createFBO(S.sw, S.sh);
+  var divFBO = createFBO(S.sw, S.sh);
+
+  /* ---------- shaders ---------- */
+  function F(s){ return 'precision highp float; varying vec2 vUv;' + s; }
+
+  var advectP = program(F(
+    'uniform sampler2D uVelocity,uSource; uniform vec2 uTexel; uniform float uDt,uDissipation;' +
+    'void main(){ vec2 coord = vUv - uDt*texture2D(uVelocity,vUv).xy*uTexel;' +
+    ' gl_FragColor = texture2D(uSource,coord)/(1.0+uDissipation*uDt); }'));
+
+  var splatP = program(F(
+    'uniform sampler2D uTarget; uniform float uAspect,uRadius; uniform vec2 uPoint; uniform vec3 uColor;' +
+    'void main(){ vec2 p = vUv-uPoint; p.x*=uAspect; vec3 splat = exp(-dot(p,p)/uRadius)*uColor;' +
+    ' gl_FragColor = vec4(texture2D(uTarget,vUv).rgb + splat, 1.0); }'));
+
+  var curlP = program(F(
+    'uniform sampler2D uVelocity; uniform vec2 uTexel;' +
+    'void main(){ float L=texture2D(uVelocity,vUv-vec2(uTexel.x,0.)).y; float R=texture2D(uVelocity,vUv+vec2(uTexel.x,0.)).y;' +
+    ' float B=texture2D(uVelocity,vUv-vec2(0.,uTexel.y)).x; float T=texture2D(uVelocity,vUv+vec2(0.,uTexel.y)).x;' +
+    ' gl_FragColor = vec4(0.5*(R-L-T+B),0.,0.,1.); }'));
+
+  var vortP = program(F(
+    'uniform sampler2D uVelocity,uCurl; uniform vec2 uTexel; uniform float uCurl_s,uDt;' +
+    'void main(){ float L=texture2D(uCurl,vUv-vec2(uTexel.x,0.)).x; float R=texture2D(uCurl,vUv+vec2(uTexel.x,0.)).x;' +
+    ' float B=texture2D(uCurl,vUv-vec2(0.,uTexel.y)).x; float T=texture2D(uCurl,vUv+vec2(0.,uTexel.y)).x;' +
+    ' float C=texture2D(uCurl,vUv).x; vec2 force=0.5*vec2(abs(T)-abs(B),abs(R)-abs(L));' +
+    ' force/=length(force)+0.0001; force*=uCurl_s*C; force.y*=-1.0;' +
+    ' vec2 vel=texture2D(uVelocity,vUv).xy+force*uDt; gl_FragColor=vec4(clamp(vel,-1000.,1000.),0.,1.); }'));
+
+  var divP = program(F(
+    'uniform sampler2D uVelocity; uniform vec2 uTexel;' +
+    'void main(){ float L=texture2D(uVelocity,vUv-vec2(uTexel.x,0.)).x; float R=texture2D(uVelocity,vUv+vec2(uTexel.x,0.)).x;' +
+    ' float B=texture2D(uVelocity,vUv-vec2(0.,uTexel.y)).y; float T=texture2D(uVelocity,vUv+vec2(0.,uTexel.y)).y;' +
+    ' vec2 C=texture2D(uVelocity,vUv).xy;' +
+    ' if(vUv.x-uTexel.x<0.) L=-C.x; if(vUv.x+uTexel.x>1.) R=-C.x; if(vUv.y-uTexel.y<0.) B=-C.y; if(vUv.y+uTexel.y>1.) T=-C.y;' +
+    ' gl_FragColor=vec4(0.5*(R-L+T-B),0.,0.,1.); }'));
+
+  var pressP = program(F(
+    'uniform sampler2D uPressure,uDivergence; uniform vec2 uTexel;' +
+    'void main(){ float L=texture2D(uPressure,vUv-vec2(uTexel.x,0.)).x; float R=texture2D(uPressure,vUv+vec2(uTexel.x,0.)).x;' +
+    ' float B=texture2D(uPressure,vUv-vec2(0.,uTexel.y)).x; float T=texture2D(uPressure,vUv+vec2(0.,uTexel.y)).x;' +
+    ' float d=texture2D(uDivergence,vUv).x; gl_FragColor=vec4((L+R+B+T-d)*0.25,0.,0.,1.); }'));
+
+  var gradP = program(F(
+    'uniform sampler2D uPressure,uVelocity; uniform vec2 uTexel;' +
+    'void main(){ float L=texture2D(uPressure,vUv-vec2(uTexel.x,0.)).x; float R=texture2D(uPressure,vUv+vec2(uTexel.x,0.)).x;' +
+    ' float B=texture2D(uPressure,vUv-vec2(0.,uTexel.y)).x; float T=texture2D(uPressure,vUv+vec2(0.,uTexel.y)).x;' +
+    ' vec2 vel=texture2D(uVelocity,vUv).xy-vec2(R-L,T-B); gl_FragColor=vec4(vel,0.,1.); }'));
+
+  var clearP = program(F(
+    'uniform sampler2D uTexture; uniform float uValue;' +
+    'void main(){ gl_FragColor = uValue*texture2D(uTexture,vUv); }'));
+
+  var displayP = program(F(
+    'uniform sampler2D uDye; uniform vec3 uPaper; uniform float uMode; uniform vec2 uUvScale,uUvOffset;' +
+    'float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }' +
+    'float noise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);' +
+    ' return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }' +
+    'void main(){ vec2 duv = vUv*uUvScale + uUvOffset;' +
+    ' float fiber = noise(vUv*420.0)*0.028 + noise(vUv*180.0)*0.022 + noise(vUv*60.0)*0.018;' +
+    ' vec3 A = texture2D(uDye,duv).rgb;' +
+    ' vec2 uv2 = vUv*(1.0-vUv.yx); float vign = pow(uv2.x*uv2.y*15.0,0.18);' +
+    ' vec3 col;' +
+    ' if(uMode < 0.5){' +                              // paper: subtractive
+    '   col = uPaper*exp(-A) + fiber; col *= 0.92+0.08*vign;' +
+    ' } else {' +                                      // dark water: luminous ink
+    '   vec3 trans = exp(-A);' +
+    '   float density = 1.0 - clamp(min(trans.r,min(trans.g,trans.b)),0.0,1.0);' +
+    '   vec3 hue = trans / max(max(trans.r,max(trans.g,trans.b)),0.001);' +
+    '   vec3 glow = hue * pow(density,0.85);' +
+    '   col = uPaper + glow*1.25 + fiber*0.4; col *= 0.88+0.12*vign;' +
+    ' }' +
+    ' gl_FragColor = vec4(clamp(col,0.0,1.0),1.0); }'));
+
+  /* ---------- draw helpers ---------- */
+  function bindTex(unit, tex){ gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, tex); return unit; }
+  function target(fbo){
+    if(fbo){ gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.fbo); gl.viewport(0,0,fbo.w,fbo.h); }
+    else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0,0,gl.drawingBufferWidth, gl.drawingBufferHeight); }
+  }
+  function draw(){ gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }
+
+  /* ---------- splats ---------- */
+  function splatVelocity(x,y,fx,fy,radMul){
+    gl.useProgram(splatP.prog);
+    gl.uniform1i(loc(splatP,'uTarget'), bindTex(0, velocity.read.tex));
+    gl.uniform1f(loc(splatP,'uAspect'), canvas.width/canvas.height);
+    gl.uniform2f(loc(splatP,'uPoint'), x, y);
+    gl.uniform1f(loc(splatP,'uRadius'), config.SPLAT_RADIUS*(radMul||1));
+    gl.uniform3f(loc(splatP,'uColor'), fx, fy, 0);
+    target(velocity.write); draw(); velocity.swap();
+  }
+  function splatDye(x,y,abs,radMul){
+    gl.useProgram(splatP.prog);
+    gl.uniform1i(loc(splatP,'uTarget'), bindTex(0, dye.read.tex));
+    gl.uniform1f(loc(splatP,'uAspect'), canvas.width/canvas.height);
+    gl.uniform2f(loc(splatP,'uPoint'), x, y);
+    gl.uniform1f(loc(splatP,'uRadius'), config.SPLAT_RADIUS*(radMul||1));
+    gl.uniform3f(loc(splatP,'uColor'), abs[0], abs[1], abs[2]);
+    target(dye.write); draw(); dye.swap();
+  }
+  function dropInk(x,y,color,strength){
+    var a = inkAbsorption(color, strength*0.22);
+    splatDye(x,y,a,1.0);
+    var ang = Math.random()*Math.PI*2, speed = 60 + Math.random()*80;
+    splatVelocity(x,y, Math.cos(ang)*speed, Math.sin(ang)*speed, 1.2);
+  }
+
+  /* ---------- ink mode ---------- */
+  var inkMode = 'cycle', cycleIdx = 0;
+  function currentInk(advance){
+    if(inkMode === 'cycle'){ var c = INKS[INK_KEYS[cycleIdx % INK_KEYS.length]]; if(advance) cycleIdx++; return c; }
+    return INKS[inkMode] || INKS.sumi;
+  }
+
+  /* ---------- pointer ---------- */
+  var ptr = {down:false, moved:false, x:0,y:0, px:0,py:0, color:INKS.sumi};
+  var lastInteraction = 0;
+  function toUV(e){ var r = canvas.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width, y:1-(e.clientY-r.top)/r.height}; }
+
+  canvas.addEventListener('pointerdown', function(e){
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+    var p = toUV(e);
+    ptr.down = true; ptr.x = ptr.px = p.x; ptr.y = ptr.py = p.y;
+    ptr.color = currentInk(true);
+    dropInk(p.x, p.y, ptr.color, 0.6 + Math.random()*0.3);
+    lastInteraction = performance.now(); hideHint();
+  });
+  canvas.addEventListener('pointermove', function(e){
+    var p = toUV(e);
+    ptr.px = ptr.x; ptr.py = ptr.y; ptr.x = p.x; ptr.y = p.y; ptr.moved = true;
+    lastInteraction = performance.now();
+  });
+  window.addEventListener('pointerup', function(){ ptr.down = false; });
+  window.addEventListener('pointercancel', function(){ ptr.down = false; });
+
+  function applyPointer(){
+    if(!ptr.moved) return; ptr.moved = false;
+    var dx = ptr.x-ptr.px, dy = ptr.y-ptr.py;
+    if(Math.abs(dx)+Math.abs(dy) < 1e-6) return;
+    splatVelocity(ptr.x, ptr.y, dx*config.SPLAT_FORCE, dy*config.SPLAT_FORCE, ptr.down ? 2.0 : 1.4);
+    if(ptr.down){
+      var speed = Math.min(Math.hypot(dx,dy)*30, 1);
+      splatDye(ptr.x, ptr.y, inkAbsorption(ptr.color, 0.06 + speed*0.12), 0.9);
+    }
+  }
+
+  /* ---------- auto performance ---------- */
+  var autoFlow = !reduceMotion;
+  var nextDrop = 1200, nextStir = 2600;
+  function autoUpdate(now, dt){
+    if(!autoFlow) return;
+    var idle = now - lastInteraction > 3000;
+    nextDrop -= dt*1000;
+    if(idle && nextDrop <= 0){
+      var x = 0.14 + Math.random()*0.72, y = 0.16 + Math.random()*0.68;
+      var c = INKS[INK_KEYS[Math.floor(Math.random()*INK_KEYS.length)]];
+      dropInk(x, y, c, 0.8 + Math.random()*0.7);
+      if(Math.random() < 0.3){
+        var c2 = INKS[INK_KEYS[Math.floor(Math.random()*INK_KEYS.length)]];
+        var x2 = Math.min(Math.max(x + (Math.random()-0.5)*0.16, 0.08), 0.92);
+        var y2 = Math.min(Math.max(y + (Math.random()-0.5)*0.16, 0.08), 0.92);
+        setTimeout(function(){ dropInk(x2, y2, c2, 0.5 + Math.random()*0.4); }, 220 + Math.random()*300);
+      }
+      nextDrop = (reduceMotion ? 6500 : 2600) + Math.random()*2600;
+    }
+    nextStir -= dt*1000;
+    if(!reduceMotion && nextStir <= 0){
+      var t = now*0.00012;
+      var cx = 0.5 + Math.sin(t*1.7)*0.3, cy = 0.5 + Math.cos(t*1.1)*0.3;
+      var a = t*6.0 + Math.random()*1.5;
+      splatVelocity(cx, cy, Math.cos(a)*130, Math.sin(a)*130, 14);
+      nextStir = 700 + Math.random()*900;
+    }
+  }
+
+  /* ---------- wash ---------- */
+  var washing = 0;
+  function wash(){ washing = 1.6; announce('Washing the surface'); }
+
+  /* ---------- simulation step ---------- */
+  function step(dt){
+    // curl
+    gl.useProgram(curlP.prog);
+    gl.uniform1i(loc(curlP,'uVelocity'), bindTex(0, velocity.read.tex));
+    gl.uniform2f(loc(curlP,'uTexel'), velocity.read.texelX, velocity.read.texelY);
+    target(curlFBO); draw();
+    // vorticity
+    gl.useProgram(vortP.prog);
+    gl.uniform1i(loc(vortP,'uVelocity'), bindTex(0, velocity.read.tex));
+    gl.uniform1i(loc(vortP,'uCurl'), bindTex(1, curlFBO.tex));
+    gl.uniform2f(loc(vortP,'uTexel'), velocity.read.texelX, velocity.read.texelY);
+    gl.uniform1f(loc(vortP,'uCurl_s'), config.CURL);
+    gl.uniform1f(loc(vortP,'uDt'), dt);
+    target(velocity.write); draw(); velocity.swap();
+    // divergence
+    gl.useProgram(divP.prog);
+    gl.uniform1i(loc(divP,'uVelocity'), bindTex(0, velocity.read.tex));
+    gl.uniform2f(loc(divP,'uTexel'), velocity.read.texelX, velocity.read.texelY);
+    target(divFBO); draw();
+    // pressure decay then jacobi
+    gl.useProgram(clearP.prog);
+    gl.uniform1i(loc(clearP,'uTexture'), bindTex(0, pressure.read.tex));
+    gl.uniform1f(loc(clearP,'uValue'), 0.8);
+    target(pressure.write); draw(); pressure.swap();
+    gl.useProgram(pressP.prog);
+    gl.uniform1i(loc(pressP,'uDivergence'), bindTex(1, divFBO.tex));
+    gl.uniform2f(loc(pressP,'uTexel'), velocity.read.texelX, velocity.read.texelY);
+    for(var i=0;i<config.PRESSURE_ITER;i++){
+      gl.uniform1i(loc(pressP,'uPressure'), bindTex(0, pressure.read.tex));
+      target(pressure.write); draw(); pressure.swap();
+    }
+    // gradient subtract
+    gl.useProgram(gradP.prog);
+    gl.uniform1i(loc(gradP,'uPressure'), bindTex(0, pressure.read.tex));
+    gl.uniform1i(loc(gradP,'uVelocity'), bindTex(1, velocity.read.tex));
+    gl.uniform2f(loc(gradP,'uTexel'), velocity.read.texelX, velocity.read.texelY);
+    target(velocity.write); draw(); velocity.swap();
+    // advect velocity
+    gl.useProgram(advectP.prog);
+    gl.uniform1i(loc(advectP,'uVelocity'), bindTex(0, velocity.read.tex));
+    gl.uniform1i(loc(advectP,'uSource'), bindTex(0, velocity.read.tex));
+    gl.uniform2f(loc(advectP,'uTexel'), velocity.read.texelX, velocity.read.texelY);
+    gl.uniform1f(loc(advectP,'uDt'), dt);
+    gl.uniform1f(loc(advectP,'uDissipation'), config.VEL_DISSIPATION);
+    target(velocity.write); draw(); velocity.swap();
+    // advect dye
+    var dyeDis = config.DYE_DISSIPATION + (washing > 0 ? 2.4 : 0);
+    gl.useProgram(advectP.prog);
+    gl.uniform1i(loc(advectP,'uVelocity'), bindTex(0, velocity.read.tex));
+    gl.uniform1i(loc(advectP,'uSource'), bindTex(1, dye.read.tex));
+    gl.uniform2f(loc(advectP,'uTexel'), dye.read.texelX, dye.read.texelY);
+    gl.uniform1f(loc(advectP,'uDissipation'), dyeDis);
+    target(dye.write); draw(); dye.swap();
+    if(washing > 0) washing -= dt;
+  }
+
+  /* ---------- theme ---------- */
+  var WATER_DARK = hexRGB('0d0e12');
+  var theme = 'paper';
+  function paperColor(){ return theme === 'sumi' ? WATER_DARK : PAPER; }
+  function themeMode(){ return theme === 'sumi' ? 1 : 0; }
+
+  function renderDisplay(toFBO, scaleX, scaleY, offX, offY){
+    var p = paperColor();
+    gl.useProgram(displayP.prog);
+    gl.uniform1i(loc(displayP,'uDye'), bindTex(0, dye.read.tex));
+    gl.uniform3f(loc(displayP,'uPaper'), p[0], p[1], p[2]);
+    gl.uniform1f(loc(displayP,'uMode'), themeMode());
+    gl.uniform2f(loc(displayP,'uUvScale'), scaleX===undefined?1:scaleX, scaleY===undefined?1:scaleY);
+    gl.uniform2f(loc(displayP,'uUvOffset'), offX||0, offY||0);
+    target(toFBO || null); draw();
+  }
+
+  /* ---------- adaptive quality (protects low-end devices) ---------- */
+  var qLevel = 0; // 0 full, 1 reduced, 2 minimal
+  var qSamples = [], qCheckAt = 0;
+  function downgrade(){
+    if(qLevel >= 2) return;
+    qLevel++;
+    if(qLevel === 1){ config.PRESSURE_ITER = 20; config.DYE_RES = 1024; }
+    else { config.PRESSURE_ITER = 14; config.DYE_RES = 768; }
+    S = simSizes(); dye.resize(S.dw, S.dh);
+  }
+  function qualityWatch(now, dt){
+    if(qLevel >= 2) return;
+    qSamples.push(dt);
+    if(qSamples.length > 90) qSamples.shift();
+    if(now < qCheckAt) return;
+    qCheckAt = now + 2000;
+    if(qSamples.length < 60) return;
+    var arr = qSamples.slice().sort(function(a,b){return a-b;});
+    var median = arr[Math.floor(arr.length/2)];
+    if(median > 1/45){ downgrade(); qSamples.length = 0; }
+  }
+
+  /* ---------- main loop ---------- */
+  var lastT = performance.now();
+  var running = true;
+  function frame(now){
+    if(!running) return;
+    requestAnimationFrame(frame);
+    var dt = (now-lastT)/1000; lastT = now; dt = Math.min(dt, 1/30);
+    if(dt <= 0) return;
+    applyPointer();
+    autoUpdate(now, dt);
+    timerTick(now);
+    step(dt);
+    renderDisplay(null);
+    qualityWatch(now, dt);
+  }
+
+  /* ---------- seed ---------- */
+  function seed(){
+    dropInk(0.38, 0.58, INKS.sumi, 0.75);
+    setTimeout(function(){ dropInk(0.62, 0.42, INKS.ai, 0.6); }, 450);
+    setTimeout(function(){ dropInk(0.5, 0.62, INKS.shu, 0.5); }, 950);
+  }
+
+  /* ---------- timer chime (singing-bowl tone; no ambience) ---------- */
+  var actx = null;
+  function armAudio(){ // called from the Start gesture so the browser permits sound
+    if(actx){ if(actx.state==='suspended') actx.resume(); return; }
+    var AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
+    try { actx = new AC(); } catch(e){ actx = null; }
+  }
+  function chime(){
+    if(!actx) return;
+    if(actx.state==='suspended') actx.resume();
+    var t = actx.currentTime, base = 196.00;
+    var out = actx.createGain(); out.gain.value = 0.9; out.connect(actx.destination);
+    var delay = actx.createDelay(1.0); delay.delayTime.value = 0.28;
+    var fb = actx.createGain(); fb.gain.value = 0.3;
+    var dlp = actx.createBiquadFilter(); dlp.type='lowpass'; dlp.frequency.value = 1600;
+    delay.connect(dlp); dlp.connect(fb); fb.connect(delay); delay.connect(out);
+    [1, 2.01, 2.78].forEach(function(mul, i){
+      var o = actx.createOscillator(); o.type='sine'; o.frequency.value = base*mul;
+      var g = actx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(i===0 ? 0.22 : 0.07, t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 5.5 - i*1.2);
+      o.connect(g); g.connect(out); g.connect(delay);
+      o.start(t); o.stop(t + 6);
+    });
+  }
+
+  /* ---------- capture ---------- */
+  function chosenSize(){
+    var v = capSize.value;
+    if(v==='screen') return [canvas.width, canvas.height];
+    var p = v.split('x'); return [parseInt(p[0],10), parseInt(p[1],10)];
+  }
+  function captureCanvas(seal){
+    var sz = chosenSize(), W = sz[0], H = sz[1];
+    var cap = createFBOByte(W, H);
+    // cover-crop: keep the on-screen pattern's proportions instead of stretching to the target aspect
+    var dyeAspect = canvas.width / canvas.height, capAspect = W / H, sx = 1, sy = 1;
+    if(capAspect > dyeAspect) sy = dyeAspect / capAspect; else sx = capAspect / dyeAspect;
+    renderDisplay(cap, sx, sy, (1-sx)/2, (1-sy)/2);
+    var px = new Uint8Array(W*H*4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, cap.fbo);
+    gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,px);
+    gl.deleteFramebuffer(cap.fbo); gl.deleteTexture(cap.tex);
+    var out = document.createElement('canvas'); out.width=W; out.height=H;
+    var c2 = out.getContext('2d'); var img = c2.createImageData(W, H);
+    for(var y=0;y<H;y++){ var src=(H-1-y)*W*4, dst=y*W*4; img.data.set(px.subarray(src, src+W*4), dst); }
+    c2.putImageData(img, 0, 0);
+    if(seal){
+      var s = Math.round(Math.min(W,H)*0.072), m = Math.round(Math.min(W,H)*0.045);
+      var x = W-m-s, y2 = H-m-s, rad = Math.round(s*0.18);
+      c2.fillStyle = '#a8341e';
+      c2.beginPath();
+      c2.moveTo(x+rad,y2); c2.arcTo(x+s,y2,x+s,y2+s,rad); c2.arcTo(x+s,y2+s,x,y2+s,rad);
+      c2.arcTo(x,y2+s,x,y2,rad); c2.arcTo(x,y2,x+s,y2,rad); c2.closePath(); c2.fill();
+      c2.fillStyle = '#f3ecdd';
+      c2.font = '500 ' + Math.round(s*0.56) + 'px "Hiragino Mincho ProN","Yu Mincho","Songti SC","Noto Serif JP",Georgia,serif';
+      c2.textAlign='center'; c2.textBaseline='middle'; c2.fillText('墨', x+s/2, y2+s/2+s*0.02);
+    }
+    return out;
+  }
+  function createFBOByte(w,h){
+    var tex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,tex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    var fbo=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);
+    return {tex:tex,fbo:fbo,w:w,h:h};
+  }
+  function downloadCapture(){
+    captureCanvas(capSeal.checked).toBlob(function(blob){
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='suminagashi-'+Date.now()+'.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000); announce('Image downloaded');
+    }, 'image/png');
+  }
+  function copyCapture(){
+    if(!navigator.clipboard || !window.ClipboardItem){ announce('Clipboard not supported — downloading instead'); downloadCapture(); return; }
+    captureCanvas(capSeal.checked).toBlob(function(blob){
+      navigator.clipboard.write([new window.ClipboardItem({'image/png':blob})])
+        .then(function(){ announce('Copied to clipboard'); })
+        .catch(function(){ announce('Copy blocked — downloading instead'); downloadCapture(); });
+    }, 'image/png');
+  }
+
+  /* ---------- UI ---------- */
+  var inksWrap = document.getElementById('inks');
+  var autoBtn = document.getElementById('autoBtn');
+  var washBtn = document.getElementById('washBtn');
+  var captureBtn = document.getElementById('captureBtn');
+  autoBtn.setAttribute('aria-pressed', String(autoFlow));
+  var helpBtn = document.getElementById('helpBtn');
+  var helpDlg = document.getElementById('helpDlg');
+  var helpClose = document.getElementById('helpClose');
+  var capDlg = document.getElementById('capDlg');
+  var capClose = document.getElementById('capClose');
+  var capSize = document.getElementById('capSize');
+  var capSeal = document.getElementById('capSeal');
+  var themeBtn = document.getElementById('themeBtn');
+  var timeBtn = document.getElementById('timeBtn');
+  var timeDlg = document.getElementById('timeDlg');
+  var timeClose = document.getElementById('timeClose');
+  var timeModes = document.getElementById('timeModes');
+  var clockOpts = document.getElementById('clockOpts');
+  var clockSecondsCb = document.getElementById('clockSeconds');
+  var timerOpts = document.getElementById('timerOpts');
+  var timerPresets = document.getElementById('timerPresets');
+  var timeOverlay = document.getElementById('timeOverlay');
+  var focusBtn = document.getElementById('focusBtn');
+  var revealTab = document.getElementById('revealTab');
+  var dock = document.querySelector('.dock');
+  var hintEl = document.getElementById('hint');
+  var hintHidden = false;
+  function hideHint(){ if(hintHidden) return; hintHidden = true; hintEl.classList.add('gone'); }
+  setTimeout(hideHint, 30000); // long safety fallback; first interaction hides it sooner
+  setTimeout(function(){ document.getElementById('titleBar').classList.add('dim'); }, 5200);
+
+  /* ---------- settings persistence ---------- */
+  var SKEY = 'suminagashi.settings';
+  var settings = {};
+  try { settings = JSON.parse(localStorage.getItem(SKEY) || '{}') || {}; } catch(e){ settings = {}; }
+  var clockSeconds = settings.clockSeconds === true;
+  function saveSettings(){
+    try { localStorage.setItem(SKEY, JSON.stringify({
+      clockSeconds: clockSeconds
+    })); } catch(e){}
+  }
+
+  /* ---------- theme ---------- */
+  function applyTheme(name){
+    theme = name === 'sumi' ? 'sumi' : 'paper';
+    if(theme === 'sumi') document.documentElement.setAttribute('data-theme','sumi');
+    else document.documentElement.removeAttribute('data-theme');
+    themeBtn.setAttribute('aria-pressed', theme === 'sumi' ? 'true' : 'false');
+    saveSettings();
+  }
+  themeBtn.addEventListener('click', function(){
+    applyTheme(theme === 'sumi' ? 'paper' : 'sumi');
+    announce(theme === 'sumi' ? 'Dark water' : 'Light paper');
+  });
+
+  /* ---------- clock & timer ---------- */
+  var timeMode = 'off';
+  var timerLenMs = 5*60000, timerRemaining = timerLenMs, timerRunning = false, timerEndAt = 0;
+  var lastTimeStr = '';
+  var hour12 = (function(){ try { var h = new Intl.DateTimeFormat([], {hour:'numeric'}).resolvedOptions().hour12; return h !== false; } catch(e){ return true; } })();
+  function pad2(n){ return (n<10?'0':'')+n; }
+  function clockHTML(){
+    var d = new Date(), h = d.getHours(), m = d.getMinutes(), s = d.getSeconds(), mer = '', hh;
+    if(hour12){ mer = h<12?'AM':'PM'; hh = h%12; if(hh===0) hh = 12; hh = String(hh); }
+    else hh = pad2(h);
+    return hh + ':' + pad2(m) + (clockSeconds ? (':'+pad2(s)) : '') + (mer ? (' <span class="meridiem">'+mer+'</span>') : '');
+  }
+  function timerHTML(ms){ var t = Math.max(0, Math.ceil(ms/1000)); return pad2(Math.floor(t/60)) + ':' + pad2(t%60); }
+  function setTimeText(html){ if(html !== lastTimeStr){ lastTimeStr = html; timeOverlay.innerHTML = html; } }
+  function timerFinish(){
+    timerRunning = false; timerRemaining = 0; lastTimeStr = '';
+    timeOverlay.innerHTML = '00:00<span class="caption">— done —</span>';
+    timeOverlay.classList.remove('pulse'); void timeOverlay.offsetWidth; timeOverlay.classList.add('pulse');
+    chime();
+    var c = currentInk(false);
+    dropInk(0.5, 0.5, c, 1.6);
+    setTimeout(function(){ dropInk(0.45, 0.53, c, 1.0); }, 120);
+    setTimeout(function(){ dropInk(0.55, 0.47, c, 1.0); }, 240);
+    announce('Timer complete');
+  }
+  function timerTick(now){
+    if(timeMode === 'clock'){ setTimeText(clockHTML()); }
+    else if(timeMode === 'timer'){
+      if(timerRunning){
+        var ms = timerEndAt - Date.now();
+        if(ms <= 0){ timerFinish(); return; }
+        setTimeText(timerHTML(ms));
+      } else { setTimeText(timerHTML(timerRemaining)); }
+    }
+  }
+  function setTimeMode(mode){
+    timeMode = mode; lastTimeStr = '';
+    Array.prototype.forEach.call(timeModes.querySelectorAll('[data-mode]'), function(b){
+      b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+    });
+    clockOpts.hidden = mode !== 'clock';
+    timerOpts.hidden = mode !== 'timer';
+    timeOverlay.classList.toggle('on', mode !== 'off');
+    if(mode === 'off'){ timeOverlay.innerHTML = ''; }
+    else timerTick(performance.now());
+  }
+  timeModes.addEventListener('click', function(e){
+    var b = e.target.closest('[data-mode]'); if(!b) return;
+    setTimeMode(b.dataset.mode);
+  });
+  timerPresets.addEventListener('click', function(e){
+    var b = e.target.closest('[data-min]'); if(!b) return;
+    Array.prototype.forEach.call(timerPresets.querySelectorAll('[data-min]'), function(x){ x.setAttribute('aria-pressed', String(x===b)); });
+    timerLenMs = parseInt(b.dataset.min,10)*60000;
+    if(!timerRunning){ timerRemaining = timerLenMs; lastTimeStr=''; if(timeMode==='timer') timerTick(performance.now()); }
+  });
+  document.getElementById('timerStart').addEventListener('click', function(){
+    if(timeMode !== 'timer') setTimeMode('timer');
+    armAudio(); // user gesture: lets the completion chime sound later
+    if(!timerRunning){
+      if(timerRemaining <= 0) timerRemaining = timerLenMs;
+      timerEndAt = Date.now() + timerRemaining; timerRunning = true;
+      announce('Timer started');
+    }
+  });
+  document.getElementById('timerPause').addEventListener('click', function(){
+    if(timerRunning){ timerRemaining = Math.max(0, timerEndAt - Date.now()); timerRunning = false; lastTimeStr=''; timerTick(performance.now()); announce('Timer paused'); }
+  });
+  document.getElementById('timerReset').addEventListener('click', function(){
+    timerRunning = false; timerRemaining = timerLenMs; lastTimeStr=''; if(timeMode==='timer') timerTick(performance.now()); announce('Timer reset');
+  });
+  clockSecondsCb.addEventListener('change', function(){ clockSeconds = clockSecondsCb.checked; lastTimeStr=''; saveSettings(); });
+  timeBtn.addEventListener('click', function(){ timeDlg.showModal(); });
+  timeClose.addEventListener('click', function(){ timeDlg.close(); });
+
+  /* ---------- focus (immersive) mode ---------- */
+  var immersive = false, peekTimer = null;
+  function setFocus(on){
+    immersive = on;
+    document.body.classList.toggle('immersive', on);
+    if(!on) document.body.classList.remove('peek');
+    revealTab.hidden = !on;
+    focusBtn.setAttribute('aria-pressed', String(on));
+    announce(on ? 'Controls hidden — press H or tap the handle to show them' : 'Controls shown');
+  }
+  function peek(){
+    if(!immersive) return;
+    document.body.classList.add('peek');
+    if(peekTimer) clearTimeout(peekTimer);
+    peekTimer = setTimeout(function(){ document.body.classList.remove('peek'); }, 3200);
+  }
+  focusBtn.addEventListener('click', function(){ setFocus(!immersive); });
+  revealTab.addEventListener('click', peek);
+  // desktop: a small mouse movement near the bottom reveals the dock briefly
+  window.addEventListener('mousemove', function(e){
+    if(immersive && e.clientY > window.innerHeight - 90) peek();
+  });
+
+  inksWrap.addEventListener('click', function(e){
+    var btn = e.target.closest('.ink'); if(!btn) return;
+    inkMode = btn.dataset.ink;
+    inksWrap.querySelectorAll('.ink').forEach(function(b){ b.setAttribute('aria-pressed', String(b===btn)); });
+    announce('Ink: ' + (btn.getAttribute('aria-label')||'').replace(/\s*\(.*\)/,''));
+  });
+  function selectInkByIndex(i){
+    var keys = ['cycle','sumi','ai','shu','matsuba'];
+    var btn = inksWrap.querySelector('[data-ink="'+keys[i]+'"]');
+    if(btn) btn.click();
+  }
+  autoBtn.addEventListener('click', function(){ autoFlow=!autoFlow; autoBtn.setAttribute('aria-pressed', String(autoFlow)); announce(autoFlow?'Auto performance on':'Auto performance off'); });
+  washBtn.addEventListener('click', wash);
+  captureBtn.addEventListener('click', function(){ capDlg.showModal(); });
+  helpBtn.addEventListener('click', function(){ helpDlg.showModal(); });
+  helpClose.addEventListener('click', function(){ helpDlg.close(); });
+  capClose.addEventListener('click', function(){ capDlg.close(); });
+  document.getElementById('capDownload').addEventListener('click', downloadCapture);
+  document.getElementById('capCopy').addEventListener('click', copyCapture);
+
+  // hide hint on the first real interaction with the surface
+  document.addEventListener('pointerdown', function(e){ if(e.target && e.target.id === 'gl') hideHint(); });
+
+  document.addEventListener('keydown', function(e){
+    var t = e.target;
+    if(t && (t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA')) return;
+    if(helpDlg.open || capDlg.open || timeDlg.open) return;
+    if(e.metaKey||e.ctrlKey||e.altKey) return;
+    switch(e.key){
+      case '0': selectInkByIndex(0); break;
+      case '1': selectInkByIndex(1); break;
+      case '2': selectInkByIndex(2); break;
+      case '3': selectInkByIndex(3); break;
+      case '4': selectInkByIndex(4); break;
+      case ' ': e.preventDefault(); dropInk(0.2+Math.random()*0.6, 0.2+Math.random()*0.6, currentInk(true), 0.8+Math.random()*0.6); hideHint(); break;
+      case 'a': case 'A': autoBtn.click(); break;
+      case 'h': case 'H': setFocus(!immersive); break;
+      case 'Escape': if(immersive){ e.preventDefault(); setFocus(false); } break;
+      case 'd': case 'D': themeBtn.click(); break;
+      case 't': case 'T': timeDlg.showModal(); break;
+      case 'p': case 'P': capDlg.showModal(); break;
+      case 'x': case 'X': case 'w': case 'W': wash(); break;
+    }
+  });
+
+  /* ---------- resize ---------- */
+  window.addEventListener('resize', function(){
+    sizeCanvas();
+    S = simSizes();
+    velocity.resize(S.sw, S.sh); pressure.resize(S.sw, S.sh);
+    curlFBO.resize(S.sw, S.sh); divFBO.resize(S.sw, S.sh);
+    dye.resize(S.dw, S.dh);
+  });
+
+  /* ---------- pause when tab is hidden (saves battery / heat) ---------- */
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden){ running = false; }
+    else { if(!running){ running = true; lastT = performance.now(); requestAnimationFrame(frame); }
+      timerTick(performance.now()); }
+  });
+
+  /* ---------- restore settings ---------- */
+  applyTheme('paper'); // light is always the startup default; dark is a per-session toggle
+  clockSecondsCb.checked = clockSeconds;
+
+  /* ---------- boot ---------- */
+  seed();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
