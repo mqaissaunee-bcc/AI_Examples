@@ -2,21 +2,27 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.18
+  Version:  v5.21
   Date:     June 16, 2026
-  Features: Three refinements:
-            (1) Thousands separators (commas) applied wherever totals
-                ≥1,000 are displayed: KPI strip, By Discipline parent
-                rows and course sub-rows, Sections at a Glance discipline
-                meta, list-view "N of M" search count, trend chart
-                Y-axis labels, FTE "to go" sub-text. New fmtInt() helper
-                routes integer counts through en-US locale formatting.
-            (2) FTE tooltip text: "set by Institutional Research" →
-                "set by the college".
-            (3) "By Discipline" course rows now show the course title
-                inline next to the course code in the Discipline column
-                (was previously in the right-most/Trend slot). Reads
-                left-to-right as code → title → numbers.
+  Features: Three coordinated changes:
+            (1) Trend chart hover-isolate. Both the Enrollment and Fill
+                Rate charts now respond to hover on any line, dot, or
+                legend chip — the hovered discipline raises to full
+                opacity, all others dim to 16%. Dots additionally show a
+                small dark readout tooltip with the formatted value.
+                Lets a chair pull any individual line out of the visual
+                tangle without restructuring the chart.
+            (2) College reference stays bright on hover. On the Fill
+                Rate chart (the only chart where the college baseline
+                appears), the reference line is exempted from the
+                dimming, brightening slightly when something is
+                highlighted. Reading "is my discipline ahead of or
+                behind the college pace" is now a single hover away.
+            (3) What's new modal auto-opens once for returning readers
+                whose stored seen-version is stale. Pill text swaps to
+                "UPDATED" instead of "NEW" in that case. First-time
+                visitors are not auto-opened — the badge alone
+                introduces them to the feature.
             Built on v4.9 canonical baseline.
 -->
 <html lang="en">
@@ -43,6 +49,7 @@
     --up: #2d5a3d;
     --down: #c4452d;
     --flat: #8a8580;
+    --wait: #b06820;
   }
   /* Crisp white theme — cooler, more dashboard-like, less editorial-paper */
   [data-theme="white"] {
@@ -62,6 +69,7 @@
     --up: #0f766e;
     --down: #b91c1c;
     --flat: #94a3b8;
+    --wait: #b45309;
   }
   [data-theme="dark"] {
     --bg: #1a1814;
@@ -80,6 +88,7 @@
     --up: #6ba87f;
     --down: #e36849;
     --flat: #807a6e;
+    --wait: #d9974a;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -959,6 +968,27 @@
   .panel .stat-row .d.flat { color: var(--flat); }
   .panel .panel-sparkline { margin-top: 10px; }
 
+  /* Waitlist panel — same chrome, distinct headline color (amber/warn)
+     for the waitlist count so it reads as a constraint signal rather
+     than a delta. Course title sits inline below the course code. */
+  .panel .stat-row .d.wl-wait {
+    color: var(--wait);
+    font-size: 13px;
+    min-width: 32px;
+  }
+  .panel .stat-row .wl-course-title {
+    display: block;
+    color: var(--ink-mute);
+    font-style: italic;
+    font-size: 10px;
+    font-weight: 400;
+    margin-top: 1px;
+    /* keep titles from blowing out the row width in the four-up grid */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* Course cards */
   .discipline-group {
     margin-bottom: 16px;
@@ -1708,6 +1738,69 @@
     display: inline-block; width: 16px; height: 3px;
   }
 
+  /* Hover-isolate: hovering a line, dot, or legend chip raises that
+     discipline to full opacity and dims the rest. Reference series
+     (College baseline) stays bright even on hover so it remains a stable
+     reference for whichever discipline is being inspected. Mouse-only —
+     touch and keyboard fall through to the default all-visible view. */
+  .trend-chart-wrap .legend .lg-item {
+    padding: 3px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s;
+  }
+  .trend-chart-wrap .legend .lg-item:hover {
+    background: rgba(0,0,0,0.045);
+  }
+  .trend-chart-wrap .legend .lg-item.is-ref {
+    font-style: italic;
+    color: var(--ink-mute);
+  }
+  .trend-chart-wrap .tc-line {
+    transition: opacity 0.18s, stroke-width 0.18s;
+  }
+  .trend-chart-wrap .tc-line:hover { cursor: pointer; }
+  .trend-chart-wrap .tc-dot {
+    transition: opacity 0.18s;
+  }
+  .trend-chart-wrap.is-hover .tc-line:not([data-is-ref]) { opacity: 0.16; }
+  .trend-chart-wrap.is-hover .tc-dot:not([data-is-ref]) { opacity: 0.16; }
+  .trend-chart-wrap.is-hover .tc-line[data-is-ref] {
+    opacity: 0.9;
+    stroke-width: 2;
+  }
+  .trend-chart-wrap.is-hover .tc-dot[data-is-ref] { opacity: 0.85; }
+  .trend-chart-wrap.is-hover .tc-line.is-active {
+    opacity: 1;
+    stroke-width: 2.8;
+  }
+  .trend-chart-wrap.is-hover .tc-dot.is-active { opacity: 1; }
+  .trend-chart-wrap.is-hover .lg-item:not([data-is-ref]) .sw { opacity: 0.22; }
+  .trend-chart-wrap.is-hover .lg-item:not([data-is-ref]) { opacity: 0.45; }
+  .trend-chart-wrap.is-hover .lg-item.is-active { opacity: 1; color: var(--ink); }
+  .trend-chart-wrap.is-hover .lg-item.is-active .sw { opacity: 1; }
+  .trend-chart-frame {
+    position: relative;
+  }
+  .trend-readout {
+    position: absolute;
+    pointer-events: none;
+    background: var(--ink);
+    color: var(--surface);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.12s;
+    transform: translate(-50%, -135%);
+    z-index: 5;
+  }
+  .trend-readout.show { opacity: 1; }
+  .trend-readout .rd-num { font-weight: 700; }
+
   /* Footer */
   footer {
     margin-top: 48px;
@@ -1781,7 +1874,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.18</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.21</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -1831,11 +1924,18 @@
   // re-announce after a future feature release, bump WHATS_NEW_VERSION and
   // update WHATS_NEW_CONTENT. Keep content brief — this is a release note,
   // not a manual.
-  const WHATS_NEW_VERSION = '2026-05-28';
+  //
+  // Returning-reader treatment: when a user has previously dismissed an
+  // older version (so localStorage[SEEN] is set but doesn't match), the
+  // pill renders as "UPDATED" instead of "NEW", and the modal auto-opens
+  // once on first load. First-time visitors (no stored value) see "NEW"
+  // with no auto-open — the badge alone is their introduction.
+  const WHATS_NEW_VERSION = '2026-06-16';
   const WHATS_NEW_CONTENT = `
     <ul>
-      <li><strong>Combined classes linked.</strong> Paired MATH and ENGL-121 sections (XL+RL, including async DE) now group as one with combined enrollment.</li>
-      <li><strong>Discipline rows expand.</strong> Click any row or chevron to see the course-level breakdown. Expand all / Collapse all at top right.</li>
+      <li><strong>Biggest Waitlists</strong> card in the Movers section, aggregated by course code rather than section. Surfaces course-level demand pressure (e.g., HIST-201 across all of its sections, not just one).</li>
+      <li><strong>Hover-isolate on trend charts.</strong> Hover any line, dot, or legend chip on the Enrollment or Fill Rate chart to pull that discipline out of the tangle. The college baseline stays bright as a reference.</li>
+      <li><strong>Cleaner large numbers.</strong> Thousands separators applied everywhere counts hit four digits, plus a typography pass on the By Discipline table.</li>
     </ul>
   `;
 
@@ -1907,6 +2007,18 @@
   function fmtInt(n) {
     if (n == null || isNaN(n)) return '0';
     return Math.round(Number(n)).toLocaleString('en-US');
+  }
+  // Same idea for decimal values like FTE (1792.8 → "1,792.8"). Uses
+  // toLocaleString with explicit min/max fraction digits so the decimal
+  // is preserved and the thousands separator is applied. Keep separate
+  // from fmtInt so call sites read clearly about which kind of number
+  // they're formatting.
+  function fmtFloat(n, decimals) {
+    if (n == null || isNaN(n)) return (0).toFixed(decimals);
+    return Number(n).toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
   }
   function escapeHtml(s) {
     return String(s == null ? '' : s)
@@ -2818,7 +2930,7 @@
       const prevFTE = prevSnap ? collegeWideFTE(prevSnap) : null;
       const dFTE = prevFTE !== null ? collegeFTE - prevFTE : null;
       const dStr = dFTE !== null && Math.abs(dFTE) >= 0.05
-        ? `<span class="delta ${dFTE > 0 ? 'up' : 'down'}" title="Change in college-wide FTE since the previous snapshot">${dFTE > 0 ? '+' : ''}${dFTE.toFixed(1)}</span>`
+        ? `<span class="delta ${dFTE > 0 ? 'up' : 'down'}" title="Change in college-wide FTE since the previous snapshot">${dFTE > 0 ? '+' : ''}${fmtFloat(dFTE, 1)}</span>`
         : '';
 
       // Your selection's contribution
@@ -2829,7 +2941,7 @@
         state.selectedDisciplines.size < totalDisciplines;
 
       const sub = showYourSelection
-        ? `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · your selection: ${yourFTE.toFixed(1)}`
+        ? `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · your selection: ${fmtFloat(yourFTE, 1)}`
         : `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · ${fmtInt(Math.max(0, goal - collegeFTE))} to go`;
 
       // Tooltip explains FTE, calculation, and goal scope. A custom CSS
@@ -2848,7 +2960,7 @@
               <span class="kpi-tooltip" role="tooltip">${escapeHtml(fteTooltip)}</span>
             </span>
           </div>
-          <div class="value">${collegeFTE.toFixed(1)} ${dStr}</div>
+          <div class="value">${fmtFloat(collegeFTE, 1)} ${dStr}</div>
           <div class="sub">${sub}</div>
         </div>
       `;
@@ -4480,6 +4592,42 @@
     const stalled = movers.filter(m => m.diff === 0 && m.endFill < 50).sort((a, b) => a.endEnr - b.endEnr).slice(0, 8);
     const losers = movers.filter(m => m.diff < 0).sort((a, b) => a.diff - b.diff).slice(0, 8);
 
+    // Waitlist pressure — aggregated by course CODE, not by section. Different
+    // shape from the other three movers: it looks at the current snapshot
+    // only (waitlist is a "right now" quantity, not a time delta), and it
+    // rolls up multiple sections of the same course (e.g., HIST-201-001RL +
+    // 002RL + 003RL → one HIST-201 row showing total waitlist + section
+    // count). Surfaces courses with combined demand pressure that
+    // section-level views miss. Threshold of 3+ waitlisted total filters
+    // noise (a single 1-waiting course isn't a meaningful signal).
+    const waitlistByCourse = new Map();
+    lastSnap.rows.forEach(r => {
+      if (!state.selectedDisciplines.has(r._prefix)) return;
+      const wait = Number(r['Wait List']) || 0;
+      const course = String(r.Course || '');
+      if (!course) return;
+      if (!waitlistByCourse.has(course)) {
+        waitlistByCourse.set(course, {
+          course,
+          prefix: r._prefix,
+          title: r['Course Title'] || '',
+          sections: 0,
+          waiting: 0,
+          enrolled: 0,
+          capacity: 0,
+        });
+      }
+      const agg = waitlistByCourse.get(course);
+      agg.sections += 1;
+      agg.waiting += wait;
+      agg.enrolled += Number(r['Enrolled Students']) || 0;
+      agg.capacity += Number(r.Capacity) || 0;
+    });
+    const waitlists = [...waitlistByCourse.values()]
+      .filter(c => c.waiting >= 3)
+      .sort((a, b) => b.waiting - a.waiting)
+      .slice(0, 8);
+
     return `
       <div class="section-title">Enrollment Over Time <span class="meta">${state.snapshots.length} snapshots · ${fmtDate(firstSnap.date)} → ${fmtDate(lastSnap.date)}</span></div>
       ${renderMultiSeriesChart(series, dates, 'enr', 'Enrolled Students', null)}
@@ -4490,6 +4638,7 @@
         ${renderMoverPanel('Biggest Gainers', gainers, 'up')}
         ${renderMoverPanel('Stalled (no growth, under-filled)', stalled, 'flat')}
         ${renderMoverPanel('Lost Enrollment', losers, 'down')}
+        ${renderWaitlistPanel(waitlists)}
       </div>
     `;
   }
@@ -4517,18 +4666,26 @@
       yTicks.push({ v, y: yCoord(v) });
     }
 
-    const renderLine = (s) => {
+    // Format the value for the hover readout based on chart kind. Pre-stored
+    // on each dot as data-display so the hover handler doesn't need to know
+    // whether this is the enrollment or fill chart.
+    const fmtVal = (v) => key === 'fill' ? `${v.toFixed(1)}%` : fmtInt(v);
+
+    const renderLine = (s, isRef) => {
       const path = s[key].map((v, i) => `${i === 0 ? 'M' : 'L'}${xCoord(i)},${yCoord(v)}`).join(' ');
-      const dots = s[key].map((v, i) => `<circle cx="${xCoord(i)}" cy="${yCoord(v)}" r="${s.dashed ? 2 : 3}" fill="${s.color}" opacity="${s.dashed ? 0.6 : 1}"/>`).join('');
-      const dash = s.dashed ? 'stroke-dasharray="5,4"' : '';
-      const opacity = s.dashed ? '0.6' : '1';
+      const refAttrs = isRef ? ' data-is-ref="true"' : '';
+      const dotsRefAttrs = isRef ? ' data-is-ref="true"' : '';
+      const dots = s[key].map((v, i) =>
+        `<circle class="tc-dot" data-disc="${escapeHtml(s.code)}"${dotsRefAttrs} data-i="${i}" data-val="${v}" data-display="${escapeHtml(fmtVal(v))}" cx="${xCoord(i)}" cy="${yCoord(v)}" r="${isRef ? 2.4 : 3}" fill="${s.color}"/>`
+      ).join('');
+      const dash = isRef ? 'stroke-dasharray="5,4"' : '';
       return `
-        <path d="${path}" fill="none" stroke="${s.color}" stroke-width="${s.dashed ? 1.5 : 2}" ${dash} stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>
+        <path class="tc-line${isRef ? ' tc-ref-line' : ''}" data-disc="${escapeHtml(s.code)}"${refAttrs} d="${path}" fill="none" stroke="${s.color}" stroke-width="${isRef ? 1.6 : 2}" ${dash} stroke-linejoin="round" stroke-linecap="round"/>
         ${dots}
       `;
     };
 
-    const lines = series.map(renderLine).join('') + (refSeries ? renderLine(refSeries) : '');
+    const lines = series.map(s => renderLine(s, false)).join('') + (refSeries ? renderLine(refSeries, true) : '');
 
     const xLabels = dates.map((d, i) =>
       `<text x="${xCoord(i)}" y="${H - padB + 18}" text-anchor="middle" font-size="11" fill="var(--ink-mute)" font-family="Helvetica Neue, sans-serif">${escapeHtml(d)}</text>`
@@ -4540,22 +4697,28 @@
     ).join('');
 
     const legendItems = series.map(s =>
-      `<span><span class="sw" style="background:${s.color}"></span>${escapeHtml(s.code)}</span>`
+      `<span class="lg-item" data-disc="${escapeHtml(s.code)}"><span class="sw" style="background:${s.color}"></span>${escapeHtml(s.code)}</span>`
     );
     if (refSeries) {
-      legendItems.push(`<span><span class="sw" style="background:${refSeries.color};opacity:0.6;background-image:repeating-linear-gradient(90deg, ${refSeries.color} 0 4px, transparent 4px 7px)"></span>${escapeHtml(refSeries.code)} <em style="color:var(--ink-mute)">(reference)</em></span>`);
+      legendItems.push(`<span class="lg-item is-ref" data-disc="${escapeHtml(refSeries.code)}" data-is-ref="true"><span class="sw" style="background:${refSeries.color};opacity:0.6;background-image:repeating-linear-gradient(90deg, ${refSeries.color} 0 4px, transparent 4px 7px)"></span>${escapeHtml(refSeries.code)} <em style="color:var(--ink-mute)">(reference)</em></span>`);
     }
     const legend = legendItems.join('');
 
+    // The readout is a small dark tooltip positioned at the hovered data
+    // point. Built once per chart wrap; the hover handler updates content
+    // and position. Hidden by default via .show class.
     return `
-      <div class="trend-chart-wrap">
+      <div class="trend-chart-wrap" data-chart-key="${escapeHtml(key)}">
         <h4>${escapeHtml(title)}</h4>
         <div class="legend">${legend}</div>
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
-          ${yLabels}
-          ${lines}
-          ${xLabels}
-        </svg>
+        <div class="trend-chart-frame">
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">
+            ${yLabels}
+            ${lines}
+            ${xLabels}
+          </svg>
+          <div class="trend-readout"><span class="rd-name"></span> · <span class="rd-num"></span></div>
+        </div>
       </div>
     `;
   }
@@ -4589,6 +4752,49 @@
         ${rows}
       </div>
     `;
+  }
+
+  // Waitlist mover panel — same panel chrome as renderMoverPanel but the
+  // data shape is course-aggregated, not section-level. Headline value is
+  // the combined waitlist count in warning amber (distinct from the
+  // green/red used for enrollment deltas — waitlist is a constraint
+  // signal, not a "good/bad" delta). Course title sits below the code in
+  // italic mute, matching the discipline accordion treatment.
+  function renderWaitlistPanel(items) {
+    const title = 'Biggest Waitlists';
+    if (items.length === 0) {
+      return `<div class="panel">
+        <h3>${escapeHtml(title)}</h3>
+        <div class="panel-sub">No course has 3+ on waitlist right now.</div>
+      </div>`;
+    }
+    const rows = items.map(c => {
+      const color = colorFor(c.prefix);
+      const fill = c.capacity > 0 ? (c.enrolled / c.capacity * 100) : 0;
+      const fillStr = c.capacity > 0 ? `${fillFmt(fill)} fill` : '—';
+      return `
+        <div class="stat-row">
+          <span class="k" style="text-transform:none;letter-spacing:0;font-size:11px">
+            <strong style="color:var(--ink);font-family:Helvetica Neue, sans-serif">${escapeHtml(c.course)}</strong>
+            <span class="wl-course-title">${escapeHtml(c.title)}</span>
+          </span>
+          <span class="v" style="font-size:11px">${fmtInt(c.sections)} sec · ${fillStr}</span>
+          <span class="d wl-wait" style="font-weight:700">${fmtInt(c.waiting)}</span>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="panel">
+        <h3>${escapeHtml(title)}</h3>
+        <div class="panel-sub">By course · aggregated across sections</div>
+        ${rows}
+      </div>
+    `;
+  }
+  // Tiny helper to format fill % without trailing decimal noise when round
+  function fillFmt(n) {
+    if (n == null || isNaN(n)) return '—';
+    return `${Math.round(n)}%`;
   }
 
   /* =========================================================================
@@ -4983,6 +5189,60 @@
       });
     }
 
+    // -------------------------------------------------------------------
+    // Trend chart hover-isolate
+    // -------------------------------------------------------------------
+    // Each .trend-chart-wrap can host its own independent hover state.
+    // Hovering any element tagged with data-disc inside the wrap (legend
+    // chip, line, or dot) raises that discipline to full opacity and
+    // dims the rest. Reference series stay bright via CSS rules keyed
+    // on data-is-ref. Dot hover also positions a small readout tooltip
+    // with the formatted value.
+    document.querySelectorAll('.trend-chart-wrap').forEach(wrap => {
+      const readout = wrap.querySelector('.trend-readout');
+      const readoutName = readout && readout.querySelector('.rd-name');
+      const readoutNum  = readout && readout.querySelector('.rd-num');
+
+      function setActive(code) {
+        if (!code) {
+          wrap.classList.remove('is-hover');
+          wrap.querySelectorAll('.is-active').forEach(el => el.classList.remove('is-active'));
+          if (readout) readout.classList.remove('show');
+          return;
+        }
+        wrap.classList.add('is-hover');
+        wrap.querySelectorAll('[data-disc]').forEach(el => {
+          el.classList.toggle('is-active', el.dataset.disc === code);
+        });
+      }
+
+      wrap.querySelectorAll('.lg-item[data-disc]').forEach(item => {
+        item.addEventListener('mouseenter', () => setActive(item.dataset.disc));
+        item.addEventListener('mouseleave', () => setActive(null));
+      });
+      wrap.querySelectorAll('.tc-line[data-disc]').forEach(line => {
+        line.addEventListener('mouseenter', () => setActive(line.dataset.disc));
+        line.addEventListener('mouseleave', () => setActive(null));
+      });
+      wrap.querySelectorAll('.tc-dot[data-disc]').forEach(dot => {
+        dot.addEventListener('mouseenter', () => {
+          setActive(dot.dataset.disc);
+          if (!readout) return;
+          // Position the readout at the dot's center within the
+          // chart frame. getBoundingClientRect handles SVG scaling
+          // correctly without us reverse-engineering the viewBox.
+          const dotRect = dot.getBoundingClientRect();
+          const frame = wrap.querySelector('.trend-chart-frame').getBoundingClientRect();
+          readoutName.textContent = dot.dataset.disc;
+          readoutNum.textContent = dot.dataset.display || dot.dataset.val;
+          readout.style.left = (dotRect.left - frame.left + dotRect.width / 2) + 'px';
+          readout.style.top  = (dotRect.top  - frame.top  + dotRect.height / 2) + 'px';
+          readout.classList.add('show');
+        });
+        dot.addEventListener('mouseleave', () => setActive(null));
+      });
+    });
+
     const reset = el('resetFilters');
     if (reset) reset.addEventListener('click', () => {
       state.activeDisciplineFilter.clear();
@@ -5217,8 +5477,31 @@
     if (!pill) return;
     let seen = null;
     try { seen = localStorage.getItem(STORAGE.WHATS_NEW_SEEN); } catch (e) {}
-    if (seen === WHATS_NEW_VERSION) pill.classList.add('hidden');
-    else pill.classList.remove('hidden');
+    if (seen === WHATS_NEW_VERSION) {
+      pill.classList.add('hidden');
+      return;
+    }
+    pill.classList.remove('hidden');
+    // Distinguish "first-ever sighting" (NEW) from "you saw an older
+    // version, this is newer than that" (UPDATED). Helps returning
+    // readers recognize the badge is meaningful rather than something
+    // they've already processed.
+    pill.textContent = (seen && seen !== WHATS_NEW_VERSION) ? 'UPDATED' : 'NEW';
+  }
+
+  // For returning readers (i.e., they saw a prior version and dismissed
+  // it), surface the change actively by auto-opening the modal once.
+  // First-time visitors are NOT auto-opened — the badge alone introduces
+  // the feature for them. The whatsNewSeen value is set when the modal
+  // opens, so this fires once per version bump.
+  function maybeAutoOpenWhatsNew() {
+    let seen = null;
+    try { seen = localStorage.getItem(STORAGE.WHATS_NEW_SEEN); } catch (e) {}
+    if (seen && seen !== WHATS_NEW_VERSION) {
+      // Small delay so the user is briefly oriented to the dashboard
+      // before the modal appears, rather than ambushing on page load.
+      setTimeout(openWhatsNew, 400);
+    }
   }
 
   function openWhatsNew() {
@@ -5263,6 +5546,7 @@
   loadStorage();
   updateThemeButtonLabel();
   refreshWhatsNewBadge();
+  maybeAutoOpenWhatsNew();
   // Snapshots now come from GitHub, not localStorage. Clear any leftovers.
   state.snapshots = [];
   state.currentSnapshotId = null;
