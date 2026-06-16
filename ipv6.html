@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IPv6 Network Protocol Learning Simulator</title>
+<meta name="description" content="Interactive IPv6 learning simulator: address structure, compression, address types, prefix calculator, multicast and NDP, EUI-64, transition mechanisms, and a knowledge quiz.">
+<style>
+:root{
+  --bg:#f4f6fb;
+  --surface:#ffffff;
+  --surface-2:#eef1f9;
+  --ink:#1c2233;
+  --ink-soft:#4b5468;
+  --line:#d7dcea;
+  --brand:#3b2fb3;
+  --brand-2:#5a4bdb;
+  --accent:#0e8f86;
+  --accent-soft:#d9f2ef;
+  --warn:#b3541e;
+  --warn-soft:#fbe9dd;
+  --good:#1d7a3e;
+  --good-soft:#def3e4;
+  --bad:#b03247;
+  --mono-bg:#101430;
+  --mono-ink:#9fe8e0;
+  --radius:10px;
+  --shadow:0 1px 3px rgba(28,34,51,.08),0 4px 14px rgba(28,34,51,.06);
+  --font-body:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono","SF Mono",Consolas,"Liberation Mono",monospace;
+  --z-global:#3b2fb3;
+  --z-ula:#5a4bdb;
+  --z-ll:#b3541e;
+  --z-mc:#0e8f86;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1220;
+    --surface:#181c30;
+    --surface-2:#1f2440;
+    --ink:#e7eaf6;
+    --ink-soft:#a8b0c8;
+    --line:#2e3554;
+    --brand:#8d80ff;
+    --brand-2:#6f5fff;
+    --accent:#3fd1c4;
+    --accent-soft:#10302e;
+    --warn:#f09a62;
+    --warn-soft:#3a2415;
+    --good:#5ecb84;
+    --good-soft:#143123;
+    --mono-bg:#0a0d22;
+    --mono-ink:#7fe3d8;
+    --z-global:#6f5fdb;
+    --z-ula:#8a7cf0;
+    --z-ll:#c96a32;
+    --z-mc:#1aa195;
+    --shadow:0 1px 3px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.3);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);line-height:1.55;font-size:clamp(15px,1vw + 12px,17px)}
+.skip-link{position:absolute;left:-9999px;top:0;background:var(--brand);color:#fff;padding:.6rem 1rem;border-radius:0 0 8px 0;z-index:100}
+.skip-link:focus{left:0}
+header.site{background:linear-gradient(135deg,var(--brand) 0%,var(--brand-2) 60%,#3a2f8f 100%);color:#fff;padding:1.6rem 1rem 1.2rem;text-align:center}
+header.site .glyph{font-size:2.2rem;display:block}
+header.site h1{margin:.25rem 0 .15rem;font-size:clamp(1.3rem,2.5vw,1.9rem);letter-spacing:.01em}
+header.site p{margin:0;opacity:.85;font-size:.92rem}
+nav.tabs{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
+nav.tabs .strip{display:flex;gap:.25rem;overflow-x:auto;padding:.45rem .6rem;max-width:1180px;margin:0 auto;scrollbar-width:thin}
+nav.tabs button{flex:0 0 auto;min-height:44px;min-width:44px;border:1px solid transparent;background:transparent;color:var(--ink-soft);font:inherit;font-size:.88rem;padding:.45rem .8rem;border-radius:999px;cursor:pointer;white-space:nowrap}
+nav.tabs button:hover{background:var(--surface-2);color:var(--ink)}
+nav.tabs button[aria-selected="true"]{background:var(--brand);color:#fff;border-color:var(--brand)}
+nav.tabs button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+main{max-width:1180px;margin:0 auto;padding:1.2rem 1rem 3rem}
+section.panel{display:none}
+section.panel.active{display:block;animation:fadein .25s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.panel-head{text-align:center;margin:.8rem 0 1.4rem}
+.panel-head .glyph{font-size:1.9rem;display:block}
+.panel-head h2{margin:.2rem 0 .15rem;font-size:clamp(1.25rem,2vw,1.6rem)}
+.panel-head p{margin:0;color:var(--ink-soft)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.7rem;margin:1rem 0 1.4rem}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:.85rem .6rem;text-align:center;box-shadow:var(--shadow)}
+.stat .num{font-family:var(--font-mono);font-size:1.25rem;font-weight:600;color:var(--brand)}
+.stat .lbl{font-size:.78rem;color:var(--ink-soft)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.1rem 1.2rem;margin:0 0 1.1rem}
+.card h3{margin:0 0 .6rem;font-size:1.05rem}
+.grid2{display:grid;grid-template-columns:1fr;gap:1.1rem}
+@media(min-width:820px){.grid2{grid-template-columns:1fr 1fr}}
+table{width:100%;border-collapse:collapse;font-size:.88rem;margin:.5rem 0}
+caption{text-align:left;font-weight:600;padding-bottom:.35rem}
+th,td{border:1px solid var(--line);padding:.45rem .55rem;text-align:left;vertical-align:top}
+th{background:var(--surface-2)}
+.table-wrap{overflow-x:auto}
+.mono,code,kbd{font-family:var(--font-mono)}
+code{background:var(--surface-2);padding:.05rem .35rem;border-radius:5px;font-size:.92em}
+.addr-display{background:var(--mono-bg);color:var(--mono-ink);font-family:var(--font-mono);border-radius:var(--radius);padding:.8rem 1rem;overflow-x:auto;font-size:clamp(.82rem,1.6vw,1rem);line-height:1.7}
+.addr-display .dim{opacity:.45}
+.addr-display .hl{color:#ffd479}
+.addr-display strong{color:#fff;font-weight:600}
+ul.tight{margin:.4rem 0;padding-left:1.2rem}
+ul.tight li{margin:.3rem 0}
+label{display:block;font-weight:600;font-size:.88rem;margin:.6rem 0 .25rem}
+input[type=text],select{width:100%;font:inherit;font-family:var(--font-mono);padding:.55rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-height:44px}
+input[type=text]:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.btn{display:inline-block;min-height:44px;min-width:44px;font:inherit;font-weight:600;padding:.55rem 1.1rem;border-radius:8px;border:1px solid var(--brand);background:var(--brand);color:#fff;cursor:pointer;margin:.55rem .4rem .1rem 0}
+.btn:hover{background:var(--brand-2);border-color:var(--brand-2)}
+.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.secondary{background:transparent;color:var(--brand)}
+.btn.secondary:hover{background:var(--surface-2)}
+.btn.choice{background:var(--surface-2);color:var(--ink);border-color:var(--line);font-family:var(--font-mono)}
+.btn.choice:hover{border-color:var(--brand);color:var(--brand);background:var(--surface)}
+.btn.choice.correct{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.btn.choice.wrong{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.result-box{border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;padding:.7rem .9rem;margin-top:.8rem;font-size:.92rem}
+.result-box.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.badge{display:inline-block;font-size:.74rem;font-weight:600;padding:.12rem .55rem;border-radius:999px;background:var(--surface-2);color:var(--ink-soft);border:1px solid var(--line)}
+.badge.brand{background:var(--brand);color:#fff;border-color:var(--brand)}
+.callout{border-left:4px solid var(--brand);background:var(--surface-2);padding:.7rem .9rem;border-radius:0 8px 8px 0;margin:.8rem 0;font-size:.92rem}
+.hdr-diagram{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;font-size:.74rem;font-family:var(--font-mono);margin:.6rem 0}
+.hdr-diagram .f{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:.45rem .3rem;text-align:center}
+.hdr-diagram .f small{display:block;color:var(--ink-soft)}
+.hdr-diagram .w1{grid-column:span 1}.hdr-diagram .w2{grid-column:span 2}.hdr-diagram .w4{grid-column:span 4}.hdr-diagram .w5{grid-column:span 5}.hdr-diagram .w8{grid-column:span 8}
+.hdr-diagram .src{background:var(--accent-soft);border-color:var(--accent)}
+.hdr-diagram .dst{background:var(--good-soft);border-color:var(--good)}
+/* first-hextet ruler */
+.ruler{position:relative;height:44px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);margin:.4rem 0 .15rem}
+.ruler .zone{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:.7rem;color:#fff;overflow:hidden;white-space:nowrap}
+.ruler .zone.res{color:var(--ink-soft)}
+.ruler .zone.zg{background:var(--z-global)}
+.ruler .zone.zu{background:var(--z-ula)}
+.ruler .zone.zl{background:var(--z-ll)}
+.ruler .zone.zm{background:var(--z-mc)}
+.ruler .marker{position:absolute;top:-7px;bottom:-7px;width:3px;background:var(--warn);border-radius:2px;display:none;z-index:2}
+.ruler-axis{position:relative;height:1.15rem;font-size:.7rem;font-family:var(--font-mono);color:var(--ink-soft);margin-bottom:.7rem}
+.ruler-axis span{position:absolute;transform:translateX(-50%)}
+.ruler-axis span:first-child{transform:none}
+.ruler-axis span:last-child{transform:translateX(-100%)}
+/* prefix nibble bar */
+.nibble-bar{display:grid;grid-template-columns:repeat(32,1fr);gap:2px;margin:.7rem 0 .25rem}
+@media(max-width:700px){.nibble-bar{grid-template-columns:repeat(16,1fr)}}
+.nibble-bar span{font-family:var(--font-mono);font-size:.66rem;text-align:center;padding:.32rem 0;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);min-width:0;overflow:hidden}
+.nibble-bar span.net{background:var(--brand);color:#fff;border-color:var(--brand)}
+.nibble-bar span.split{color:var(--ink)}
+.nibble-bar span.gsep{border-right:3px solid var(--ink-soft)}
+/* NDP sequence stepper */
+.seq{border:1px dashed var(--line);border-radius:8px;padding:.7rem .8rem;margin:.6rem 0;background:var(--surface-2)}
+.seq .lanes{display:flex;justify-content:space-between;gap:.5rem;font-weight:600;font-size:.85rem;border-bottom:1px solid var(--line);padding-bottom:.45rem;margin-bottom:.3rem}
+.seq .step{opacity:.12;transition:opacity .35s ease;margin:.65rem 0}
+.seq .step.shown{opacity:1}
+.seq .step .lbl{font-family:var(--font-mono);font-size:.76rem;text-align:center;margin:0 0 .15rem}
+.seq .step .cap{font-size:.8rem;color:var(--ink-soft);text-align:center;margin:.15rem 0 0}
+.seq .step.note .lbl{font-family:var(--font-body);font-size:.84rem}
+.seq .arrow-line{position:relative;height:2px;background:var(--brand);margin:.35rem 7%}
+.seq .arrow-line.right::after{content:'';position:absolute;right:-2px;top:-5px;border:6px solid transparent;border-left-color:var(--brand)}
+.seq .arrow-line.left::before{content:'';position:absolute;left:-2px;top:-5px;border:6px solid transparent;border-right-color:var(--brand)}
+.btn.secondary[aria-pressed="true"]{background:var(--brand);color:#fff;border-color:var(--brand)}
+/* EUI-64 chip pipeline */
+.chiprow{display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin:.25rem 0 .5rem}
+.chip{font-family:var(--font-mono);font-size:.8rem;padding:.18rem .42rem;border-radius:5px;background:var(--surface-2);border:1px solid var(--line)}
+.chip.oui{border-bottom:3px solid var(--brand)}
+.chip.dev{border-bottom:3px solid var(--good)}
+.chip.ins{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+.chip.flip{background:var(--warn-soft);border-color:var(--warn);font-weight:600}
+.chip.gap{background:transparent;border-color:transparent;color:var(--ink-soft)}
+/* tunnel encapsulation */
+.pkt-outer{border:2px solid var(--warn);border-radius:10px;padding:.6rem .7rem;background:var(--warn-soft);margin:.6rem 0}
+.pkt-outer>.pkt-label{font-size:.78rem;font-weight:600;margin-bottom:.45rem}
+.pkt-inner{border:2px solid var(--brand);border-radius:8px;padding:.5rem .6rem;background:var(--surface)}
+.pkt-inner .pkt-label{font-size:.78rem;font-weight:600;color:var(--brand)}
+.pkt-payload{border:1px dashed var(--line);border-radius:6px;padding:.4rem;margin-top:.45rem;font-size:.8rem;color:var(--ink-soft);text-align:center}
+/* log-scale comparison bars */
+.logbars .row{display:flex;align-items:center;gap:.6rem;margin:.5rem 0}
+.logbars .name{flex:0 0 56px;font-weight:600;font-size:.85rem}
+.logbars .track{flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;height:28px;position:relative;overflow:hidden}
+.logbars .fill{position:absolute;top:0;bottom:0;left:0;border-radius:5px;background:var(--brand);display:flex;align-items:center;justify-content:flex-end;color:#fff;font-size:.74rem;font-family:var(--font-mono);padding-right:.45rem;min-width:fit-content}
+/* compression step-through */
+.stepfade{animation:fadein .45s ease backwards}
+.strike{color:var(--warn);text-decoration:line-through;opacity:.75}
+.runhl{background:var(--warn-soft);color:var(--warn);font-weight:600;border-radius:3px;padding:0 2px}
+#cx-steps li{margin:.45rem 0}
+/* interactive header diagram */
+.hdr-diagram button.f{font:inherit;font-family:var(--font-mono);cursor:pointer;color:var(--ink);min-height:44px}
+.hdr-diagram button.f:hover{border-color:var(--brand)}
+.hdr-diagram button.f:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.hdr-diagram button.f.sel{border-color:var(--brand);background:var(--accent-soft)}
+.score-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.6rem;margin:.6rem 0 1rem}
+.flow{display:flex;flex-wrap:wrap;gap:.6rem;align-items:stretch;justify-content:center;margin:.8rem 0}
+.flow .node{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:.7rem .9rem;text-align:center;font-size:.85rem;flex:1 1 150px;max-width:230px}
+.flow .node .mono{display:block;font-size:.8rem;color:var(--brand);margin-top:.2rem;word-break:break-all}
+.flow .arrow{align-self:center;font-size:1.2rem;color:var(--ink-soft)}
+.q-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:.9rem;box-shadow:var(--shadow)}
+.q-card h4{margin:0 0 .6rem;font-size:.98rem}
+.q-card .opts{display:grid;gap:.5rem}
+.q-card .opt{display:flex;gap:.6rem;align-items:flex-start;text-align:left;font:inherit;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:.6rem .75rem;cursor:pointer;min-height:44px;color:var(--ink)}
+.q-card .opt:hover{border-color:var(--brand)}
+.q-card .opt:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.q-card .opt.correct{background:var(--good-soft);border-color:var(--good)}
+.q-card .opt.wrong{background:var(--warn-soft);border-color:var(--warn)}
+.q-card .opt:disabled{cursor:default;opacity:.92}
+.q-card .explain{display:none;margin-top:.6rem;font-size:.88rem;border-top:1px dashed var(--line);padding-top:.55rem;color:var(--ink-soft)}
+.q-card .explain.show{display:block}
+.history{max-height:220px;overflow-y:auto;font-size:.85rem;border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem;background:var(--surface-2)}
+.history p{margin:.25rem 0}
+.big-addr{font-size:clamp(1rem,3vw,1.5rem);text-align:center;font-family:var(--font-mono);background:var(--mono-bg);color:var(--mono-ink);border-radius:var(--radius);padding:1rem .8rem;margin:.8rem 0;word-break:break-all}
+footer.site{border-top:1px solid var(--line);background:var(--surface);text-align:center;padding:1.2rem 1rem;font-size:.85rem;color:var(--ink-soft)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.cmp-table td:nth-child(2){background:color-mix(in srgb,var(--warn-soft) 40%,transparent)}
+.cmp-table td:nth-child(3){background:color-mix(in srgb,var(--good-soft) 40%,transparent)}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<header class="site">
+  <span class="glyph" aria-hidden="true">🌐</span>
+  <h1>IPv6 Network Protocol Learning Simulator</h1>
+  <p>Brookdale Community College — Networking &amp; Cybersecurity Education</p>
+</header>
+
+<nav class="tabs" aria-label="Module sections">
+  <div class="strip" role="tablist" aria-label="IPv6 topics">
+    <button role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true" tabindex="0">🏠 Overview</button>
+    <button role="tab" id="tab-structure" aria-controls="panel-structure" aria-selected="false" tabindex="-1">🔢 Address Structure</button>
+    <button role="tab" id="tab-types" aria-controls="panel-types" aria-selected="false" tabindex="-1">🗂️ Address Types</button>
+    <button role="tab" id="tab-prefix" aria-controls="panel-prefix" aria-selected="false" tabindex="-1">🧮 Prefix Calculator</button>
+    <button role="tab" id="tab-multicast" aria-controls="panel-multicast" aria-selected="false" tabindex="-1">📡 Multicast &amp; NDP</button>
+    <button role="tab" id="tab-iid" aria-controls="panel-iid" aria-selected="false" tabindex="-1">💻 Interface IDs</button>
+    <button role="tab" id="tab-transition" aria-controls="panel-transition" aria-selected="false" tabindex="-1">🔄 Transition</button>
+    <button role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false" tabindex="-1">🆚 IPv4 vs IPv6</button>
+    <button role="tab" id="tab-quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1">✅ Test Your Knowledge</button>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- ============ OVERVIEW ============ -->
+<section class="panel active" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+  <div class="panel-head">
+    <span class="glyph" aria-hidden="true">🌐</span>
+    <h2>IPv6 Protocol Overview</h2>
+    <p>Internet Protocol version 6 — the next generation of internet addressing</p>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat"><div class="num">128</div><div class="lbl">Address Bits</div></div>
+    <div class="stat"><div class="num">3.4×10³⁸</div><div class="lbl">Total Addresses</div></div>
+    <div class="stat"><div class="num">8200</div><div class="lbl">Current RFC (2017)</div></div>
+    <div class="stat"><div class="num">8</div><div class="lbl">Hextets (16-bit groups)</div></div>
+    <div class="stat"><div class="num">40</div><div class="lbl">Fixed Header Bytes</div></div>
+    <div class="stat"><div class="num">/64</div><div class="lbl">Standard Subnet</div></div>
+  </div>
+
+  <div class="card">
+    <h3>📋 What is IPv6?</h3>
+    <p>IPv6 (Internet Protocol version 6) is the successor to IPv4, originally specified in RFC 2460 (1998) and now governed by <strong>RFC 8200</strong> (2017). It was designed primarily to solve IPv4 address exhaustion, but it also simplifies the packet header, eliminates broadcast traffic, builds in address autoconfiguration, and restores true end-to-end connectivity without NAT.</p>
+    <p>IPv6 uses <strong>128-bit addresses</strong>, giving 2¹²⁸ ≈ 340 undecillion (3.4×10³⁸) unique addresses — enough to assign trillions of addresses to every person on Earth. Addresses are written in hexadecimal as eight 16-bit groups (hextets) separated by colons.</p>
+    <div class="big-addr">2001:0db8:85a3:0000:0000:8a2e:0370:7334</div>
+  </div>
+
+  <div class="card">
+    <h3>📦 IPv6 Header Structure (fixed 40 bytes)</h3>
+    <div class="hdr-diagram" aria-label="Interactive IPv6 header diagram — select a field for details">
+      <button type="button" class="f w1" data-h="version">Version<small>4b</small></button>
+      <button type="button" class="f w2" data-h="tclass">Traffic Class<small>8b</small></button>
+      <button type="button" class="f w5" data-h="flow">Flow Label<small>20b</small></button>
+      <button type="button" class="f w4" data-h="plen">Payload Length<small>16b</small></button>
+      <button type="button" class="f w2" data-h="nh">Next Header<small>8b</small></button>
+      <button type="button" class="f w2" data-h="hop">Hop Limit<small>8b</small></button>
+      <button type="button" class="f w8 src" data-h="src">Source Address<small>128 bits</small></button>
+      <button type="button" class="f w8 dst" data-h="dst">Destination Address<small>128 bits</small></button>
+      <button type="button" class="f w8" data-h="ext">Extension Headers (optional, chained via Next Header) + Payload</button>
+    </div>
+    <p class="callout" id="hdr-detail" aria-live="polite">👆 Click any field above to see what it does — and its IPv4 counterpart.</p>
+    <p class="callout"><strong>Simpler than IPv4:</strong> the IPv6 header has only 8 fields versus IPv4's 13+. There is <strong>no header checksum</strong> (upper layers handle error detection), and routers <strong>never fragment</strong> packets — the source uses Path MTU Discovery instead.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>⚙️ Key Header Fields</h3>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Field</th><th scope="col">Size</th><th scope="col">Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>Version</td><td>4b</td><td>Always 6 for IPv6</td></tr>
+          <tr><td>Traffic Class</td><td>8b</td><td>QoS / DSCP marking (like IPv4 ToS)</td></tr>
+          <tr><td>Flow Label</td><td>20b</td><td>Tags packet flows for special handling</td></tr>
+          <tr><td>Payload Length</td><td>16b</td><td>Bytes after the 40-byte header</td></tr>
+          <tr><td>Next Header</td><td>8b</td><td>TCP=6, UDP=17, ICMPv6=58, or an extension header</td></tr>
+          <tr><td>Hop Limit</td><td>8b</td><td>Replaces IPv4 TTL — decremented per hop</td></tr>
+          <tr><td>Source Address</td><td>128b</td><td>Sender's IPv6 address</td></tr>
+          <tr><td>Destination Address</td><td>128b</td><td>Receiver's IPv6 address</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🔑 Core Concepts for Network Administrators</h3>
+      <ul class="tight">
+        <li><strong>Hexadecimal addressing:</strong> eight colon-separated hextets, compressible with <code>::</code>.</li>
+        <li><strong>/64 everywhere:</strong> virtually every LAN segment is a /64 — 64 bits network, 64 bits interface ID.</li>
+        <li><strong>No broadcast:</strong> IPv6 replaces broadcast with targeted multicast groups.</li>
+        <li><strong>NDP:</strong> Neighbor Discovery Protocol (ICMPv6) replaces ARP and adds router discovery.</li>
+        <li><strong>SLAAC:</strong> hosts can autoconfigure addresses from router advertisements — no DHCP required.</li>
+        <li><strong>Multiple addresses per interface:</strong> link-local + global + temporary privacy addresses simultaneously.</li>
+        <li><strong>Link-local required:</strong> every IPv6 interface always has an <code>fe80::/10</code> address.</li>
+        <li><strong>Extension headers:</strong> options moved out of the base header into a flexible chain.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ADDRESS STRUCTURE ============ -->
+<section class="panel" id="panel-structure" role="tabpanel" aria-labelledby="tab-structure">
+  <div class="panel-head">
+    <span class="glyph" aria-hidden="true">🔢</span>
+    <h2>IPv6 Address Structure</h2>
+    <p>128-bit addressing, hextets, and the two compression rules</p>
+  </div>
+
+  <div class="card">
+    <h3>📐 Address Anatomy</h3>
+    <p>An IPv6 address is a 128-bit number written as <strong>eight hextets</strong> — 16-bit groups in hexadecimal, separated by colons. A typical global unicast address splits into three parts:</p>
+    <div class="flow">
+      <div class="node"><strong>Global Routing Prefix</strong><span class="mono">2001:0db8:acad</span>48 bits — assigned by ISP/RIR</div>
+      <div class="arrow" aria-hidden="true">+</div>
+      <div class="node"><strong>Subnet ID</strong><span class="mono">0001</span>16 bits — your internal subnets</div>
+      <div class="arrow" aria-hidden="true">+</div>
+      <div class="node"><strong>Interface ID</strong><span class="mono">0000:0000:0000:0001</span>64 bits — identifies the host</div>
+    </div>
+    <p>A /48 site prefix leaves 16 subnet bits = <strong>65,536 possible /64 subnets</strong> — more subnets than most enterprises will ever use.</p>
+  </div>
+
+  <div class="card">
+    <h3>✂️ The Two Compression Rules</h3>
+    <ol>
+      <li><strong>Rule 1 — Drop leading zeros</strong> in each hextet: <code>0db8</code> → <code>db8</code>, <code>0000</code> → <code>0</code>.</li>
+      <li><strong>Rule 2 — Double colon (<code>::</code>)</strong> replaces one contiguous run of all-zero hextets. It may appear <strong>only once</strong> per address (otherwise the expansion would be ambiguous).</li>
+    </ol>
+    <div class="addr-display">
+      2001:<span class="dim">0</span>db8:<span class="dim">0000:0000:0000:0000:0000</span>:<span class="dim">0</span>001<br>
+      2001:db8<strong>::</strong>1 &nbsp;<span class="hl">← fully compressed (RFC 5952)</span>
+    </div>
+    <p class="callout"><strong>RFC 5952 canonical form:</strong> lowercase hex, leading zeros removed, <code>::</code> compresses the <em>longest</em> zero run (the leftmost if tied), and <code>::</code> is never used for a single zero hextet.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>🔄 Interactive Compressor / Expander</h3>
+      <label for="cx-input">Enter any IPv6 address (full or compressed)</label>
+      <input type="text" id="cx-input" value="2001:0db8:0000:0000:0000:ff00:0042:8329" autocomplete="off" spellcheck="false">
+      <button class="btn" id="cx-go">Convert</button>
+      <button class="btn secondary" id="cx-steps-btn">🎬 Step Through Compression</button>
+      <div id="cx-out" aria-live="polite"></div>
+      <ol id="cx-steps" aria-live="polite"></ol>
+    </div>
+    <div class="card">
+      <h3>🎯 Hextet Converter (16-bit value)</h3>
+      <label for="hx-input">Enter a hextet (hex, 0–ffff) or decimal (0–65535)</label>
+      <input type="text" id="hx-input" value="db8" autocomplete="off" spellcheck="false">
+      <fieldset style="border:none;padding:0;margin:.4rem 0 0">
+        <legend class="sr-only">Input base</legend>
+        <button class="btn secondary" id="hx-as-hex">Treat as Hex</button>
+        <button class="btn secondary" id="hx-as-dec">Treat as Decimal</button>
+      </fieldset>
+      <div id="hx-out" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📏 Why Hexadecimal?</h3>
+    <p>Each hex digit encodes exactly <strong>4 bits</strong> (a nibble), so one hextet = 4 hex digits = 16 bits, and a full address = 32 hex digits = 128 bits. Writing 128 bits in dotted decimal would take 16 octets — hex keeps it (relatively) readable.</p>
+    <div class="table-wrap">
+    <table>
+      <caption>Nibble reference: hex digit ↔ binary</caption>
+      <thead><tr><th scope="col">Hex</th><th scope="col">Binary</th><th scope="col">Hex</th><th scope="col">Binary</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">0</td><td class="mono">0000</td><td class="mono">8</td><td class="mono">1000</td></tr>
+        <tr><td class="mono">1</td><td class="mono">0001</td><td class="mono">9</td><td class="mono">1001</td></tr>
+        <tr><td class="mono">2</td><td class="mono">0010</td><td class="mono">a</td><td class="mono">1010</td></tr>
+        <tr><td class="mono">3</td><td class="mono">0011</td><td class="mono">b</td><td class="mono">1011</td></tr>
+        <tr><td class="mono">4</td><td class="mono">0100</td><td class="mono">c</td><td class="mono">1100</td></tr>
+        <tr><td class="mono">5</td><td class="mono">0101</td><td class="mono">d</td><td class="mono">1101</td></tr>
+        <tr><td class="mono">6</td><td class="mono">0110</td><td class="mono">e</td><td class="mono">1110</td></tr>
+        <tr><td class="mono">7</td><td class="mono">0111</td><td class="mono">f</td><td class="mono">1111</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ADDRESS TYPES ============ -->
+<section class="panel" id="panel-types" role="tabpanel" aria-labelledby="tab-types">
+  <div class="panel-head">
+    <span class="glyph" aria-hidden="true">🗂️</span>
+    <h2>IPv6 Address Types</h2>
+    <p>Unicast, multicast, and anycast — there are no classes and no broadcast</p>
+  </div>
+
+  <div class="callout"><strong>Tip:</strong> The first hextet is all you need. Memorize the prefixes: <strong>2xxx/3xxx = Global Unicast</strong>, <strong>fe80 = Link-Local</strong>, <strong>fc00/fd00 = Unique Local</strong>, <strong>ff00 = Multicast</strong>, <strong>::1 = Loopback</strong>.</div>
+
+  <div class="card">
+    <h3>📏 First-Hextet Ruler (0000 – ffff)</h3>
+    <p>Every address type is identifiable from its first hextet. The top band shows the full 16-bit range <strong>to scale</strong> — notice the interesting prefixes all crowd into the last sliver of the space, magnified in the bottom band.</p>
+    <div class="ruler" aria-hidden="true">
+      <div class="zone zg" style="left:12.5%;width:12.5%">2000–3fff Global</div>
+      <div class="zone res" style="left:27%;width:69%">reserved / unassigned</div>
+      <div class="zone zu" style="left:98.43%;width:1.57%"></div>
+      <div class="marker" id="rl-m1"></div>
+    </div>
+    <div class="ruler-axis" aria-hidden="true"><span style="left:0">0000</span><span style="left:25%">4000</span><span style="left:50%">8000</span><span style="left:75%">c000</span><span style="left:100%">ffff</span></div>
+    <p style="text-align:center;font-size:.8rem;color:var(--ink-soft);margin:.1rem 0 .25rem">▼ tail magnified: fc00 – ffff (the last 1/64 of the space)</p>
+    <div class="ruler" aria-hidden="true">
+      <div class="zone zu" style="left:0;width:50%">fc00–fdff ULA</div>
+      <div class="zone res" style="left:50%;width:12.5%">resvd</div>
+      <div class="zone zl" style="left:62.5%;width:6.25%">fe80</div>
+      <div class="zone res" style="left:68.75%;width:6.25%">fec0</div>
+      <div class="zone zm" style="left:75%;width:25%">ff00–ffff Multicast</div>
+      <div class="marker" id="rl-m2"></div>
+    </div>
+    <div class="ruler-axis" aria-hidden="true"><span style="left:0">fc00</span><span style="left:50%">fe00</span><span style="left:62.5%">fe80</span><span style="left:75%">ff00</span><span style="left:100%">ffff</span></div>
+    <label for="rl-input">Locate a first hextet on the ruler</label>
+    <input type="text" id="rl-input" value="fe80" autocomplete="off" spellcheck="false" maxlength="4">
+    <button class="btn" id="rl-go">📍 Locate</button>
+    <div id="rl-out" aria-live="polite"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3><span class="badge brand">G</span> Global Unicast — <code>2000::/3</code></h3>
+      <p>Publicly routable, globally unique — the IPv6 equivalent of public IPv4. First three bits are <code>001</code>, so addresses begin with <strong>2</strong> or <strong>3</strong>. Allocated by IANA → RIRs → ISPs → customers (typically a /48 or /56 per site).</p>
+      <div class="addr-display">2001:db8:acad:1::10</div>
+    </div>
+    <div class="card">
+      <h3><span class="badge brand">L</span> Link-Local — <code>fe80::/10</code></h3>
+      <p><strong>Every IPv6 interface has one — automatically.</strong> Valid only on the local link, never routed. Used for NDP, routing protocol adjacencies, and as the default-gateway address. The same fe80 address can exist on different links.</p>
+      <div class="addr-display">fe80::1%eth0 <span class="dim">(zone ID selects the interface)</span></div>
+    </div>
+    <div class="card">
+      <h3><span class="badge brand">U</span> Unique Local (ULA) — <code>fc00::/7</code></h3>
+      <p>The rough analog of RFC 1918 private space. In practice addresses use <code>fd00::/8</code> with a randomly generated 40-bit Global ID, making accidental collisions between organizations unlikely. Not routed on the public internet.</p>
+      <div class="addr-display">fd12:3456:789a:1::1</div>
+    </div>
+    <div class="card">
+      <h3><span class="badge brand">M</span> Multicast — <code>ff00::/8</code></h3>
+      <p>One-to-many delivery to a group. Replaces broadcast entirely. The second byte encodes flags and <strong>scope</strong> (1 = interface-local, 2 = link-local, 5 = site-local, e = global). See the Multicast &amp; NDP tab.</p>
+      <div class="addr-display">ff02::1 <span class="dim">— all nodes on link</span></div>
+    </div>
+    <div class="card">
+      <h3><span class="badge brand">A</span> Anycast</h3>
+      <p>The same unicast address assigned to <strong>multiple devices</strong>; routing delivers packets to the <em>nearest</em> one. Indistinguishable from unicast by format. Used for DNS root servers, CDNs, and load distribution.</p>
+    </div>
+    <div class="card">
+      <h3><span class="badge brand">S</span> Special Addresses</h3>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Address</th><th scope="col">Purpose</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">::1/128</td><td>Loopback (the only one — vs IPv4's whole 127/8)</td></tr>
+          <tr><td class="mono">::/128</td><td>Unspecified ("this host", used during DAD)</td></tr>
+          <tr><td class="mono">::/0</td><td>Default route</td></tr>
+          <tr><td class="mono">2001:db8::/32</td><td>Documentation &amp; examples only</td></tr>
+          <tr><td class="mono">3fff::/20</td><td>Additional documentation space (RFC 9637, 2024)</td></tr>
+          <tr><td class="mono">::ffff:0:0/96</td><td>IPv4-mapped (e.g. <code>::ffff:192.0.2.1</code>)</td></tr>
+          <tr><td class="mono">64:ff9b::/96</td><td>NAT64 well-known prefix</td></tr>
+          <tr><td class="mono">2002::/16</td><td>6to4 transition (deprecated)</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🌳 Type Identification Decision Tree</h3>
+    <div class="addr-display">
+      Look at the FIRST HEXTET:<br>
+      ├─ <strong>2xxx or 3xxx</strong> → Global Unicast (2000::/3)<br>
+      ├─ <strong>fe80–febf</strong> → Link-Local (fe80::/10)<br>
+      ├─ <strong>fc00–fdff</strong> → Unique Local (fc00::/7)<br>
+      ├─ <strong>ffxx</strong> → Multicast (ff00::/8)<br>
+      ├─ <strong>::1</strong> → Loopback<br>
+      └─ <strong>::</strong> → Unspecified
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🎯 Type Identification Challenge</h3>
+    <p>A random IPv6 address will be displayed. Identify its type. The first hextet is your key clue!</p>
+    <div class="score-grid">
+      <div class="stat"><div class="num" id="g-correct">0</div><div class="lbl">Correct</div></div>
+      <div class="stat"><div class="num" id="g-wrong">0</div><div class="lbl">Incorrect</div></div>
+      <div class="stat"><div class="num" id="g-streak">0</div><div class="lbl">Streak 🔥</div></div>
+      <div class="stat"><div class="num" id="g-acc">—</div><div class="lbl">Accuracy</div></div>
+    </div>
+    <p style="text-align:center;margin:.2rem 0"><strong>What type is this IPv6 address?</strong></p>
+    <div class="big-addr" id="g-addr" aria-live="polite">—</div>
+    <p style="text-align:center">
+      <button class="btn secondary" id="g-hint">💡 Show Hint</button>
+    </p>
+    <p id="g-hint-text" class="callout" hidden></p>
+    <div style="text-align:center">
+      <button class="btn choice" data-type="global">Global Unicast</button>
+      <button class="btn choice" data-type="linklocal">Link-Local</button>
+      <button class="btn choice" data-type="ula">Unique Local</button>
+      <button class="btn choice" data-type="multicast">Multicast</button>
+      <button class="btn choice" data-type="loopback">Loopback</button>
+    </div>
+    <p id="g-feedback" aria-live="assertive" style="text-align:center;font-weight:600;min-height:1.4em"></p>
+    <p style="text-align:center">
+      <button class="btn" id="g-next">Next Address →</button>
+      <button class="btn secondary" id="g-reset">↺ Reset Game</button>
+    </p>
+    <h3>📋 Answer History <span class="badge" id="g-count">0 questions</span></h3>
+    <div class="history" id="g-history" aria-live="polite"><p>Your answer history will appear here.</p></div>
+  </div>
+</section>
+
+<!-- ============ PREFIX CALCULATOR ============ -->
+<section class="panel" id="panel-prefix" role="tabpanel" aria-labelledby="tab-prefix">
+  <div class="panel-head">
+    <span class="glyph" aria-hidden="true">🧮</span>
+    <h2>Prefix &amp; Subnet Calculator</h2>
+    <p>Calculate network prefixes, address ranges, and subnet counts</p>
+  </div>
+
+  <div class="card">
+    <h3>⚙️ Interactive Prefix Calculator</h3>
+    <div class="grid2">
+      <div>
+        <label for="pc-addr">IPv6 Address</label>
+        <input type="text" id="pc-addr" value="2001:db8:acad:1::ff" autocomplete="off" spellcheck="false">
+      </div>
+      <div>
+        <label for="pc-len">Prefix Length: <span class="mono" id="pc-len-val">/64</span></label>
+        <input type="range" id="pc-len" min="1" max="128" value="64" style="width:100%;min-height:44px" aria-label="Prefix length slider, 1 to 128">
+      </div>
+    </div>
+    <div class="nibble-bar" id="pc-nibbles" aria-hidden="true"></div>
+    <p style="font-size:.8rem;color:var(--ink-soft);margin:.1rem 0 .3rem">Each cell is one <strong>nibble</strong> (4 bits = 1 hex digit); thick dividers mark hextet boundaries. Filled cells = network prefix, open cells = interface ID. <span id="pc-nibble-note"></span></p>
+    <button class="btn" id="pc-go">🧮 Calculate Prefix</button>
+    <div id="pc-out" aria-live="polite"></div>
+  </div>
+
+  <div class="card">
+    <h3>📐 IPv6 Subnetting Is Different</h3>
+    <ul class="tight">
+      <li><strong>No host math:</strong> with 2⁶⁴ interface IDs per /64, "how many usable hosts" is never the question — a /64 holds 18.4 quintillion addresses.</li>
+      <li><strong>Subnet on nibble boundaries:</strong> split prefixes on 4-bit (one hex digit) boundaries — /48 → /52 → /56 → /60 → /64 — so subnets stay readable.</li>
+      <li><strong>No network/broadcast reservations:</strong> the all-zeros address is the Subnet-Router anycast, but there's no broadcast address to subtract.</li>
+      <li><strong>Plan by subnets, not hosts:</strong> count the /64s you need; a /48 gives 65,536 of them.</li>
+    </ul>
+    <div class="table-wrap">
+    <table>
+      <caption>Common prefix sizes</caption>
+      <thead><tr><th scope="col">Prefix</th><th scope="col">Typical Assignment</th><th scope="col">/64 Subnets Inside</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">/32</td><td>ISP / LIR allocation</td><td class="mono">4,294,967,296</td></tr>
+        <tr><td class="mono">/48</td><td>Enterprise site</td><td class="mono">65,536</td></tr>
+        <tr><td class="mono">/56</td><td>Residential / small business</td><td class="mono">256</td></tr>
+        <tr><td class="mono">/60</td><td>Small site / home router</td><td class="mono">16</td></tr>
+        <tr><td class="mono">/64</td><td>One LAN / VLAN segment</td><td class="mono">1</td></tr>
+        <tr><td class="mono">/127</td><td>Point-to-point link (RFC 6164)</td><td class="mono">—</td></tr>
+        <tr><td class="mono">/128</td><td>Single host (loopback interface)</td><td class="mono">—</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🗺️ Subnet Planning Example — carving a /48</h3>
+    <p>Given <code>2001:db8:acad::/48</code>, the 4th hextet is the 16-bit Subnet ID:</p>
+    <div class="addr-display">
+      2001:db8:acad:<span class="hl">0001</span>::/64 → VLAN 1 (Faculty)<br>
+      2001:db8:acad:<span class="hl">0002</span>::/64 → VLAN 2 (Students)<br>
+      2001:db8:acad:<span class="hl">0010</span>::/64 → Servers<br>
+      2001:db8:acad:<span class="hl">00ff</span>::/64 → Management<br>
+      <span class="dim">… 65,532 more /64s available</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MULTICAST & NDP ============ -->
+<section class="panel" id="panel-multicast" role="tabpanel" aria-labelledby="tab-multicast">
+  <div class="panel-head">
+    <span class="glyph" aria-hidden="true">📡</span>
+    <h2>Multicast &amp; Neighbor Discovery</h2>
+    <p>IPv6 has no broadcast — multicast and NDP do the work instead</p>
+  </div>
+
+  <div class="card">
+    <h3>🚫 No Broadcast in IPv6</h3>
+    <p>IPv4 floods every host on a segment with broadcasts (ARP, DHCP discover, etc.). IPv6 eliminates broadcast entirely: packets go only to hosts that have <strong>joined the relevant multicast group</strong>. The closest thing to a broadcast is <code>ff02::1</code> (all nodes on the link), but most control traffic is far more targeted.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>📡 Multicast Address Format — <code>ff00::/8</code></h3>
+      <div class="flow">
+        <div class="node"><strong>ff</strong><span class="mono">8 bits</span>always ff</div>
+        <div class="node"><strong>Flags</strong><span class="mono">4 bits</span>0 = well-known</div>
+        <div class="node"><strong>Scope</strong><span class="mono">4 bits</span>how far it travels</div>
+        <div class="node"><strong>Group ID</strong><span class="mono">112 bits</span>which group</div>
+      </div>
+      <div class="table-wrap">
+      <table>
+        <caption>Scope values</caption>
+        <thead><tr><th scope="col">Scope</th><th scope="col">Meaning</th><th scope="col">Example</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">1</td><td>Interface-local</td><td class="mono">ff01::1</td></tr>
+          <tr><td class="mono">2</td><td>Link-local</td><td class="mono">ff02::1</td></tr>
+          <tr><td class="mono">5</td><td>Site-local</td><td class="mono">ff05::2</td></tr>
+          <tr><td class="mono">8</td><td>Organization-local</td><td class="mono">ff08::x</td></tr>
+          <tr><td class="mono">e</td><td>Global</td><td class="mono">ff0e::x</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>⭐ Well-Known Multicast Groups</h3>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Address</th><th scope="col">Group</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">ff02::1</td><td>All nodes on link</td></tr>
+          <tr><td class="mono">ff02::2</td><td>All routers on link</td></tr>
+          <tr><td class="mono">ff02::5</td><td>OSPFv3 routers</td></tr>
+          <tr><td class="mono">ff02::6</td><td>OSPFv3 designated routers</td></tr>
+          <tr><td class="mono">ff02::9</td><td>RIPng routers</td></tr>
+          <tr><td class="mono">ff02::a</td><td>EIGRP routers</td></tr>
+          <tr><td class="mono">ff02::d</td><td>PIM routers</td></tr>
+          <tr><td class="mono">ff02::1:2</td><td>DHCPv6 relay agents &amp; servers</td></tr>
+          <tr><td class="mono">ff02::1:ffxx:xxxx</td><td>Solicited-node (per host)</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🤝 Neighbor Discovery Protocol (NDP) — RFC 4861</h3>
+    <p>NDP runs over ICMPv6 and replaces ARP, ICMP router discovery, and ICMP redirect from the IPv4 world. Five message types:</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">Message</th><th scope="col">ICMPv6 Type</th><th scope="col">Purpose</th><th scope="col">IPv4 Analog</th></tr></thead>
+      <tbody>
+        <tr><td>Router Solicitation (RS)</td><td class="mono">133</td><td>Host asks "any routers here?" → sent to ff02::2</td><td>—</td></tr>
+        <tr><td>Router Advertisement (RA)</td><td class="mono">134</td><td>Router announces prefix, flags, default gateway → ff02::1</td><td>DHCP (partially)</td></tr>
+        <tr><td>Neighbor Solicitation (NS)</td><td class="mono">135</td><td>"Who has this IP?" → sent to solicited-node multicast</td><td>ARP request</td></tr>
+        <tr><td>Neighbor Advertisement (NA)</td><td class="mono">136</td><td>"I have it — here's my MAC"</td><td>ARP reply</td></tr>
+        <tr><td>Redirect</td><td class="mono">137</td><td>Router points host to a better next hop</td><td>ICMP redirect</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="callout"><strong>Duplicate Address Detection (DAD):</strong> before using any address, a host sends an NS for its own address from the unspecified source <code>::</code>. Silence means the address is unique and safe to use.</p>
+  </div>
+
+  <div class="card">
+    <h3>🎬 NDP in Action — Step Through</h3>
+    <p>
+      <button class="btn secondary" id="ndp-sc-res" aria-pressed="true">Address Resolution (NS/NA)</button>
+      <button class="btn secondary" id="ndp-sc-slaac" aria-pressed="false">SLAAC (RS/RA)</button>
+    </p>
+    <div class="seq">
+      <div class="lanes" id="ndp-lanes"><span></span><span></span></div>
+      <div id="ndp-steps"></div>
+    </div>
+    <p id="ndp-cap" aria-live="polite" style="min-height:1.3em;font-size:.88rem;color:var(--ink-soft)">Click "Next Step" to begin.</p>
+    <button class="btn" id="ndp-next">Next Step →</button>
+    <button class="btn secondary" id="ndp-reset">↺ Reset</button>
+  </div>
+
+  <div class="card">
+    <h3>🧮 Solicited-Node Multicast Calculator</h3>
+    <p>Address resolution doesn't bother every host. The NS is sent to <code>ff02::1:ff</code> + the <strong>last 24 bits</strong> of the target address — only hosts whose addresses end in those bits are listening.</p>
+    <label for="sn-input">Target IPv6 address</label>
+    <input type="text" id="sn-input" value="2001:db8::a1b2:c3d4" autocomplete="off" spellcheck="false">
+    <button class="btn" id="sn-go">Calculate Solicited-Node Address</button>
+    <div id="sn-out" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ============ INTERFACE IDs ============ -->
+<section class="panel" id="panel-iid" role="tabpanel" aria-labelledby="tab-iid">
+  <div class="panel-head">
+    <span class="glyph" aria-hidden="true">💻</span>
+    <h2>Interface IDs &amp; Autoconfiguration</h2>
+    <p>EUI-64, SLAAC, DHCPv6, and privacy addresses</p>
+  </div>
+
+  <div class="card">
+    <h3>🪪 The 64-bit Interface ID</h3>
+    <p>The low 64 bits of an address identify the interface within its /64 subnet. The interface ID can come from four places:</p>
+    <ul class="tight">
+      <li><strong>Modified EUI-64</strong> — derived from the interface's 48-bit MAC address (classic method, shown below).</li>
+      <li><strong>Random / stable-private (RFC 7217)</strong> — random but stable per network; the modern OS default.</li>
+      <li><strong>Temporary privacy addresses (RFC 8981)</strong> — rotate periodically for outbound connections.</li>
+      <li><strong>Manual / DHCPv6</strong> — statically assigned (e.g. <code>::10</code> for a server) or leased.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>🔧 EUI-64: MAC → Interface ID (3 steps)</h3>
+    <ol>
+      <li><strong>Split</strong> the 48-bit MAC in half: OUI (24 bits) | device (24 bits).</li>
+      <li><strong>Insert <code>fffe</code></strong> in the middle to pad to 64 bits.</li>
+      <li><strong>Flip the U/L bit</strong> — the 7th bit of the first byte is inverted (XOR with <code>02</code>).</li>
+    </ol>
+    <label for="eui-mac">MAC address (any common format)</label>
+    <input type="text" id="eui-mac" value="00:1A:2B:3C:4D:5E" autocomplete="off" spellcheck="false">
+    <label for="eui-prefix">Network prefix (optional, default <code>fe80::/64</code>)</label>
+    <input type="text" id="eui-prefix" value="2001:db8:acad:1::" autocomplete="off" spellcheck="false">
+    <button class="btn" id="eui-go">Generate EUI-64 Address</button>
+    <div id="eui-out" aria-live="polite"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>⚡ SLAAC — Stateless Address Autoconfiguration</h3>
+      <ol>
+        <li>Host generates a <strong>link-local</strong> address and verifies it with DAD.</li>
+        <li>Host sends a <strong>Router Solicitation</strong> to ff02::2.</li>
+        <li>Router replies with a <strong>Router Advertisement</strong> containing the /64 prefix.</li>
+        <li>Host appends its interface ID to the prefix → global address. DAD again. Done — <strong>no server involved</strong>.</li>
+      </ol>
+      <p>RA flags steer the process: <strong>A</strong> (autonomous — use SLAAC), <strong>M</strong> (managed — get address from DHCPv6), <strong>O</strong> (other — get DNS etc. from DHCPv6).</p>
+    </div>
+    <div class="card">
+      <h3>🆚 SLAAC vs DHCPv6</h3>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col"></th><th scope="col">SLAAC</th><th scope="col">DHCPv6 (stateful)</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Server required</th><td>No</td><td>Yes</td></tr>
+          <tr><th scope="row">Address source</th><td>Host builds it from RA prefix</td><td>Server leases it</td></tr>
+          <tr><th scope="row">Tracking/logging</th><td>Harder</td><td>Centralized</td></tr>
+          <tr><th scope="row">DNS server info</th><td>Via RDNSS option (RFC 8106)</td><td>Native</td></tr>
+          <tr><th scope="row">Typical use</th><td>Client LANs, home</td><td>Enterprise needing control</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="callout"><strong>Security note (CEH relevance):</strong> rogue RAs can hijack traffic on a LAN — mitigate with <strong>RA Guard</strong> (RFC 6105) on access ports. EUI-64 also leaks the hardware MAC, which is why privacy extensions are now default.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TRANSITION ============ -->
+<section class="panel" id="panel-transition" role="tabpanel" aria-labelledby="tab-transition">
+  <div class="panel-head">
+    <span class="glyph" aria-hidden="true">🔄</span>
+    <h2>Transition Mechanisms</h2>
+    <p>Running IPv6 and IPv4 side by side during the long migration</p>
+  </div>
+
+  <div class="card">
+    <h3>🛤️ Three Strategies</h3>
+    <div class="flow">
+      <div class="node"><strong>1. Dual Stack</strong><span class="mono">v4 + v6 together</span>Every device runs both protocols; applications pick per connection.</div>
+      <div class="node"><strong>2. Tunneling</strong><span class="mono">v6 inside v4</span>IPv6 packets encapsulated in IPv4 to cross v4-only networks.</div>
+      <div class="node"><strong>3. Translation</strong><span class="mono">v6 ↔ v4</span>NAT64/DNS64 rewrites packets so v6-only hosts reach v4-only servers.</div>
+    </div>
+    <p class="callout"><strong>Dual stack is the preferred approach</strong> wherever possible — native performance, no encapsulation overhead. "Happy Eyeballs" (RFC 8305) lets browsers race v6 and v4 connections and use whichever answers first.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>🚇 Tunneling Mechanisms</h3>
+      <p>All tunneling variants share one idea — the IPv6 packet rides as cargo inside an IPv4 packet:</p>
+      <div class="pkt-outer" role="img" aria-label="Encapsulation diagram: an IPv4 header with protocol 41 and tunnel endpoint addresses wraps a complete IPv6 packet, whose header carries the real source and destination, followed by the payload.">
+        <div class="pkt-label">📦 IPv4 Header — Protocol = 41 · src/dst = tunnel endpoints (public IPv4)</div>
+        <div class="pkt-inner">
+          <div class="pkt-label">IPv6 Header — src/dst = the real endpoints</div>
+          <div class="pkt-payload">Payload (TCP / UDP / ICMPv6 …)</div>
+        </div>
+      </div>
+      <p style="font-size:.85rem;color:var(--ink-soft)">The IPv4 network only ever sees the outer envelope. At the far tunnel endpoint the envelope is removed and the IPv6 packet continues natively.</p>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Mechanism</th><th scope="col">How</th><th scope="col">Status</th></tr></thead>
+        <tbody>
+          <tr><td>6in4 (manual)</td><td>Static IPv6-in-IPv4, protocol 41</td><td>Still used (tunnel brokers)</td></tr>
+          <tr><td>GRE</td><td>Generic encapsulation between routers</td><td>Common in enterprise</td></tr>
+          <tr><td>6to4 (2002::/16)</td><td>Automatic, derives prefix from public v4</td><td>Deprecated (RFC 7526)</td></tr>
+          <tr><td>Teredo</td><td>v6 in UDP, works through NAT</td><td>Legacy / mostly off</td></tr>
+          <tr><td>ISATAP</td><td>Intra-site automatic tunneling</td><td>Legacy / rarely deployed</td></tr>
+          <tr><td>6rd</td><td>ISP-deployed 6to4 variant</td><td>Some ISPs</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🔁 NAT64 + DNS64</h3>
+      <p>For IPv6-only networks (common on mobile carriers): <strong>DNS64</strong> synthesizes AAAA records by embedding the server's IPv4 address into the well-known prefix <code>64:ff9b::/96</code>; the <strong>NAT64</strong> gateway then translates the packets.</p>
+      <div class="flow">
+        <div class="node">📱 v6-only host<span class="mono">2001:db8::100</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="node">🔁 NAT64 gateway<span class="mono">64:ff9b::c000:201</span></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="node">🌐 v4-only server<span class="mono">192.0.2.1</span></div>
+      </div>
+      <p><code>c000:0201</code> is just <code>192.0.2.1</code> in hex — the IPv4 address rides inside the IPv6 address.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📈 Deployment Reality</h3>
+    <ul class="tight">
+      <li>Major mobile networks in the US run <strong>IPv6-only with NAT64/464XLAT</strong> internally.</li>
+      <li>Google and major CDNs report roughly <strong>40–50% of traffic over IPv6</strong> in recent years.</li>
+      <li>All RIRs have <strong>exhausted their free IPv4 pools</strong>; IPv4 addresses now trade on a market.</li>
+      <li>Federal mandate (OMB M-21-07) requires 80% of US government IP-enabled assets to be <strong>IPv6-only by end of FY2025</strong>.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ COMPARE ============ -->
+<section class="panel" id="panel-compare" role="tabpanel" aria-labelledby="tab-compare">
+  <div class="panel-head">
+    <span class="glyph" aria-hidden="true">🆚</span>
+    <h2>IPv4 vs IPv6 — Side by Side</h2>
+    <p>What changed, what stayed, and what disappeared</p>
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+    <table class="cmp-table">
+      <thead><tr><th scope="col">Feature</th><th scope="col">IPv4</th><th scope="col">IPv6</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Address size</th><td>32 bits</td><td>128 bits</td></tr>
+        <tr><th scope="row">Address count</th><td>~4.3 billion</td><td>~3.4×10³⁸</td></tr>
+        <tr><th scope="row">Notation</th><td>Dotted decimal (192.168.1.1)</td><td>Hex hextets (2001:db8::1)</td></tr>
+        <tr><th scope="row">Header</th><td>20–60 bytes, variable, 13+ fields</td><td>40 bytes fixed, 8 fields</td></tr>
+        <tr><th scope="row">Checksum</th><td>Header checksum, recomputed per hop</td><td>None (upper layers handle it)</td></tr>
+        <tr><th scope="row">Fragmentation</th><td>Routers and hosts</td><td>Source only (PMTUD)</td></tr>
+        <tr><th scope="row">TTL field</th><td>TTL</td><td>Hop Limit</td></tr>
+        <tr><th scope="row">Broadcast</th><td>Yes (255.255.255.255, subnet bcast)</td><td>None — multicast only</td></tr>
+        <tr><th scope="row">Address resolution</th><td>ARP (broadcast)</td><td>NDP / ICMPv6 (multicast)</td></tr>
+        <tr><th scope="row">Autoconfiguration</th><td>DHCP (or APIPA fallback)</td><td>SLAAC built in; DHCPv6 optional</td></tr>
+        <tr><th scope="row">Private addressing</th><td>RFC 1918 + NAT nearly universal</td><td>ULA exists; NAT unnecessary by design</td></tr>
+        <tr><th scope="row">Loopback</th><td>127.0.0.0/8 (16M addresses)</td><td>::1 (exactly one)</td></tr>
+        <tr><th scope="row">IPsec</th><td>Optional add-on</td><td>Specified as part of the suite</td></tr>
+        <tr><th scope="row">Classes</th><td>Historical A–E, replaced by CIDR</td><td>Never had classes — prefix-based from day one</td></tr>
+        <tr><th scope="row">Typical LAN subnet</th><td>/24 (254 hosts)</td><td>/64 (2⁶⁴ interface IDs)</td></tr>
+        <tr><th scope="row">DNS record</th><td>A</td><td>AAAA</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📏 The Scale Gap</h3>
+    <p>Bar length below is proportional to the <strong>number of digits</strong> (logarithmic scale) — a linear chart is physically impossible to draw:</p>
+    <div class="logbars">
+      <div class="row"><span class="name">IPv4</span><div class="track"><div class="fill" style="width:25.6%">4.3×10⁹</div></div></div>
+      <div class="row"><span class="name">IPv6</span><div class="track"><div class="fill" style="width:100%">3.4×10³⁸</div></div></div>
+    </div>
+    <p style="font-size:.88rem">On a <em>linear</em> scale, if the IPv6 bar spanned this entire page, the IPv4 bar would be about 10⁻²⁷ mm wide — billions of times smaller than a proton. Put differently: IPv6 provides roughly <strong>6.7×10¹⁷ addresses for every square millimeter of Earth's surface</strong>.</p>
+  </div>
+
+  <div class="card">
+    <h3>🧠 Memory Hooks</h3>
+    <ul class="tight">
+      <li><strong>4× everything:</strong> 32→128 bits, A→AAAA records (four A's, four times the bits).</li>
+      <li><strong>"Hop Limit" is honest:</strong> IPv4's TTL was never really "time" — IPv6 renamed it to what it actually counts.</li>
+      <li><strong>No ARP, no broadcast, no checksum, no router fragmentation, no NAT</strong> — much of learning IPv6 is unlearning IPv4 workarounds.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ QUIZ ============ -->
+<section class="panel" id="panel-quiz" role="tabpanel" aria-labelledby="tab-quiz">
+  <div class="panel-head">
+    <span class="glyph" aria-hidden="true">✅</span>
+    <h2>Test Your Knowledge</h2>
+    <p>20 questions covering all IPv6 topics</p>
+  </div>
+
+  <div class="score-grid">
+    <div class="stat"><div class="num" id="q-correct">0</div><div class="lbl">Correct</div></div>
+    <div class="stat"><div class="num" id="q-answered">0</div><div class="lbl">Answered</div></div>
+    <div class="stat"><div class="num" id="q-score">0%</div><div class="lbl">Score</div></div>
+    <div class="stat" style="display:flex;align-items:center;justify-content:center"><button class="btn secondary" id="q-reset" style="margin:0">↺ Reset</button></div>
+  </div>
+  <div id="quiz-container"></div>
+</section>
+
+</main>
+
+<footer class="site">
+  <p><strong>IPv6 Learning Simulator</strong> — Networking &amp; Cybersecurity Program · Brookdale Community College · 2026</p>
+  <p>Educational resource for CompTIA Network+, CCNA, and cybersecurity workforce development · Companion to the IPv4 Learning Simulator</p>
+</footer>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- utilities ---------- */
+var STORAGE_KEY='ipv6-sim-v1';
+function saveState(s){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(s));}catch(e){}}
+function loadState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch(e){return {};}}
+var state=loadState();
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function shuffle(array){var a=array.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function pad4(n){return n.toString(16).padStart(4,'0');}
+
+/* parse an IPv6 address string -> array of 8 numbers, or null */
+function parseIPv6(str){
+  str=(str||'').trim().toLowerCase();
+  if(str.indexOf('%')>=0) str=str.split('%')[0]; /* drop zone id */
+  if(!str||!/^[0-9a-f:]+$/.test(str)) return null;
+  if(str.indexOf(':::')>=0) return null;
+  var dbl=str.split('::');
+  if(dbl.length>2) return null;
+  function parts(s){return s===''?[]:s.split(':');}
+  var groups;
+  if(dbl.length===2){
+    var a=parts(dbl[0]),b=parts(dbl[1]);
+    var miss=8-a.length-b.length;
+    if(miss<1) return null;
+    groups=a.concat(new Array(miss).fill('0'),b);
+  }else{
+    groups=parts(str);
+  }
+  if(groups.length!==8) return null;
+  var nums=[];
+  for(var i=0;i<groups.length;i++){
+    var p=groups[i];
+    if(p.length<1||p.length>4||!/^[0-9a-f]+$/.test(p)) return null;
+    nums.push(parseInt(p,16));
+  }
+  return nums;
+}
+function expandStr(g){return g.map(pad4).join(':');}
+/* RFC 5952 compression */
+function findZeroRun(g){
+  var best=-1,bestLen=0,cur=-1,len=0;
+  for(var i=0;i<8;i++){
+    if(g[i]===0){
+      if(cur<0){cur=i;len=1;}else{len++;}
+      if(len>bestLen){bestLen=len;best=cur;}
+    }else{cur=-1;len=0;}
+  }
+  return {best:best,len:bestLen};
+}
+function compressStr(g){
+  var run=findZeroRun(g);
+  var hex=g.map(function(x){return x.toString(16);});
+  if(run.len<2) return hex.join(':');
+  var left=hex.slice(0,run.best).join(':');
+  var right=hex.slice(run.best+run.len).join(':');
+  return left+'::'+right;
+}
+function groupsToBig(g){var v=0n;for(var i=0;i<8;i++)v=(v<<16n)|BigInt(g[i]);return v;}
+function bigToGroups(v){var g=new Array(8);for(var i=7;i>=0;i--){g[i]=Number(v&0xffffn);v>>=16n;}return g;}
+function fmtBig(v){ /* thousands separators for BigInt */
+  var s=v.toString(),out='',c=0;
+  for(var i=s.length-1;i>=0;i--){out=s[i]+out;if(++c%3===0&&i>0)out=','+out;}
+  return out;
+}
+
+/* ---------- tabs ---------- */
+var tabs=Array.prototype.slice.call(document.querySelectorAll('nav.tabs [role=tab]'));
+var panels=Array.prototype.slice.call(document.querySelectorAll('section.panel'));
+function activateTab(tab){
+  tabs.forEach(function(t){
+    var sel=(t===tab);
+    t.setAttribute('aria-selected',sel?'true':'false');
+    t.tabIndex=sel?0:-1;
+  });
+  panels.forEach(function(p){
+    p.classList.toggle('active',p.id===tab.getAttribute('aria-controls'));
+  });
+  tab.focus();
+}
+tabs.forEach(function(t,idx){
+  t.addEventListener('click',function(){activateTab(t);});
+  t.addEventListener('keydown',function(e){
+    var dir=0;
+    if(e.key==='ArrowRight')dir=1;
+    else if(e.key==='ArrowLeft')dir=-1;
+    else if(e.key==='Home'){activateTab(tabs[0]);e.preventDefault();return;}
+    else if(e.key==='End'){activateTab(tabs[tabs.length-1]);e.preventDefault();return;}
+    if(dir){
+      e.preventDefault();
+      activateTab(tabs[(idx+dir+tabs.length)%tabs.length]);
+    }
+  });
+});
+
+/* ---------- compressor / expander ---------- */
+var cxIn=document.getElementById('cx-input'),cxOut=document.getElementById('cx-out');
+function runCx(){
+  var g=parseIPv6(cxIn.value);
+  if(!g){
+    cxOut.innerHTML='<div class="result-box warn"><strong>Invalid address.</strong> Use hex hextets separated by colons; <code>::</code> may appear once. (Embedded IPv4 notation like ::ffff:192.0.2.1 is not supported here — write the last 32 bits in hex.)</div>';
+    return;
+  }
+  var bits=g.map(function(x){return x.toString(2).padStart(16,'0');});
+  cxOut.innerHTML=
+    '<div class="result-box">'+
+    '<p><strong>Fully expanded:</strong><br><span class="mono">'+expandStr(g)+'</span></p>'+
+    '<p><strong>RFC 5952 compressed:</strong><br><span class="mono">'+compressStr(g)+'</span></p>'+
+    '<p><strong>Binary (first 2 hextets):</strong><br><span class="mono">'+bits[0]+' '+bits[1]+' …</span></p>'+
+    '</div>';
+}
+document.getElementById('cx-go').addEventListener('click',runCx);
+cxIn.addEventListener('keydown',function(e){if(e.key==='Enter')runCx();});
+
+/* ---------- compression step-through ---------- */
+document.getElementById('cx-steps-btn').addEventListener('click',function(){
+  var box=document.getElementById('cx-steps');
+  var g=parseIPv6(cxIn.value);
+  if(!g){box.innerHTML='<li class="stepfade"><span class="runhl">Enter a valid IPv6 address above first.</span></li>';return;}
+  var full=g.map(pad4);
+  var hex=g.map(function(x){return x.toString(16);});
+  var run=findZeroRun(g);
+  var marked=full.map(function(h){
+    if(h==='0000')return '<span class="strike">000</span>0';
+    var m=h.match(/^0+/);
+    if(m&&m[0].length<4)return '<span class="strike">'+m[0]+'</span>'+h.slice(m[0].length);
+    return h;
+  }).join(':');
+  var steps=[
+    '<strong>Fully expanded</strong> — 8 hextets, 32 hex digits:<br><span class="mono">'+full.join(':')+'</span>',
+    '<strong>Rule 1 — mark the leading zeros</strong> in each hextet (an all-zero hextet keeps one digit):<br><span class="mono">'+marked+'</span>',
+    '<strong>Rule 1 applied:</strong><br><span class="mono">'+hex.join(':')+'</span>'
+  ];
+  if(run.len>=2){
+    steps.push('<strong>Rule 2 — find the longest run of zero hextets</strong> (leftmost wins a tie):<br><span class="mono">'+hex.map(function(h,i){return (i>=run.best&&i<run.best+run.len)?'<span class="runhl">'+h+'</span>':h;}).join(':')+'</span>');
+    steps.push('<strong>Rule 2 applied — collapse the run to <span class="mono">::</span></strong> (allowed only once). Final RFC 5952 form:<br><span class="mono">'+compressStr(g).replace('::','<span class="runhl">::</span>')+'</span>');
+  }else{
+    steps.push('<strong>Rule 2 — no run of two or more zero hextets</strong>, so <span class="mono">::</span> is not used. This is already the final RFC 5952 form:<br><span class="mono">'+compressStr(g)+'</span>');
+  }
+  box.innerHTML=steps.map(function(s,i){return '<li class="stepfade" style="animation-delay:'+(i*0.45)+'s">'+s+'</li>';}).join('');
+});
+
+/* ---------- header field explorer ---------- */
+var HDRINFO={
+  version:'Version (4 bits) — always 6. IPv4 counterpart: Version, always 4.',
+  tclass:'Traffic Class (8 bits) — DSCP + ECN bits for QoS marking. IPv4 counterpart: Type of Service / DSCP.',
+  flow:'Flow Label (20 bits) — tags all packets of one flow so routers can keep them on a consistent path without digging into layer 4. New in IPv6 — no IPv4 counterpart.',
+  plen:'Payload Length (16 bits) — number of bytes after the 40-byte base header (extension headers count as payload). Differs from IPv4 Total Length, which included the header itself.',
+  nh:'Next Header (8 bits) — what comes next: TCP = 6, UDP = 17, ICMPv6 = 58, or an extension header type. IPv4 counterpart: Protocol.',
+  hop:'Hop Limit (8 bits) — decremented by every router; the packet is discarded at 0. IPv4 counterpart: TTL, renamed to describe what it actually counts.',
+  src:'Source Address (128 bits) — the sender. Same role as in IPv4, four times the size.',
+  dst:'Destination Address (128 bits) — the receiver. May be unicast, multicast, or anycast.',
+  ext:'Extension Headers — Hop-by-Hop Options, Routing, Fragment, AH, ESP, Destination Options — chained together via the Next Header field. They replace IPv4 Options, but transit routers don\u2019t have to parse them, which keeps forwarding fast.'
+};
+var hdrBtns=Array.prototype.slice.call(document.querySelectorAll('.hdr-diagram button.f'));
+var hdrDetail=document.getElementById('hdr-detail');
+hdrBtns.forEach(function(b){
+  b.addEventListener('click',function(){
+    hdrBtns.forEach(function(x){x.classList.remove('sel');});
+    b.classList.add('sel');
+    hdrDetail.innerHTML='<strong>📦</strong> '+HDRINFO[b.getAttribute('data-h')];
+  });
+});
+
+/* ---------- first-hextet ruler locator ---------- */
+function hextetZoneInfo(v){
+  if(v===0)return 'Reserved — the very bottom of this range holds :: (unspecified) and ::1 (loopback)';
+  if(v>=0x2000&&v<=0x3fff)return 'Global Unicast (2000::/3)';
+  if(v>=0xfc00&&v<=0xfdff)return 'Unique Local (fc00::/7)';
+  if(v>=0xfe80&&v<=0xfebf)return 'Link-Local (fe80::/10)';
+  if(v>=0xfec0&&v<=0xfeff)return 'Reserved — former site-local fec0::/10, deprecated by RFC 3879';
+  if(v>=0xff00)return 'Multicast (ff00::/8)';
+  return 'Reserved / unassigned';
+}
+function runRuler(){
+  var out=document.getElementById('rl-out');
+  var s=document.getElementById('rl-input').value.trim().toLowerCase().replace(/^0x/,'');
+  var m1=document.getElementById('rl-m1'),m2=document.getElementById('rl-m2');
+  if(!/^[0-9a-f]{1,4}$/.test(s)){
+    out.innerHTML='<div class="result-box warn"><strong>Enter 1–4 hex digits</strong>, e.g. fe80, 2001, ff02.</div>';
+    m1.style.display='none';m2.style.display='none';
+    return;
+  }
+  var v=parseInt(s,16);
+  m1.style.left=(v/655.36)+'%';m1.style.display='block';
+  if(v>=0xfc00){m2.style.left=((v-0xfc00)/10.24)+'%';m2.style.display='block';}
+  else{m2.style.display='none';}
+  out.innerHTML='<div class="result-box"><span class="mono">'+pad4(v)+'</span> → <strong>'+hextetZoneInfo(v)+'</strong>'+(v>=0xfc00?' — marked on both bands.':' — marked on the top band.')+'</div>';
+}
+document.getElementById('rl-go').addEventListener('click',runRuler);
+document.getElementById('rl-input').addEventListener('keydown',function(e){if(e.key==='Enter')runRuler();});
+
+/* ---------- hextet converter ---------- */
+var hxIn=document.getElementById('hx-input'),hxOut=document.getElementById('hx-out');
+function showHx(v){
+  if(v===null||isNaN(v)||v<0||v>65535){
+    hxOut.innerHTML='<div class="result-box warn"><strong>Out of range.</strong> A hextet is 16 bits: hex 0–ffff, decimal 0–65535.</div>';
+    return;
+  }
+  hxOut.innerHTML='<div class="result-box">'+
+    '<p><strong>Hex:</strong> <span class="mono">'+v.toString(16)+'</span> &nbsp; (padded: <span class="mono">'+pad4(v)+'</span>)</p>'+
+    '<p><strong>Decimal:</strong> <span class="mono">'+v+'</span></p>'+
+    '<p><strong>Binary:</strong> <span class="mono">'+v.toString(2).padStart(16,'0').replace(/(.{4})(?=.)/g,'$1 ')+'</span></p>'+
+    '</div>';
+}
+document.getElementById('hx-as-hex').addEventListener('click',function(){
+  var s=hxIn.value.trim().toLowerCase().replace(/^0x/,'');
+  showHx(/^[0-9a-f]{1,4}$/.test(s)?parseInt(s,16):NaN);
+});
+document.getElementById('hx-as-dec').addEventListener('click',function(){
+  var s=hxIn.value.trim();
+  showHx(/^[0-9]{1,5}$/.test(s)?parseInt(s,10):NaN);
+});
+
+/* ---------- type identification game ---------- */
+var TYPES={
+  global:{label:'Global Unicast',hint:'First hextet starts with 2 or 3 → 2000::/3.'},
+  linklocal:{label:'Link-Local',hint:'First hextet fe80–febf → fe80::/10.'},
+  ula:{label:'Unique Local',hint:'First hextet fc00–fdff → fc00::/7 (fd in practice).'},
+  multicast:{label:'Multicast',hint:'First hextet ff00–ffff → ff00::/8.'},
+  loopback:{label:'Loopback',hint:'The single address ::1.'}
+};
+function r16(){return Math.floor(Math.random()*65536);}
+function randTail(n){var t=[];for(var i=0;i<n;i++)t.push(r16());return t;}
+function genAddress(){
+  var keys=['global','global','linklocal','ula','multicast','loopback']; /* weight global a bit */
+  var type=keys[Math.floor(Math.random()*keys.length)];
+  var g;
+  if(type==='global'){
+    var first=0x2000+Math.floor(Math.random()*0x2000);
+    g=[first].concat(randTail(7));
+    /* keep some zeros so compression shows up */
+    if(Math.random()<0.6){g[3]=0;g[4]=0;g[5]=0;}
+  }else if(type==='linklocal'){
+    g=[0xfe80,0,0,0].concat(randTail(4));
+  }else if(type==='ula'){
+    g=[0xfd00+Math.floor(Math.random()*256)].concat(randTail(3),[0,0],randTail(2));
+  }else if(type==='multicast'){
+    var scopes=[1,2,2,5,8,14];
+    var sc=scopes[Math.floor(Math.random()*scopes.length)];
+    var known=Math.random()<0.5;
+    if(known){
+      var ids=[1,2,5,6,9,0xa,0xd];
+      g=[0xff00+sc,0,0,0,0,0,0,ids[Math.floor(Math.random()*ids.length)]];
+    }else{
+      g=[0xff00+sc,0,0,0,0,0].concat(randTail(2));
+    }
+  }else{
+    g=[0,0,0,0,0,0,0,1];
+  }
+  return {type:type,addr:compressStr(g)};
+}
+var game=state.game||{correct:0,wrong:0,streak:0,history:[]};
+var current=null,answered=false;
+var gAddr=document.getElementById('g-addr'),gFeedback=document.getElementById('g-feedback'),
+    gHintBtn=document.getElementById('g-hint'),gHintText=document.getElementById('g-hint-text'),
+    gHistory=document.getElementById('g-history'),gCount=document.getElementById('g-count');
+var choiceBtns=Array.prototype.slice.call(document.querySelectorAll('.btn.choice'));
+function renderScore(){
+  document.getElementById('g-correct').textContent=game.correct;
+  document.getElementById('g-wrong').textContent=game.wrong;
+  document.getElementById('g-streak').textContent=game.streak;
+  var tot=game.correct+game.wrong;
+  document.getElementById('g-acc').textContent=tot?Math.round(100*game.correct/tot)+'%':'—';
+  gCount.textContent=game.history.length+' question'+(game.history.length===1?'':'s');
+  if(game.history.length){
+    gHistory.innerHTML=game.history.slice(-30).reverse().map(function(h){
+      return '<p>'+(h.ok?'✅':'❌')+' <span class="mono">'+esc(h.addr)+'</span> — '+esc(h.guess)+(h.ok?'':' (was '+esc(h.actual)+')')+'</p>';
+    }).join('');
+  }else{
+    gHistory.innerHTML='<p>Your answer history will appear here.</p>';
+  }
+}
+function nextAddress(){
+  current=genAddress();
+  answered=false;
+  gAddr.textContent=current.addr;
+  gFeedback.textContent='';
+  gHintText.hidden=true;
+  choiceBtns.forEach(function(b){b.classList.remove('correct','wrong');b.disabled=false;});
+}
+choiceBtns.forEach(function(b){
+  b.addEventListener('click',function(){
+    if(!current||answered)return;
+    answered=true;
+    var guess=b.getAttribute('data-type');
+    var ok=(guess===current.type);
+    if(ok){game.correct++;game.streak++;b.classList.add('correct');gFeedback.textContent='✅ Correct — '+TYPES[current.type].label+'!';}
+    else{
+      game.wrong++;game.streak=0;b.classList.add('wrong');
+      choiceBtns.forEach(function(cb){if(cb.getAttribute('data-type')===current.type)cb.classList.add('correct');});
+      gFeedback.textContent='❌ Not quite — that was '+TYPES[current.type].label+'. '+TYPES[current.type].hint;
+    }
+    game.history.push({addr:current.addr,guess:TYPES[guess].label,actual:TYPES[current.type].label,ok:ok});
+    state.game=game;saveState(state);
+    renderScore();
+  });
+});
+gHintBtn.addEventListener('click',function(){
+  if(!current)return;
+  gHintText.textContent='💡 '+TYPES[current.type].hint;
+  gHintText.hidden=false;
+});
+document.getElementById('g-next').addEventListener('click',nextAddress);
+document.getElementById('g-reset').addEventListener('click',function(){
+  game={correct:0,wrong:0,streak:0,history:[]};
+  state.game=game;saveState(state);
+  renderScore();nextAddress();
+});
+renderScore();nextAddress();
+
+/* ---------- prefix calculator ---------- */
+var pcLen=document.getElementById('pc-len'),pcLenVal=document.getElementById('pc-len-val');
+var pcAddr=document.getElementById('pc-addr');
+var pcNibbles=document.getElementById('pc-nibbles'),pcNibbleNote=document.getElementById('pc-nibble-note');
+function renderNibbles(){
+  var p=parseInt(pcLen.value,10);
+  var g=parseIPv6(pcAddr.value);
+  var digits=g?expandStr(g).replace(/:/g,'').split(''):new Array(32).fill('·');
+  var fullN=Math.floor(p/4),rem=p%4;
+  var html='';
+  for(var i=0;i<32;i++){
+    var cls='',st='';
+    if(i<fullN)cls='net';
+    else if(i===fullN&&rem){cls='split';st=' style="background:linear-gradient(90deg,var(--brand) '+(rem*25)+'%,var(--surface-2) '+(rem*25)+'%)"';}
+    if((i+1)%4===0&&i<31)cls+=' gsep';
+    html+='<span class="'+cls+'"'+st+'>'+digits[i]+'</span>';
+  }
+  pcNibbles.innerHTML=html;
+  pcNibbleNote.textContent='/'+p+' = '+fullN+' full network nibble'+(fullN===1?'':'s')+(rem?' + '+rem+' bit'+(rem===1?'':'s')+' (off nibble boundary — note the half-filled cell)':'')+'.';
+}
+pcLen.addEventListener('input',function(){pcLenVal.textContent='/'+pcLen.value;renderNibbles();});
+pcAddr.addEventListener('input',renderNibbles);
+renderNibbles();
+function runPc(){
+  var out=document.getElementById('pc-out');
+  var g=parseIPv6(document.getElementById('pc-addr').value);
+  var p=parseInt(pcLen.value,10);
+  if(!g){out.innerHTML='<div class="result-box warn"><strong>Invalid IPv6 address.</strong></div>';return;}
+  var v=groupsToBig(g);
+  var hostBits=BigInt(128-p);
+  var mask=hostBits===0n?(~0n & ((1n<<128n)-1n)):(((1n<<128n)-1n)^((1n<<hostBits)-1n));
+  var net=v&mask;
+  var last=net|((1n<<hostBits)-1n);
+  var netG=bigToGroups(net),lastG=bigToGroups(last);
+  var total=1n<<hostBits;
+  var sub64='';
+  if(p<64){sub64='<p><strong>/64 subnets inside this prefix:</strong> <span class="mono">'+fmtBig(1n<<BigInt(64-p))+'</span></p>';}
+  else if(p===64){sub64='<p><strong>This is exactly one /64 subnet</strong> — the standard LAN size.</p>';}
+  out.innerHTML='<div class="result-box">'+
+    '<p><strong>Input (expanded):</strong><br><span class="mono">'+expandStr(g)+'/'+p+'</span></p>'+
+    '<p><strong>Network prefix:</strong><br><span class="mono">'+compressStr(netG)+'/'+p+'</span></p>'+
+    '<p><strong>First address:</strong> <span class="mono">'+compressStr(netG)+'</span><br>'+
+    '<strong>Last address:</strong> <span class="mono">'+compressStr(lastG)+'</span></p>'+
+    '<p><strong>Interface-ID bits:</strong> <span class="mono">'+(128-p)+'</span> &nbsp;|&nbsp; <strong>Addresses in prefix:</strong> <span class="mono">2^'+(128-p)+' = '+fmtBig(total)+'</span></p>'+
+    sub64+'</div>';
+}
+document.getElementById('pc-go').addEventListener('click',runPc);
+
+/* ---------- solicited-node calculator ---------- */
+function runSn(){
+  var out=document.getElementById('sn-out');
+  var g=parseIPv6(document.getElementById('sn-input').value);
+  if(!g){out.innerHTML='<div class="result-box warn"><strong>Invalid IPv6 address.</strong></div>';return;}
+  var low24=((g[6]&0xff)<<16)|g[7];
+  var snG=[0xff02,0,0,0,0,1,0xff00|((low24>>16)&0xff),low24&0xffff];
+  out.innerHTML='<div class="result-box">'+
+    '<p><strong>Target (expanded):</strong><br><span class="mono">'+expandStr(g)+'</span></p>'+
+    '<p><strong>Last 24 bits:</strong> <span class="mono">'+((g[6]&0xff).toString(16).padStart(2,'0'))+':'+pad4(g[7])+'</span></p>'+
+    '<p><strong>Solicited-node multicast:</strong><br><span class="mono">'+compressStr(snG)+'</span></p>'+
+    '<p>A Neighbor Solicitation for this target is sent to that group — only hosts whose addresses share those final 24 bits process it.</p>'+
+    '</div>';
+}
+document.getElementById('sn-go').addEventListener('click',runSn);
+document.getElementById('sn-input').addEventListener('keydown',function(e){if(e.key==='Enter')runSn();});
+
+/* ---------- NDP step-through ---------- */
+var NDP={
+  res:{lanes:['🖥️ Host A — 2001:db8::a','🖥️ Host B — 2001:db8::b'],steps:[
+    {t:'note',lbl:'📋 Host A needs Host B\u2019s MAC. From the last 24 bits of the target it derives the solicited-node group: ff02::1:ff00:b'},
+    {t:'right',lbl:'NS — ICMPv6 type 135 → ff02::1:ff00:b',cap:'"Who has 2001:db8::b?" Only hosts subscribed to that group process it — the rest of the LAN stays quiet (unlike an ARP broadcast).'},
+    {t:'left',lbl:'NA — ICMPv6 type 136 (unicast)',cap:'"I do — here is my MAC address."'},
+    {t:'note',lbl:'📋 Host A stores the mapping in its neighbor cache and sends the waiting packet. (View the cache with ip -6 neigh / netsh interface ipv6 show neighbors.)'}
+  ]},
+  slaac:{lanes:['🖥️ New Host','📶 Router'],steps:[
+    {t:'note',lbl:'📋 The host self-generates link-local fe80::<interface-ID>, then runs DAD — an NS for its own address from source ::. Silence = the address is unique.'},
+    {t:'right',lbl:'RS — ICMPv6 type 133 → ff02::2',cap:'"Any routers on this link?"'},
+    {t:'left',lbl:'RA — ICMPv6 type 134 · prefix 2001:db8:acad:1::/64 · A=1',cap:'The RA also establishes the router\u2019s link-local address as the default gateway.'},
+    {t:'note',lbl:'📋 The host appends its interface ID to the advertised prefix → global address. One more DAD pass, and it is fully configured — no server involved.'}
+  ]}
+};
+var ndpScenario='res',ndpIdx=0;
+var ndpSteps=document.getElementById('ndp-steps'),ndpLanes=document.getElementById('ndp-lanes'),ndpCap=document.getElementById('ndp-cap');
+function ndpRender(){
+  var sc=NDP[ndpScenario];
+  ndpLanes.children[0].textContent=sc.lanes[0];
+  ndpLanes.children[1].textContent=sc.lanes[1];
+  ndpSteps.innerHTML=sc.steps.map(function(s){
+    if(s.t==='note')return '<div class="step note"><p class="lbl">'+s.lbl+'</p></div>';
+    return '<div class="step"><p class="lbl">'+s.lbl+'</p><div class="arrow-line '+s.t+'"></div><p class="cap">'+s.cap+'</p></div>';
+  }).join('');
+  ndpIdx=0;
+  ndpCap.textContent='Click "Next Step" to begin.';
+}
+document.getElementById('ndp-next').addEventListener('click',function(){
+  var sc=NDP[ndpScenario];
+  if(ndpIdx<sc.steps.length){
+    ndpSteps.children[ndpIdx].classList.add('shown');
+    var s=sc.steps[ndpIdx];
+    ndpCap.textContent='Step '+(ndpIdx+1)+': '+s.lbl.replace('📋 ','')+(s.cap?' — '+s.cap:'');
+    ndpIdx++;
+  }else{
+    ndpCap.textContent='Sequence complete — press Reset to replay, or switch scenarios.';
+  }
+});
+document.getElementById('ndp-reset').addEventListener('click',ndpRender);
+var scBtns={res:document.getElementById('ndp-sc-res'),slaac:document.getElementById('ndp-sc-slaac')};
+Object.keys(scBtns).forEach(function(k){
+  scBtns[k].addEventListener('click',function(){
+    ndpScenario=k;
+    scBtns.res.setAttribute('aria-pressed',k==='res'?'true':'false');
+    scBtns.slaac.setAttribute('aria-pressed',k==='slaac'?'true':'false');
+    ndpRender();
+  });
+});
+ndpRender();
+
+/* ---------- EUI-64 ---------- */
+function runEui(){
+  var out=document.getElementById('eui-out');
+  var raw=document.getElementById('eui-mac').value.toLowerCase().replace(/[^0-9a-f]/g,'');
+  if(raw.length!==12){out.innerHTML='<div class="result-box warn"><strong>Invalid MAC.</strong> Enter 12 hex digits, e.g. 00:1A:2B:3C:4D:5E.</div>';return;}
+  var bytes=[];
+  for(var i=0;i<12;i+=2)bytes.push(parseInt(raw.substr(i,2),16));
+  var origFirst=bytes[0];
+  var flipped=origFirst^0x02;
+  var full=[flipped,bytes[1],bytes[2],0xff,0xfe,bytes[3],bytes[4],bytes[5]];
+  var iid=[];
+  for(var j=0;j<8;j+=2)iid.push((full[j]<<8)|full[j+1]);
+  var prefIn=document.getElementById('eui-prefix').value.trim();
+  var prefG=prefIn?parseIPv6(prefIn):[0xfe80,0,0,0,0,0,0,0];
+  var prefNote='';
+  if(prefIn&&!prefG){prefG=[0xfe80,0,0,0,0,0,0,0];prefNote='<p class="mono">(Prefix invalid — fell back to fe80::/64.)</p>';}
+  var addrG=prefG.slice(0,4).concat(iid);
+  var llG=[0xfe80,0,0,0].concat(iid);
+  function b8(n){return n.toString(2).padStart(8,'0');}
+  function h2(n){return n.toString(16).padStart(2,'0');}
+  var oui=[h2(bytes[0]),h2(bytes[1]),h2(bytes[2])];
+  var dev=[h2(bytes[3]),h2(bytes[4]),h2(bytes[5])];
+  function chipRow(items){return '<div class="chiprow">'+items.map(function(it){return '<span class="chip '+(it.c||'')+'">'+it.v+'</span>';}).join('')+'</div>';}
+  var r1=chipRow([{v:oui[0],c:'oui'},{v:oui[1],c:'oui'},{v:oui[2],c:'oui'},{v:'┆',c:'gap'},{v:dev[0],c:'dev'},{v:dev[1],c:'dev'},{v:dev[2],c:'dev'}]);
+  var r2=chipRow([{v:oui[0],c:'oui'},{v:oui[1],c:'oui'},{v:oui[2],c:'oui'},{v:'ff',c:'ins'},{v:'fe',c:'ins'},{v:dev[0],c:'dev'},{v:dev[1],c:'dev'},{v:dev[2],c:'dev'}]);
+  var r3=chipRow([{v:h2(flipped),c:'flip'},{v:oui[1],c:'oui'},{v:oui[2],c:'oui'},{v:'ff',c:'ins'},{v:'fe',c:'ins'},{v:dev[0],c:'dev'},{v:dev[1],c:'dev'},{v:dev[2],c:'dev'}]);
+  out.innerHTML='<div class="result-box">'+prefNote+
+    '<p><strong>Step 1 — split the 48-bit MAC</strong> into OUI (vendor) and device halves:</p>'+r1+
+    '<p><strong>Step 2 — insert <span class="mono">fffe</span></strong> in the middle to pad to 64 bits:</p>'+r2+
+    '<p><strong>Step 3 — flip the U/L bit</strong> (7th bit of the first byte, XOR <span class="mono">02</span>):</p>'+r3+
+    '<p class="mono" style="font-size:.85rem">'+b8(origFirst).slice(0,6)+'<span class="runhl">'+b8(origFirst).charAt(6)+'</span>'+b8(origFirst).charAt(7)+' → '+b8(flipped).slice(0,6)+'<span class="runhl">'+b8(flipped).charAt(6)+'</span>'+b8(flipped).charAt(7)+' &nbsp;('+h2(origFirst)+' → '+h2(flipped)+')</p>'+
+    '<p><strong>Interface ID:</strong> <span class="mono">'+iid.map(function(x){return x.toString(16);}).join(':')+'</span><br>'+
+    '<strong>Link-local address:</strong> <span class="mono">'+compressStr(llG)+'</span><br>'+
+    '<strong>Address on given prefix:</strong> <span class="mono">'+compressStr(addrG)+'</span></p>'+
+    '</div>';
+}
+document.getElementById('eui-go').addEventListener('click',runEui);
+
+/* ---------- quiz ---------- */
+var QUIZ=[
+ {q:'How many bits are in an IPv6 address?',o:['32','64','128','256'],a:2,e:'IPv6 addresses are 128 bits — four times the size of IPv4\u2019s 32 bits.'},
+ {q:'An IPv6 address is written as how many groups, of how many bits each?',o:['4 groups of 8 bits','8 groups of 16 bits','6 groups of 16 bits','16 groups of 8 bits'],a:1,e:'Eight 16-bit hextets in hexadecimal, separated by colons: 8 × 16 = 128 bits.'},
+ {q:'What is the IPv6 loopback address?',o:['127.0.0.1','::','::1','fe80::1'],a:2,e:'::1/128 is the single loopback address — IPv6 doesn\u2019t reserve a whole block like IPv4\u2019s 127/8.'},
+ {q:'Which prefix identifies link-local addresses?',o:['2000::/3','fc00::/7','ff00::/8','fe80::/10'],a:3,e:'fe80::/10 — every IPv6 interface automatically configures one, valid only on the local link.'},
+ {q:'How many times may the double colon (::) appear in one address?',o:['Once','Twice','Once per hextet','Unlimited'],a:0,e:'Only once. A second :: would make it impossible to know how many zero hextets each one replaces.'},
+ {q:'Which RFC currently defines the IPv6 protocol?',o:['RFC 791','RFC 1918','RFC 2460','RFC 8200'],a:3,e:'RFC 8200 (2017) is the Internet Standard, obsoleting the original RFC 2460 from 1998. RFC 791 is IPv4.'},
+ {q:'How large is the IPv6 base header?',o:['20 bytes, variable','40 bytes, fixed','60 bytes, fixed','Variable, 40–60 bytes'],a:1,e:'A fixed 40 bytes. Options moved to extension headers, so routers can parse the header at a constant offset.'},
+ {q:'Which IPv6 field replaces the IPv4 TTL?',o:['Flow Label','Traffic Class','Hop Limit','Next Header'],a:2,e:'Hop Limit — same job (decremented at each router), but renamed to describe what it actually counts.'},
+ {q:'Which IPv4 header field was REMOVED in IPv6?',o:['Source address','Header checksum','Version','Destination address'],a:1,e:'The header checksum is gone — link layers and transport layers already detect errors, so per-hop recomputation was wasted work.'},
+ {q:'How does IPv6 handle broadcast traffic?',o:['ff02::255 is the broadcast address','The last address in each /64 is broadcast','There is no broadcast — multicast is used instead','Broadcast works the same as IPv4'],a:2,e:'IPv6 has no broadcast at all. Multicast groups (like ff02::1, all nodes) deliver one-to-many traffic only to subscribed hosts.'},
+ {q:'What does ff02::1 represent?',o:['All routers on the link','All nodes on the link','DHCPv6 servers','The default gateway'],a:1,e:'ff02::1 is the all-nodes link-local multicast group. ff02::2 is all routers.'},
+ {q:'What is the standard prefix length for an IPv6 LAN segment?',o:['/24','/48','/64','/128'],a:2,e:'/64 — 64 bits of network, 64 bits of interface ID. SLAAC requires it.'},
+ {q:'NDP (Neighbor Discovery Protocol) replaces which IPv4 protocol for address resolution?',o:['DNS','DHCP','ICMP','ARP'],a:3,e:'Neighbor Solicitation/Advertisement messages (ICMPv6 types 135/136) replace ARP — using multicast instead of broadcast.'},
+ {q:'In the EUI-64 process, what 16-bit value is inserted into the middle of the MAC address?',o:['ffff','fffe','feff','0000'],a:1,e:'fffe is inserted between the OUI and device halves of the 48-bit MAC to reach 64 bits.'},
+ {q:'EUI-64 also flips which bit of the MAC address?',o:['The 1st bit (multicast bit)','The 7th bit (Universal/Local bit)','The last bit','The 16th bit'],a:1,e:'The 7th bit of the first byte — the U/L bit — is inverted (XOR 0x02).'},
+ {q:'Which prefix is reserved for Unique Local Addresses (ULA)?',o:['fe80::/10','2000::/3','fc00::/7','ff00::/8'],a:2,e:'fc00::/7 — in practice fd00::/8 with a random 40-bit Global ID. The rough IPv6 analog of RFC 1918 space.'},
+ {q:'Global unicast addresses currently come from which range?',o:['2000::/3','4000::/2','f000::/4','::/3'],a:0,e:'2000::/3 — first bits 001, so global addresses start with 2 or 3.'},
+ {q:'What does SLAAC stand for?',o:['Stateful Link Address Allocation Control','Stateless Address Autoconfiguration','Secure Local Address Assignment Convention','Subnet-Level Automatic Address Caching'],a:1,e:'Stateless Address Autoconfiguration — hosts build their own addresses from Router Advertisement prefixes, no server needed.'},
+ {q:'What problem does NAT64 (with DNS64) solve?',o:['Hiding internal IPv6 topology','Letting IPv6-only hosts reach IPv4-only servers','Conserving IPv6 addresses','Encrypting IPv6 traffic'],a:1,e:'NAT64 translates between v6 and v4; DNS64 synthesizes AAAA records using the 64:ff9b::/96 prefix. Common on IPv6-only mobile networks.'},
+ {q:'Which prefix is reserved for documentation and examples?',o:['2001:db8::/32','2002::/16','64:ff9b::/96','fd00::/8'],a:0,e:'2001:db8::/32 (RFC 3849) — the IPv6 equivalent of TEST-NET, used in courseware and docs, never routed.'}
+];
+var quizState=state.quiz||{};
+var qContainer=document.getElementById('quiz-container');
+function renderQuiz(){
+  qContainer.innerHTML='';
+  QUIZ.forEach(function(item,qi){
+    var card=document.createElement('div');card.className='q-card';
+    var h=document.createElement('h4');h.textContent=(qi+1)+'. '+item.q;card.appendChild(h);
+    var opts=document.createElement('div');opts.className='opts';
+    var order=quizState[qi]&&quizState[qi].order?quizState[qi].order:shuffle([0,1,2,3]);
+    if(!quizState[qi])quizState[qi]={order:order,picked:null};
+    order.forEach(function(oi){
+      var b=document.createElement('button');
+      b.type='button';b.className='opt';b.textContent=item.o[oi];
+      b.setAttribute('data-oi',oi);
+      opts.appendChild(b);
+    });
+    card.appendChild(opts);
+    var ex=document.createElement('p');ex.className='explain';ex.textContent='💡 '+item.e;card.appendChild(ex);
+    qContainer.appendChild(card);
+    function reveal(pickedOi){
+      Array.prototype.forEach.call(opts.children,function(btn){
+        var oi=parseInt(btn.getAttribute('data-oi'),10);
+        btn.disabled=true;
+        if(oi===item.a)btn.classList.add('correct');
+        else if(oi===pickedOi)btn.classList.add('wrong');
+      });
+      ex.classList.add('show');
+    }
+    if(quizState[qi].picked!==null&&quizState[qi].picked!==undefined){reveal(quizState[qi].picked);}
+    opts.addEventListener('click',function(e){
+      var btn=e.target.closest('.opt');
+      if(!btn||btn.disabled)return;
+      var oi=parseInt(btn.getAttribute('data-oi'),10);
+      quizState[qi].picked=oi;
+      state.quiz=quizState;saveState(state);
+      reveal(oi);
+      updateQuizScore();
+    });
+  });
+  updateQuizScore();
+}
+function updateQuizScore(){
+  var correct=0,answeredCt=0;
+  QUIZ.forEach(function(item,qi){
+    var s=quizState[qi];
+    if(s&&s.picked!==null&&s.picked!==undefined){answeredCt++;if(s.picked===item.a)correct++;}
+  });
+  document.getElementById('q-correct').textContent=correct;
+  document.getElementById('q-answered').textContent=answeredCt;
+  document.getElementById('q-score').textContent=answeredCt?Math.round(100*correct/answeredCt)+'%':'0%';
+}
+document.getElementById('q-reset').addEventListener('click',function(){
+  quizState={};state.quiz=quizState;saveState(state);renderQuiz();
+});
+renderQuiz();
+
+})();
+</script>
+</body>
+</html>
