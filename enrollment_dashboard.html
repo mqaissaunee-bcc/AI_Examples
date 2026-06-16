@@ -2,17 +2,22 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.17
-  Date:     May 28, 2026
-  Features: Adds a "? What's new" button to the subline metadata row,
-            with a purple NEW badge that draws attention on first visit
-            and dismisses after the user opens the modal once. Tracks
-            seen-version via localStorage; bumping the WHATS_NEW_VERSION
-            constant re-announces to everyone. Content is brief
-            release-note style (currently announces v5.11-v5.16 combined
-            classes and By Discipline accordion). Modal closes on
-            backdrop click, Escape, or "Got it" button. Built on v4.9
-            canonical baseline.
+  Version:  v5.18
+  Date:     June 16, 2026
+  Features: Three refinements:
+            (1) Thousands separators (commas) applied wherever totals
+                ≥1,000 are displayed: KPI strip, By Discipline parent
+                rows and course sub-rows, Sections at a Glance discipline
+                meta, list-view "N of M" search count, trend chart
+                Y-axis labels, FTE "to go" sub-text. New fmtInt() helper
+                routes integer counts through en-US locale formatting.
+            (2) FTE tooltip text: "set by Institutional Research" →
+                "set by the college".
+            (3) "By Discipline" course rows now show the course title
+                inline next to the course code in the Discipline column
+                (was previously in the right-most/Trend slot). Reads
+                left-to-right as code → title → numbers.
+            Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -895,6 +900,7 @@
     color: var(--ink-mute);
     font-style: italic;
     font-size: 11px;
+    font-weight: 400;
   }
   /* Soften the row-divider between consecutive course sub-rows so the group
      reads as one nested cluster, not as several stacked rows. The full
@@ -1775,7 +1781,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.17</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.18</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -1892,6 +1898,16 @@
   function uid() { return 'id-' + Math.random().toString(36).slice(2, 10); }
   function sum(arr, key) { return arr.reduce((a, r) => a + (Number(r[key]) || 0), 0); }
   function el(id) { return document.getElementById(id); }
+  // Display an integer count with thousands separators when ≥ 1000. Used
+  // wherever enrollment, capacity, or section counts are rendered for users
+  // so 4-digit numbers like 1188 read as "1,188" rather than running
+  // together. Explicit en-US locale because the dashboard is US-only and
+  // browsers with non-US locale settings would otherwise produce periods
+  // as separators.
+  function fmtInt(n) {
+    if (n == null || isNaN(n)) return '0';
+    return Math.round(Number(n)).toLocaleString('en-US');
+  }
   function escapeHtml(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -2814,14 +2830,14 @@
 
       const sub = showYourSelection
         ? `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · your selection: ${yourFTE.toFixed(1)}`
-        : `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · ${Math.max(0, goal - collegeFTE).toFixed(0)} to go`;
+        : `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · ${fmtInt(Math.max(0, goal - collegeFTE))} to go`;
 
       // Tooltip explains FTE, calculation, and goal scope. A custom CSS
       // tooltip (not native title=) so it appears immediately on hover,
       // stays put while the cursor is on the trigger, and renders with
       // dashboard styling rather than OS chrome. Native title tooltips are
       // unreliable: delayed, dismissed quickly, and styled inconsistently.
-      const fteTooltip = `Full-Time Equivalent (FTE) = Total Student Credit Hours ÷ 30 (Brookdale convention). Compared against the fall enrollment goal of ${goal.toLocaleString()}, set by Institutional Research. Goals reset each semester.`;
+      const fteTooltip = `Full-Time Equivalent (FTE) = Total Student Credit Hours ÷ 30 (Brookdale convention). Compared against the fall enrollment goal of ${goal.toLocaleString()}, set by the college. Goals reset each semester.`;
 
       fteCard = `
         <div class="kpi">
@@ -2842,13 +2858,13 @@
       <div class="kpi-strip${goal ? ' has-fte' : ''}">
         <div class="kpi">
           <div class="label">Sections</div>
-          <div class="value">${sectionsNow} ${dSections}</div>
-          <div class="sub">${fullCount} at capacity · ${emptyCount} with zero enrolled</div>
+          <div class="value">${fmtInt(sectionsNow)} ${dSections}</div>
+          <div class="sub">${fmtInt(fullCount)} at capacity · ${fmtInt(emptyCount)} with zero enrolled</div>
         </div>
         <div class="kpi">
           <div class="label">Enrollment</div>
-          <div class="value">${enrolledNow} ${dEnrolled}</div>
-          <div class="sub">of ${capacityNow} total seats</div>
+          <div class="value">${fmtInt(enrolledNow)} ${dEnrolled}</div>
+          <div class="sub">of ${fmtInt(capacityNow)} total seats</div>
         </div>
         <div class="kpi">
           <div class="label">Overall Fill</div>
@@ -2857,8 +2873,8 @@
         </div>
         <div class="kpi">
           <div class="label">Student Credit Hrs</div>
-          <div class="value">${schNow} ${dSCH}</div>
-          <div class="sub">${waitlistTotal > 0 ? waitlistTotal + ' on waitlist' : 'no waitlist activity'}</div>
+          <div class="value">${fmtInt(schNow)} ${dSCH}</div>
+          <div class="sub">${waitlistTotal > 0 ? fmtInt(waitlistTotal) + ' on waitlist' : 'no waitlist activity'}</div>
         </div>
         ${fteCard}
       </div>
@@ -3120,8 +3136,8 @@
         <tr class="ds-row ${isExpanded ? 'expanded' : ''}" data-disc-row="${escapeHtml(p)}">
           <td class="ds-chev-cell" data-disc-chev="${escapeHtml(p)}" title="${isExpanded ? 'Hide course breakdown' : 'Show course breakdown'}">${chevron}</td>
           <td class="ds-disc"><span class="swatch" style="background:${colorFor(p)}"></span><strong>${escapeHtml(p)}</strong></td>
-          <td class="right">${sections}</td>
-          <td class="right">${enrolled} / ${capacity}</td>
+          <td class="right">${fmtInt(sections)}</td>
+          <td class="right">${fmtInt(enrolled)} / ${fmtInt(capacity)}</td>
           <td class="right">${fillDisplay} ${dFill}</td>
           <td class="right">${vsCollegeCell}</td>
           <td class="ds-trend">${sparkCell}</td>
@@ -3134,11 +3150,12 @@
       let subRows = '';
       if (isExpanded) {
         // Group this discipline's filtered rows by course code (e.g.
-        // 'ENGL-121'). Course rows show the same Sections/Enrolled/Fill
-        // columns as the parent so numbers align vertically. The Trend
-        // column at course-level is repurposed to show the course title
-        // (computing course-level historical trends would require a deeper
-        // refactor and isn't yet justified by the use case).
+        // 'ENGL-121'). The course title is shown inline next to the
+        // course code in the Discipline column so the reader's eye flows
+        // code → title → numbers left-to-right. The trend column at
+        // course-level stays blank (computing course-level historical
+        // trends would require a deeper refactor and isn't yet justified
+        // by the use case).
         const byCourse = new Map();
         rows.forEach(r => {
           const c = r.Course;
@@ -3164,15 +3181,18 @@
           const cFillDisplay = cFill > 200
             ? `<strong title="High fill % typically indicates placeholder-capacity sections">${cFill.toFixed(1)}%</strong>`
             : `<strong>${cFill.toFixed(1)}%</strong>`;
+          const titleHTML = cTitle
+            ? ` <span class="ds-course-title">${escapeHtml(cTitle)}</span>`
+            : '';
           return `
             <tr class="ds-course-row">
               <td></td>
-              <td class="ds-course-code">${escapeHtml(courseCode)}</td>
-              <td class="right">${cSec}</td>
-              <td class="right">${cEnr} / ${cCap}</td>
+              <td class="ds-course-code">${escapeHtml(courseCode)}${titleHTML}</td>
+              <td class="right">${fmtInt(cSec)}</td>
+              <td class="right">${fmtInt(cEnr)} / ${fmtInt(cCap)}</td>
               <td class="right">${cFillDisplay}</td>
               <td></td>
-              <td class="ds-course-title">${escapeHtml(cTitle)}</td>
+              <td></td>
             </tr>
           `;
         }).join('');
@@ -3184,7 +3204,7 @@
     return `
       <div class="section-title">
         By Discipline
-        <span class="meta">${filteredRows().length} sections in view</span>
+        <span class="meta">${fmtInt(filteredRows().length)} sections in view</span>
         <button type="button" class="bulk-toggle" id="bulkDiscRowToggle" data-bulk-action="${bulkAction}" title="${anyExpanded ? 'Collapse course breakdown on every discipline' : 'Expand course breakdown on every discipline'}">${bulkLabel}</button>
       </div>
       <div class="discipline-table-wrap">
@@ -3355,8 +3375,8 @@
       // Trace shows summary even when collapsed
       const arrow = expanded ? '▼' : '▶';
       const trace = expanded
-        ? `<span class="discipline-meta">${sections.length} section${sections.length === 1 ? '' : 's'} · ${totalEnrolled} / ${totalCapacity} enrolled · ${groupFill.toFixed(0)}% fill</span>`
-        : `<span class="discipline-meta collapsed-trace">${sections.length} section card${sections.length === 1 ? '' : 's'} (click to show) · ${totalEnrolled} / ${totalCapacity} enrolled · ${groupFill.toFixed(0)}% fill</span>`;
+        ? `<span class="discipline-meta">${fmtInt(sections.length)} section${sections.length === 1 ? '' : 's'} · ${fmtInt(totalEnrolled)} / ${fmtInt(totalCapacity)} enrolled · ${groupFill.toFixed(0)}% fill</span>`
+        : `<span class="discipline-meta collapsed-trace">${fmtInt(sections.length)} section card${sections.length === 1 ? '' : 's'} (click to show) · ${fmtInt(totalEnrolled)} / ${fmtInt(totalCapacity)} enrolled · ${groupFill.toFixed(0)}% fill</span>`;
 
       const cardsHtml = expanded
         ? `<div class="course-grid">${sections.map(renderSectionCard).join('')}</div>`
@@ -3842,7 +3862,7 @@
 
     // Match count display: only shown when searching
     const matchCount = hasActiveSearch
-      ? `<span class="search-count">${searched.length} of ${enriched.length}</span>`
+      ? `<span class="search-count">${fmtInt(searched.length)} of ${fmtInt(enriched.length)}</span>`
       : '';
 
     return `
@@ -4356,7 +4376,7 @@
   // and grouped renderers can use it
   function renderTableToolbar(totalCount, matchCount, hasActiveSearch) {
     const matchHTML = hasActiveSearch
-      ? `<span class="search-count">${matchCount} of ${totalCount}</span>`
+      ? `<span class="search-count">${fmtInt(matchCount)} of ${fmtInt(totalCount)}</span>`
       : '';
     return `
       <div class="table-toolbar">
@@ -4516,7 +4536,7 @@
 
     const yLabels = yTicks.map(t =>
       `<line x1="${padL}" x2="${W - padR}" y1="${t.y}" y2="${t.y}" stroke="var(--rule)" stroke-width="0.5"/>
-       <text x="${padL - 8}" y="${t.y + 3}" text-anchor="end" font-size="10" fill="var(--ink-mute)" font-family="Helvetica Neue, sans-serif">${key === 'fill' ? t.v.toFixed(0) + '%' : t.v.toFixed(0)}</text>`
+       <text x="${padL - 8}" y="${t.y + 3}" text-anchor="end" font-size="10" fill="var(--ink-mute)" font-family="Helvetica Neue, sans-serif">${key === 'fill' ? t.v.toFixed(0) + '%' : fmtInt(t.v)}</text>`
     ).join('');
 
     const legendItems = series.map(s =>
