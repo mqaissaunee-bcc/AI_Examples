@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markdown Studio — write, preview, and export Markdown</title>
+<meta name="description" content="A single-file Markdown editor with live preview and export to Markdown, HTML, or PDF. Works offline, no dependencies.">
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+
+    /* sumi-ink frame — constant across themes (the woodblock border) */
+    --ink: #15171c;
+    --ink-2: #1c1f26;
+    --ink-text: #ece9df;
+    --ink-muted: #9ba0aa;
+    --ink-border: #2c313a;
+
+    /* light "paper" surfaces */
+    --bg: #fbf8f1;
+    --editor-bg: #f2f0e8;
+    --preview-bg: #fffdf8;
+    --text: #20242e;
+    --muted: #5b626f;
+    --faint: #8a8f9a;
+    --border: #e6dfce;
+    --border-strong: #d7cfba;
+    --code-bg: #efe9dc;
+    --accent: #cf4636;        /* shu vermilion — the seal */
+    --accent-strong: #b63b2c;
+    --link: #1f5089;          /* indigo ink */
+    --sel: rgba(207,70,54,0.16);
+    --shadow: 0 1px 2px rgba(20,23,28,.06), 0 8px 24px rgba(20,23,28,.05);
+    --radius: 9px;
+  }
+  [data-theme="dark"] {
+    --bg: #131519;
+    --editor-bg: #15181d;
+    --preview-bg: #181b21;
+    --text: #e4e1d8;
+    --muted: #9aa0ab;
+    --faint: #6e747f;
+    --border: #2a2f38;
+    --border-strong: #363c46;
+    --code-bg: #20242b;
+    --accent: #e2675c;
+    --accent-strong: #ec7c72;
+    --link: #7fb0e6;
+    --sel: rgba(226,103,92,0.22);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  ::selection { background: var(--sel); }
+
+  .skip-link {
+    position: absolute; left: 8px; top: -48px; z-index: 50;
+    background: var(--accent); color: #fff; padding: 10px 14px;
+    border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;
+    transition: top .15s ease;
+  }
+  .skip-link:focus { top: 8px; }
+
+  button { font-family: inherit; }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* ---------- Header (sumi frame) ---------- */
+  header.appbar {
+    background: var(--ink);
+    color: var(--ink-text);
+    border-bottom: 1px solid var(--ink-border);
+    display: flex; align-items: center; gap: 14px;
+    padding: 9px 14px;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; margin-right: auto; }
+  .seal {
+    width: 30px; height: 30px; border-radius: 7px;
+    background: var(--accent);
+    display: grid; place-items: center;
+    color: #fff; font-family: var(--serif); font-weight: 700; font-size: 17px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
+    flex: none;
+  }
+  .seal.live { animation: pulse .6s ease; }
+  @keyframes pulse { 0%{ transform: scale(1); } 40%{ transform: scale(1.12); } 100%{ transform: scale(1); } }
+  .brand-name { font-weight: 700; font-size: 16px; letter-spacing: .2px; line-height: 1; }
+  .brand-sub { display: block; font-size: 11px; color: var(--ink-muted); margin-top: 3px; letter-spacing: .3px; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    appearance: none; border: 1px solid var(--ink-border);
+    background: var(--ink-2); color: var(--ink-text);
+    font-size: 13px; font-weight: 600;
+    padding: 0 13px; min-height: 38px; border-radius: 8px;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+    transition: background .14s ease, border-color .14s ease, color .14s ease;
+    white-space: nowrap;
+  }
+  .btn:hover { background: #262b34; border-color: #3a414c; }
+  .btn .ic { width: 16px; height: 16px; flex: none; }
+  .btn.accent { background: var(--accent); border-color: transparent; color: #fff; }
+  .btn.accent:hover { background: var(--accent-strong); }
+  .btn.ghost { background: transparent; }
+  .btn.ghost:hover { background: var(--ink-2); }
+  .btn[aria-pressed="true"] { background: var(--accent); border-color: transparent; color: #fff; }
+
+  .menu-wrap { position: relative; }
+  .menu {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 40;
+    background: var(--preview-bg); color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: 10px;
+    box-shadow: var(--shadow); padding: 6px; min-width: 210px;
+    display: none;
+  }
+  .menu.open { display: block; }
+  .menu button {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    background: none; border: 0; text-align: left;
+    padding: 10px 11px; border-radius: 7px; cursor: pointer;
+    font-size: 13.5px; color: var(--text); font-weight: 500;
+  }
+  .menu button:hover { background: var(--sel); }
+  .menu .ic { width: 16px; height: 16px; color: var(--muted); flex: none; }
+  .menu hr { border: 0; border-top: 1px solid var(--border); margin: 5px 4px; }
+
+  /* mobile pane switch */
+  .mobile-tabs { display: none; gap: 4px; background: var(--ink-2); padding: 3px; border-radius: 9px; }
+  .mobile-tabs button {
+    border: 0; background: none; color: var(--ink-muted); font-weight: 600; font-size: 13px;
+    padding: 7px 14px; border-radius: 7px; cursor: pointer; min-height: 38px;
+  }
+  .mobile-tabs button[aria-selected="true"] { background: var(--accent); color: #fff; }
+
+  /* ---------- Main split ---------- */
+  main.workspace { flex: 1; display: flex; min-height: 0; }
+  .pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .editor-pane { flex: 0 0 50%; background: var(--editor-bg); border-right: 1px solid var(--border); }
+  .preview-pane { flex: 1 1 auto; background: var(--preview-bg); }
+
+  .pane-head {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 12px; border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--editor-bg) 70%, var(--bg));
+    min-height: 44px;
+  }
+  .preview-pane .pane-head { background: color-mix(in srgb, var(--preview-bg) 70%, var(--bg)); }
+  .pane-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase;
+    color: var(--faint); margin-right: auto; padding-left: 2px;
+  }
+
+  /* format strip */
+  .fmt { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+  .fmt button {
+    border: 1px solid transparent; background: none; color: var(--muted);
+    width: 32px; height: 32px; border-radius: 7px; cursor: pointer;
+    display: inline-grid; place-items: center; font-weight: 700;
+  }
+  .fmt button:hover { background: var(--code-bg); color: var(--text); border-color: var(--border); }
+  .fmt .ic { width: 17px; height: 17px; }
+  .fmt .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+  textarea#editor {
+    flex: 1; width: 100%; resize: none; border: 0; outline: none;
+    background: transparent; color: var(--text);
+    font-family: var(--mono); font-size: 14.5px; line-height: 1.7;
+    padding: 18px 20px; tab-size: 2;
+    caret-color: var(--accent);
+  }
+  textarea#editor::placeholder { color: var(--faint); }
+
+  .preview-scroll { flex: 1; overflow: auto; }
+
+  /* ---------- Splitter ---------- */
+  .splitter {
+    flex: 0 0 7px; cursor: col-resize; position: relative;
+    background: var(--border); transition: background .15s ease;
+  }
+  .splitter::before {
+    content: ""; position: absolute; inset: 0 -4px; /* wider hit area */
+  }
+  .splitter::after {
+    content: ""; position: absolute; top: 50%; left: 50%;
+    width: 3px; height: 34px; transform: translate(-50%,-50%);
+    border-radius: 3px; background: var(--border-strong);
+  }
+  .splitter:hover, .splitter.dragging { background: var(--accent); }
+  .splitter:hover::after, .splitter.dragging::after { background: #fff; }
+  body.dragging { cursor: col-resize; user-select: none; }
+
+  /* ---------- Status bar ---------- */
+  footer.statusbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 7px 16px; font-size: 12.5px; color: var(--muted);
+    background: var(--ink); color: var(--ink-muted);
+    border-top: 1px solid var(--ink-border);
+  }
+  .statusbar .stat b { color: var(--ink-text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .save-dot { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; }
+  .save-dot .dot { width: 8px; height: 8px; border-radius: 50%; background: #5fae6a; box-shadow: 0 0 0 3px rgba(95,174,106,.18); }
+  .save-dot.saving .dot { background: var(--accent); box-shadow: 0 0 0 3px rgba(207,70,54,.18); }
+
+  .visually-hidden {
+    position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* ---------- Rendered Markdown ---------- */
+  .markdown-body {
+    font-family: var(--serif);
+    font-size: 17px; line-height: 1.72; color: var(--text);
+    max-width: 760px; margin: 0 auto; padding: 34px 40px 80px;
+    word-wrap: break-word;
+  }
+  .markdown-body > :first-child { margin-top: 0; }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3,
+  .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+    font-family: var(--serif); line-height: 1.25; font-weight: 700;
+    margin: 1.7em 0 .6em; color: var(--text);
+  }
+  .markdown-body h1 {
+    font-size: 1.95em; margin-top: .2em;
+    padding-bottom: .28em; border-bottom: 2px solid var(--border-strong);
+  }
+  .markdown-body h1::before {
+    content: ""; display: inline-block; width: .42em; height: .42em;
+    margin-right: .42em; border-radius: 2px; background: var(--accent);
+    transform: translateY(-.12em);
+  }
+  .markdown-body h2 { font-size: 1.5em; padding-bottom: .2em; border-bottom: 1px solid var(--border); }
+  .markdown-body h3 { font-size: 1.25em; }
+  .markdown-body h4 { font-size: 1.08em; }
+  .markdown-body h5 { font-size: .96em; color: var(--muted); }
+  .markdown-body h6 { font-size: .9em; color: var(--faint); text-transform: uppercase; letter-spacing: .5px; }
+  .markdown-body p { margin: 0 0 1.05em; }
+  .markdown-body a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+  .markdown-body a:hover { text-decoration-thickness: 2px; }
+  .markdown-body strong { font-weight: 700; }
+  .markdown-body del { color: var(--faint); }
+
+  .markdown-body ul, .markdown-body ol { margin: 0 0 1.05em; padding-left: 1.5em; }
+  .markdown-body li { margin: .3em 0; }
+  .markdown-body li > ul, .markdown-body li > ol { margin: .3em 0; }
+  .markdown-body li.task-item { list-style: none; margin-left: -1.4em; padding-left: 1.4em; }
+  .markdown-body li.task-item input { margin-right: .5em; transform: translateY(1px); accent-color: var(--accent); }
+
+  .markdown-body blockquote {
+    margin: 0 0 1.05em; padding: .2em 1.1em;
+    border-left: 3px solid var(--accent); color: var(--muted);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    border-radius: 0 6px 6px 0;
+  }
+  .markdown-body blockquote > :last-child { margin-bottom: 0; }
+
+  .markdown-body code {
+    font-family: var(--mono); font-size: .86em;
+    background: var(--code-bg); padding: .15em .4em; border-radius: 5px;
+  }
+  .markdown-body pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; overflow: auto;
+    margin: 0 0 1.05em;
+  }
+  .markdown-body pre code { background: none; padding: 0; font-size: 13.5px; line-height: 1.6; }
+
+  .markdown-body hr { border: 0; border-top: 1px solid var(--border-strong); margin: 2em 0; }
+
+  .markdown-body table {
+    border-collapse: collapse; width: 100%; margin: 0 0 1.15em; font-size: .94em;
+    font-family: var(--sans);
+  }
+  .markdown-body th, .markdown-body td { border: 1px solid var(--border-strong); padding: 8px 12px; }
+  .markdown-body thead th { background: var(--code-bg); font-weight: 700; }
+  .markdown-body tbody tr:nth-child(even) { background: color-mix(in srgb, var(--code-bg) 45%, transparent); }
+
+  .markdown-body img { max-width: 100%; height: auto; border-radius: 8px; }
+  .markdown-body kbd {
+    font-family: var(--mono); font-size: .82em;
+    background: var(--code-bg); border: 1px solid var(--border-strong);
+    border-bottom-width: 2px; border-radius: 5px; padding: .1em .45em;
+  }
+  .preview-empty { color: var(--faint); font-family: var(--sans); font-size: 15px; text-align: center; padding: 60px 20px; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 820px) {
+    .brand-sub { display: none; }
+  }
+  @media (max-width: 760px) {
+    .mobile-tabs { display: flex; }
+    .splitter { display: none; }
+    .editor-pane, .preview-pane { flex: 1 1 100% !important; width: 100%; border-right: 0; }
+    main.workspace[data-mobileview="write"] .preview-pane { display: none; }
+    main.workspace[data-mobileview="preview"] .editor-pane { display: none; }
+    .markdown-body { padding: 24px 20px 70px; font-size: 16px; }
+    .toolbar .label-text { display: none; }
+    .btn { padding: 0 11px; }
+  }
+  @media (pointer: coarse) {
+    .btn, .fmt button, .mobile-tabs button, .menu button { min-height: 44px; }
+    .fmt button { min-width: 44px; width: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  /* ---------- Print → PDF ---------- */
+  @media print {
+    body { overflow: visible; display: block; height: auto; background: #fff; }
+    header.appbar, footer.statusbar, .splitter, .editor-pane, .pane-head, .mobile-tabs { display: none !important; }
+    main.workspace { display: block; }
+    .preview-pane { background: #fff; }
+    .preview-scroll { overflow: visible; }
+    .markdown-body { max-width: none; color: #000; padding: 0; }
+    .markdown-body a { color: #000; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#editor">Skip to editor</a>
+
+<header class="appbar">
+  <div class="brand">
+    <div class="seal" id="seal" aria-hidden="true">朱</div>
+    <div>
+      <span class="brand-name">Markdown Studio</span>
+      <span class="brand-sub">write · preview · export</span>
+    </div>
+  </div>
+
+  <div class="mobile-tabs" role="tablist" aria-label="Switch pane">
+    <button id="tabWrite" role="tab" aria-selected="true">Write</button>
+    <button id="tabPreview" role="tab" aria-selected="false">Preview</button>
+  </div>
+
+  <div class="toolbar" role="toolbar" aria-label="Document actions">
+    <button class="btn ghost" id="syncBtn" aria-pressed="false" title="Sync scrolling between panes">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8 4 11l3 3"/><path d="M4 11h12a4 4 0 0 1 0 8h-3"/><path d="m17 16 3-3-3-3"/><path d="M20 13H8"/></svg>
+      <span class="label-text">Sync scroll</span>
+    </button>
+    <button class="btn ghost" id="themeBtn" title="Switch color theme" aria-label="Theme: auto">
+      <svg class="ic" id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <span class="label-text" id="themeLabel">Auto</span>
+    </button>
+    <button class="btn ghost" id="resetBtn" title="Restore the starter document">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      <span class="label-text">Reset</span>
+    </button>
+    <button class="btn" id="copyBtn" title="Copy Markdown source to clipboard">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+      <span class="label-text" id="copyLabel">Copy</span>
+    </button>
+    <div class="menu-wrap">
+      <button class="btn accent" id="exportBtn" aria-haspopup="true" aria-expanded="false" title="Export this document">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        <span class="label-text">Export</span>
+      </button>
+      <div class="menu" id="exportMenu" role="menu" aria-label="Export options">
+        <button role="menuitem" data-export="md">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M8 13v4l2-2 2 2v-4"/></svg>
+          Download Markdown (.md)
+        </button>
+        <button role="menuitem" data-export="html">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 9-3 3 3 3"/><path d="m15 9 3 3-3 3"/></svg>
+          Download HTML (.html)
+        </button>
+        <hr>
+        <button role="menuitem" data-export="pdf">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+          Print / Save as PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="workspace" data-mobileview="write">
+  <section class="pane editor-pane" aria-label="Markdown editor">
+    <div class="pane-head">
+      <span class="pane-label">Markdown</span>
+      <div class="fmt" role="group" aria-label="Formatting">
+        <button type="button" data-fmt="h" title="Heading" aria-label="Heading">H</button>
+        <button type="button" data-fmt="bold" title="Bold (Ctrl/Cmd+B)" aria-label="Bold"><b>B</b></button>
+        <button type="button" data-fmt="italic" title="Italic (Ctrl/Cmd+I)" aria-label="Italic"><i>I</i></button>
+        <span class="sep" aria-hidden="true"></span>
+        <button type="button" data-fmt="link" title="Link" aria-label="Insert link"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></button>
+        <button type="button" data-fmt="code" title="Inline code" aria-label="Inline code"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 9-3 3 3 3"/><path d="m15 9 3 3-3 3"/></svg></button>
+        <button type="button" data-fmt="quote" title="Quote" aria-label="Block quote"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 17h4l2-4V7H4v6h4Z"/><path d="M14 17h4l2-4V7h-8v6h4Z"/></svg></button>
+        <button type="button" data-fmt="list" title="Bulleted list" aria-label="Bulleted list"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg></button>
+      </div>
+    </div>
+    <textarea id="editor" spellcheck="true" autocomplete="off" autocapitalize="off"
+      aria-label="Markdown source" placeholder="# Start writing…"></textarea>
+  </section>
+
+  <div class="splitter" id="splitter" role="separator" aria-orientation="vertical"
+    aria-label="Resize panes (drag, or use arrow keys)" tabindex="0"></div>
+
+  <section class="pane preview-pane" aria-label="Rendered preview">
+    <div class="pane-head">
+      <span class="pane-label">Preview</span>
+    </div>
+    <div class="preview-scroll" id="previewScroll">
+      <article class="markdown-body" id="preview" aria-live="off"></article>
+    </div>
+  </section>
+</main>
+
+<footer class="statusbar">
+  <span class="stat"><b id="wordCount">0</b> words</span>
+  <span class="stat"><b id="charCount">0</b> characters</span>
+  <span class="stat"><b id="readTime">0</b> min read</span>
+  <span class="save-dot" id="saveDot" aria-hidden="true"><span class="dot"></span><span id="saveText">Saved</span></span>
+</footer>
+
+<p class="visually-hidden" id="live" role="status" aria-live="polite"></p>
+
+<!-- Default document, stored verbatim (not executed) -->
+<script type="text/markdown" id="sample">
+# Markdown Studio
+
+A tidy place to **write**, **preview**, and **export** Markdown. Type on the left — the rendered document updates live on the right. Everything runs in your browser; nothing is uploaded.
+
+## Why it's handy
+
+- Live two-pane preview with a draggable divider
+- Export to **Markdown**, **HTML**, or **PDF** (via print)
+- Auto-saves your draft locally, so a refresh won't lose your work
+- Works completely offline — a single file, no dependencies
+
+> Tip: drag the divider in the middle to resize the panes. Double-click it to snap back to 50/50.
+
+## A quick tour of the syntax
+
+### Text styles
+
+You can write *italics*, **bold**, ***both***, ~~strikethrough~~, and `inline code`. Links look like [this](https://www.markdownguide.org). Press <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>B</kbd> for bold.
+
+### Lists
+
+1. Ordered items
+2. keep their numbers
+   - and nest cleanly
+   - as deep as you need
+3. back to the top level
+
+- [x] Finished task
+- [ ] Pending task
+
+### Code
+
+```python
+def greet(name):
+    return f"Hello, {name}!"
+
+print(greet("world"))
+```
+
+### Tables
+
+| Feature        | Supported | Notes                |
+|:---------------|:---------:|:---------------------|
+| Headings       |    Yes    | `#` through `######` |
+| Tables         |    Yes    | with column align    |
+| Task lists     |    Yes    | `- [ ]` / `- [x]`    |
+
+### Quotes & rules
+
+> "The palest ink is better than the best memory."
+
+---
+
+Clear all of this with **Reset**, or just start typing over it. Happy writing.
+</script>
+
+<script id="md-parser">
+/* Minimal, dependency-free Markdown -> HTML parser.
+   Supports: ATX & setext headings, fenced + indented code, blockquotes (nested),
+   ordered/unordered/task lists (nested), GFM tables, hr, links, images, autolinks,
+   bold/italic/bold-italic, strikethrough, inline code, hard line breaks, backslash escapes.
+   Output is sanitized separately in the app via a DOM walker. */
+(function (global) {
+  'use strict';
+
+  function escapeHtml(s) {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ---------- Inline parsing ----------
+  function parseInline(text) {
+    var store = [];
+    function stash(html) {
+      store.push(html);
+      return '\u0000' + (store.length - 1) + '\u0000';
+    }
+
+    // 1. Backslash escapes -> stash the literal (escaped) char
+    text = text.replace(/\\([\\`*_{}\[\]()#+\-.!>~|])/g, function (_, ch) {
+      return stash(escapeHtml(ch));
+    });
+
+    // 2. Inline code spans (no further processing inside)
+    text = text.replace(/(`+)([\s\S]*?[^`]|[^`])\1(?!`)/g, function (m, ticks, code) {
+      return stash('<code>' + escapeHtml(code.replace(/^ (.*?) $/, '$1')) + '</code>');
+    });
+
+    // 3. Raw HTML tags: keep as-is (sanitized later by the app)
+    text = text.replace(/<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*?)?\/?>/g, function (m) {
+      return stash(m);
+    });
+
+    // 4. Autolinks <http://...> and <email>
+    text = text.replace(/<((?:https?|ftp):\/\/[^\s<>]+)>/g, function (_, url) {
+      return stash('<a href="' + escapeHtml(url) + '">' + escapeHtml(url) + '</a>');
+    });
+    text = text.replace(/<([^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)>/g, function (_, mail) {
+      return stash('<a href="mailto:' + escapeHtml(mail) + '">' + escapeHtml(mail) + '</a>');
+    });
+
+    // 5. Images ![alt](src "title")  -- before escaping so quoted titles survive
+    text = text.replace(/!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(?:\s+["']([^"']*)["'])?\s*\)/g,
+      function (_, alt, src, title) {
+        src = src.replace(/^<|>$/g, '');
+        var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+        return stash('<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(alt) + '"' + t + '>');
+      });
+
+    // 6. Links [text](href "title") -- stash tags, keep label inline for formatting
+    text = text.replace(/\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]*)(?:\s+["']([^"']*)["'])?\s*\)/g,
+      function (_, label, href, title) {
+        href = href.replace(/^<|>$/g, '');
+        var t = title ? ' title="' + escapeHtml(title) + '"' : '';
+        var open = stash('<a href="' + escapeHtml(href) + '"' + t + '>');
+        return open + label + stash('</a>');
+      });
+
+    // 7. Escape the remaining raw text
+    text = escapeHtml(text);
+
+    // 8. Bold + italic
+    text = text.replace(/\*\*\*([^\s][\s\S]*?[^\s]|\S)\*\*\*/g, '<strong><em>$1</em></strong>');
+    text = text.replace(/___([^\s][\s\S]*?[^\s]|\S)___/g, '<strong><em>$1</em></strong>');
+    // 9. Bold
+    text = text.replace(/\*\*([^\s][\s\S]*?[^\s]|\S)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__([^\s][\s\S]*?[^\s]|\S)__/g, '<strong>$1</strong>');
+    // 10. Italic
+    text = text.replace(/\*([^\s*][\s\S]*?[^\s*]|[^\s*])\*/g, '<em>$1</em>');
+    text = text.replace(/(^|[^a-zA-Z0-9])_([^\s_][\s\S]*?[^\s_]|[^\s_])_(?![a-zA-Z0-9])/g, '$1<em>$2</em>');
+    // 11. Strikethrough
+    text = text.replace(/~~([^\s][\s\S]*?[^\s]|\S)~~/g, '<del>$1</del>');
+
+    // 12. Hard line breaks (two trailing spaces or backslash already handled)
+    text = text.replace(/ {2,}\n/g, '<br>\n');
+
+    // restore stashed segments (may be nested, loop until clean)
+    var prev;
+    do {
+      prev = text;
+      text = text.replace(/\u0000(\d+)\u0000/g, function (_, n) { return store[+n]; });
+    } while (text !== prev && /\u0000\d+\u0000/.test(text));
+
+    return text;
+  }
+
+  // ---------- Block parsing ----------
+  var RE_MARKER = /^(\s*)([-*+]|(\d+)[.)])(\s+)(.*)$/;
+  var RE_HEADING = /^(#{1,6})\s+(.*?)(?:\s+#+\s*)?$/;
+  var RE_FENCE = /^(\s*)(`{3,}|~{3,})\s*([\w+#.-]*)\s*$/;
+  var RE_HR = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
+  var RE_BLANK = /^\s*$/;
+
+  function indentOf(line) { return (/^(\s*)/.exec(line)[1] || '').replace(/\t/g, '    ').length; }
+
+  function parseBlocks(src) {
+    var lines = src.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n');
+    var out = [];
+    var i = 0;
+
+    while (i < lines.length) {
+      var line = lines[i];
+
+      if (RE_BLANK.test(line)) { i++; continue; }
+
+      // Fenced code
+      var f = RE_FENCE.exec(line);
+      if (f) {
+        var fenceChar = f[2][0];
+        var lang = f[3] || '';
+        var closer = new RegExp('^\\s*' + fenceChar + '{' + f[2].length + ',}\\s*$');
+        i++;
+        var code = [];
+        while (i < lines.length && !closer.test(lines[i])) { code.push(lines[i]); i++; }
+        i++; // consume closing fence
+        out.push('<pre><code' + (lang ? ' class="language-' + lang + '"' : '') + '>' +
+          escapeHtml(code.join('\n')) + '</code></pre>');
+        continue;
+      }
+
+      // ATX heading
+      var h = RE_HEADING.exec(line);
+      if (h) {
+        var lvl = h[1].length;
+        out.push('<h' + lvl + '>' + parseInline(h[2].trim()) + '</h' + lvl + '>');
+        i++; continue;
+      }
+
+      // Horizontal rule
+      if (RE_HR.test(line)) { out.push('<hr>'); i++; continue; }
+
+      // Blockquote
+      if (/^\s{0,3}>/.test(line)) {
+        var qlines = [];
+        while (i < lines.length && /^\s{0,3}>/.test(lines[i])) {
+          qlines.push(lines[i].replace(/^\s{0,3}>\s?/, ''));
+          i++;
+        }
+        out.push('<blockquote>\n' + parseBlocks(qlines.join('\n')) + '\n</blockquote>');
+        continue;
+      }
+
+      // GFM table
+      if (line.indexOf('|') !== -1 && i + 1 < lines.length &&
+        /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?\s*$/.test(lines[i + 1])) {
+        var tbl = parseTable(lines, i);
+        out.push(tbl.html); i = tbl.next; continue;
+      }
+
+      // Lists
+      if (RE_MARKER.test(line)) {
+        var lst = parseList(lines, i);
+        out.push(lst.html); i = lst.next; continue;
+      }
+
+      // Indented code block (4 spaces)
+      if (/^ {4}/.test(line)) {
+        var ic = [];
+        while (i < lines.length && (/^ {4}/.test(lines[i]) || RE_BLANK.test(lines[i]))) {
+          if (RE_BLANK.test(lines[i]) && !(i + 1 < lines.length && /^ {4}/.test(lines[i + 1]))) break;
+          ic.push(lines[i].replace(/^ {4}/, '')); i++;
+        }
+        out.push('<pre><code>' + escapeHtml(ic.join('\n')) + '</code></pre>');
+        continue;
+      }
+
+      // Setext heading (paragraph line followed by === or ---)
+      if (i + 1 < lines.length && !RE_BLANK.test(line)) {
+        if (/^\s{0,3}=+\s*$/.test(lines[i + 1])) {
+          out.push('<h1>' + parseInline(line.trim()) + '</h1>'); i += 2; continue;
+        }
+        if (/^\s{0,3}-+\s*$/.test(lines[i + 1]) && !RE_MARKER.test(line)) {
+          out.push('<h2>' + parseInline(line.trim()) + '</h2>'); i += 2; continue;
+        }
+      }
+
+      // Paragraph
+      var para = [];
+      while (i < lines.length && !RE_BLANK.test(lines[i]) &&
+        !RE_FENCE.test(lines[i]) && !RE_HEADING.test(lines[i]) &&
+        !RE_HR.test(lines[i]) && !/^\s{0,3}>/.test(lines[i]) &&
+        !RE_MARKER.test(lines[i])) {
+        // stop if a setext underline is the next line
+        if (para.length && (/^\s{0,3}=+\s*$/.test(lines[i]) || /^\s{0,3}-+\s*$/.test(lines[i]))) break;
+        para.push(lines[i]); i++;
+      }
+      out.push('<p>' + parseInline(para.join('\n')) + '</p>');
+    }
+
+    return out.join('\n');
+  }
+
+  function parseTable(lines, i) {
+    function cells(row) {
+      var r = row.trim().replace(/^\|/, '').replace(/\|$/, '');
+      var res = [], cur = '', esc = false;
+      for (var k = 0; k < r.length; k++) {
+        var c = r[k];
+        if (esc) { cur += c; esc = false; continue; }
+        if (c === '\\') { cur += c; esc = true; continue; }
+        if (c === '|') { res.push(cur); cur = ''; continue; }
+        cur += c;
+      }
+      res.push(cur);
+      return res.map(function (s) { return s.trim(); });
+    }
+    var header = cells(lines[i]);
+    var aligns = cells(lines[i + 1]).map(function (s) {
+      var l = s[0] === ':', r = s[s.length - 1] === ':';
+      return l && r ? 'center' : r ? 'right' : l ? 'left' : '';
+    });
+    var html = '<table>\n<thead>\n<tr>';
+    header.forEach(function (c, idx) {
+      var a = aligns[idx] ? ' style="text-align:' + aligns[idx] + '"' : '';
+      html += '<th' + a + '>' + parseInline(c) + '</th>';
+    });
+    html += '</tr>\n</thead>\n<tbody>\n';
+    var j = i + 2;
+    while (j < lines.length && lines[j].indexOf('|') !== -1 && !RE_BLANK.test(lines[j])) {
+      var row = cells(lines[j]);
+      html += '<tr>';
+      for (var c = 0; c < header.length; c++) {
+        var a2 = aligns[c] ? ' style="text-align:' + aligns[c] + '"' : '';
+        html += '<td' + a2 + '>' + parseInline(row[c] || '') + '</td>';
+      }
+      html += '</tr>\n';
+      j++;
+    }
+    html += '</tbody>\n</table>';
+    return { html: html, next: j };
+  }
+
+  function parseList(lines, i) {
+    var first = RE_MARKER.exec(lines[i]);
+    var baseIndent = first[1].length;
+    var ordered = !!first[3];
+    var startNum = ordered ? parseInt(first[3], 10) : 1;
+    var items = [];
+    var loose = false;
+    var sawBlank = false;
+
+    while (i < lines.length) {
+      var line = lines[i];
+
+      if (RE_BLANK.test(line)) {
+        // peek past blank run
+        var j = i;
+        while (j < lines.length && RE_BLANK.test(lines[j])) j++;
+        if (j >= lines.length) { i = j; break; }
+        var nm = RE_MARKER.exec(lines[j]);
+        var nextIndent = indentOf(lines[j]);
+        var sameType = nm && nm[1].length === baseIndent && (!!nm[3] === ordered);
+        if (sameType || nextIndent > baseIndent) {
+          if (items.length) items[items.length - 1].lines.push('');
+          sawBlank = true;
+          i = j; // continue from next content
+          continue;
+        }
+        i = j; break; // list ends
+      }
+
+      var m = RE_MARKER.exec(line);
+      if (m && m[1].length === baseIndent) {
+        if (!!m[3] !== ordered) break; // different list type -> new list
+        if (sawBlank) loose = true;
+        sawBlank = false;
+        var contentIndent = m[1].length + m[2].length + m[4].length;
+        items.push({ lines: [m[5]], contentIndent: contentIndent });
+        i++;
+        continue;
+      }
+
+      if (items.length && indentOf(line) > baseIndent) {
+        var ci = items[items.length - 1].contentIndent;
+        items[items.length - 1].lines.push(line.replace(new RegExp('^ {0,' + ci + '}'), ''));
+        i++;
+        continue;
+      }
+
+      // lazy paragraph continuation
+      if (items.length && !RE_BLANK.test(line) && !m) {
+        items[items.length - 1].lines.push(line.replace(/^\s+/, ''));
+        i++;
+        continue;
+      }
+      break;
+    }
+
+    var tag = ordered ? 'ol' : 'ul';
+    var startAttr = (ordered && startNum !== 1) ? ' start="' + startNum + '"' : '';
+    var html = '<' + tag + startAttr + '>\n';
+    items.forEach(function (it) {
+      var content = it.lines.join('\n');
+      // task list item
+      var task = /^\[([ xX])\]\s+([\s\S]*)$/.exec(content);
+      var checkbox = '';
+      if (task) {
+        var checked = task[1].toLowerCase() === 'x' ? ' checked' : '';
+        checkbox = '<input type="checkbox" disabled' + checked + '> ';
+        content = task[2];
+      }
+      var inner = parseBlocks(content);
+      if (!loose) {
+        // tight list: drop the wrapping <p> on the item's own text,
+        // but keep nested block structures (sublists, code, etc.)
+        inner = inner.replace(/^<p>([\s\S]*?)<\/p>(\n|$)/, '$1$2');
+      }
+      html += '<li' + (task ? ' class="task-item"' : '') + '>' + checkbox + inner + '</li>\n';
+    });
+    html += '</' + tag + '>';
+    return { html: html, next: i };
+  }
+
+  function mdToHtml(src) {
+    if (src == null) return '';
+    return parseBlocks(String(src));
+  }
+
+  var api = { mdToHtml: mdToHtml };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else global.MD = api;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+
+<script id="app">
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var editor = $('editor');
+  var preview = $('preview');
+  var previewScroll = $('previewScroll');
+  var live = $('live');
+  var seal = $('seal');
+
+  var KEY_DOC = 'markdown-studio:doc:v1';
+  var KEY_THEME = 'markdown-studio:theme:v1';
+  var KEY_SPLIT = 'markdown-studio:split:v1';
+  var KEY_SYNC = 'markdown-studio:sync:v1';
+
+  var SAMPLE = $('sample').textContent.replace(/^\n/, '');
+
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  function announce(msg) { live.textContent = ''; setTimeout(function () { live.textContent = msg; }, 30); }
+
+  /* ---------- Sanitize rendered HTML ---------- */
+  var ALLOW = {
+    A:1,P:1,BR:1,HR:1,EM:1,STRONG:1,DEL:1,CODE:1,PRE:1,BLOCKQUOTE:1,
+    H1:1,H2:1,H3:1,H4:1,H5:1,H6:1,UL:1,OL:1,LI:1,IMG:1,
+    TABLE:1,THEAD:1,TBODY:1,TR:1,TH:1,TD:1,INPUT:1,KBD:1,SUB:1,SUP:1,
+    SPAN:1,DIV:1,B:1,I:1,U:1,MARK:1,SMALL:1,ABBR:1,DETAILS:1,SUMMARY:1
+  };
+  function sanitize(html) {
+    var tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    var walker = document.createTreeWalker(tpl.content, NodeFilter.SHOW_ELEMENT, null);
+    var doomed = [];
+    var node = walker.nextNode();
+    while (node) {
+      if (!ALLOW[node.tagName]) {
+        doomed.push(node);
+      } else {
+        var attrs = Array.prototype.slice.call(node.attributes);
+        for (var a = 0; a < attrs.length; a++) {
+          var name = attrs[a].name.toLowerCase();
+          var val = attrs[a].value;
+          var ok = false;
+          if (name === 'href' || name === 'src') {
+            ok = !/^\s*(javascript|data|vbscript):/i.test(val) || /^\s*data:image\//i.test(val);
+          } else if (name === 'alt' || name === 'title' || name === 'class' ||
+                     name === 'start' || name === 'colspan' || name === 'rowspan') {
+            ok = true;
+          } else if (name === 'style') {
+            ok = /^text-align:\s*(left|right|center);?$/.test(val.trim());
+          } else if (node.tagName === 'INPUT' &&
+                     (name === 'type' || name === 'checked' || name === 'disabled')) {
+            ok = true;
+          }
+          if (!ok) node.removeAttribute(attrs[a].name);
+        }
+      }
+      node = walker.nextNode();
+    }
+    // unwrap disallowed elements (keep their text), remove dangerous ones outright
+    doomed.forEach(function (el) {
+      if (/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|LINK|META|BASE|FORM)$/.test(el.tagName)) {
+        el.remove();
+      } else {
+        while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.remove();
+      }
+    });
+    return tpl.innerHTML;
+  }
+
+  /* ---------- Render ---------- */
+  var sealTimer = null;
+  function flashSeal() {
+    seal.classList.remove('live');
+    void seal.offsetWidth;
+    seal.classList.add('live');
+    clearTimeout(sealTimer);
+    sealTimer = setTimeout(function () { seal.classList.remove('live'); }, 650);
+  }
+
+  function render() {
+    var src = editor.value;
+    var html = window.MD.mdToHtml(src);
+    preview.innerHTML = sanitize(html);
+    // make external links open in a new tab with a visible (new-tab) signal
+    var links = preview.querySelectorAll('a[href^="http"]');
+    for (var i = 0; i < links.length; i++) {
+      links[i].setAttribute('target', '_blank');
+      links[i].setAttribute('rel', 'noopener noreferrer');
+    }
+    if (!src.trim()) {
+      preview.innerHTML = '<p class="preview-empty">Your rendered document will appear here.</p>';
+    }
+    updateCounts(src);
+    flashSeal();
+  }
+
+  function updateCounts(src) {
+    var words = (src.trim().match(/\S+/g) || []).length;
+    $('wordCount').textContent = words.toLocaleString();
+    $('charCount').textContent = src.length.toLocaleString();
+    $('readTime').textContent = Math.max(1, Math.ceil(words / 200));
+  }
+
+  /* ---------- Autosave (debounced) ---------- */
+  var saveDot = $('saveDot'), saveText = $('saveText');
+  var renderTimer = null, saveTimer = null;
+  function onInput() {
+    updateCounts(editor.value);
+    saveDot.classList.add('saving');
+    saveText.textContent = 'Saving…';
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(render, 90);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      store(KEY_DOC, editor.value);
+      saveDot.classList.remove('saving');
+      saveText.textContent = 'Saved';
+    }, 350);
+  }
+
+  /* ---------- Formatting helpers ---------- */
+  function wrapSelection(before, after, placeholder) {
+    var s = editor.selectionStart, e = editor.selectionEnd;
+    var sel = editor.value.slice(s, e) || placeholder || '';
+    var insert = before + sel + after;
+    editor.setRangeText(insert, s, e, 'end');
+    if (!editor.value.slice(s, e)) { /* noop */ }
+    // place caret inside if placeholder was empty
+    var caret = s + before.length + sel.length;
+    editor.selectionStart = s + before.length;
+    editor.selectionEnd = caret;
+    editor.focus();
+    onInput();
+  }
+  function prefixLines(prefix) {
+    var s = editor.selectionStart, e = editor.selectionEnd;
+    var val = editor.value;
+    var lineStart = val.lastIndexOf('\n', s - 1) + 1;
+    var block = val.slice(lineStart, e);
+    var replaced = block.replace(/^/gm, prefix);
+    editor.setRangeText(replaced, lineStart, e, 'end');
+    editor.focus();
+    onInput();
+  }
+  var fmtActions = {
+    h: function () { prefixLines('## '); },
+    bold: function () { wrapSelection('**', '**', 'bold text'); },
+    italic: function () { wrapSelection('*', '*', 'italic text'); },
+    link: function () { wrapSelection('[', '](https://)', 'link text'); },
+    code: function () { wrapSelection('`', '`', 'code'); },
+    quote: function () { prefixLines('> '); },
+    list: function () { prefixLines('- '); }
+  };
+  document.querySelectorAll('.fmt button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var fn = fmtActions[b.getAttribute('data-fmt')];
+      if (fn) fn();
+    });
+  });
+
+  /* ---------- Editor keyboard shortcuts ---------- */
+  editor.addEventListener('keydown', function (ev) {
+    var mod = ev.metaKey || ev.ctrlKey;
+    if (mod && (ev.key === 'b' || ev.key === 'B')) { ev.preventDefault(); fmtActions.bold(); return; }
+    if (mod && (ev.key === 'i' || ev.key === 'I')) { ev.preventDefault(); fmtActions.italic(); return; }
+    if (mod && (ev.key === 's' || ev.key === 'S')) { ev.preventDefault(); exportAs('md'); return; }
+    if (ev.key === 'Tab') {
+      ev.preventDefault();
+      var s = editor.selectionStart, e = editor.selectionEnd;
+      if (s !== e || ev.shiftKey) {
+        // indent / outdent whole lines
+        var val = editor.value;
+        var ls = val.lastIndexOf('\n', s - 1) + 1;
+        var block = val.slice(ls, e);
+        var out = ev.shiftKey ? block.replace(/^ {1,2}/gm, '') : block.replace(/^/gm, '  ');
+        editor.setRangeText(out, ls, e, 'end');
+      } else {
+        editor.setRangeText('  ', s, e, 'end');
+      }
+      onInput();
+    }
+  });
+
+  editor.addEventListener('input', onInput);
+
+  /* ---------- Reset / Copy ---------- */
+  $('resetBtn').addEventListener('click', function () {
+    if (editor.value.trim() && editor.value !== SAMPLE) {
+      if (!window.confirm('Replace the current document with the starter content? This cannot be undone.')) return;
+    }
+    editor.value = SAMPLE;
+    render();
+    store(KEY_DOC, editor.value);
+    announce('Document reset to the starter content.');
+    editor.focus();
+  });
+
+  var copyLabel = $('copyLabel');
+  $('copyBtn').addEventListener('click', function () {
+    var text = editor.value;
+    function done() {
+      copyLabel.textContent = 'Copied!';
+      announce('Markdown copied to clipboard.');
+      setTimeout(function () { copyLabel.textContent = 'Copy'; }, 1600);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { legacyCopy(text, done); });
+    } else { legacyCopy(text, done); }
+  });
+  function legacyCopy(text, cb) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); cb(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  /* ---------- Export menu ---------- */
+  var exportBtn = $('exportBtn'), exportMenu = $('exportMenu');
+  function openMenu(open) {
+    exportMenu.classList.toggle('open', open);
+    exportBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  exportBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    openMenu(!exportMenu.classList.contains('open'));
+  });
+  document.addEventListener('click', function () { openMenu(false); });
+  exportMenu.addEventListener('click', function (e) { e.stopPropagation(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') openMenu(false); });
+  exportMenu.querySelectorAll('[data-export]').forEach(function (b) {
+    b.addEventListener('click', function () { openMenu(false); exportAs(b.getAttribute('data-export')); });
+  });
+
+  function downloadFile(filename, mime, content) {
+    var blob = new Blob([content], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  function docTitle() {
+    var m = /^#\s+(.+)$/m.exec(editor.value);
+    var t = m ? m[1].trim() : 'markdown-document';
+    return t.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').slice(0, 60) || 'document';
+  }
+  function exportAs(kind) {
+    if (kind === 'md') {
+      downloadFile(docTitle() + '.md', 'text/markdown;charset=utf-8', editor.value);
+      announce('Markdown file downloaded.');
+    } else if (kind === 'html') {
+      downloadFile(docTitle() + '.html', 'text/html;charset=utf-8', buildStandaloneHtml());
+      announce('HTML file downloaded.');
+    } else if (kind === 'pdf') {
+      window.print();
+    }
+  }
+  function buildStandaloneHtml() {
+    var body = sanitize(window.MD.mdToHtml(editor.value));
+    var title = (/^#\s+(.+)$/m.exec(editor.value) || [, 'Document'])[1];
+    title = title.replace(/[<>&]/g, '');
+    return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
+      '<title>' + title + '</title>\n<style>\n' +
+      'body{font-family:Georgia,"Times New Roman",serif;line-height:1.7;color:#1c1c1c;' +
+      'max-width:740px;margin:40px auto;padding:0 22px}' +
+      'h1,h2,h3,h4{line-height:1.25}h1{border-bottom:2px solid #d8d8d8;padding-bottom:.2em}' +
+      'h2{border-bottom:1px solid #e6e6e6;padding-bottom:.15em}' +
+      'a{color:#1f5089}code{font-family:Menlo,Consolas,monospace;background:#f0ece2;' +
+      'padding:.15em .4em;border-radius:4px;font-size:.9em}' +
+      'pre{background:#f0ece2;padding:14px 16px;border-radius:8px;overflow:auto}' +
+      'pre code{background:none;padding:0}blockquote{border-left:3px solid #cf4636;' +
+      'margin:0 0 1em;padding:.2em 1em;color:#555}table{border-collapse:collapse;width:100%}' +
+      'th,td{border:1px solid #d3d3d3;padding:7px 11px}thead th{background:#f0ece2}' +
+      'img{max-width:100%}hr{border:0;border-top:1px solid #d3d3d3;margin:2em 0}' +
+      'li.task-item{list-style:none;margin-left:-1.4em}' +
+      '</style>\n</head>\n<body>\n' + body + '\n</body>\n</html>';
+  }
+
+  /* ---------- Sync scroll ---------- */
+  var syncBtn = $('syncBtn');
+  var syncing = recall(KEY_SYNC) === '1';
+  var lock = false;
+  function setSync(on) {
+    syncing = on;
+    syncBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    store(KEY_SYNC, on ? '1' : '0');
+  }
+  setSync(syncing);
+  syncBtn.addEventListener('click', function () { setSync(!syncing); });
+  function ratio(el) { var m = el.scrollHeight - el.clientHeight; return m > 0 ? el.scrollTop / m : 0; }
+  function applyRatio(el, r) { el.scrollTop = r * (el.scrollHeight - el.clientHeight); }
+  editor.addEventListener('scroll', function () {
+    if (!syncing || lock) return; lock = true;
+    applyRatio(previewScroll, ratio(editor));
+    requestAnimationFrame(function () { lock = false; });
+  });
+  previewScroll.addEventListener('scroll', function () {
+    if (!syncing || lock) return; lock = true;
+    applyRatio(editor, ratio(previewScroll));
+    requestAnimationFrame(function () { lock = false; });
+  });
+
+  /* ---------- Splitter ---------- */
+  var splitter = $('splitter');
+  var workspace = document.querySelector('.workspace');
+  var editorPane = document.querySelector('.editor-pane');
+  function setSplit(pct) {
+    pct = Math.max(20, Math.min(80, pct));
+    editorPane.style.flex = '0 0 ' + pct + '%';
+    store(KEY_SPLIT, String(pct));
+  }
+  var savedSplit = parseFloat(recall(KEY_SPLIT));
+  if (!isNaN(savedSplit)) setSplit(savedSplit);
+
+  var dragging = false;
+  function onMove(clientX) {
+    var rect = workspace.getBoundingClientRect();
+    setSplit(((clientX - rect.left) / rect.width) * 100);
+  }
+  splitter.addEventListener('pointerdown', function (e) {
+    dragging = true;
+    splitter.classList.add('dragging');
+    document.body.classList.add('dragging');
+    splitter.setPointerCapture(e.pointerId);
+  });
+  splitter.addEventListener('pointermove', function (e) { if (dragging) onMove(e.clientX); });
+  splitter.addEventListener('pointerup', function (e) {
+    dragging = false;
+    splitter.classList.remove('dragging');
+    document.body.classList.remove('dragging');
+    try { splitter.releasePointerCapture(e.pointerId); } catch (err) {}
+  });
+  splitter.addEventListener('dblclick', function () { setSplit(50); });
+  splitter.addEventListener('keydown', function (e) {
+    var cur = parseFloat(editorPane.style.flexBasis) || 50;
+    if (e.key === 'ArrowLeft') { setSplit(cur - 3); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { setSplit(cur + 3); e.preventDefault(); }
+  });
+
+  /* ---------- Mobile pane tabs ---------- */
+  var tabWrite = $('tabWrite'), tabPreview = $('tabPreview');
+  function setMobileView(v) {
+    workspace.setAttribute('data-mobileview', v);
+    tabWrite.setAttribute('aria-selected', v === 'write' ? 'true' : 'false');
+    tabPreview.setAttribute('aria-selected', v === 'preview' ? 'true' : 'false');
+  }
+  tabWrite.addEventListener('click', function () { setMobileView('write'); });
+  tabPreview.addEventListener('click', function () { setMobileView('preview'); render(); });
+
+  /* ---------- Theme ---------- */
+  var themeBtn = $('themeBtn'), themeLabel = $('themeLabel'), themeIcon = $('themeIcon');
+  var sunPath = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  var moonPath = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>';
+  var mql = window.matchMedia('(prefers-color-scheme: dark)');
+  var themePref = recall(KEY_THEME) || 'auto'; // auto | light | dark
+  function effective() { return themePref === 'auto' ? (mql.matches ? 'dark' : 'light') : themePref; }
+  function applyTheme() {
+    var eff = effective();
+    if (eff === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    themeLabel.textContent = themePref.charAt(0).toUpperCase() + themePref.slice(1);
+    themeBtn.setAttribute('aria-label', 'Theme: ' + themePref);
+    themeIcon.innerHTML = eff === 'dark' ? moonPath : sunPath;
+  }
+  themeBtn.addEventListener('click', function () {
+    themePref = themePref === 'auto' ? 'light' : themePref === 'light' ? 'dark' : 'auto';
+    store(KEY_THEME, themePref);
+    applyTheme();
+  });
+  mql.addEventListener('change', function () { if (themePref === 'auto') applyTheme(); });
+  applyTheme();
+
+  /* ---------- Init ---------- */
+  var saved = recall(KEY_DOC);
+  editor.value = (saved !== null && saved !== '') ? saved : SAMPLE;
+  render();
+})();
+</script>
+</body>
+</html>
