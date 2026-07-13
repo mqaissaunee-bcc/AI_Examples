@@ -2,22 +2,19 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.22
+  Version:  v5.23
   Date:     July 13, 2026
-  Features: Step 3 of the sub-term rollout — invisible plumbing. Adds
-            state.activePartOfTerm (default '15W'), persisted to
-            localStorage. Snapshot objects now carry a part_of_term
-            field; rows carry _partOfTerm. Ingest paths (both the
-            manifest-driven auto-loader and the manual upload path)
-            accept and store the POT.
-            currentSnapshot() and previousSnapshot() now operate through
-            a new activeSnapshots() helper that filters to just the
-            active POT. Trend chart, discipline table sparklines, tab
-            counters, subline snapshot count, and the Snapshot Library
-            all route through activeSnapshots(). No visible change
-            because all existing data is 15W and the default POT is 15W;
-            once 11W/7A/7B data lands (Step 5), each POT will have its
-            own independent view. Built on v4.9 canonical baseline.
+  Features: Step 4 of the sub-term rollout — visible masthead subtitle.
+            A small "Fall 2026 · 15-week" label now appears beneath the
+            main title. The POT portion is a pill styled the same way
+            the interactive picker will be styled in Step 6. Currently
+            static (not clickable) — but populates from
+            state.activePartOfTerm, so when Step 6 wires up the picker
+            interaction, the label updates automatically to reflect the
+            selected sub-term. Hidden during loading and error states;
+            appears only once data has loaded. Small POT label helper
+            renders codes as "15-week", "11-week", "7A · first half",
+            "7B · second half" etc. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -123,6 +120,46 @@
     letter-spacing: -0.01em;
     text-align: center;
     line-height: 1.05;
+    margin: 0;
+  }
+  /* Title-block wraps the h1 and (when data is loaded) a subtitle
+     showing the current term and part-of-term. The subtitle is empty
+     until data loads to avoid showing "Fall 2026 · 15-week" against
+     an empty dashboard during the loading state. Sub-term display is
+     handled by titlePotPill; the label populates as "15-week",
+     "11-week", "7A · first half", "7B · second half" depending on
+     state.activePartOfTerm. */
+  .masthead .title-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .title-subtitle {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-mute);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .title-subtitle .pot-divider {
+    color: var(--ink-mute);
+    font-size: 10px;
+  }
+  .title-subtitle .pot-pill {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    padding: 3px 12px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink);
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 500;
   }
   .masthead .controls {
     display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap;
@@ -1846,7 +1883,14 @@
       <div id="editionLeft">Faculty Edition</div>
       <div id="editionLeftSub">Fall 2026</div>
     </div>
-    <h1>Enrollment Dashboard</h1>
+    <div class="title-block">
+      <h1>Enrollment Dashboard</h1>
+      <div id="titleSubtitle" class="title-subtitle" style="display:none">
+        <span id="titleTermLabel">Fall 2026</span>
+        <span class="pot-divider" aria-hidden="true">·</span>
+        <span class="pot-pill" id="titlePotPill">15-week</span>
+      </div>
+    </div>
     <div class="controls">
       <button class="btn" id="disciplineBtn" type="button" style="display:none">≡ Disciplines</button>
       <button class="btn" id="refreshBtn" type="button" title="Reload latest data from GitHub">↻ Refresh</button>
@@ -1868,7 +1912,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.22</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.23</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -2814,6 +2858,24 @@
     bindAllEvents();
   }
 
+  // Human-readable label for a part-of-term code. Used by the masthead
+  // subtitle pill. The suffixed variants ("7A · first half", "7B · second
+  // half") make the abbreviated codes readable to someone unfamiliar with
+  // Brookdale's sub-term naming without cluttering the label for the
+  // common 15W/11W cases.
+  function partOfTermLabel(code) {
+    switch (code) {
+      case '15W': return '15-week';
+      case '11W': return '11-week';
+      case '7A':  return '7A · first half';
+      case '7B':  return '7B · second half';
+      case 'SU1': return 'Summer I';
+      case 'SU2': return 'Summer II';
+      case 'SU3': return 'Summer III';
+      default:    return code || '15-week';
+    }
+  }
+
   function updateHeader() {
     const snap = currentSnapshot();
     if (state.loadStatus === 'loading') {
@@ -2824,6 +2886,21 @@
       el('reportDate').textContent = `Latest report: ${fmtDate(snap.date)}`;
     } else {
       el('reportDate').textContent = 'No data loaded';
+    }
+
+    // Title subtitle: visible only once data has loaded. Populates the POT
+    // pill from state.activePartOfTerm. The term label ("Fall 2026") is
+    // still hardcoded — the dashboard is scoped to a single term at a time
+    // and 26FA is the current focus. When multi-term support arrives
+    // later, this can be replaced with a dynamic term-code → label helper.
+    const subtitle = el('titleSubtitle');
+    if (subtitle) {
+      const showSubtitle = snap && state.loadStatus !== 'loading' && state.loadStatus !== 'error';
+      subtitle.style.display = showSubtitle ? 'flex' : 'none';
+      if (showSubtitle) {
+        const pill = el('titlePotPill');
+        if (pill) pill.textContent = partOfTermLabel(state.activePartOfTerm);
+      }
     }
 
     if (state.selectedDisciplines.size === 0) {
