@@ -2,19 +2,29 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.23
+  Version:  v5.24
   Date:     July 13, 2026
-  Features: Step 4 of the sub-term rollout — visible masthead subtitle.
-            A small "Fall 2026 · 15-week" label now appears beneath the
-            main title. The POT portion is a pill styled the same way
-            the interactive picker will be styled in Step 6. Currently
-            static (not clickable) — but populates from
-            state.activePartOfTerm, so when Step 6 wires up the picker
-            interaction, the label updates automatically to reflect the
-            selected sub-term. Hidden during loading and error states;
-            appears only once data has loaded. Small POT label helper
-            renders codes as "15-week", "11-week", "7A · first half",
-            "7B · second half" etc. Built on v4.9 canonical baseline.
+  Features: Step 6 of the sub-term rollout — the picker is now
+            interactive. Clicking the "15-week" pill in the masthead
+            opens a dropdown showing every part-of-term that has at
+            least one snapshot in the loaded data. Selecting one:
+            updates state.activePartOfTerm, resets currentSnapshotId
+            (so currentSnapshot() picks the newest in the new POT),
+            persists to localStorage, and re-renders the whole
+            dashboard. Every view — KPIs, discipline table, section
+            detail, trends, movers, snapshot library — was routed
+            through activeSnapshots() in Step 3, so they update
+            automatically with no per-view changes needed.
+            An amber banner appears beneath the subline whenever the
+            active POT is not 15W: "▸ Viewing 7A · first half sections
+            only" with a "Back to 15-week" quick-reset button.
+            The picker pill also takes on an amber-tinted state when
+            non-default so the context indicator is doubled up. Menu
+            closes on outside click or Escape.
+            What's New content updated to announce the sub-term picker
+            (WHATS_NEW_VERSION bumped to 2026-07-13). Returning readers
+            see the UPDATED pill and the modal auto-opens on next visit.
+            Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -161,6 +171,145 @@
     letter-spacing: normal;
     font-weight: 500;
   }
+  /* Interactive picker variant. The pill is now a button that opens the
+     POT menu. When the active POT is anything other than 15W, the pill
+     takes on the amber "you're not in the default view" treatment so the
+     visual cue matches the banner. */
+  .title-subtitle .pot-pill-btn {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .title-subtitle .pot-pill-btn:hover {
+    border-color: var(--ink-mute);
+    background: var(--surface-2);
+  }
+  .title-subtitle .pot-pill-btn[aria-expanded="true"] {
+    border-color: var(--ink);
+    background: var(--surface-2);
+  }
+  .title-subtitle .pot-pill-btn.is-non-default {
+    background: rgba(176, 104, 32, 0.12);
+    border-color: rgba(176, 104, 32, 0.5);
+    color: var(--wait);
+    font-weight: 600;
+  }
+  .title-subtitle .pot-pill-btn.is-non-default:hover {
+    background: rgba(176, 104, 32, 0.2);
+    border-color: var(--wait);
+  }
+  .pot-chev {
+    font-size: 9px;
+    color: var(--ink-mute);
+    transition: transform 0.15s;
+  }
+  .pot-pill-btn[aria-expanded="true"] .pot-chev {
+    transform: rotate(180deg);
+  }
+  .pot-pill-btn.is-non-default .pot-chev {
+    color: var(--wait);
+  }
+
+  /* Dropdown menu. Positioned absolutely relative to the picker wrap
+     so it hangs beneath the pill. Small, restrained styling — matches
+     the dashboard's overall aesthetic rather than adopting a heavier
+     "system menu" look. */
+  .pot-picker-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+  .pot-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 180px;
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    padding: 4px;
+    z-index: 50;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+  .pot-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 7px 12px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    border-radius: 4px;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 400;
+  }
+  .pot-menu-item:hover {
+    background: var(--surface-2);
+  }
+  .pot-menu-item.is-active {
+    font-weight: 600;
+  }
+  .pot-menu-item .check {
+    color: var(--up);
+    font-size: 12px;
+  }
+  .pot-menu-item .count {
+    font-size: 10px;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Amber banner shown when the active POT is not the default (15W).
+     Persistent visual reminder that the KPIs, tables, and charts on
+     screen represent only the selected sub-term — prevents accidental
+     "wait, why did enrollment drop?" moments when someone glances at
+     the dashboard in a filtered view. */
+  .pot-banner {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 12px;
+    color: var(--wait);
+    background: rgba(176, 104, 32, 0.08);
+    border: 1px solid rgba(176, 104, 32, 0.35);
+    border-radius: 4px;
+    padding: 8px 14px;
+    margin: -12px 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pot-banner strong {
+    font-weight: 700;
+  }
+  .pot-banner-reset {
+    margin-left: auto;
+    font-family: inherit;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: transparent;
+    border: 1px solid rgba(176, 104, 32, 0.5);
+    color: var(--wait);
+    padding: 3px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .pot-banner-reset:hover {
+    background: rgba(176, 104, 32, 0.15);
+    border-color: var(--wait);
+  }
+
   .masthead .controls {
     display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap;
   }
@@ -1888,7 +2037,19 @@
       <div id="titleSubtitle" class="title-subtitle" style="display:none">
         <span id="titleTermLabel">Fall 2026</span>
         <span class="pot-divider" aria-hidden="true">·</span>
-        <span class="pot-pill" id="titlePotPill">15-week</span>
+        <div class="pot-picker-wrap">
+          <button
+            type="button"
+            class="pot-pill pot-pill-btn"
+            id="titlePotPill"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            title="Switch part of term">
+            <span id="titlePotPillLabel">15-week</span>
+            <span class="pot-chev" aria-hidden="true">▾</span>
+          </button>
+          <div class="pot-menu" id="potMenu" role="listbox" aria-labelledby="titlePotPill" style="display:none"></div>
+        </div>
       </div>
     </div>
     <div class="controls">
@@ -1909,10 +2070,16 @@
     <button type="button" id="whatsNewBtn" class="whats-new-btn" title="See what's new since your last visit"><span class="wn-icon" aria-hidden="true">?</span> What's new <span class="wn-pill" id="whatsNewPill">NEW</span></button>
   </div>
 
+  <div id="potBanner" class="pot-banner" style="display:none">
+    <span aria-hidden="true">▸</span>
+    Viewing <strong id="potBannerLabel">7A · first half</strong> sections only
+    <button type="button" class="pot-banner-reset" id="potBannerReset" title="Return to 15-week view">Back to 15-week</button>
+  </div>
+
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.23</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.24</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -1969,12 +2136,10 @@
   // pill renders as "UPDATED" instead of "NEW", and the modal auto-opens
   // once on first load. First-time visitors (no stored value) see "NEW"
   // with no auto-open — the badge alone is their introduction.
-  const WHATS_NEW_VERSION = '2026-06-16';
+  const WHATS_NEW_VERSION = '2026-07-13';
   const WHATS_NEW_CONTENT = `
     <ul>
-      <li><strong>Biggest Waitlists</strong> card in the Movers section, aggregated by course code rather than section. Surfaces course-level demand pressure (e.g., HIST-201 across all of its sections, not just one).</li>
-      <li><strong>Hover-isolate on trend charts.</strong> Hover any line, dot, or legend chip on the Enrollment or Fill Rate chart to pull that discipline out of the tangle. The college baseline stays bright as a reference.</li>
-      <li><strong>Cleaner large numbers.</strong> Thousands separators applied everywhere counts hit four digits, plus a typography pass on the By Discipline table.</li>
+      <li><strong>Sub-term picker.</strong> Click the "15-week" pill under the title to switch between 15-week, 11-week, 7A, and 7B. Every view — KPIs, discipline table, section detail, trends, movers — recalculates for the selected sub-term. An amber banner appears when you're viewing anything other than 15-week so you don't accidentally leave a screenshot in the wrong view.</li>
     </ul>
   `;
 
@@ -2858,6 +3023,24 @@
     bindAllEvents();
   }
 
+  // Canonical ordering for the POT dropdown. Fall/spring parts of term
+  // sit before summer sessions; within fall/spring the sequence is 15W
+  // (longest / default) followed by the shorter variants. Any POT code
+  // not in this list is appended alphabetically at the end so unfamiliar
+  // codes still appear rather than being silently dropped.
+  const POT_ORDER = ['15W', '11W', '7A', '7B', 'SU1', 'SU2', 'SU3'];
+
+  // Returns the parts of term that have at least one snapshot in the
+  // loaded data, sorted in canonical order. Used to populate the picker
+  // menu so users only see options they can actually switch to.
+  function availablePartsOfTerm() {
+    const found = new Set();
+    state.snapshots.forEach(s => found.add(s.part_of_term || '15W'));
+    const known = POT_ORDER.filter(p => found.has(p));
+    const extra = [...found].filter(p => !POT_ORDER.includes(p)).sort();
+    return [...known, ...extra];
+  }
+
   // Human-readable label for a part-of-term code. Used by the masthead
   // subtitle pill. The suffixed variants ("7A · first half", "7B · second
   // half") make the abbreviated codes readable to someone unfamiliar with
@@ -2898,8 +3081,47 @@
       const showSubtitle = snap && state.loadStatus !== 'loading' && state.loadStatus !== 'error';
       subtitle.style.display = showSubtitle ? 'flex' : 'none';
       if (showSubtitle) {
-        const pill = el('titlePotPill');
-        if (pill) pill.textContent = partOfTermLabel(state.activePartOfTerm);
+        const activePot = state.activePartOfTerm;
+        const isDefault = activePot === '15W';
+        const label = partOfTermLabel(activePot);
+
+        // Pill label + non-default state (amber treatment when not 15W)
+        const pillLabel = el('titlePotPillLabel');
+        if (pillLabel) pillLabel.textContent = label;
+        const pillBtn = el('titlePotPill');
+        if (pillBtn) {
+          pillBtn.classList.toggle('is-non-default', !isDefault);
+          pillBtn.setAttribute('aria-expanded', pillBtn.getAttribute('aria-expanded') === 'true' ? 'true' : 'false');
+        }
+
+        // Rebuild the dropdown menu contents from currently-available POTs
+        const menu = el('potMenu');
+        if (menu) {
+          const available = availablePartsOfTerm();
+          menu.innerHTML = available.map(pot => {
+            const count = state.snapshots.filter(s => (s.part_of_term || '15W') === pot).length;
+            const isActive = pot === activePot;
+            const check = isActive ? '<span class="check" aria-hidden="true">✓</span>' : '<span class="check" aria-hidden="true" style="visibility:hidden">✓</span>';
+            const countLabel = count === 1 ? '1 snapshot' : `${count} snapshots`;
+            return `
+              <button type="button" class="pot-menu-item ${isActive ? 'is-active' : ''}" role="option" data-pot="${escapeHtml(pot)}" aria-selected="${isActive}">
+                ${check}
+                <span class="label">${escapeHtml(partOfTermLabel(pot))}</span>
+                <span class="count">${countLabel}</span>
+              </button>
+            `;
+          }).join('');
+        }
+
+        // Amber banner shown only when the active POT is not 15W
+        const banner = el('potBanner');
+        if (banner) {
+          banner.style.display = isDefault ? 'none' : 'flex';
+          if (!isDefault) {
+            const bannerLabel = el('potBannerLabel');
+            if (bannerLabel) bannerLabel.textContent = label;
+          }
+        }
       }
     }
 
@@ -5672,6 +5894,86 @@
 
   const whatsNewBtn = el('whatsNewBtn');
   if (whatsNewBtn) whatsNewBtn.addEventListener('click', openWhatsNew);
+
+  // -----------------------------------------------------------------------
+  // Part-of-term picker — click handling
+  // -----------------------------------------------------------------------
+  // The pill in the masthead opens a menu of available POTs. Selecting one
+  // updates state.activePartOfTerm, persists to localStorage, and triggers
+  // a full re-render — every view (KPIs, discipline table, list view,
+  // trends, movers, snapshot library) already reads through activeSnapshots()
+  // so they update automatically. The "Back to 15-week" button in the
+  // amber banner is a quick escape hatch for users who ended up in a
+  // non-default view and want to return without hunting for the picker.
+  function closePotMenu() {
+    const menu = el('potMenu');
+    const pillBtn = el('titlePotPill');
+    if (menu) menu.style.display = 'none';
+    if (pillBtn) pillBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function switchPartOfTerm(pot) {
+    if (!pot || pot === state.activePartOfTerm) {
+      closePotMenu();
+      return;
+    }
+    state.activePartOfTerm = pot;
+    // Reset current snapshot pointer — the stored ID belongs to a
+    // different POT. currentSnapshot() will fall back to the newest
+    // snapshot in the new POT on the next call.
+    state.currentSnapshotId = null;
+    saveStorage();
+    closePotMenu();
+    render();
+  }
+
+  const potPillBtn = el('titlePotPill');
+  if (potPillBtn) {
+    potPillBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = el('potMenu');
+      if (!menu) return;
+      const isOpen = menu.style.display === 'block';
+      if (isOpen) {
+        closePotMenu();
+      } else {
+        menu.style.display = 'block';
+        potPillBtn.setAttribute('aria-expanded', 'true');
+      }
+    });
+  }
+
+  // Menu items — event delegation on the container since items are
+  // rebuilt dynamically in updateHeader()
+  const potMenu = el('potMenu');
+  if (potMenu) {
+    potMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-pot]');
+      if (!item) return;
+      switchPartOfTerm(item.dataset.pot);
+    });
+  }
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    const menu = el('potMenu');
+    if (!menu || menu.style.display !== 'block') return;
+    const wrap = e.target.closest('.pot-picker-wrap');
+    if (!wrap) closePotMenu();
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const menu = el('potMenu');
+    if (menu && menu.style.display === 'block') closePotMenu();
+  });
+
+  // "Back to 15-week" quick-reset button in the amber banner
+  const potBannerReset = el('potBannerReset');
+  if (potBannerReset) {
+    potBannerReset.addEventListener('click', () => switchPartOfTerm('15W'));
+  }
 
   /* =========================================================================
    * INIT
