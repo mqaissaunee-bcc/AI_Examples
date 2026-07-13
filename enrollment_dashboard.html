@@ -2,28 +2,22 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.21
-  Date:     June 16, 2026
-  Features: Three coordinated changes:
-            (1) Trend chart hover-isolate. Both the Enrollment and Fill
-                Rate charts now respond to hover on any line, dot, or
-                legend chip — the hovered discipline raises to full
-                opacity, all others dim to 16%. Dots additionally show a
-                small dark readout tooltip with the formatted value.
-                Lets a chair pull any individual line out of the visual
-                tangle without restructuring the chart.
-            (2) College reference stays bright on hover. On the Fill
-                Rate chart (the only chart where the college baseline
-                appears), the reference line is exempted from the
-                dimming, brightening slightly when something is
-                highlighted. Reading "is my discipline ahead of or
-                behind the college pace" is now a single hover away.
-            (3) What's new modal auto-opens once for returning readers
-                whose stored seen-version is stale. Pill text swaps to
-                "UPDATED" instead of "NEW" in that case. First-time
-                visitors are not auto-opened — the badge alone
-                introduces them to the feature.
-            Built on v4.9 canonical baseline.
+  Version:  v5.22
+  Date:     July 13, 2026
+  Features: Step 3 of the sub-term rollout — invisible plumbing. Adds
+            state.activePartOfTerm (default '15W'), persisted to
+            localStorage. Snapshot objects now carry a part_of_term
+            field; rows carry _partOfTerm. Ingest paths (both the
+            manifest-driven auto-loader and the manual upload path)
+            accept and store the POT.
+            currentSnapshot() and previousSnapshot() now operate through
+            a new activeSnapshots() helper that filters to just the
+            active POT. Trend chart, discipline table sparklines, tab
+            counters, subline snapshot count, and the Snapshot Library
+            all route through activeSnapshots(). No visible change
+            because all existing data is 15W and the default POT is 15W;
+            once 11W/7A/7B data lands (Step 5), each POT will have its
+            own independent view. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
@@ -1874,7 +1868,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.21</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.22</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -1914,6 +1908,7 @@
     GROUPED_VIEW: 'enroll-grouped-view',
     DISCIPLINE_ROW_EXPANSION: 'enroll-disc-row-expansion',
     WHATS_NEW_SEEN: 'enroll-whats-new-seen',
+    ACTIVE_PART_OF_TERM: 'enroll-active-part-of-term',
   };
 
   // -----------------------------------------------------------------------
@@ -1941,10 +1936,19 @@
 
   const state = {
     // Data
-    snapshots: [],          // [{ id, date, label, filename, rows: [...] }] sorted ASC by date
+    snapshots: [],          // [{ id, date, label, filename, part_of_term, rows: [...] }] sorted ASC by date
     currentSnapshotId: null,
     instituteIndex: {},     // { 'BUSS': ['CULA','ACCT',...], ... }
     allDisciplines: [],     // [{ code, institute, count }]
+
+    // Part-of-term selection. Each snapshot belongs to exactly one part of
+    // term (15W, 11W, 7A, 7B — or SU1/SU2/SU3 for summer). The active POT
+    // filters which snapshots are considered "in view" — currentSnapshot(),
+    // previousSnapshot(), and any aggregation across snapshots (trend chart,
+    // movers, waitlist) all operate on the active POT only. Default is 15W
+    // which matches the existing dashboard behavior when only 15W data
+    // exists. Persisted to localStorage so the user's choice sticks.
+    activePartOfTerm: '15W',
 
     // User selections
     selectedDisciplines: new Set(),
@@ -2099,6 +2103,9 @@
 
       const dre = localStorage.getItem(STORAGE.DISCIPLINE_ROW_EXPANSION);
       if (dre) state.disciplineRowExpansion = JSON.parse(dre);
+
+      const apot = localStorage.getItem(STORAGE.ACTIVE_PART_OF_TERM);
+      if (apot) state.activePartOfTerm = apot;
     } catch (err) {
       console.error('Storage load error:', err);
     }
@@ -2113,6 +2120,7 @@
       localStorage.setItem(STORAGE.CARD_EXPANSION, JSON.stringify(state.cardExpansion));
       localStorage.setItem(STORAGE.GROUPED_VIEW, String(state.groupedView));
       localStorage.setItem(STORAGE.DISCIPLINE_ROW_EXPANSION, JSON.stringify(state.disciplineRowExpansion));
+      localStorage.setItem(STORAGE.ACTIVE_PART_OF_TERM, state.activePartOfTerm);
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
     }
@@ -2213,7 +2221,7 @@
           const sheetName = wb.SheetNames.find(n => /individual\s*sect/i.test(n)) || wb.SheetNames[0];
           const sheet = wb.Sheets[sheetName];
           const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
-          ingestRowsSilent(rawRows, entry.file, entry.date);
+          ingestRowsSilent(rawRows, entry.file, entry.date, entry.part_of_term);
         } catch (err) {
           console.error(`Failed to parse ${entry.file}:`, err);
         }
@@ -2249,7 +2257,13 @@
   // Like ingestRows, but used during manifest load — does not toast or modify
   // currentSnapshotId (the caller decides). Uses the manifest-provided date
   // rather than re-parsing it from the filename.
-  function ingestRowsSilent(rawRows, filename, manifestDate) {
+  function ingestRowsSilent(rawRows, filename, manifestDate, partOfTerm) {
+    // partOfTerm identifies which sub-term this snapshot belongs to. Comes
+    // from the manifest entry's part_of_term field (added in the Step 1
+    // pipeline update). Snapshots produced before the pipeline update, or
+    // any missing/undefined value, default to '15W' — that was the effective
+    // meaning of "no sub-term declared" in the pre-sub-term-support era.
+    const pot = partOfTerm || '15W';
     const fall = rawRows.filter(r => {
       const term = String(r.Term || '').toUpperCase();
       // Drop -295 (Special Project) and -299 (Internship) sections entirely
@@ -2281,6 +2295,7 @@
         Term: r.Term,
         _prefix: prefix,
         _session: getSessionLength(r),
+        _partOfTerm: pot,
       };
     }).filter(r => r._prefix);
 
@@ -2305,12 +2320,18 @@
       date,
       label: fmtDate(date),
       filename,
+      part_of_term: pot,
       rows: fall,
       uploadedAt: new Date().toISOString(),
     });
   }
 
   function ingestRows(rawRows, filename) {
+    // Manual upload path (not from manifest). Assume the file belongs to
+    // whichever part-of-term the user is currently viewing — that's the
+    // implicit context of "here's a file I want to add." If they were on
+    // 7A view and uploaded a 15W file, they'd want to switch to 15W first.
+    const pot = state.activePartOfTerm || '15W';
     const fall = rawRows.filter(r => {
       const term = String(r.Term || '').toUpperCase();
       // Drop -295 / -299 sections at ingest. See note in ingestRowsSilent.
@@ -2339,6 +2360,7 @@
         Term: r.Term,
         _prefix: prefix,
         _session: getSessionLength(r),
+        _partOfTerm: pot,
       };
     }).filter(r => r._prefix);
 
@@ -2361,13 +2383,16 @@
     let date = parseDateFromFilename(filename);
     if (!date) date = new Date().toISOString().slice(0, 10);
 
-    // Check for duplicate date — if so, replace
-    const existingIdx = state.snapshots.findIndex(s => s.date === date);
+    // Check for duplicate (date, part_of_term) pair — a 15W and 7A snapshot
+    // on the same date are different snapshots; only a same-POT duplicate
+    // should trigger the replace path.
+    const existingIdx = state.snapshots.findIndex(s => s.date === date && (s.part_of_term || '15W') === pot);
     const snapshot = {
       id: uid(),
       date,
       label: fmtDate(date),
       filename,
+      part_of_term: pot,
       rows: fall,
       uploadedAt: new Date().toISOString(),
     };
@@ -2424,15 +2449,36 @@
    * SNAPSHOT ACCESSORS
    * ========================================================================= */
 
+  // Returns the subset of state.snapshots belonging to the currently
+  // active part-of-term. This is the single source of truth for "which
+  // snapshots are visible to the user right now" — every function that
+  // needs to iterate across the history (trend chart, movers, snapshot
+  // library) uses this instead of state.snapshots directly. Snapshots
+  // missing the part_of_term field default to '15W' for backward
+  // compatibility with any old data loaded before Step 1.
+  function activeSnapshots() {
+    return state.snapshots.filter(s =>
+      (s.part_of_term || '15W') === state.activePartOfTerm
+    );
+  }
+
   function currentSnapshot() {
-    return state.snapshots.find(s => s.id === state.currentSnapshotId) || state.snapshots[state.snapshots.length - 1];
+    // Prefer a POT-appropriate snapshot for currentSnapshotId; if the
+    // stored id belongs to a different POT (which can happen after the
+    // user switches the picker), fall back to the newest snapshot in the
+    // active POT. If no active POT snapshots exist yet, return undefined
+    // and let the caller render an empty state.
+    const active = activeSnapshots();
+    const byId = active.find(s => s.id === state.currentSnapshotId);
+    return byId || active[active.length - 1];
   }
 
   function previousSnapshot() {
     const cur = currentSnapshot();
     if (!cur) return null;
-    const idx = state.snapshots.findIndex(s => s.id === cur.id);
-    return idx > 0 ? state.snapshots[idx - 1] : null;
+    const active = activeSnapshots();
+    const idx = active.findIndex(s => s.id === cur.id);
+    return idx > 0 ? active[idx - 1] : null;
   }
 
   // Filtered current rows by selected disciplines + sub-filters
@@ -2788,10 +2834,11 @@
       el('disciplineSummary').textContent = display;
     }
 
+    const potSnapCount = activeSnapshots().length;
     el('snapshotCount').textContent =
-      state.snapshots.length === 0 ? '0 snapshots'
-      : state.snapshots.length === 1 ? '1 snapshot'
-      : `${state.snapshots.length} snapshots`;
+      potSnapCount === 0 ? '0 snapshots'
+      : potSnapCount === 1 ? '1 snapshot'
+      : `${potSnapCount} snapshots`;
 
     if (snap) {
       const updated = state.manifestUpdatedAt
@@ -2868,7 +2915,7 @@
     return `
       <div class="tabs">
         <button class="tab ${state.activeTab === 'snapshot' ? 'active' : ''}" data-tab="snapshot">Current Snapshot <span class="count">${sections}</span></button>
-        <button class="tab ${state.activeTab === 'trends' ? 'active' : ''}" data-tab="trends">Trends <span class="count">${state.snapshots.length}</span></button>
+        <button class="tab ${state.activeTab === 'trends' ? 'active' : ''}" data-tab="trends">Trends <span class="count">${activeSnapshots().length}</span></button>
         <button class="tab ${state.activeTab === 'snapshots' ? 'active' : ''}" data-tab="snapshots">Snapshots</button>
       </div>
     `;
@@ -3234,10 +3281,11 @@
         ? `<strong title="High fill % typically indicates placeholder-capacity sections (e.g., independent study) where ‘capacity’ is set to 1">${fill.toFixed(1)}%</strong>`
         : `<strong>${fill.toFixed(1)}%</strong>`;
 
-      const enrSeries = state.snapshots.map(s =>
+      const snapsInPot = activeSnapshots();
+      const enrSeries = snapsInPot.map(s =>
         sum(s.rows.filter(r => r._prefix === p && inFilter(r)), 'Enrolled Students')
       );
-      const sparkCell = state.snapshots.length > 1
+      const sparkCell = snapsInPot.length > 1
         ? renderSparkline(enrSeries, colorFor(p), 100, 22)
         : '<span style="color:var(--ink-mute)">—</span>';
 
@@ -4514,7 +4562,12 @@
    * ========================================================================= */
 
   function renderTrendsView() {
-    if (state.snapshots.length < 2) {
+    // Iterate the snapshots belonging to the current part-of-term only.
+    // Historical comparisons, movers, and waitlist counts are all
+    // per-POT — comparing a 15W snapshot against a 7A snapshot would be
+    // meaningless.
+    const snaps = activeSnapshots();
+    if (snaps.length < 2) {
       return `
         <div class="welcome" style="margin-top:32px">
           <h2>One snapshot so far.</h2>
@@ -4524,7 +4577,7 @@
     }
 
     let present = [...state.selectedDisciplines]
-      .filter(p => state.snapshots.some(s => s.rows.some(r => r._prefix === p)))
+      .filter(p => snaps.some(s => s.rows.some(r => r._prefix === p)))
       .sort();
 
     // Honor the discipline filter chips here too, so the trends chart focuses
@@ -4535,8 +4588,8 @@
 
     // Build series per discipline
     const series = present.map(p => {
-      const enr = state.snapshots.map(s => sum(s.rows.filter(r => r._prefix === p), 'Enrolled Students'));
-      const fill = state.snapshots.map(s => {
+      const enr = snaps.map(s => sum(s.rows.filter(r => r._prefix === p), 'Enrolled Students'));
+      const fill = snaps.map(s => {
         const rows = s.rows.filter(r => r._prefix === p);
         const cap = sum(rows, 'Capacity');
         const en = sum(rows, 'Enrolled Students');
@@ -4550,21 +4603,21 @@
       code: 'College',
       color: 'var(--flat)',
       dashed: true,
-      enr: state.snapshots.map(s => sum(s.rows, 'Enrolled Students')),
-      fill: state.snapshots.map(s => {
+      enr: snaps.map(s => sum(s.rows, 'Enrolled Students')),
+      fill: snaps.map(s => {
         const cap = sum(s.rows, 'Capacity');
         const en = sum(s.rows, 'Enrolled Students');
         return cap > 0 ? (en / cap * 100) : 0;
       }),
     } : null;
 
-    const dates = state.snapshots.map(s => fmtDateShort(s.date));
+    const dates = snaps.map(s => fmtDateShort(s.date));
 
     // Movers — biggest enrollment changes between first and last snapshot
-    const firstSnap = state.snapshots[0];
-    const lastSnap = state.snapshots[state.snapshots.length - 1];
+    const firstSnap = snaps[0];
+    const lastSnap = snaps[snaps.length - 1];
     const allSections = new Set();
-    state.snapshots.forEach(s => s.rows.forEach(r => {
+    snaps.forEach(s => s.rows.forEach(r => {
       if (state.selectedDisciplines.has(r._prefix)) allSections.add(r.Section);
     }));
 
@@ -4629,7 +4682,7 @@
       .slice(0, 8);
 
     return `
-      <div class="section-title">Enrollment Over Time <span class="meta">${state.snapshots.length} snapshots · ${fmtDate(firstSnap.date)} → ${fmtDate(lastSnap.date)}</span></div>
+      <div class="section-title">Enrollment Over Time <span class="meta">${snaps.length} snapshots · ${fmtDate(firstSnap.date)} → ${fmtDate(lastSnap.date)}</span></div>
       ${renderMultiSeriesChart(series, dates, 'enr', 'Enrolled Students', null)}
       ${renderMultiSeriesChart(series, dates, 'fill', 'Fill Rate (%)', cwSeries)}
 
@@ -4802,7 +4855,11 @@
    * ========================================================================= */
 
   function renderSnapshotManager() {
-    const rows = state.snapshots.slice().reverse().map(s => {
+    // Show snapshots belonging to the active part-of-term. When we have
+    // 11W/7A/7B data later, users switch POTs via the picker and this
+    // library reflects whichever POT they're currently viewing.
+    const potSnaps = activeSnapshots();
+    const rows = potSnaps.slice().reverse().map(s => {
       const isCurrent = s.id === state.currentSnapshotId;
       const totalSections = s.rows.length;
       const totalEnr = sum(s.rows, 'Enrolled Students');
@@ -4813,7 +4870,7 @@
             <div style="font-weight:600">${escapeHtml(s.label)}</div>
             <div class="name">${escapeHtml(s.filename)}</div>
           </div>
-          <div class="stats">${totalSections} sections · ${totalEnr} enrolled</div>
+          <div class="stats">${fmtInt(totalSections)} sections · ${fmtInt(totalEnr)} enrolled</div>
           ${isCurrent ? '<span class="badge cur">VIEWING</span>' : `<button class="btn ghost" data-set-current="${s.id}">View</button>`}
           <span></span>
         </div>
@@ -4825,7 +4882,7 @@
       : `Loaded ${state.loadedAt ? new Date(state.loadedAt).toLocaleString() : ''}`;
 
     return `
-      <div class="section-title">Snapshot Library <span class="meta">${state.snapshots.length} snapshots from data folder</span></div>
+      <div class="section-title">Snapshot Library <span class="meta">${fmtInt(potSnaps.length)} snapshots from data folder</span></div>
 
       <div style="background:var(--surface-2);border:1px solid var(--rule);padding:14px 18px;margin-bottom:18px;font-size:13px;color:var(--ink-soft)">
         <strong style="font-family:Helvetica Neue, sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink)">Data Source</strong><br>
