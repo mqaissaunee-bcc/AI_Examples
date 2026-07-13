@@ -13,6 +13,27 @@ Examples that parse correctly:
     26FA_Course_Enrollment_Report_042826.xlsx  -> 2026-04-28
     26FA_Course_Enrollment_Report_050126.xlsx  -> 2026-05-01
 
+Folder structure — two conventions supported side by side:
+
+    Loose files at the term level (backward compat, treated as 15-week):
+        data/26FA/26FA_..._050126.xlsx
+
+    Files organized into sub-term subfolders (new; use folder name as
+    the part-of-term identifier):
+        data/26FA/15W/26FA_..._050126.xlsx
+        data/26FA/11W/26FA_..._050126.xlsx
+        data/26FA/7A/26FA_..._050126.xlsx
+        data/26FA/7B/26FA_..._050126.xlsx
+
+Both conventions can coexist during migration. After all files are
+moved into subfolders, the loose-file path is no longer used but the
+script still tolerates loose files (defaulting them to "15W") so that
+accidental drops don't break the pipeline.
+
+Subfolder names starting with '.' or '_' are ignored (avoids picking
+up .git, __pycache__, _backup, etc.). Only one level of nesting is
+walked — files inside data/{term}/{pot}/deeper/ are not discovered.
+
 Usage
 -----
     # Default: scans data/26FA/, writes manifest there
@@ -37,12 +58,18 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Tuple
 
 
 # Match the trailing _MMDDYY or " MMDDYY" before .xlsx
 # (last 6 digits before extension, preceded by either underscore or space)
 DATE_PATTERN = re.compile(r"[_\s](\d{2})(\d{2})(\d{2})\.xlsx$", re.IGNORECASE)
+
+# Part-of-term assigned to files found loose at the term-folder level
+# (i.e., not inside a POT subfolder). Preserves the meaning of files
+# uploaded before the sub-term structure existed — all such files were
+# 15-week snapshots.
+LOOSE_DEFAULT_POT = "15W"
 
 
 def parse_date_from_filename(filename: str) -> Optional[str]:
@@ -80,6 +107,53 @@ def derive_term(data_dir: Path) -> str:
     return data_dir.name
 
 
+def is_valid_xlsx(f: Path) -> bool:
+    """
+    True if f is a real .xlsx file worth including in the manifest.
+    Excludes Office temp/lock files (~$foo.xlsx) and hidden files (.foo).
+    """
+    return (
+        f.is_file()
+        and f.suffix.lower() == ".xlsx"
+        and not f.name.startswith("~$")
+        and not f.name.startswith(".")
+    )
+
+
+def discover_snapshots(data_dir: Path) -> List[Tuple[Path, str]]:
+    """
+    Return a list of (file_path, part_of_term) tuples for every valid
+    xlsx file in and beneath data_dir.
+
+    Two search patterns, combined:
+      - Loose .xlsx files directly in data_dir → part_of_term = "15W"
+        (backward compat: files uploaded before the sub-term structure)
+      - .xlsx files inside a subfolder → part_of_term = subfolder name
+
+    Subfolders starting with '.' or '_' are skipped (avoids .git,
+    __pycache__, _backup, etc.). Deeper nesting is not walked.
+    """
+    results: List[Tuple[Path, str]] = []
+
+    # Loose files (backward compat: treated as 15W)
+    for f in data_dir.iterdir():
+        if is_valid_xlsx(f):
+            results.append((f, LOOSE_DEFAULT_POT))
+
+    # Subfolders (new sub-term structure)
+    for sub in data_dir.iterdir():
+        if not sub.is_dir():
+            continue
+        if sub.name.startswith(".") or sub.name.startswith("_"):
+            continue
+        pot = sub.name  # e.g., "15W", "11W", "7A", "7B", "SU1"
+        for f in sub.iterdir():
+            if is_valid_xlsx(f):
+                results.append((f, pot))
+
+    return results
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Generate manifest.json for the enrollment dashboard."
@@ -103,24 +177,23 @@ def main() -> int:
         print(f"ERROR: data folder not found: {data_dir}", file=sys.stderr)
         return 2
 
-    # Find all .xlsx files (case-insensitive), excluding temp/lock files
-    xlsx_files = sorted(
-        f for f in data_dir.iterdir()
-        if f.is_file()
-        and f.suffix.lower() == ".xlsx"
-        and not f.name.startswith("~$")
-        and not f.name.startswith(".")
-    )
+    # Discover all xlsx files (loose files + subfolder-organized files)
+    discovered = discover_snapshots(data_dir)
 
-    if not xlsx_files:
+    if not discovered:
         print(f"ERROR: no .xlsx files found in {data_dir}", file=sys.stderr)
         return 2
 
-    # Normalize filenames: spaces -> underscores. This handles the case where
-    # IR sends a file with spaces and the upload preserves them. Once renamed,
-    # the rest of the script and the dashboard's manifest see consistent names.
+    # Sort deterministically: by POT, then by filename. Final manifest
+    # sorting (by date) happens later; this initial sort just makes the
+    # normalization and rename output easier to scan in logs.
+    discovered.sort(key=lambda t: (t[1], t[0].name))
+
+    # Normalize filenames: spaces -> underscores. Applied to files at any
+    # location (loose or in a subfolder). Once renamed, the parent path is
+    # unchanged; the same POT applies.
     renamed = []
-    for i, f in enumerate(xlsx_files):
+    for i, (f, pot) in enumerate(discovered):
         normalized = normalize_filename(f.name)
         if normalized != f.name:
             new_path = f.parent / normalized
@@ -134,7 +207,7 @@ def main() -> int:
                 return 1
             f.rename(new_path)
             renamed.append((f.name, normalized))
-            xlsx_files[i] = new_path
+            discovered[i] = (new_path, pot)
 
     if renamed:
         print("Normalized filenames (spaces -> underscores):")
@@ -145,14 +218,20 @@ def main() -> int:
     snapshots = []
     unparseable = []
 
-    for f in xlsx_files:
+    for f, pot in discovered:
         date = parse_date_from_filename(f.name)
+        # The file path stored in the manifest is relative to data_dir.
+        # For loose files this is just the filename; for subfolder files
+        # it's "POT/filename". The client fetches ${data_dir}/${file}
+        # so this works transparently in both cases.
+        rel_path = str(f.relative_to(data_dir))
         if date is None:
-            unparseable.append(f.name)
+            unparseable.append(rel_path)
         else:
             snapshots.append({
                 "date": date,
-                "file": f.name,
+                "part_of_term": pot,
+                "file": rel_path,
             })
 
     # Fail loudly on bad filenames — do not write a partial manifest
@@ -171,22 +250,26 @@ def main() -> int:
         )
         return 1
 
-    # Sort by date ascending so the dashboard displays oldest-first naturally
-    snapshots.sort(key=lambda s: s["date"])
+    # Sort by (date, part_of_term) so entries are ordered oldest-first, and
+    # so that multiple POTs on the same date have a deterministic order.
+    snapshots.sort(key=lambda s: (s["date"], s["part_of_term"]))
 
-    # Detect duplicate dates — these produce ambiguous results in the dashboard
+    # Detect duplicates — same (date, part_of_term) pair must appear at most
+    # once. Note that a 15W and a 7A snapshot on the same date are NOT
+    # duplicates; they're different POTs happening to share a report date.
     dates_seen = {}
     for s in snapshots:
-        dates_seen.setdefault(s["date"], []).append(s["file"])
-    duplicates = {d: files for d, files in dates_seen.items() if len(files) > 1}
+        key = (s["date"], s["part_of_term"])
+        dates_seen.setdefault(key, []).append(s["file"])
+    duplicates = {k: files for k, files in dates_seen.items() if len(files) > 1}
     if duplicates:
         print(
-            "ERROR: the following report dates have multiple files. The dashboard\n"
-            "expects exactly one report per date:",
+            "ERROR: the following (date, part-of-term) pairs have multiple files.\n"
+            "The dashboard expects exactly one report per date per part of term:",
             file=sys.stderr,
         )
-        for date, files in duplicates.items():
-            print(f"  {date}: {', '.join(files)}", file=sys.stderr)
+        for (date, pot), files in duplicates.items():
+            print(f"  {date} · {pot}: {', '.join(files)}", file=sys.stderr)
         return 1
 
     # Preserve any non-auto-generated fields (like goals) from an existing
@@ -221,7 +304,7 @@ def main() -> int:
     manifest_path.write_text(output, encoding="utf-8")
     print(f"Wrote {manifest_path} with {len(snapshots)} snapshot(s):")
     for s in snapshots:
-        print(f"  {s['date']}  {s['file']}")
+        print(f"  {s['part_of_term']:4s}  {s['date']}  {s['file']}")
     return 0
 
 
