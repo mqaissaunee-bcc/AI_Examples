@@ -1072,7 +1072,42 @@ Time management</textarea>
   ["targetMin","targetMax"].forEach(function(id){ $(id).addEventListener("input", refreshTargetLabel); });
 
   // ---------- camera ----------
-  btnEnable.addEventListener("click", enableCamera);
+  btnEnable.addEventListener("click", function(){
+    if(recorder && recorder.state === "recording") return;   // never kill a live take
+    if(stream) stopCamera(); else enableCamera();
+  });
+
+  // Label follows both the on/off state and the chosen quality, so audio-only
+  // mode doesn't promise a camera it isn't using.
+  function updateEnableLabel(){
+    const audioOnly = $("quality").value === "audio";
+    const thing = audioOnly ? "microphone" : "camera";
+    btnEnable.querySelector("span.dot-ico").nextSibling.textContent =
+      (stream ? "Turn off " : "Turn on ") + thing;
+    btnEnable.setAttribute("aria-pressed", stream ? "true" : "false");
+  }
+  $("quality").addEventListener("change", updateEnableLabel);
+
+  function stopCamera(){
+    try{ if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); } }catch(e){}
+    stream = null;
+    stopMetering();
+    stopRecognition();
+    // clear only the live preview - a recorded take keeps playing
+    if(video.srcObject){
+      video.srcObject = null;
+      if(!recURL){ viewport.classList.remove("has-video"); }
+    }
+    btnRecord.disabled = true;
+    const wasAudioOnly = isAudioOnly;
+    isAudioOnly = false;
+    $("phMark").textContent = "\uD83C\uDF99";
+    $("phTitle").textContent = "Step onto the stage.";
+    $("phBody").textContent = "Turn on your camera and mic to begin. Find your light, take a breath, and start your take when you're ready.";
+    setStatus("idle", wasAudioOnly ? "Microphone off" : "Camera off");
+    updateEnableLabel();
+    announce(wasAudioOnly ? "Microphone is off." : "Camera and microphone are off.");
+  }
   async function enableCamera(){
     clearErr();
     if(!mediaSupported){
@@ -1096,8 +1131,9 @@ Time management</textarea>
       video.removeAttribute("controls");
       await video.play().catch(function(){});
       if(!audioOnly){ viewport.classList.add("has-video"); }
-      btnEnable.hidden = true;
+      btnRecord.hidden = false;
       btnRecord.disabled = false;
+      updateEnableLabel();
       btnRecord.focus();
       setStatus("ready","Ready — take the stage");
       announce("Camera and microphone are on. Ready to record.");
@@ -1244,6 +1280,7 @@ Time management</textarea>
 
     // UI → live
     viewport.classList.add("recording");
+    btnEnable.disabled = true;
     recDot.classList.add("live");
     onair.classList.add("show");
     setStatus("live","Recording");
@@ -1283,6 +1320,7 @@ Time management</textarea>
     stopRecognition();
     if(timerId){ clearInterval(timerId); timerId = null; }
     viewport.classList.remove("recording");
+    btnEnable.disabled = false;
     recDot.classList.remove("live");
     onair.classList.remove("show");
     captions.classList.remove("show");
@@ -2571,6 +2609,7 @@ Time management</textarea>
     if(savedAsst && ASSISTANTS[savedAsst]) $("assistant").value = savedAsst;
   }catch(e){}
   refreshAssistant();
+  updateEnableLabel();
   setStageState(false);
   renderRubric();
   renderHistory();
