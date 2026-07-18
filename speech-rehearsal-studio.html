@@ -1,0 +1,2545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Rehearsal Room — Speech Practice Studio</title>
+<meta name="description" content="Record a speech take in your browser, then see an objective breakdown of your delivery: pace, filler words, pauses, and word variety. Runs fully in the browser, no account or upload.">
+<style>
+:root{
+  /* Stage is a design constant — dark in both light and dark mode, like a real stage */
+  --stage:#15171c;
+  --stage-2:#1d2028;
+  --stage-ink:#eef1f5;
+  --stage-ink-soft:#9aa3b0;
+  --stage-line:#2b303a;
+
+  --lamp:#e8a33d;          /* stage-light amber — the accent, used with restraint */
+  --lamp-soft:rgba(232,163,61,.16);
+  --live:#e2574f;          /* recording red — only when live */
+
+  --good:#5fa47a;          /* on target */
+  --slow:#6f97c9;          /* under target (cool) */
+  --over:#d8894a;          /* over target (warm) */
+
+  --paper:#e9edf1;         /* page */
+  --card:#ffffff;          /* surfaces */
+  --line:#d7dde4;          /* hairlines */
+  --field:#f3f6f9;         /* inputs */
+  --ink:#1b2027;           /* text */
+  --ink-soft:#5a636f;      /* muted text */
+
+  --radius:14px;
+  --radius-sm:9px;
+  --shadow:0 1px 2px rgba(20,25,35,.06),0 8px 30px rgba(20,25,35,.08);
+
+  --font-display:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+  --font-body:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+
+  --maxw:1080px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0e1013;
+    --card:#181b21;
+    --line:#282d36;
+    --field:#14161b;
+    --ink:#e9ecef;
+    --ink-soft:#98a1ac;
+  }
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  font-family:var(--font-body);
+  color:var(--ink);
+  background:var(--paper);
+  line-height:1.5;
+  font-size:16px;
+}
+
+.skip-link{
+  position:absolute;left:-999px;top:0;z-index:100;
+  background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:0 0 8px 0;
+  text-decoration:none;
+}
+.skip-link:focus{left:0}
+
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
+
+/* ---------- Header ---------- */
+header.site{padding:34px 0 18px}
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--lamp);margin:0 0 6px;font-weight:600;
+}
+h1{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:clamp(1.9rem,5vw,2.9rem);
+  line-height:1.04;margin:0 0 8px;letter-spacing:-.01em;
+}
+.tagline{margin:0;color:var(--ink-soft);max-width:52ch;font-size:1.02rem}
+
+.statusbar{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin-top:18px;
+}
+.status-pill{
+  display:inline-flex;align-items:center;gap:9px;
+  font-family:var(--font-mono);font-size:.8rem;letter-spacing:.04em;
+  background:var(--card);border:1px solid var(--line);border-radius:100px;
+  padding:8px 15px 8px 13px;color:var(--ink-soft);box-shadow:var(--shadow);
+}
+.status-dot{width:9px;height:9px;border-radius:50%;background:var(--ink-soft);flex:0 0 auto}
+.status-pill[data-state="live"]{color:var(--live);border-color:var(--live)}
+.status-pill[data-state="live"] .status-dot{background:var(--live);animation:pulse 1.1s ease-in-out infinite}
+.status-pill[data-state="review"]{color:var(--lamp)}
+.status-pill[data-state="review"] .status-dot{background:var(--lamp)}
+.status-pill[data-state="ready"] .status-dot{background:var(--good)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.82)}}
+
+.onair{
+  display:none;align-items:center;gap:8px;
+  font-family:var(--font-mono);font-weight:700;font-size:.78rem;letter-spacing:.18em;
+  color:#fff;background:var(--live);border-radius:6px;padding:7px 12px;
+  box-shadow:0 0 0 4px rgba(226,87,79,.18);
+}
+.onair.show{display:inline-flex}
+.onair .bulb{width:8px;height:8px;border-radius:50%;background:#fff;animation:pulse 1.1s ease-in-out infinite}
+
+/* ---------- Layout ---------- */
+main{padding:6px 0 60px}
+.grid{display:grid;grid-template-columns:1fr;gap:20px}
+@media (min-width:900px){
+  .grid{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start}
+}
+
+/* ---------- Stage ---------- */
+.stage{
+  background:radial-gradient(120% 90% at 50% -10%,var(--stage-2),var(--stage) 62%);
+  border:1px solid var(--stage-line);
+  border-radius:var(--radius);
+  overflow:hidden;
+  box-shadow:var(--shadow);
+  color:var(--stage-ink);
+}
+.viewport{
+  position:relative;
+  aspect-ratio:16/9;
+  background:
+    repeating-linear-gradient(45deg,rgba(255,255,255,.012) 0 14px,transparent 14px 28px),
+    #0c0e12;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+video{
+  width:100%;height:100%;object-fit:cover;display:none;background:#000;
+  transform:scaleX(-1); /* mirror the live preview like a rehearsal mirror */
+}
+video.playback{transform:none} /* un-mirror during review */
+.viewport.has-video video{display:block}
+
+.placeholder{
+  text-align:center;padding:26px;color:var(--stage-ink-soft);max-width:34ch;
+}
+.placeholder .mark{
+  font-family:var(--font-display);font-size:2.4rem;color:var(--lamp);
+  line-height:1;margin-bottom:10px;
+}
+.placeholder p{margin:.35em 0;font-size:.95rem}
+.viewport.has-video .placeholder{display:none}
+
+/* recording glow */
+.viewport::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 0 0 rgba(226,87,79,0);
+  transition:box-shadow .3s ease;
+}
+.viewport.recording::after{box-shadow:inset 0 0 0 3px rgba(226,87,79,.85),inset 0 0 60px rgba(226,87,79,.25)}
+
+/* teleprompter prompt */
+.prompt-strip{
+  position:absolute;left:0;right:0;top:0;
+  background:linear-gradient(180deg,rgba(10,12,16,.82),rgba(10,12,16,0));
+  color:var(--stage-ink);padding:12px 16px 26px;font-size:.92rem;
+  display:none;
+}
+.prompt-strip.show{display:block}
+.prompt-strip b{color:var(--lamp);font-weight:600;letter-spacing:.03em;
+  font-family:var(--font-mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.16em;
+  display:block;margin-bottom:3px}
+
+/* live captions */
+.captions{
+  position:absolute;left:0;right:0;bottom:0;
+  background:linear-gradient(0deg,rgba(10,12,16,.86),rgba(10,12,16,0));
+  color:var(--stage-ink);padding:30px 18px 16px;font-size:1.02rem;line-height:1.4;
+  min-height:2.4em;display:none;text-align:center;
+}
+.captions.show{display:block}
+.captions .interim{color:var(--stage-ink-soft)}
+
+/* timer + meter bar */
+.readout{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 18px;border-top:1px solid var(--stage-line);
+  background:var(--stage-2);
+}
+.timer-wrap{display:flex;align-items:center;gap:14px}
+.ring{position:relative;width:54px;height:54px;flex:0 0 auto}
+.ring svg{transform:rotate(-90deg);display:block}
+.ring .track{stroke:var(--stage-line)}
+.ring .fill{stroke:var(--lamp);stroke-linecap:round;transition:stroke-dashoffset .25s linear,stroke .25s}
+.ring .rec-dot{
+  position:absolute;inset:0;margin:auto;width:13px;height:13px;border-radius:50%;
+  background:var(--stage-ink-soft);
+}
+.viewport.recording ~ .readout .ring .rec-dot,
+.readout .ring .rec-dot.live{background:var(--live)}
+.timer{
+  font-family:var(--font-mono);font-size:1.5rem;font-weight:600;letter-spacing:.02em;
+  color:var(--stage-ink);font-variant-numeric:tabular-nums;
+}
+.timer .target{font-size:.8rem;color:var(--stage-ink-soft);margin-left:2px}
+
+.level{flex:1;max-width:220px}
+.level-label{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--stage-ink-soft);margin-bottom:5px}
+.level-track{height:8px;border-radius:100px;background:var(--stage-line);overflow:hidden}
+.level-bar{height:100%;width:0%;border-radius:100px;
+  background:linear-gradient(90deg,var(--good),var(--lamp) 70%,var(--live));
+  transition:width .08s linear}
+
+/* controls */
+.controls{
+  display:flex;flex-wrap:wrap;gap:10px;padding:16px 18px;
+  border-top:1px solid var(--stage-line);background:var(--stage);
+}
+button{
+  font-family:var(--font-body);font-size:.95rem;font-weight:600;
+  min-height:44px;padding:0 20px;border-radius:100px;cursor:pointer;
+  border:1px solid transparent;display:inline-flex;align-items:center;gap:9px;
+  transition:transform .06s ease,background .15s,border-color .15s,opacity .15s;
+}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible{outline:3px solid var(--lamp);outline-offset:2px}
+.btn-primary{background:var(--lamp);color:#1a1204;border-color:var(--lamp)}
+.btn-primary:hover:not(:disabled){background:#f0b155}
+.btn-rec{background:var(--live);color:#fff;border-color:var(--live)}
+.btn-rec:hover:not(:disabled){background:#e86a63}
+.btn-ghost{background:transparent;color:var(--stage-ink);border-color:var(--stage-line)}
+.btn-ghost:hover:not(:disabled){border-color:var(--stage-ink-soft);background:rgba(255,255,255,.04)}
+.dot-ico{width:11px;height:11px;border-radius:50%;background:currentColor;flex:0 0 auto}
+.sq-ico{width:11px;height:11px;border-radius:2px;background:currentColor;flex:0 0 auto}
+
+/* ---------- Settings ---------- */
+.settings{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.settings>summary{
+  list-style:none;cursor:pointer;padding:16px 20px;font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-family:var(--font-mono);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);
+}
+.settings>summary::-webkit-details-marker{display:none}
+.settings>summary:focus-visible{outline:3px solid var(--lamp);outline-offset:-3px}
+.chev{transition:transform .2s;color:var(--ink-soft)}
+.settings[open] .chev{transform:rotate(180deg)}
+.settings-body{padding:4px 20px 20px;display:grid;gap:16px}
+.field label{display:block;font-weight:600;font-size:.86rem;margin-bottom:5px}
+.field .hint{font-size:.78rem;color:var(--ink-soft);margin:4px 0 0}
+input[type="text"],input[type="number"],textarea{
+  width:100%;font-family:var(--font-body);font-size:.95rem;color:var(--ink);
+  background:var(--field);border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:10px 12px;
+}
+textarea{resize:vertical;min-height:60px;line-height:1.5}
+input:focus,textarea:focus{outline:2px solid var(--lamp);outline-offset:0;border-color:var(--lamp)}
+input[type="file"]{width:100%;font-family:var(--font-body);font-size:.88rem;color:var(--ink);
+  background:var(--field);border:1px solid var(--line);border-radius:var(--radius-sm);padding:9px 11px}
+input[type="file"]::file-selector-button{
+  font-family:var(--font-body);font-size:.84rem;font-weight:600;cursor:pointer;
+  background:var(--ink);color:var(--paper);border:0;border-radius:100px;
+  padding:7px 14px;margin-right:11px;min-height:34px}
+input[type="file"]::file-selector-button:hover{opacity:.9}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.inline{display:flex;align-items:center;gap:10px}
+.inline input[type="number"]{width:90px}
+.toggle{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.9rem;font-weight:600}
+.toggle input{width:18px;height:18px;accent-color:var(--lamp);cursor:pointer}
+
+/* ---------- Analysis ---------- */
+.analysis{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.analysis-head{padding:18px 20px 4px}
+
+/* ---------- numbered stages ---------- */
+.stage-head{
+  display:flex;align-items:center;gap:11px;padding:15px 20px;
+  border-bottom:1px solid var(--line);
+}
+.stage-num{
+  width:24px;height:24px;border-radius:50%;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:.78rem;font-weight:600;
+  background:var(--field);color:var(--ink-soft);border:1px solid var(--line);
+}
+.stage-title{font-weight:600;font-size:1rem}
+.stage-when{margin-left:auto;font-size:.78rem;color:var(--ink-soft)}
+.stage-card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden;margin-top:16px;
+}
+.stage-card[data-active="1"] .stage-num{background:var(--lamp);color:#1a1204;border-color:var(--lamp)}
+.stage-card[data-active="1"] .stage-when{color:var(--lamp);font-weight:600}
+.stage-card[data-locked="1"]{opacity:.55}
+.stage-card[data-locked="1"] .stage-body{display:none}
+
+/* plain-language metric display */
+.metric .headline{font-size:1.05rem;font-weight:600;line-height:1.25;margin-bottom:4px}
+.metric .detail{font-size:.86rem;color:var(--ink-soft)}
+.metric .headline[data-tone="good"]{color:var(--good)}
+.metric .headline[data-tone="slow"]{color:var(--slow)}
+.metric .headline[data-tone="over"]{color:var(--over)}
+.metric .headline[data-tone="mute"]{color:var(--ink-soft);font-weight:400}
+.accuracy-note{
+  margin:0;padding:11px 13px;background:var(--lamp-soft);border-radius:var(--radius-sm);
+  font-size:.82rem;color:var(--ink);display:flex;gap:9px;align-items:flex-start;
+}
+.accuracy-note .n-ico{color:var(--lamp);font-weight:700;flex:0 0 auto}
+.analysis-head h2{
+  font-family:var(--font-display);font-size:1.35rem;font-weight:600;margin:0;letter-spacing:-.01em;
+}
+.analysis-head p{margin:4px 0 0;color:var(--ink-soft);font-size:.9rem}
+
+.empty{padding:34px 24px 40px;text-align:center;color:var(--ink-soft)}
+
+.delta{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.delta .d{font-family:var(--font-mono);font-size:.72rem;padding:3px 9px;border-radius:100px;
+  background:var(--field);border:1px solid var(--line);color:var(--ink-soft)}
+.delta .d b{font-weight:600}
+.delta .d.up b{color:var(--good)}
+.delta .d.dn b{color:var(--over)}
+
+.countdown{
+  position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(10,12,16,.72);z-index:3;
+}
+.countdown.show{display:flex}
+.countdown span{
+  font-family:var(--font-display);font-size:clamp(3.5rem,14vw,7rem);color:var(--lamp);
+  line-height:1;text-shadow:0 4px 30px rgba(0,0,0,.5);
+}
+.empty .mark{font-family:var(--font-display);font-size:2rem;color:var(--line);margin-bottom:6px}
+
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+  border-top:1px solid var(--line);margin-top:14px}
+.metric{background:var(--card);padding:16px 18px}
+.metric .k{font-family:var(--font-mono);font-size:.64rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px}
+.metric .v{font-family:var(--font-mono);font-size:1.9rem;font-weight:600;line-height:1;
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.metric .v small{font-size:.8rem;color:var(--ink-soft);font-weight:400;margin-left:4px}
+.metric .flag{
+  display:inline-flex;align-items:center;gap:6px;margin-top:10px;
+  font-size:.78rem;font-weight:600;padding:3px 9px;border-radius:100px;
+}
+.flag[data-tone="good"]{background:rgba(95,164,122,.16);color:var(--good)}
+.flag[data-tone="slow"]{background:rgba(111,151,201,.16);color:var(--slow)}
+.flag[data-tone="over"]{background:rgba(216,137,74,.16);color:var(--over)}
+.flag[data-tone="live"]{background:rgba(226,87,79,.14);color:var(--live)}
+.flag[data-tone="mute"]{background:var(--field);color:var(--ink-soft)}
+.flag .fdot{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+/* pace scale */
+.scale{margin-top:12px}
+.scale-track{position:relative;height:8px;border-radius:100px;
+  background:linear-gradient(90deg,var(--slow) 0 33%,var(--good) 33% 66%,var(--over) 66% 100%);
+  opacity:.85}
+.scale-mark{position:absolute;top:-4px;width:3px;height:16px;border-radius:2px;
+  background:var(--ink);transform:translateX(-50%)}
+.scale-ends{display:flex;justify-content:space-between;font-family:var(--font-mono);
+  font-size:.62rem;color:var(--ink-soft);margin-top:6px}
+
+/* found fillers chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{font-family:var(--font-mono);font-size:.72rem;background:var(--field);
+  border:1px solid var(--line);border-radius:100px;padding:3px 9px;color:var(--ink-soft)}
+.chip b{color:var(--over)}
+
+/* volume trace */
+.trace-wrap{padding:16px 18px;border-top:1px solid var(--line)}
+.trace-label{font-family:var(--font-mono);font-size:.64rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;display:flex;justify-content:space-between}
+canvas.trace{width:100%;height:60px;display:block;background:#20252e;border-radius:var(--radius-sm)}
+
+/* coaching */
+.coach-wrap{padding:16px 18px;border-top:1px solid var(--line)}
+.coach-wrap h3{font-size:.95rem;margin:0 0 2px}
+.coach-lead{margin:0 0 12px;color:var(--ink-soft);font-size:.86rem}
+.copy-note{font-size:.82rem;color:var(--good);font-weight:600;align-self:center}
+.copy-note.warn{color:var(--over)}
+.adv{margin-top:14px;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+.adv>summary{list-style:none;cursor:pointer;padding:11px 14px;font-size:.82rem;font-weight:600;color:var(--ink-soft)}
+.adv>summary::-webkit-details-marker{display:none}
+.adv>summary:focus-visible{outline:3px solid var(--lamp);outline-offset:-3px}
+.adv-body{padding:4px 14px 16px;display:grid;gap:12px}
+.warn-box{font-size:.8rem;background:rgba(216,137,74,.12);border:1px solid rgba(216,137,74,.4);border-radius:var(--radius-sm);padding:10px 12px;color:var(--ink)}
+.warn-box b{color:var(--over)}
+.coach-out{padding:14px 0 4px}
+.coach-out[hidden]{display:none}
+.coach-card{background:var(--field);border:1px solid var(--line);border-left:3px solid var(--lamp);border-radius:var(--radius-sm);padding:16px}
+.coach-opener{margin:0 0 4px;font-size:1rem;font-weight:600}
+.coach-sec{margin-top:14px}
+.coach-sec h4{font-family:var(--font-mono);font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 7px}
+.coach-sec ul{margin:0;padding-left:18px}
+.coach-sec li{margin:4px 0}
+.improve{margin:8px 0;padding:11px 13px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius-sm)}
+.imp-focus{font-weight:600}
+.imp-why{font-size:.9rem;color:var(--ink-soft);margin-top:2px}
+.imp-try{font-size:.9rem;margin-top:6px}
+.imp-try b{color:var(--lamp)}
+.coach-next{margin-top:14px;padding:11px 13px;background:var(--lamp-soft);border-radius:var(--radius-sm);font-weight:600}
+.coach-next span{display:block;font-family:var(--font-mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--lamp);margin-bottom:3px}
+.coach-raw{white-space:pre-wrap;font-size:.92rem;line-height:1.6}
+.coach-prose{font-size:.94rem;line-height:1.65}
+.coach-prose p{margin:.55em 0}
+.coach-prose ul{margin:.5em 0;padding-left:20px}
+.coach-prose li{margin:.3em 0}
+.coach-prose .prose-h{font-size:.7rem;font-family:var(--font-mono);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-soft);margin:1.1em 0 .4em;font-weight:600}
+.coach-prose strong{font-weight:600}
+.assistant-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px}
+.assistant-row .field{flex:1 1 220px;margin:0}
+.open-link{
+  display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 16px;
+  border-radius:100px;border:1px solid var(--line);color:var(--ink);text-decoration:none;
+  font-size:.88rem;font-weight:600;background:transparent;
+}
+.open-link:hover{border-color:var(--ink-soft);background:var(--field)}
+.open-link:focus-visible{outline:3px solid var(--lamp);outline-offset:2px}
+.coach-loading{color:var(--ink-soft);font-size:.9rem;padding:8px 2px}
+.coach-err{font-size:.88rem;color:var(--over);background:rgba(216,137,74,.1);border:1px solid rgba(216,137,74,.35);border-radius:var(--radius-sm);padding:12px}
+
+/* ---------- rubric ---------- */
+.rubric-wrap{padding:16px 18px;border-top:1px solid var(--line)}
+.rubric-wrap h3{font-size:.95rem;margin:0 0 2px}
+.rubric-lead{margin:0 0 14px;color:var(--ink-soft);font-size:.86rem}
+.crit{padding:11px 0;border-bottom:1px solid var(--line)}
+.crit:last-of-type{border-bottom:0}
+.crit-name{font-weight:600;font-size:.9rem;margin-bottom:8px}
+.scale-opts{display:flex;flex-wrap:wrap;gap:6px}
+.scale-opts label{
+  flex:1 1 0;min-width:74px;cursor:pointer;text-align:center;
+  border:1px solid var(--line);border-radius:var(--radius-sm);padding:7px 6px;
+  font-size:.76rem;color:var(--ink-soft);background:var(--field);
+  transition:border-color .15s,background .15s,color .15s;
+}
+.scale-opts input{position:absolute;opacity:0;width:0;height:0}
+.scale-opts label:hover{border-color:var(--ink-soft)}
+.scale-opts input:checked+span{color:var(--ink)}
+.scale-opts label:has(input:checked){border-color:var(--lamp);background:var(--lamp-soft);color:var(--ink);font-weight:600}
+.scale-opts label:has(input:focus-visible){outline:3px solid var(--lamp);outline-offset:2px}
+.scale-opts .num{display:block;font-family:var(--font-mono);font-size:1rem;font-weight:600;line-height:1.2}
+.reflect{margin-top:14px;display:grid;gap:12px}
+.rubric-total{
+  display:flex;align-items:baseline;gap:10px;margin-top:14px;padding:11px 13px;
+  background:var(--field);border-radius:var(--radius-sm);
+}
+.rubric-total b{font-family:var(--font-mono);font-size:1.3rem}
+.rubric-total span{font-size:.84rem;color:var(--ink-soft)}
+
+/* ---------- history ---------- */
+.history{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden;margin-top:20px}
+.history>summary{list-style:none;cursor:pointer;padding:16px 20px;font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-family:var(--font-mono);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+.history>summary::-webkit-details-marker{display:none}
+.history>summary:focus-visible{outline:3px solid var(--lamp);outline-offset:-3px}
+.history[open] .chev{transform:rotate(180deg)}
+.hist-body{padding:0 20px 20px}
+.hist-empty{color:var(--ink-soft);font-size:.88rem;padding:6px 0 10px}
+.spark-wrap{margin:6px 0 16px}
+.spark-label{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;display:flex;justify-content:space-between}
+canvas.spark{width:100%;height:52px;display:block;background:var(--field);
+  border:1px solid var(--line);border-radius:var(--radius-sm)}
+.take{border:1px solid var(--line);border-radius:var(--radius-sm);margin-bottom:9px;overflow:hidden}
+.take>summary{list-style:none;cursor:pointer;padding:11px 13px;display:flex;flex-wrap:wrap;
+  align-items:center;gap:9px;font-size:.86rem}
+.take>summary::-webkit-details-marker{display:none}
+.take>summary:focus-visible{outline:3px solid var(--lamp);outline-offset:-3px}
+.take .tno{font-family:var(--font-mono);font-weight:600;color:var(--lamp);font-size:.8rem}
+.take .tdate{color:var(--ink-soft);font-size:.8rem}
+.take .tstat{font-family:var(--font-mono);font-size:.75rem;color:var(--ink-soft);margin-left:auto}
+.take-body{padding:2px 13px 14px;font-size:.86rem;border-top:1px solid var(--line)}
+.take-body dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:10px 0}
+.take-body dt{color:var(--ink-soft)}
+.take-body dd{margin:0}
+.take-body .tprompt{font-style:italic;color:var(--ink-soft);margin:8px 0}
+.take-body .ttext{background:var(--field);border-radius:var(--radius-sm);padding:10px;
+  max-height:120px;overflow:auto;white-space:pre-wrap;margin:8px 0}
+.hist-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.btn-danger{background:transparent;color:var(--over);border-color:rgba(216,137,74,.5)}
+.btn-danger:hover:not(:disabled){background:rgba(216,137,74,.1)}
+
+/* transcript */
+.transcript-wrap{padding:16px 18px;border-top:1px solid var(--line)}
+.transcript-wrap h3{font-size:.95rem;margin:0 0 4px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.transcript-wrap h3 span{font-family:var(--font-mono);font-size:.7rem;font-weight:400;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase}
+.transcript{
+  font-size:.95rem;line-height:1.7;background:var(--field);border:1px solid var(--line);
+  border-radius:var(--radius-sm);padding:14px;min-height:80px;max-height:280px;overflow:auto;
+  white-space:pre-wrap;
+}
+.transcript mark{background:rgba(216,137,74,.28);color:inherit;border-radius:3px;padding:0 2px;font-weight:600}
+.transcript[contenteditable="true"]:focus{outline:2px solid var(--lamp)}
+.transcript:empty:before{content:attr(data-placeholder);color:var(--ink-soft)}
+.t-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.btn-sm{min-height:40px;font-size:.86rem;padding:0 16px}
+.btn-solid{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn-solid:hover:not(:disabled){opacity:.9}
+.btn-line{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn-line:hover:not(:disabled){border-color:var(--ink-soft)}
+
+/* notices */
+.notice{
+  margin:14px 0 0;padding:12px 14px;border-radius:var(--radius-sm);font-size:.86rem;
+  background:var(--lamp-soft);border:1px solid rgba(232,163,61,.4);color:var(--ink);
+  display:flex;gap:10px;align-items:flex-start;
+}
+.notice.err{background:rgba(226,87,79,.1);border-color:rgba(226,87,79,.4)}
+.notice .n-ico{color:var(--lamp);font-weight:700;flex:0 0 auto}
+.notice.err .n-ico{color:var(--live)}
+.notice[hidden]{display:none}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* footer */
+footer.site{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--ink-soft);font-size:.84rem}
+footer.site .program{color:var(--ink);font-weight:600}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important}
+}
+
+/* ---------- print: a clean report for the instructor ---------- */
+@media print{
+  @page{ margin:14mm; }
+  body{background:#fff;color:#000;font-size:11pt}
+  .stage-card#card1, .settings, .history, .notice, .onair, .statusbar,
+  .controls, .readout, .viewport, .t-actions, .delta, .skip-link,
+  #loadPanel, #emptyState, .accuracy-note, .coach-lead, .rubric-lead,
+  .scale, .chips, #coachPaste, label[for="coachPaste"], footer.site .print-hide{
+    display:none !important;
+  }
+  header.site{padding:0 0 8px;border-bottom:1px solid #000}
+  h1{font-size:17pt;margin:0}
+  .eyebrow{color:#000;font-size:8pt;margin:0}
+  .tagline{display:none}
+  .wrap{max-width:none;padding:0}
+  .grid{display:block}
+  .analysis, .stage-card{border:0;box-shadow:none;margin:0;page-break-inside:avoid}
+  .stage-head{border-bottom:1px solid #999;padding:8px 0 4px}
+  .stage-num{background:#fff;color:#000;border:1px solid #000}
+  .stage-when{display:none}
+  .metrics{grid-template-columns:1fr 1fr;gap:0;background:#fff;border-top:1px solid #999}
+  .metric{padding:7px 0;border-bottom:1px solid #ddd;background:#fff}
+  .metric .k{color:#000}
+  .metric .headline{color:#000 !important;font-size:11pt}
+  .metric .detail{color:#333}
+  .transcript{max-height:none;overflow:visible;background:#fff;border:1px solid #ccc;font-size:9.5pt}
+  .trace-wrap, .transcript-wrap, .rubric-wrap, .coach-wrap, .stage-body{padding:8px 0}
+  canvas.trace{background:#fff;border:1px solid #ccc;height:44px}
+  .crit{padding:5px 0}
+  .scale-opts label{border:1px solid #ccc;background:#fff;color:#666;padding:3px 4px;font-size:8pt}
+  .scale-opts label:has(input:checked){border:1.5px solid #000;background:#eee;color:#000}
+  .coach-card{background:#fff;border:1px solid #999;border-left:3px solid #000}
+  .improve{background:#fff;border:1px solid #ddd}
+  .coach-next{background:#f2f2f2}
+  .rubric-total{background:#f2f2f2}
+  footer.site{border-top:1px solid #999;font-size:8pt;padding:8px 0 0}
+  a[href]:after{content:""}
+}
+@media (max-width:520px){
+  .metrics{grid-template-columns:1fr}
+  .readout{flex-wrap:wrap}
+  .level{max-width:none;flex-basis:100%}
+}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<div class="wrap">
+<header class="site">
+  <p class="eyebrow">Speech Practice Studio</p>
+  <h1>The Rehearsal Room</h1>
+  <p class="tagline">Record a take, watch it back, and see an honest read on your delivery — pace, filler words, pauses, and word variety. Everything runs in your browser. Nothing is uploaded.</p>
+  <div class="statusbar">
+    <span class="status-pill" id="statusPill" data-state="idle" role="status" aria-live="polite">
+      <span class="status-dot"></span><span id="statusText">Camera off</span>
+    </span>
+    <span class="onair" id="onair" aria-hidden="true"><span class="bulb"></span>ON AIR</span>
+  </div>
+</header>
+</div>
+
+<div class="wrap">
+<main id="main">
+  <div class="grid">
+
+    <!-- ============ STAGE ============ -->
+    <div class="stage-col">
+      <div class="stage-card" id="card1" data-active="1" style="margin-top:0">
+        <div class="stage-head">
+          <span class="stage-num">1</span>
+          <span class="stage-title">Record your take</span>
+          <span class="stage-when" id="when1">You're here</span>
+        </div>
+      <section class="stage" aria-label="Recording stage" style="border:0;border-radius:0;box-shadow:none;margin:0">
+        <div class="viewport" id="viewport">
+          <div class="placeholder" id="placeholder">
+            <div class="mark" aria-hidden="true" id="phMark">🎙</div>
+            <p><strong id="phTitle">Step onto the stage.</strong></p>
+            <p id="phBody">Turn on your camera and mic to begin. Find your light, take a breath, and start your take when you're ready.</p>
+          </div>
+          <div class="prompt-strip" id="promptStrip"><b>Your prompt</b><span id="promptText"></span></div>
+          <video id="video" playsinline></video>
+          <div class="countdown" id="countdown" aria-hidden="true"><span id="countNum">3</span></div>
+          <div class="captions" id="captions" aria-hidden="true"></div>
+        </div>
+
+        <div class="readout">
+          <div class="timer-wrap">
+            <div class="ring" aria-hidden="true">
+              <svg width="54" height="54" viewBox="0 0 54 54">
+                <circle class="track" cx="27" cy="27" r="23" fill="none" stroke-width="4"></circle>
+                <circle class="fill" id="ringFill" cx="27" cy="27" r="23" fill="none" stroke-width="4"
+                        stroke-dasharray="144.5" stroke-dashoffset="144.5"></circle>
+              </svg>
+              <span class="rec-dot" id="recDot"></span>
+            </div>
+            <div>
+              <div class="timer"><span id="timer">0:00</span><span class="target" id="timerTarget"></span></div>
+            </div>
+          </div>
+          <div class="level" aria-hidden="true">
+            <div class="level-label">Mic level</div>
+            <div class="level-track"><div class="level-bar" id="levelBar"></div></div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button class="btn-primary" id="btnEnable" type="button">
+            <span class="dot-ico"></span>Turn on camera
+          </button>
+          <button class="btn-rec" id="btnRecord" type="button" disabled>
+            <span class="dot-ico"></span>Start recording
+          </button>
+          <button class="btn-ghost" id="btnStop" type="button" disabled hidden>
+            <span class="sq-ico"></span>Stop
+          </button>
+          <button class="btn-ghost" id="btnAgain" type="button" disabled hidden>Record again</button>
+          <button class="btn-ghost" id="btnSaveVideo" type="button" disabled hidden>Save video</button>
+        </div>
+      </section>
+      </div>
+
+      <details class="settings" id="loadPanel" style="margin-top:20px">
+        <summary>
+          <span>Analyze an existing recording</span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </summary>
+        <div class="settings-body">
+          <p class="hint" style="margin:0">Already recorded elsewhere — on your phone, in Zoom or Teams, or while presenting slides? Load the file here instead of recording. Nothing is uploaded; the file is read in your browser.</p>
+          <div class="field">
+            <label for="fileVideo">Video or audio file</label>
+            <input type="file" id="fileVideo" accept="video/*,audio/*">
+            <p class="hint">mp4, webm, mov, m4a, mp3, wav. Length, pauses, and energy are read straight from the audio.</p>
+            <span class="copy-note" id="sourceNote" hidden></span>
+          </div>
+          <div class="field">
+            <label for="fileCaps">Transcript file <span style="font-weight:400;color:var(--ink-soft)">(optional)</span></label>
+            <input type="file" id="fileCaps" accept=".vtt,.srt,text/vtt,text/plain">
+            <p class="hint">A .vtt or .srt caption file — Zoom, Teams, Panopto, and YouTube all export these. Without one, just paste your words into the transcript box and choose Recount.</p>
+            <span class="copy-note" id="capsNote" hidden></span>
+          </div>
+        </div>
+      </details>
+
+      <div class="notice err" id="errNotice" hidden role="alert">
+        <span class="n-ico" aria-hidden="true">!</span><span id="errText"></span>
+      </div>
+      <div class="notice" id="capNotice" hidden>
+        <span class="n-ico" aria-hidden="true">i</span>
+        <span>Live transcription isn't available in this browser. You can still record and time your take — then type or paste your transcript into the box below to get pace and filler analysis. (Chrome, Edge, and Comet support live captions.)</span>
+      </div>
+      <div class="notice" id="embedNotice" hidden>
+        <span class="n-ico" aria-hidden="true">i</span>
+        <span><strong>Recording needs its own tab.</strong> This looks like it's running inside an embedded preview (or an LMS iframe), which can block camera and mic access. If the camera doesn't turn on, open this file directly in a browser tab or from your GitHub Pages URL.</span>
+      </div>
+    </div>
+
+    <!-- ============ ANALYSIS ============ -->
+    <div>
+      <details class="settings" id="settings">
+        <summary>
+          <span>Set up the take</span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </summary>
+        <div class="settings-body">
+          <div class="field">
+            <label for="promptInput">Speaking prompt <span style="font-weight:400;color:var(--ink-soft)">(optional — shows over the video)</span></label>
+            <textarea id="promptInput" placeholder="e.g. Deliver a 2-minute persuasive speech on why your community should fund public libraries."></textarea>
+          </div>
+          <div class="field">
+            <label>Target length</label>
+            <div class="inline">
+              <input type="number" id="targetMin" min="0" max="60" step="0.5" value="2" aria-label="Target minimum minutes"> min
+              <span aria-hidden="true">to</span>
+              <input type="number" id="targetMax" min="0" max="60" step="0.5" value="3" aria-label="Target maximum minutes"> min
+            </div>
+            <p class="hint">The timer ring fills toward the upper limit.</p>
+          </div>
+          <div class="field">
+            <label>Target pace (words per minute)</label>
+            <div class="inline">
+              <input type="number" id="wpmLow" min="60" max="260" step="5" value="130" aria-label="Pace lower bound"> to
+              <input type="number" id="wpmHigh" min="60" max="260" step="5" value="160" aria-label="Pace upper bound"> wpm
+            </div>
+            <p class="hint">A relaxed, clear public-speaking pace sits around 130–160.</p>
+          </div>
+          <div class="field">
+            <label for="fillerInput">Filler words to flag</label>
+            <input type="text" id="fillerInput" value="um, uh, er, ah, like, you know, so, basically, actually, literally, right, okay">
+            <p class="hint">Comma-separated. Common words like “like” and “so” have legitimate uses, so read flagged counts as a prompt to check, not a verdict.</p>
+          </div>
+          <div class="field">
+            <label for="rubricInput">Self-scoring criteria</label>
+            <textarea id="rubricInput" rows="3">Organization &amp; structure
+Clarity of delivery
+Vocal variety &amp; emphasis
+Eye contact &amp; presence
+Support &amp; evidence
+Time management</textarea>
+            <p class="hint">One per line. Edit to match your instructor's rubric.</p>
+          </div>
+          <div class="field">
+            <label for="quality">Recording quality</label>
+            <select id="quality">
+              <option value="720">Video — 720p (best picture, largest file)</option>
+              <option value="480" selected>Video — 480p (smaller file, good for handing in)</option>
+              <option value="audio">Audio only (smallest — every measurement still works)</option>
+            </select>
+            <p class="hint">All the delivery measurements come from the audio, so audio-only loses nothing except the picture of you.</p>
+          </div>
+          <label class="toggle"><input type="checkbox" id="capToggle" checked> Live captions while recording</label>
+          <label class="toggle"><input type="checkbox" id="countToggle" checked> 3-2-1 countdown before recording</label>
+        </div>
+      </details>
+
+      <section class="analysis" aria-label="Delivery analysis" style="margin-top:20px">
+        <div class="stage-head">
+          <span class="stage-num">2</span>
+          <span class="stage-title">See how you did</span>
+          <span class="stage-when" id="when2">After your first take</span>
+        </div>
+        <div class="analysis-head">
+          <h2 class="sr-only">Your delivery</h2>
+          <p id="analysisSub">Record a take to see the breakdown.</p>
+          <div class="delta" id="deltaBar" hidden></div>
+        </div>
+
+        <div id="emptyState" class="empty">
+          <div class="mark" aria-hidden="true">◷</div>
+          <p>No take yet. Your pace, fillers, pauses, and word variety will appear here once you finish recording.</p>
+        </div>
+
+        <div id="results" hidden>
+          <div class="metrics">
+            <div class="metric">
+              <div class="k">Length</div>
+              <div class="headline" id="hDuration" data-tone="mute">—</div>
+              <div class="detail" id="mDuration">—</div>
+            </div>
+            <div class="metric">
+              <div class="k">Your pace</div>
+              <div class="headline" id="hWpm" data-tone="mute">—</div>
+              <div class="detail" id="mWpm">—</div>
+              <div class="scale" aria-hidden="true">
+                <div class="scale-track"><span class="scale-mark" id="paceMark" style="left:50%"></span></div>
+                <div class="scale-ends"><span id="scaleLow">130</span><span id="scaleHigh">160</span></div>
+              </div>
+            </div>
+            <div class="metric">
+              <div class="k">Filler words</div>
+              <div class="headline" id="hFillers" data-tone="mute">—</div>
+              <div class="detail" id="mFillers">—</div>
+              <div class="chips" id="fillerChips"></div>
+            </div>
+            <div class="metric">
+              <div class="k">Word variety</div>
+              <div class="headline" id="hVariety" data-tone="mute">—</div>
+              <div class="detail" id="mVariety">—</div>
+              <div class="chips" id="repeatChips"></div>
+            </div>
+          </div>
+
+          <div class="metric" style="border-top:1px solid var(--line)">
+            <div class="k">Pauses</div>
+            <div class="headline" id="hPauses" data-tone="mute">—</div>
+            <div class="detail" id="mPauses">—</div>
+          </div>
+
+          <div class="metric" style="border-top:1px solid var(--line)">
+            <div class="k">Your energy</div>
+            <div class="headline" id="hEnergy" data-tone="mute">—</div>
+            <div class="detail" id="mEnergy">—</div>
+            <div class="chips" id="energyChips"></div>
+            <p class="hint" style="margin-top:10px;font-size:.78rem;color:var(--ink-soft)">Read as variation within your own take, never as loudness — mic distance and room make raw volume impossible to compare fairly.</p>
+          </div>
+
+          <div class="trace-wrap">
+            <div class="trace-label"><span>Vocal energy over the take</span><span id="traceHint">quiet ← → loud · red = long pause</span></div>
+            <canvas class="trace" id="traceCanvas" width="600" height="120" role="img" aria-label="A trace of your speaking volume across the take, showing where you were louder, quieter, or paused."></canvas>
+          </div>
+
+          <div class="transcript-wrap">
+            <h3>Transcript <span>edit to fix mistakes</span></h3>
+            <p class="accuracy-note" style="margin-bottom:10px"><span class="n-ico" aria-hidden="true">i</span><span>This transcript is made automatically and often misreads accents, names, and technical words. Read it over and fix anything wrong before trusting the counts above.</span></p>
+            <div class="transcript" id="transcript" contenteditable="true" spellcheck="true" aria-label="Editable transcript of your take"></div>
+            <div class="t-actions">
+              <button class="btn-solid btn-sm" id="btnRecount" type="button">Recount from transcript</button>
+              <button class="btn-line btn-sm" id="btnSaveReport" type="button">Save take report</button>
+            </div>
+            <p class="hint" style="margin-top:10px">Editing the transcript updates word count, pace, fillers, and variety. Pauses and energy come from the audio and don't change.</p>
+          </div>
+
+          <div class="stage-head" style="border-top:1px solid var(--line)">
+            <span class="stage-num">3</span>
+            <span class="stage-title">Score yourself</span>
+            <span class="stage-when" id="when3">Your turn</span>
+          </div>
+          <div class="rubric-wrap" style="padding-top:14px">
+            <h3 class="sr-only">Score yourself</h3>
+            <p class="rubric-lead">Before you look at coaching, rate your own take. Self-assessment is where the learning sticks — the metrics above can't judge these.</p>
+            <div id="rubricList"></div>
+            <div class="rubric-total" id="rubricTotal" hidden>
+              <b id="rubricAvg">—</b><span id="rubricAvgNote">average across criteria you scored</span>
+            </div>
+            <div class="reflect">
+              <div class="field">
+                <label for="reflectWorked">What worked in this take?</label>
+                <textarea id="reflectWorked" placeholder="Be specific — a moment, a phrase, a section that landed."></textarea>
+              </div>
+              <div class="field">
+                <label for="reflectChange">One thing to change in the next take</label>
+                <textarea id="reflectChange" placeholder="Just one. Make it something you can actually do next time."></textarea>
+              </div>
+            </div>
+            <div class="t-actions">
+              <button class="btn-solid btn-sm" id="btnSaveTake" type="button">Save take to history</button>
+              <span class="copy-note" id="saveNote" hidden></span>
+            </div>
+          </div>
+
+          <div class="stage-head" style="border-top:1px solid var(--line)">
+            <span class="stage-num">4</span>
+            <span class="stage-title">Get coaching</span>
+            <span class="stage-when" id="when4">After you score yourself</span>
+          </div>
+          <div class="coach-wrap" style="padding-top:14px">
+            <h3 class="sr-only">Coaching from Claude</h3>
+            <p class="coach-lead">Hand this take to an AI assistant for specific feedback on your delivery — pace, fillers, flow, and word choice. Use whichever one your school provides or you already have.</p>
+            <div class="assistant-row">
+              <div class="field">
+                <label for="assistant">Which assistant will you use?</label>
+                <select id="assistant">
+                  <option value="claude">Claude</option>
+                  <option value="copilot">Microsoft Copilot</option>
+                  <option value="chatgpt">ChatGPT</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="other">Something else</option>
+                </select>
+              </div>
+              <a class="open-link" id="openAssistant" href="https://claude.ai/new" target="_blank" rel="noopener noreferrer">Open Claude</a>
+            </div>
+            <div class="t-actions">
+              <button class="btn-solid btn-sm" id="btnCopyCoach" type="button">Copy coaching prompt</button>
+              <span class="copy-note" id="copyNote" hidden></span>
+            </div>
+
+
+            <div class="field" style="margin-top:16px">
+              <label for="coachPaste">Paste the reply here <span id="pasteWho" style="font-weight:400;color:var(--ink-soft)"></span></label>
+              <textarea id="coachPaste" rows="4" placeholder="Paste the whole reply here - the tool will pick out what it needs."></textarea>
+            </div>
+            <div class="t-actions">
+              <button class="btn-solid btn-sm" id="btnAddCoaching" type="button">Add coaching to this take</button>
+              <button class="btn-line btn-sm" id="btnClearCoaching" type="button">Clear</button>
+              <span class="copy-note" id="coachNote" hidden></span>
+            </div>
+
+            <div class="coach-out" id="coachOut" hidden></div>
+          </div>
+          <div id="card5">
+        <div class="stage-head" style="border-top:1px solid var(--line)">
+          <span class="stage-num">5</span>
+          <span class="stage-title">Hand it in</span>
+          <span class="stage-when" id="when5">When you're ready</span>
+        </div>
+        <div class="stage-body" style="padding:16px 18px">
+          <div class="field">
+            <label for="studentName">Your name <span style="font-weight:400;color:var(--ink-soft)">(appears on the report)</span></label>
+            <input type="text" id="studentName" autocomplete="name" placeholder="Type your name">
+          </div>
+          <div class="t-actions" style="margin-top:14px">
+            <button class="btn-primary btn-sm" id="btnPrint" type="button">Print or save as PDF</button>
+            <button class="btn-solid btn-sm" id="btnCopyReport" type="button">Copy report</button>
+            <button class="btn-line btn-sm" id="btnPackage" type="button">Download everything (.zip)</button>
+            <span class="copy-note" id="shareNote" hidden></span>
+          </div>
+          <p class="hint" style="margin-top:12px">Print or save as PDF gives your instructor a clean one-page report. Copy report is best for a text-entry assignment. The zip bundles your report, transcript, and video together — check your instructor's file size limit first.</p>
+        </div>
+          </div>
+
+        </div>
+      </section>
+
+
+      <details class="history" id="history">
+        <summary>
+          <span>Take history <span id="histCount" style="text-transform:none;letter-spacing:0"></span></span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </summary>
+        <div class="hist-body">
+          <div class="hist-empty" id="histEmpty">No saved takes yet. Score a take and choose “Save take to history” to start tracking your progress.</div>
+          <div class="spark-wrap" id="sparkWrap" hidden>
+            <div class="spark-label"><span>Progress across takes</span><span id="sparkLegend"></span></div>
+            <canvas class="spark" id="sparkCanvas" width="600" height="104" role="img" aria-label="A chart of your filler-word rate and speaking pace across saved takes." aria-describedby="sparkSummary"></canvas>
+            <p class="sr-only" id="sparkSummary"></p>
+          </div>
+          <div id="histList"></div>
+          <div class="hist-actions" id="histActions" hidden>
+            <button class="btn-line btn-sm" id="btnExportMd" type="button">Export all (Markdown)</button>
+            <button class="btn-line btn-sm" id="btnExportCsv" type="button">Export all (CSV)</button>
+            <button class="btn-danger btn-sm" id="btnClearHist" type="button">Clear history</button>
+          </div>
+          <p class="hint" style="margin-top:12px;font-size:.78rem;color:var(--ink-soft)">History is stored in this browser only — it isn't uploaded, and it won't follow you to another device or survive clearing your browser data. Export before you need it elsewhere.</p>
+        </div>
+      </details>
+
+      <div class="notice" id="privNotice" style="margin-top:16px">
+        <span class="n-ico" aria-hidden="true">i</span>
+        <span><strong>A note on privacy.</strong> Video stays on your device — it's never uploaded here. Live captions in Chrome-family browsers process audio through the browser's built-in speech service to turn talk into text. For fully private practice, turn captions off and type your transcript in by hand.</span>
+      </div>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<div class="wrap">
+<footer class="site">
+  <p>Built for <span class="program">Speech &amp; Communication</span> · Brookdale Community College · 2026 &nbsp;·&nbsp; A zero-cost practice studio. Delivery metrics are objective aids, not a grade.</p>
+</footer>
+</div>
+
+<div class="sr-only" id="live" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // FEATURE FLAGS — flip to true to re-enable. No other edits needed.
+  // ---------------------------------------------------------------
+  const FEATURES = {
+    // "Analyze an existing recording" (file upload + .vtt/.srt import).
+    // Disabled for general-education sections: asking students to supply a
+    // video AND a caption file is more ceremony than most will manage.
+    // The in-app recorder covers the normal path, including slide shows.
+    upload: false
+  };
+
+  // ---------- element refs ----------
+  const $ = function(id){ return document.getElementById(id); };
+  const video = $("video");
+  const viewport = $("viewport");
+  const placeholder = $("placeholder");
+  const captions = $("captions");
+  const promptStrip = $("promptStrip");
+  const promptTextEl = $("promptText");
+  const levelBar = $("levelBar");
+  const ringFill = $("ringFill");
+  const recDot = $("recDot");
+  const timerEl = $("timer");
+  const timerTarget = $("timerTarget");
+  const statusPill = $("statusPill");
+  const statusText = $("statusText");
+  const onair = $("onair");
+  const live = $("live");
+
+  const btnEnable = $("btnEnable");
+  const btnRecord = $("btnRecord");
+  const btnStop = $("btnStop");
+  const btnAgain = $("btnAgain");
+  const btnSaveVideo = $("btnSaveVideo");
+  const btnRecount = $("btnRecount");
+  const btnSaveReport = $("btnSaveReport");
+
+  const errNotice = $("errNotice"), errText = $("errText");
+  const capNotice = $("capNotice");
+
+  const RING_C = 2 * Math.PI * 23; // ~144.5
+
+  // ---------- state ----------
+  let stream = null;
+  let recorder = null, chunks = [], recBlob = null, recURL = null, recExt = "webm";
+  let audioCtx = null, analyser = null, rafId = null;
+  let recog = null, recogActive = false;
+  let finals = [];         // {t, text}
+  let interim = "";
+  let rmsSeries = [];      // {t, rms}
+  let pauseRuns = [];      // silence spans >= 1.5s, for trace markers
+  let prevTake = null;     // previous take's metrics, for the delta line
+  let takeNum = 0;
+  let isUploaded = false;  // analysing a loaded file rather than a live take
+  let isAudioOnly = false;
+  let startTs = 0, timerId = null, elapsedMs = 0;
+  let lastMetrics = null;
+
+  const recogSupported = ("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window);
+  const mediaSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  const embedded = (function(){ try{ return window.self !== window.top; }catch(e){ return true; } })();
+  const EMBED_MSG = "The studio is running inside an embedded preview, which blocks camera and microphone access. Download this file and open it directly in a browser tab, or open it from your GitHub Pages URL, then try again.";
+
+  // ---------- helpers ----------
+  function announce(msg){ live.textContent = ""; setTimeout(function(){ live.textContent = msg; }, 30); }
+  function setStatus(state, text){ statusPill.dataset.state = state; statusText.textContent = text; }
+  function fmt(sec){ const m = Math.floor(sec/60), s = Math.floor(sec%60); return m + ":" + (s<10?"0":"") + s; }
+  function showErr(msg){ errText.textContent = msg; errNotice.hidden = false; }
+  function clearErr(){ errNotice.hidden = true; }
+
+  function getSettings(){
+    const fillers = ($("fillerInput").value || "")
+      .split(",").map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
+    return {
+      targetMin: parseFloat($("targetMin").value) || 0,
+      targetMax: parseFloat($("targetMax").value) || 0,
+      wpmLow: parseInt($("wpmLow").value,10) || 130,
+      wpmHigh: parseInt($("wpmHigh").value,10) || 160,
+      fillers: fillers,
+      captionsOn: $("capToggle").checked
+    };
+  }
+
+  function refreshPromptStrip(){
+    const t = $("promptInput").value.trim();
+    promptTextEl.textContent = t;
+    if(t){ promptStrip.classList.add("show"); } else { promptStrip.classList.remove("show"); }
+  }
+  $("promptInput").addEventListener("input", refreshPromptStrip);
+
+  function refreshTargetLabel(){
+    const s = getSettings();
+    if(s.targetMax > 0){ timerTarget.textContent = " / " + fmt(s.targetMax*60); }
+    else { timerTarget.textContent = ""; }
+  }
+  ["targetMin","targetMax"].forEach(function(id){ $(id).addEventListener("input", refreshTargetLabel); });
+
+  // ---------- camera ----------
+  btnEnable.addEventListener("click", enableCamera);
+  async function enableCamera(){
+    clearErr();
+    if(!mediaSupported){
+      showErr("This browser can't record media. Try a recent version of Chrome, Edge, or Comet.");
+      return;
+    }
+    try{
+      const q = $("quality").value;
+      const audioOnly = (q === "audio");
+      const vw = q === "720" ? 1280 : 854, vh = q === "720" ? 720 : 480;
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: audioOnly ? false : { width:{ideal:vw}, height:{ideal:vh} },
+        audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:false }
+      });
+      isAudioOnly = audioOnly;
+      if(audioOnly){ $("phMark").textContent = "\u25CF"; $("phTitle").textContent = "Audio-only mode."; 
+        $("phBody").textContent = "Your microphone is on. There's no picture to show \u2014 every measurement still works."; }
+      video.classList.remove("playback");
+      video.srcObject = stream;
+      video.muted = true;          // avoid feedback on the live preview
+      video.removeAttribute("controls");
+      await video.play().catch(function(){});
+      if(!audioOnly){ viewport.classList.add("has-video"); }
+      btnEnable.hidden = true;
+      btnRecord.disabled = false;
+      btnRecord.focus();
+      setStatus("ready","Ready — take the stage");
+      announce("Camera and microphone are on. Ready to record.");
+      if(!recogSupported){ capNotice.hidden = false; }
+      refreshPromptStrip();
+      refreshTargetLabel();
+    }catch(e){
+      let m = "Couldn't reach the camera or mic.";
+      if(embedded && e && (e.name === "NotAllowedError" || e.name === "SecurityError" || e.name === "NotFoundError")){
+        m = EMBED_MSG;
+      } else if(e && (e.name === "NotAllowedError" || e.name === "SecurityError")){
+        m = "Camera and mic access was blocked. Allow it from the address-bar permission icon, then reload.";
+      } else if(e && e.name === "NotFoundError"){
+        m = "No camera or microphone was found. Connect one and reload.";
+      }
+      showErr(m);
+    }
+  }
+
+  // ---------- audio metering + silence capture ----------
+  function startMetering(){
+    try{
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      src.connect(analyser);
+      const buf = new Uint8Array(analyser.fftSize);
+      const tick = function(){
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for(let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum += v*v; }
+        const rms = Math.sqrt(sum/buf.length);
+        levelBar.style.width = Math.min(100, Math.round(rms*260)) + "%";
+        rmsSeries.push({ t: performance.now()-startTs, rms: rms });
+        rafId = requestAnimationFrame(tick);
+      };
+      rafId = requestAnimationFrame(tick);
+    }catch(e){ /* metering is a nice-to-have; ignore */ }
+  }
+  function stopMetering(){
+    if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    levelBar.style.width = "0%";
+    if(audioCtx){ try{ audioCtx.close(); }catch(e){} audioCtx = null; analyser = null; }
+  }
+
+  // ---------- speech recognition ----------
+  function startRecognition(){
+    if(!recogSupported) return;
+    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recog = new Rec();
+    recog.continuous = true;
+    recog.interimResults = true;
+    recog.lang = "en-US";
+    recog.onresult = function(ev){
+      interim = "";
+      for(let i=ev.resultIndex;i<ev.results.length;i++){
+        const r = ev.results[i];
+        if(r.isFinal){
+          finals.push({ t: performance.now()-startTs, text: r[0].transcript.trim() });
+        } else {
+          interim += r[0].transcript;
+        }
+      }
+      renderCaptions();
+    };
+    recog.onend = function(){ if(recogActive){ try{ recog.start(); }catch(e){} } };
+    recog.onerror = function(ev){
+      if(ev && (ev.error === "not-allowed" || ev.error === "service-not-allowed")){
+        recogActive = false; capNotice.hidden = false;
+      }
+    };
+    recogActive = true;
+    try{ recog.start(); }catch(e){}
+  }
+  function stopRecognition(){
+    recogActive = false;
+    if(recog){ try{ recog.stop(); }catch(e){} recog = null; }
+  }
+  function renderCaptions(){
+    const done = finals.map(function(f){ return f.text; }).join(" ");
+    captions.innerHTML = escapeHTML(done) + (interim ? ' <span class="interim">'+escapeHTML(interim)+'</span>' : "");
+    captions.scrollTop = captions.scrollHeight;
+  }
+
+  // ---------- recording ----------
+  btnRecord.addEventListener("click", function(){
+    if(!$("countToggle").checked){ startRecording(); return; }
+    const cd = $("countdown"), num = $("countNum");
+    let n = 3;
+    btnRecord.disabled = true;
+    num.textContent = n; cd.classList.add("show");
+    announce("Starting in 3.");
+    const iv = setInterval(function(){
+      n--;
+      if(n > 0){ num.textContent = n; }
+      else{
+        clearInterval(iv);
+        cd.classList.remove("show");
+        btnRecord.disabled = false;
+        startRecording();
+      }
+    }, 1000);
+  });
+  btnStop.addEventListener("click", stopRecording);
+  btnAgain.addEventListener("click", recordAgain);
+  btnSaveVideo.addEventListener("click", saveVideo);
+
+  function pickMime(){
+    const types = ["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm","video/mp4"];
+    for(let i=0;i<types.length;i++){
+      if(window.MediaRecorder && MediaRecorder.isTypeSupported(types[i])) return types[i];
+    }
+    return "";
+  }
+
+  function startRecording(){
+    clearErr();
+    const s = getSettings();
+    // reset take
+    chunks = []; finals = []; interim = ""; rmsSeries = []; pauseRuns = [];
+    if(recURL){ URL.revokeObjectURL(recURL); recURL = null; }
+    captions.innerHTML = "";
+
+    const mime = pickMime();
+    recExt = (mime.indexOf("mp4") >= 0) ? "mp4" : "webm";
+    try{
+      recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    }catch(e){
+      showErr("Couldn't start the recorder in this browser.");
+      return;
+    }
+    recorder.ondataavailable = function(e){ if(e.data && e.data.size) chunks.push(e.data); };
+    recorder.onstop = onRecordingStop;
+
+    startTs = performance.now();
+    recorder.start();
+    startMetering();
+    if(s.captionsOn) startRecognition();
+
+    // captions visibility
+    if(s.captionsOn && recogSupported){ captions.classList.add("show"); }
+    else { captions.classList.remove("show"); }
+
+    // UI → live
+    viewport.classList.add("recording");
+    recDot.classList.add("live");
+    onair.classList.add("show");
+    setStatus("live","Recording");
+    btnRecord.hidden = true;
+    btnStop.hidden = false; btnStop.disabled = false; btnStop.focus();
+    btnAgain.hidden = true; btnSaveVideo.hidden = true;
+    hideResultsForNewTake();
+
+    // timer + ring
+    elapsedMs = 0;
+    timerId = setInterval(function(){
+      elapsedMs = performance.now() - startTs;
+      const sec = elapsedMs/1000;
+      timerEl.textContent = fmt(sec);
+      updateRing(sec, s);
+    }, 100);
+    announce("Recording started.");
+  }
+
+  function updateRing(sec, s){
+    let frac = 0, color = "var(--lamp)";
+    if(s.targetMax > 0){
+      frac = Math.min(1, sec/(s.targetMax*60));
+      if(sec < s.targetMin*60) color = "var(--slow)";
+      else if(sec <= s.targetMax*60) color = "var(--good)";
+      else color = "var(--live)";
+    } else {
+      frac = (sec % 60)/60;
+    }
+    ringFill.style.strokeDashoffset = (RING_C*(1-frac)).toFixed(1);
+    ringFill.style.stroke = color;
+  }
+
+  function stopRecording(){
+    if(recorder && recorder.state !== "inactive"){ recorder.stop(); }
+    stopMetering();
+    stopRecognition();
+    if(timerId){ clearInterval(timerId); timerId = null; }
+    viewport.classList.remove("recording");
+    recDot.classList.remove("live");
+    onair.classList.remove("show");
+    captions.classList.remove("show");
+    setStatus("review","Reviewing your take");
+    btnStop.hidden = true; btnStop.disabled = true;
+    announce("Recording stopped. Building your delivery breakdown.");
+  }
+
+  async function onRecordingStop(){
+    recBlob = new Blob(chunks, { type: (chunks[0] && chunks[0].type) || "video/webm" });
+    recURL = URL.createObjectURL(recBlob);
+    isUploaded = false;
+    // swap preview → playback
+    video.srcObject = null;
+    video.src = recURL;
+    video.muted = false;
+    video.setAttribute("controls","");
+    video.classList.add("playback");
+    if(!isAudioOnly){ viewport.classList.add("has-video"); }
+
+    btnAgain.hidden = false; btnAgain.disabled = false;
+    btnSaveVideo.hidden = false; btnSaveVideo.disabled = false;
+
+    // Prefer decoding the finished audio: the live sampler pauses whenever the
+    // tab is backgrounded, so a slide-show take would otherwise lose its data.
+    try{
+      const res = await analyseAudio(recBlob);
+      if(res.series.length > 5){
+        rmsSeries = res.series;
+        if(res.durationMs > 500) elapsedMs = res.durationMs;
+      }
+    }catch(e){ /* keep the live-sampled series as a fallback */ }
+
+    finishTake(null);
+  }
+
+  function recordAgain(){
+    if(recURL){ URL.revokeObjectURL(recURL); recURL = null; }
+    video.src = "";
+    video.classList.remove("playback");
+    video.removeAttribute("controls");
+    isUploaded = false;
+    $("fileVideo").value = ""; $("fileCaps").value = "";
+    $("sourceNote").hidden = true; $("capsNote").hidden = true;
+    finals = []; rmsSeries = []; pauseRuns = []; elapsedMs = 0;
+    if(stream){
+      video.srcObject = stream;
+      video.muted = true;
+      video.play().catch(function(){});
+      btnRecord.hidden = false; btnRecord.disabled = false; btnRecord.focus();
+      setStatus("ready","Ready — take the stage");
+    } else {
+      // an uploaded file was cleared but the camera was never switched on
+      viewport.classList.remove("has-video");
+      setStatus("idle","Camera off");
+    }
+    timerEl.textContent = "0:00";
+    ringFill.style.strokeDashoffset = RING_C.toFixed(1);
+    btnAgain.hidden = true; btnSaveVideo.hidden = true;
+    hideResultsForNewTake();
+    announce("Cleared.");
+  }
+
+  function hideResultsForNewTake(){
+    $("results").hidden = true;
+    $("emptyState").hidden = false;
+    setStageState(false);
+    $("analysisSub").textContent = "Record a take to see the breakdown.";
+  }
+
+  // ---------- metrics ----------
+  function transcriptText(){
+    return finals.map(function(f){ return f.text; }).join(" ").replace(/\s+/g," ").trim();
+  }
+  function wordsOf(text){
+    const m = text.toLowerCase().match(/\b[\w'’-]+\b/g);
+    return m || [];
+  }
+  function countFillers(text, fillers){
+    const lower = " " + text.toLowerCase().replace(/[.,!?;:]/g," ") + " ";
+    let total = 0; const found = {};
+    fillers.forEach(function(f){
+      if(!f) return;
+      const esc = f.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+      const re = new RegExp("(?:^|\\s)"+esc+"(?=\\s)","g");
+      const matches = lower.match(re);
+      const c = matches ? matches.length : 0;
+      if(c>0){ found[f] = c; total += c; }
+    });
+    return { total: total, found: found };
+  }
+
+  const STOP = {"the":1,"a":1,"an":1,"and":1,"or":1,"but":1,"of":1,"to":1,"in":1,"on":1,"for":1,
+    "is":1,"are":1,"was":1,"were":1,"be":1,"it":1,"this":1,"that":1,"i":1,"you":1,"we":1,"they":1,
+    "he":1,"she":1,"my":1,"our":1,"your":1,"with":1,"as":1,"at":1,"by":1,"from":1,"so":1,"if":1,
+    "not":1,"do":1,"does":1,"can":1,"will":1,"would":1,"has":1,"have":1,"had":1,"me":1,"us":1};
+
+  function computeMetrics(edited){
+    const s = getSettings();
+    const text = (typeof edited === "string") ? edited.replace(/\s+/g," ").trim() : transcriptText();
+    const durSec = elapsedMs/1000 || 0;
+    const words = wordsOf(text);
+    const wc = words.length;
+    const wpm = durSec > 0 ? Math.round(wc / (durSec/60)) : 0;
+
+    const fill = countFillers(text, s.fillers);
+    const fillRate = durSec > 0 ? (fill.total/(durSec/60)) : 0;
+
+    // variety
+    const uniq = {}; words.forEach(function(w){ uniq[w] = (uniq[w]||0)+1; });
+    const uniqCount = Object.keys(uniq).length;
+    const variety = wc > 0 ? Math.round((uniqCount/wc)*100) : 0;
+    const repeats = Object.keys(uniq)
+      .filter(function(w){ return !STOP[w] && w.length>2 && uniq[w]>=3; })
+      .sort(function(a,b){ return uniq[b]-uniq[a]; })
+      .slice(0,3).map(function(w){ return { w:w, n:uniq[w] }; });
+
+    const pauses = analysePauses();
+    const energy = analyseEnergy();
+
+    return { durSec:durSec, wc:wc, wpm:wpm, fill:fill, fillRate:fillRate,
+             variety:variety, repeats:repeats, pauses:pauses, energy:energy,
+             text:text, settings:s };
+  }
+
+  // Energy is measured RELATIVE to this take only. Absolute loudness is
+  // meaningless across devices (mic gain, distance, room), so we never score it.
+  function analyseEnergy(){
+    const none = { ok:false };
+    if(rmsSeries.length < 20) return none;
+    const peak = rmsSeries.reduce(function(mx,p){ return Math.max(mx,p.rms); }, 0);
+    if(peak < 0.02) return none;
+    // Only consider voiced frames — silence would drag every average down.
+    const floor = Math.max(0.015, peak*0.14);
+    const voiced = rmsSeries.filter(function(p){ return p.rms >= floor; });
+    if(voiced.length < 12) return none;
+
+    const mean = function(a){ return a.reduce(function(s,v){ return s+v; },0)/a.length; };
+    const vals = voiced.map(function(p){ return p.rms; });
+    const mu = mean(vals);
+    if(mu <= 0) return none;
+    const sd = Math.sqrt(mean(vals.map(function(v){ return (v-mu)*(v-mu); })));
+    const variation = sd/mu;   // coefficient of variation — unitless, device-independent
+
+    // arc: first third vs last third of the take, voiced frames only
+    const T = elapsedMs;
+    const inWin = function(lo,hi){
+      const seg = voiced.filter(function(p){ return p.t >= lo && p.t < hi; }).map(function(p){ return p.rms; });
+      return seg.length >= 4 ? mean(seg) : null;
+    };
+    const first = inWin(0, T/3), last = inWin(2*T/3, T);
+    const arcPct = (first && last) ? Math.round(((last-first)/first)*100) : null;
+
+    // finish: finalt 8% of the take vs the whole
+    const tail = inWin(T*0.92, T);
+    const finishPct = tail ? Math.round(((tail-mu)/mu)*100) : null;
+
+    return { ok:true, variation:variation, arcPct:arcPct, finishPct:finishPct };
+  }
+
+  function analysePauses(){
+    if(rmsSeries.length < 5) return { count:0, longest:0 };
+    const vals = rmsSeries.map(function(p){ return p.rms; }).slice().sort(function(a,b){ return a-b; });
+    const peak = vals[vals.length-1] || 0;
+    if(peak < 0.02) return { count:0, longest:0 };
+    const thresh = Math.max(0.015, peak*0.14);
+    // build silence runs
+    const runs = [];
+    let runStart = null;
+    for(let i=0;i<rmsSeries.length;i++){
+      const silent = rmsSeries[i].rms < thresh;
+      if(silent && runStart === null) runStart = rmsSeries[i].t;
+      if((!silent || i===rmsSeries.length-1) && runStart !== null){
+        const end = rmsSeries[i].t;
+        runs.push({ start:runStart, dur:(end-runStart)/1000 });
+        runStart = null;
+      }
+    }
+    // ignore leading/trailing silence (before first speech / after last)
+    const mid = runs.filter(function(r){
+      return r.start > 400 && (r.start/1000) < (elapsedMs/1000 - 0.5);
+    });
+    let longest = 0; let count = 0;
+    mid.forEach(function(r){
+      if(r.dur > longest) longest = r.dur;
+      if(r.dur >= 1.5) count++;
+    });
+    pauseRuns = mid.filter(function(r){ return r.dur >= 1.5; });
+    return { count:count, longest:longest };
+  }
+
+  // ---------- render ----------
+  function renderDelta(m){
+    const bar = $("deltaBar");
+    if(!prevTake){ bar.hidden = true; bar.innerHTML = ""; return; }
+    const items = [];
+    const add = function(label, now, before, lowerIsBetter, unit){
+      const d = now - before;
+      if(Math.abs(d) < 0.5) { items.push({cls:"", html: label+" unchanged"}); return; }
+      const better = lowerIsBetter ? d < 0 : d > 0;
+      const sign = d > 0 ? "+" : "";
+      items.push({ cls: better ? "up" : "dn",
+        html: label + " <b>" + sign + Math.round(d) + (unit||"") + "</b>" });
+    };
+    add("fillers", m.fill.total, prevTake.fill.total, true, "");
+    add("pace", m.wpm, prevTake.wpm, false, " wpm");
+    add("length", m.durSec, prevTake.durSec, false, "s");
+    bar.innerHTML = '<span class="d">vs last take:</span>' + items.map(function(i){
+      return '<span class="d '+i.cls+'">'+i.html+'</span>';
+    }).join("");
+    bar.hidden = false;
+  }
+
+  // Plain language first, number second. Every band gets a phrase a student
+  // can act on; the figure stays as supporting detail.
+  // Stages stay visible at all times — dimmed rather than hidden, so the page
+  // structure never shifts and students can see what's coming.
+  function setStageState(hasTake){
+    $("card1").dataset.active = hasTake ? "0" : "1";
+    $("when1").textContent = hasTake ? "Done \u2014 record again any time" : "You're here";
+    $("when2").textContent = hasTake ? "You're here" : "After your first take";
+    $("when3").textContent = hasTake ? "Your turn" : "After your first take";
+    $("when4").textContent = hasTake ? "Ready when you are" : "After you score yourself";
+  }
+
+  function say(el, tone, phrase){
+    const h = $(el);
+    h.dataset.tone = tone;
+    h.textContent = phrase;
+  }
+
+  function renderResults(m){
+    $("emptyState").hidden = true;
+    $("results").hidden = false;
+    const co = $("coachOut"); if(co){ co.hidden = true; co.innerHTML = ""; }
+    const cn = $("copyNote"); if(cn){ cn.hidden = true; }
+    const sn = $("saveNote"); if(sn){ sn.hidden = true; }
+    document.querySelectorAll('#rubricList input[type="radio"]').forEach(function(r){ r.checked = false; });
+    $("reflectWorked").value = ""; $("reflectChange").value = "";
+    updateRubricTotal();
+    $("analysisSub").textContent = "Here is what the recording shows. None of it is a grade.";
+    const s = m.settings;
+
+    // length
+    $("mDuration").textContent = fmt(m.durSec) + (s.targetMax>0 ? (" of a " + s.targetMin + "\u2013" + s.targetMax + " min target") : "");
+    if(s.targetMax > 0){
+      if(m.durSec < s.targetMin*60) say("hDuration","slow","Shorter than planned");
+      else if(m.durSec <= s.targetMax*60) say("hDuration","good","Right on time");
+      else say("hDuration","over","Ran long");
+    } else say("hDuration","mute","No target set");
+
+    // pace
+    $("mWpm").textContent = m.wpm + " words per minute";
+    $("scaleLow").textContent = s.wpmLow;
+    $("scaleHigh").textContent = s.wpmHigh;
+    const span = s.wpmHigh - s.wpmLow || 30;
+    const lo = s.wpmLow - span, hi = s.wpmHigh + span;
+    let pct = ((m.wpm - lo)/(hi - lo))*100;
+    $("paceMark").style.left = Math.max(2, Math.min(98, pct)) + "%";
+    if(m.wc < 3){ say("hWpm","mute","Not enough words yet"); $("mWpm").textContent = "Add a transcript to see your pace"; }
+    else if(m.wpm < s.wpmLow) say("hWpm","slow","On the slow side");
+    else if(m.wpm <= s.wpmHigh) say("hWpm","good","Just about right");
+    else say("hWpm","over","Moving quickly");
+
+    // fillers
+    const chips = $("fillerChips"); chips.innerHTML = "";
+    const keys = Object.keys(m.fill.found).sort(function(a,b){ return m.fill.found[b]-m.fill.found[a]; });
+    const top = keys.length ? keys[0] : null;
+    $("mFillers").textContent = m.wc < 3 ? "Add a transcript to count these"
+      : (m.fill.total + " in total" + (top ? (", mostly \u201c" + top + "\u201d") : ""));
+    if(m.wc < 3) say("hFillers","mute","Nothing counted yet");
+    else if(m.fill.total === 0) say("hFillers","good","None caught");
+    else if(m.fillRate < 2) say("hFillers","good","A few crept in");
+    else if(m.fillRate < 4) say("hFillers","over","Noticeable");
+    else say("hFillers","over","Very frequent");
+    keys.forEach(function(k){
+      const c = document.createElement("span"); c.className="chip";
+      c.innerHTML = '\u201c'+escapeHTML(k)+'\u201d <b>\u00d7'+m.fill.found[k]+'</b>';
+      chips.appendChild(c);
+    });
+
+    // variety
+    $("mVariety").textContent = m.wc < 10 ? "Add a transcript to see this" : (m.variety + "% of your words were different");
+    if(m.wc < 10) say("hVariety","mute","Not enough words yet");
+    else if(m.repeats.length === 0) say("hVariety","good","Nicely varied");
+    else say("hVariety","slow","Some words repeat");
+    const rc = $("repeatChips"); rc.innerHTML = "";
+    m.repeats.forEach(function(r){
+      const c = document.createElement("span"); c.className="chip";
+      c.innerHTML = escapeHTML(r.w)+' <b style="color:var(--ink-soft)">\u00d7'+r.n+'</b>';
+      rc.appendChild(c);
+    });
+
+    // pauses
+    if(rmsSeries.length < 5){
+      say("hPauses","mute","No audio to read"); $("mPauses").textContent = "\u2014";
+    } else {
+      $("mPauses").textContent = m.pauses.longest > 0
+        ? ("Longest about " + Math.round(m.pauses.longest) + " seconds")
+        : "No long silences found";
+      if(m.pauses.count === 0) say("hPauses","good","Smooth throughout");
+      else if(m.pauses.count === 1) say("hPauses","good","One long gap");
+      else if(m.pauses.count === 2) say("hPauses","good","Two long gaps");
+      else say("hPauses","over","Several long gaps");
+    }
+
+    // energy
+    const e = m.energy, eChips = $("energyChips");
+    eChips.innerHTML = "";
+    if(!e || !e.ok){
+      say("hEnergy","mute","Not enough audio to read"); $("mEnergy").textContent = "\u2014";
+    } else {
+      if(e.arcPct !== null && e.arcPct <= -22) say("hEnergy","over","Faded near the end");
+      else if(e.arcPct !== null && e.arcPct >= 22) say("hEnergy","good","Built toward the end");
+      else if(e.variation < 0.28) say("hEnergy","slow","Fairly level throughout");
+      else if(e.variation < 0.75) say("hEnergy","good","Good light and shade");
+      else say("hEnergy","over","Very uneven");
+
+      let detail;
+      if(e.arcPct !== null && e.arcPct <= -22) detail = "Quieter in the last third than the first";
+      else if(e.arcPct !== null && e.arcPct >= 22) detail = "Stronger in the last third than the first";
+      else if(e.variation < 0.28) detail = "Little change in emphasis \u2014 try varying it";
+      else detail = "You shifted emphasis as you spoke";
+      $("mEnergy").textContent = detail;
+
+      const chip = function(html){
+        const c = document.createElement("span"); c.className = "chip"; c.innerHTML = html; eChips.appendChild(c);
+      };
+      if(e.variation < 0.28) chip('little variation in emphasis');
+      else if(e.variation > 0.75) chip('very uneven \u2014 check mic distance');
+      if(e.finishPct !== null && e.finishPct <= -30) chip('<b>final words drop off</b>');
+    }
+
+    renderTranscript(m.text, s.fillers);
+    setStageState(true);
+    announce("Your results are ready. " + m.wc + " words at " + m.wpm + " words per minute.");
+  }
+
+  function renderTranscript(text, fillers){
+    const el = $("transcript");
+    if(!text){
+      el.innerHTML = "";
+      el.dataset.placeholder = recogSupported
+        ? "No speech was captured. Type or paste your transcript here, then Recount."
+        : "Live captions aren't available in this browser. Type or paste your transcript here, then Recount.";
+      return;
+    }
+    // highlight fillers
+    let html = escapeHTML(text);
+    fillers.forEach(function(f){
+      if(!f) return;
+      const esc = f.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+      const re = new RegExp("\\b("+esc+")\\b","gi");
+      html = html.replace(re, "<mark>$1</mark>");
+    });
+    el.innerHTML = html;
+  }
+
+  function drawTrace(){
+    const cv = $("traceCanvas");
+    const ctx = cv.getContext("2d");
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+    if(rmsSeries.length < 2){
+      ctx.fillStyle = "#9aa3b0"; ctx.font = "13px monospace"; ctx.textAlign="center";
+      ctx.fillText("No audio captured", W/2, H/2); return;
+    }
+    const N = W;
+    const peak = rmsSeries.reduce(function(mx,p){ return Math.max(mx,p.rms); }, 0) || 1;
+    const step = rmsSeries.length / N;
+    const pts = [];
+    for(let x=0;x<N;x++){
+      const idx = Math.floor(x*step);
+      const r = rmsSeries[Math.min(idx, rmsSeries.length-1)].rms / peak;
+      pts.push([x, H - Math.max(2, r*(H-8))]);
+    }
+    // filled area (raised floor so quiet passages stay visible)
+    ctx.beginPath(); ctx.moveTo(0,H);
+    pts.forEach(function(p){ ctx.lineTo(p[0],p[1]); });
+    ctx.lineTo(W,H); ctx.closePath();
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"rgba(240,177,85,.92)");
+    g.addColorStop(1,"rgba(240,177,85,.34)");
+    ctx.fillStyle = g; ctx.fill();
+    // bright contour line for a crisp, readable top edge
+    ctx.beginPath();
+    pts.forEach(function(p,i){ i ? ctx.lineTo(p[0],p[1]) : ctx.moveTo(p[0],p[1]); });
+    ctx.strokeStyle = "#ffd89e"; ctx.lineWidth = 1.6; ctx.lineJoin = "round"; ctx.stroke();
+    // baseline
+    ctx.strokeStyle = "rgba(255,255,255,.16)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0,H-1); ctx.lineTo(W,H-1); ctx.stroke();
+
+    // mark long pauses so the count and the picture agree
+    const T = elapsedMs || 1;
+    ctx.fillStyle = "rgba(226,87,79,.30)";
+    ctx.strokeStyle = "rgba(226,87,79,.85)"; ctx.lineWidth = 1;
+    pauseRuns.forEach(function(r){
+      const x0 = (r.start/T)*W, w = Math.max(2, ((r.dur*1000)/T)*W);
+      ctx.fillRect(x0, 0, w, H);
+      ctx.beginPath(); ctx.moveTo(x0,0); ctx.lineTo(x0,H); ctx.stroke();
+    });
+  }
+
+  // ---------- recount from edited transcript ----------
+  btnRecount.addEventListener("click", function(){
+    const el = $("transcript");
+    const text = (el.innerText || el.textContent || "").replace(/\s+/g," ").trim();
+    if(!text){ announce("Transcript is empty. Type your words first."); return; }
+    lastMetrics = computeMetrics(text);
+    renderResults(lastMetrics);
+    announce("Recounted from the edited transcript.");
+  });
+
+  // ---------- save video ----------
+  function saveVideo(){
+    if(!recBlob){ return; }
+    const a = document.createElement("a");
+    a.href = recURL;
+    a.download = "rehearsal-take-" + stamp() + "." + recExt;
+    document.body.appendChild(a); a.click(); a.remove();
+    announce("Saving your video.");
+  }
+
+  // ---------- save report ----------
+  // ---------- coaching handoff ----------
+  const JSON_INSTR = 'Write your reply in TWO parts, in this order.\n\n'
+    + 'PART 1 - the feedback itself, written for the student to read right here. Use clear headings and normal prose: an encouraging opening line, "What worked" with two specific things, "What to work on" with two or three prioritized items (each saying what to change, why, and what to try), and "For your next take" with a single focus. Warm and readable - no JSON, no code, just the coaching.\n\n'
+    + 'PART 2 - under a heading exactly like "--- Copy the block below back into the Rehearsal Room ---", output a single fenced code block marked json containing the same feedback in this shape: {"opener": string, "worked": [string, string], "improve": [{"focus": string, "why": string, "try": string}], "next": string}. Two or three items in "improve". No commentary inside the block.';
+
+  // ---------- assistant picker ----------
+  // The prompt itself is assistant-agnostic - every major assistant handles it.
+  // The picker only changes where the student goes and what the labels say.
+  const ASSISTANTS = {
+    claude:  { name:"Claude",            url:"https://claude.ai/new" },
+    copilot: { name:"Microsoft Copilot", url:"https://copilot.microsoft.com" },
+    chatgpt: { name:"ChatGPT",           url:"https://chatgpt.com" },
+    gemini:  { name:"Google Gemini",     url:"https://gemini.google.com" },
+    other:   { name:"your assistant",    url:"" }
+  };
+  function currentAssistant(){
+    return ASSISTANTS[$("assistant").value] || ASSISTANTS.claude;
+  }
+  function refreshAssistant(){
+    const a = currentAssistant();
+    const link = $("openAssistant");
+    if(a.url){
+      link.href = a.url; link.hidden = false;
+      link.textContent = "Open " + a.name;
+    } else {
+      link.hidden = true;
+    }
+    $("btnCopyCoach").textContent = "Copy prompt for " + a.name;
+    $("pasteWho").textContent = "from " + a.name;
+    try{ localStorage.setItem("rr_assistant", $("assistant").value); }catch(e){}
+  }
+  $("assistant").addEventListener("change", refreshAssistant);
+
+  function coachInstructions(){
+    return "You are an encouraging, specific speech-delivery coach for a college communication class. "
+      + "You are given a practice-speech transcript (auto-generated, so it may contain small transcription errors - do not nitpick those) and objective delivery metrics measured by a browser tool. "
+      + "Coach the student's DELIVERY - pacing, filler words, flow, clarity, word choice, and how the delivery is organized - not the correctness of their ideas or opinions, unless a prompt or rubric below asks you to. "
+      + "Be warm, concrete, and actionable. Point to specific moments in the transcript, tie advice to the metrics where relevant, and never shame. Prioritize the two or three changes that would most improve the next take. "
+      + "Do not claim to have heard the audio, and do not infer emotion, confidence, or tone of voice - you only have text and numbers. Treat every metric as an approximation from a browser tool, not a grade.";
+  }
+
+  function contextText(m){
+    const s = m.settings, p = $("promptInput").value.trim(), L = [];
+    if(p){ L.push("PROMPT: " + p); L.push(""); }
+    L.push("DELIVERY METRICS:");
+    L.push("- Length: " + fmt(m.durSec) + (s.targetMax>0 ? (" (target "+s.targetMin+"-"+s.targetMax+" min)") : ""));
+    L.push("- Words: " + m.wc);
+    L.push("- Pace: " + m.wpm + " wpm (target " + s.wpmLow + "-" + s.wpmHigh + ")");
+    const fk = Object.keys(m.fill.found);
+    L.push("- Filler words: " + m.fill.total + (m.durSec>0 ? (" ("+m.fillRate.toFixed(1)+"/min)") : "")
+      + (fk.length ? (" - " + fk.map(function(k){ return k+" x"+m.fill.found[k]; }).join(", ")) : ""));
+    L.push("- Word variety: " + m.variety + "% unique"
+      + (m.repeats.length ? (" - most repeated: " + m.repeats.map(function(r){ return r.w+" x"+r.n; }).join(", ")) : ""));
+    L.push("- Notable pauses (est.): " + m.pauses.count + (m.pauses.longest>0 ? (" - longest ~"+m.pauses.longest.toFixed(1)+"s") : ""));
+    if(m.energy && m.energy.ok){
+      const e = m.energy;
+      let el = "- Vocal energy (relative within this take only - NOT absolute loudness, so never comment on how loud or quiet the speaker is): ";
+      el += "variation index " + Math.round(e.variation*100)
+          + (e.variation < 0.28 ? " (fairly level/monotone)" : e.variation < 0.75 ? " (good variety)" : " (very uneven)");
+      if(e.arcPct !== null){
+        el += "; energy from first third to last third changed " + (e.arcPct>0?"+":"") + e.arcPct + "%"
+            + (e.arcPct <= -22 ? " (faded toward the end)" : e.arcPct >= 22 ? " (built toward the end)" : " (steady)");
+      }
+      if(e.finishPct !== null && e.finishPct <= -30){ el += "; the final words drop off noticeably (soft landing)"; }
+      L.push(el);
+    }
+    L.push(""); L.push("TRANSCRIPT:"); L.push(m.text || "(none captured)");
+    const rub = readRubric(), rkeys = Object.keys(rub);
+    if(rkeys.length || $("reflectWorked").value.trim() || $("reflectChange").value.trim()){
+      L.push(""); L.push("THE SPEAKER'S OWN ASSESSMENT (respond to it - affirm where they read themselves accurately, and gently note anything they were harder or easier on themselves about than the evidence supports):");
+      rkeys.forEach(function(k){ L.push("- " + k + ": " + rub[k] + "/4"); });
+      const w = $("reflectWorked").value.trim(), c = $("reflectChange").value.trim();
+      if(w) L.push("- They felt this worked: " + w);
+      if(c) L.push("- They want to change next time: " + c);
+    }
+    return L.join("\n");
+  }
+
+  function buildHandoffPrompt(m){
+    return coachInstructions() + " " + JSON_INSTR
+      + "\n\nGive me: one encouraging opener; two things that worked; two or three specific things to improve, prioritized; and one focus for my next take.\n\n"
+      + contextText(m);
+  }
+
+  function currentMetrics(){
+    const el = $("transcript");
+    const text = (el.innerText || el.textContent || "").replace(/\s+/g," ").trim();
+    return computeMetrics(text);
+  }
+
+  function notifyCopy(msg, warn){
+    const n = $("copyNote"); n.textContent = msg; n.hidden = false;
+    n.className = "copy-note" + (warn ? " warn" : "");
+    announce(msg);
+  }
+
+  function copyText(txt, ok, fail){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(ok, function(){ fallbackCopy(txt, ok, fail); });
+    } else { fallbackCopy(txt, ok, fail); }
+  }
+  function fallbackCopy(txt, ok, fail){
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = txt; ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select();
+      const done = document.execCommand("copy");
+      ta.remove();
+      done ? ok() : (fail && fail());
+    }catch(e){ if(fail) fail(); }
+  }
+
+  $("btnCopyCoach").addEventListener("click", function(){
+    const m = currentMetrics();
+    if(!m.text){ notifyCopy("Add a transcript first, then copy.", true); return; }
+    copyText(buildHandoffPrompt(m),
+      function(){ notifyCopy("Copied. Paste it into " + currentAssistant().name + ", read the feedback, then copy the whole reply back here.", false); },
+      function(){ notifyCopy("Couldn't copy - select the transcript and copy manually.", true); });
+  });
+
+  // A student may paste the whole reply (prose + code block) or just the block.
+  // Find the JSON either way; if there's none, keep whatever they pasted.
+  function extractCoachJSON(text){
+    const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const candidates = [];
+    if(fence && fence[1]) candidates.push(fence[1].trim());
+    const first = text.indexOf("{"), last = text.lastIndexOf("}");
+    if(first !== -1 && last > first) candidates.push(text.slice(first, last+1));
+    for(let i=0;i<candidates.length;i++){
+      try{
+        const o = JSON.parse(candidates[i]);
+        if(o && o.opener) return o;
+      }catch(e){}
+    }
+    return null;
+  }
+
+  // Strip the copy-back block so the student doesn't see raw JSON in the tool.
+  function proseOnly(text){
+    return text.replace(/```(?:json)?[\s\S]*?```/gi,"")
+               .replace(/-{2,}\s*copy the block below[^\n]*/gi,"")
+               .trim();
+  }
+
+  // Render the assistant's prose safely: escape first, then apply light
+  // formatting. Never inserts anything the assistant didn't write as markup.
+  function formatProse(raw){
+    const lines = escapeHTML(raw).split("\n");
+    const out = [];
+    let inList = false;
+    const closeList = function(){ if(inList){ out.push("</ul>"); inList = false; } };
+    const inline = function(t){
+      return t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+              .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, "$1<em>$2</em>");
+    };
+    lines.forEach(function(ln){
+      const t = ln.trim();
+      if(!t){ closeList(); return; }
+      const h = t.match(/^#{1,6}\s+(.*)$/);
+      if(h){ closeList(); out.push('<h4 class="prose-h">' + inline(h[1]) + "</h4>"); return; }
+      const li = t.match(/^(?:[-*\u2022]|\d+[.)])\s+(.*)$/);
+      if(li){
+        if(!inList){ out.push("<ul>"); inList = true; }
+        out.push("<li>" + inline(li[1]) + "</li>");
+        return;
+      }
+      closeList();
+      out.push("<p>" + inline(t) + "</p>");
+    });
+    closeList();
+    return out.join("");
+  }
+
+  function renderCoaching(text){
+    const out = $("coachOut"); out.hidden = false;
+    const obj = extractCoachJSON(text);
+    const prose = proseOnly(text);
+    let h = '<div class="coach-card">';
+    if(prose){
+      h += '<div class="coach-prose">' + formatProse(prose) + '</div>';
+      if(obj && obj.next){
+        h += '<div class="coach-next"><span>Your focus next take</span>' + escapeHTML(obj.next) + '</div>';
+      }
+    } else if(obj){
+      // only the copy-back block was pasted - rebuild readable prose from it
+      h += '<div class="coach-prose"><p>' + escapeHTML(obj.opener || "") + '</p>';
+      if(Array.isArray(obj.worked) && obj.worked.length){
+        h += '<h4 class="prose-h">What worked</h4><ul>'
+           + obj.worked.map(function(w){ return "<li>" + escapeHTML(w) + "</li>"; }).join("") + "</ul>";
+      }
+      if(Array.isArray(obj.improve) && obj.improve.length){
+        h += '<h4 class="prose-h">What to work on</h4>';
+        obj.improve.forEach(function(it){
+          h += '<div class="improve"><div class="imp-focus">' + escapeHTML(it.focus||"") + "</div>";
+          if(it.why) h += '<div class="imp-why">' + escapeHTML(it.why) + "</div>";
+          if(it["try"]) h += '<div class="imp-try"><b>Try:</b> ' + escapeHTML(it["try"]) + "</div>";
+          h += "</div>";
+        });
+      }
+      h += "</div>";
+      if(obj.next){ h += '<div class="coach-next"><span>Your focus next take</span>' + escapeHTML(obj.next) + '</div>'; }
+    } else {
+      h += '<div class="coach-prose">' + formatProse(text) + '</div>';
+    }
+    h += "</div>";
+    out.innerHTML = h;
+    announce("Coaching added.");
+  }
+
+  // ---------- rubric ----------
+  const HKEY = "rr_takes_v1";
+  const SCALE = [{v:1,t:"Needs work"},{v:2,t:"Developing"},{v:3,t:"Solid"},{v:4,t:"Strong"}];
+
+  function criteriaList(){
+    return ($("rubricInput").value || "").split("\n")
+      .map(function(x){ return x.trim(); }).filter(Boolean).slice(0,12);
+  }
+
+  function renderRubric(){
+    const list = $("rubricList");
+    const prior = readRubric();
+    list.innerHTML = "";
+    criteriaList().forEach(function(name, i){
+      const row = document.createElement("div");
+      row.className = "crit";
+      const h = document.createElement("div");
+      h.className = "crit-name"; h.textContent = name;
+      row.appendChild(h);
+      const opts = document.createElement("div");
+      opts.className = "scale-opts";
+      opts.setAttribute("role","group");
+      opts.setAttribute("aria-label", name);
+      SCALE.forEach(function(sc){
+        const lab = document.createElement("label");
+        const inp = document.createElement("input");
+        inp.type = "radio"; inp.name = "crit_" + i; inp.value = String(sc.v);
+        if(prior[name] === sc.v) inp.checked = true;
+        inp.addEventListener("change", updateRubricTotal);
+        const span = document.createElement("span");
+        span.innerHTML = '<span class="num">' + sc.v + '</span>' + escapeHTML(sc.t);
+        lab.appendChild(inp); lab.appendChild(span);
+        opts.appendChild(lab);
+      });
+      row.appendChild(opts);
+      list.appendChild(row);
+    });
+    updateRubricTotal();
+  }
+  $("rubricInput").addEventListener("change", renderRubric);
+
+  function readRubric(){
+    const out = {};
+    criteriaList().forEach(function(name, i){
+      const sel = document.querySelector('input[name="crit_' + i + '"]:checked');
+      if(sel) out[name] = parseInt(sel.value, 10);
+    });
+    return out;
+  }
+
+  function updateRubricTotal(){
+    const r = readRubric(), keys = Object.keys(r);
+    const box = $("rubricTotal");
+    if(!keys.length){ box.hidden = true; return; }
+    const avg = keys.reduce(function(a,k){ return a + r[k]; }, 0) / keys.length;
+    $("rubricAvg").textContent = avg.toFixed(1) + " / 4";
+    $("rubricAvgNote").textContent = "average across " + keys.length + " of " + criteriaList().length + " criteria scored";
+    box.hidden = false;
+  }
+
+  // ---------- history ----------
+  function loadTakes(){
+    try{ const raw = localStorage.getItem(HKEY); return raw ? JSON.parse(raw) : []; }
+    catch(e){ return []; }
+  }
+  function saveTakes(arr){
+    try{ localStorage.setItem(HKEY, JSON.stringify(arr)); return true; }
+    catch(e){ return false; }
+  }
+
+  $("btnSaveTake").addEventListener("click", function(){
+    const m = currentMetrics();
+    if(!m.durSec){ flashSave("Record a take first.", true); return; }
+    const takes = loadTakes();
+    const rec = {
+      id: Date.now(), date: new Date().toISOString(), n: takes.length + 1,
+      prompt: $("promptInput").value.trim(),
+      durSec: Math.round(m.durSec), wc: m.wc, wpm: m.wpm,
+      fillers: m.fill.total, fillRate: Number(m.fillRate.toFixed(1)), fillFound: m.fill.found,
+      variety: m.variety, pauses: m.pauses.count, longestPause: Number(m.pauses.longest.toFixed(1)),
+      energy: (m.energy && m.energy.ok) ? { variation: Math.round(m.energy.variation*100),
+        arcPct: m.energy.arcPct, finishPct: m.energy.finishPct } : null,
+      rubric: readRubric(),
+      worked: $("reflectWorked").value.trim(), change: $("reflectChange").value.trim(),
+      coaching: coachingPlain(),
+      text: m.text
+    };
+    takes.push(rec);
+    while(takes.length > 40) takes.shift();
+    if(saveTakes(takes)){ renderHistory(); flashSave("Saved as take " + rec.n + ".", false); }
+    else { flashSave("Couldn't save - browser storage may be full or blocked.", true); }
+  });
+
+  function flashSave(msg, warn){
+    const n = $("saveNote"); n.textContent = msg; n.hidden = false;
+    n.className = "copy-note" + (warn ? " warn" : "");
+    announce(msg);
+  }
+
+  function renderHistory(){
+    const takes = loadTakes();
+    const list = $("histList");
+    $("histCount").textContent = takes.length ? "(" + takes.length + ")" : "";
+    list.innerHTML = "";
+    if(!takes.length){
+      $("histEmpty").hidden = false; $("histActions").hidden = true; $("sparkWrap").hidden = true; return;
+    }
+    $("histEmpty").hidden = true; $("histActions").hidden = false;
+
+    takes.slice().reverse().forEach(function(t){
+      const d = document.createElement("details");
+      d.className = "take";
+      const rk = Object.keys(t.rubric || {});
+      const avg = rk.length ? (rk.reduce(function(a,k){ return a + t.rubric[k]; },0)/rk.length).toFixed(1) : null;
+      const sum = document.createElement("summary");
+      sum.innerHTML = '<span class="tno">Take ' + t.n + '</span>'
+        + '<span class="tdate">' + escapeHTML(new Date(t.date).toLocaleDateString(undefined,{month:"short",day:"numeric"})) + '</span>'
+        + '<span class="tstat">' + fmt(t.durSec) + ' - ' + t.wpm + ' wpm - ' + t.fillers + ' fillers'
+        + (avg ? ' - self ' + avg + '/4' : '') + '</span>';
+      d.appendChild(sum);
+
+      const body = document.createElement("div");
+      body.className = "take-body";
+      let h = "";
+      if(t.prompt) h += '<p class="tprompt">' + escapeHTML(t.prompt) + '</p>';
+      h += '<dl>';
+      h += '<dt>Length</dt><dd>' + fmt(t.durSec) + '</dd>';
+      h += '<dt>Pace</dt><dd>' + t.wpm + ' wpm - ' + t.wc + ' words</dd>';
+      h += '<dt>Fillers</dt><dd>' + t.fillers + ' (' + t.fillRate + '/min)</dd>';
+      h += '<dt>Variety</dt><dd>' + t.variety + '% unique</dd>';
+      h += '<dt>Pauses</dt><dd>' + t.pauses + (t.longestPause ? ' - longest ' + t.longestPause + 's' : '') + '</dd>';
+      if(t.energy){
+        h += '<dt>Energy</dt><dd>variation ' + t.energy.variation
+           + (t.energy.arcPct !== null && t.energy.arcPct !== undefined
+              ? ' - arc ' + (t.energy.arcPct>0?'+':'') + t.energy.arcPct + '%' : '') + '</dd>';
+      }
+      h += '</dl>';
+      if(rk.length){
+        h += '<dl>' + rk.map(function(k){
+          return '<dt>' + escapeHTML(k) + '</dt><dd>' + t.rubric[k] + '/4</dd>';
+        }).join("") + '</dl>';
+      }
+      if(t.worked) h += '<p><strong>Worked:</strong> ' + escapeHTML(t.worked) + '</p>';
+      if(t.change) h += '<p><strong>Next time:</strong> ' + escapeHTML(t.change) + '</p>';
+      if(t.coaching) h += '<p><strong>Coaching:</strong></p><div class="ttext">' + escapeHTML(t.coaching) + '</div>';
+      if(t.text) h += '<div class="ttext">' + escapeHTML(t.text) + '</div>';
+      body.innerHTML = h;
+
+      const del = document.createElement("button");
+      del.className = "btn-danger btn-sm"; del.type = "button";
+      del.textContent = "Delete this take";
+      del.addEventListener("click", function(){
+        saveTakes(loadTakes().filter(function(x){ return x.id !== t.id; }));
+        renderHistory(); announce("Take " + t.n + " deleted.");
+      });
+      body.appendChild(del);
+      d.appendChild(body);
+      list.appendChild(d);
+    });
+
+    drawSpark(takes);
+  }
+
+  function drawSpark(takes){
+    const wrap = $("sparkWrap");
+    if(takes.length < 2){ wrap.hidden = true; return; }
+    wrap.hidden = false;
+    $("sparkLegend").innerHTML = '<span style="color:var(--over)">&#9632;</span> fillers/min &nbsp; <span style="color:var(--lamp)">&#9632;</span> pace';
+    const cv = $("sparkCanvas"), ctx = cv.getContext("2d");
+    const W = cv.width, H = cv.height, pad = 10;
+    ctx.clearRect(0,0,W,H);
+    const series = [
+      { vals: takes.map(function(t){ return t.fillRate; }), color:"#d8894a" },
+      { vals: takes.map(function(t){ return t.wpm; }), color:"#e8a33d" }
+    ];
+    series.forEach(function(sv){
+      const mx = Math.max.apply(null, sv.vals), mn = Math.min.apply(null, sv.vals);
+      const span = (mx - mn) || 1;
+      ctx.beginPath();
+      sv.vals.forEach(function(v,i){
+        const x = pad + (i/(sv.vals.length-1))*(W-pad*2);
+        const y = H - pad - ((v-mn)/span)*(H-pad*2);
+        i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+      });
+      ctx.strokeStyle = sv.color; ctx.lineWidth = 2; ctx.lineJoin="round"; ctx.stroke();
+      sv.vals.forEach(function(v,i){
+        const x = pad + (i/(sv.vals.length-1))*(W-pad*2);
+        const y = H - pad - ((v-mn)/span)*(H-pad*2);
+        ctx.beginPath(); ctx.arc(x,y,2.6,0,Math.PI*2); ctx.fillStyle = sv.color; ctx.fill();
+      });
+    });
+    $("sparkSummary").textContent = "Across " + takes.length + " takes, filler rate went from "
+      + takes[0].fillRate + " to " + takes[takes.length-1].fillRate + " per minute, and pace from "
+      + takes[0].wpm + " to " + takes[takes.length-1].wpm + " words per minute.";
+  }
+
+  function download(name, text, mime){
+    downloadBlob(name, new Blob([text], { type: mime }));
+  }
+
+  $("btnExportMd").addEventListener("click", function(){
+    const takes = loadTakes();
+    if(!takes.length) return;
+    const L = ["# Rehearsal history", "", "Exported " + new Date().toLocaleString(), ""];
+    takes.forEach(function(t){
+      L.push("## Take " + t.n + " - " + new Date(t.date).toLocaleString());
+      if(t.prompt){ L.push(""); L.push("**Prompt:** " + t.prompt); }
+      L.push("");
+      L.push("- Length: " + fmt(t.durSec) + " - " + t.wc + " words");
+      L.push("- Pace: " + t.wpm + " wpm");
+      L.push("- Fillers: " + t.fillers + " (" + t.fillRate + "/min)");
+      L.push("- Variety: " + t.variety + "% unique");
+      L.push("- Pauses: " + t.pauses + (t.longestPause ? " - longest " + t.longestPause + "s" : ""));
+      if(t.energy) L.push("- Energy: variation " + t.energy.variation);
+      const rk = Object.keys(t.rubric||{});
+      if(rk.length){ L.push(""); L.push("**Self-scores:**"); rk.forEach(function(k){ L.push("- " + k + ": " + t.rubric[k] + "/4"); }); }
+      if(t.worked){ L.push(""); L.push("**Worked:** " + t.worked); }
+      if(t.change){ L.push("**Next time:** " + t.change); }
+      if(t.coaching){ L.push(""); L.push("**Coaching:**"); L.push(t.coaching); }
+      if(t.text){ L.push(""); L.push("**Transcript:** " + t.text); }
+      L.push(""); L.push("---"); L.push("");
+    });
+    download("rehearsal-history-" + stamp() + ".md", L.join("\n"), "text/markdown");
+    announce("Exporting history as Markdown.");
+  });
+
+  $("btnExportCsv").addEventListener("click", function(){
+    const takes = loadTakes();
+    if(!takes.length) return;
+    const q = function(v){ return '"' + String(v === null || v === undefined ? "" : v).replace(/"/g,'""') + '"'; };
+    const rows = [["take","date","seconds","words","wpm","fillers","fillers_per_min","variety_pct",
+                   "pauses","longest_pause_s","energy_variation","energy_arc_pct","self_avg","worked","next_time"]
+                   .map(q).join(",")];
+    takes.forEach(function(t){
+      const rk = Object.keys(t.rubric||{});
+      const avg = rk.length ? (rk.reduce(function(a,k){ return a+t.rubric[k]; },0)/rk.length).toFixed(2) : "";
+      rows.push([t.n, t.date, t.durSec, t.wc, t.wpm, t.fillers, t.fillRate, t.variety,
+                 t.pauses, t.longestPause, t.energy ? t.energy.variation : "",
+                 t.energy ? t.energy.arcPct : "", avg, t.worked, t.change].map(q).join(","));
+    });
+    download("rehearsal-history-" + stamp() + ".csv", rows.join("\n"), "text/csv");
+    announce("Exporting history as CSV.");
+  });
+
+  $("btnClearHist").addEventListener("click", function(){
+    const btn = $("btnClearHist");
+    if(btn.dataset.confirm === "1"){
+      try{ localStorage.removeItem(HKEY); }catch(e){}
+      btn.dataset.confirm = ""; btn.textContent = "Clear history";
+      renderHistory(); announce("History cleared.");
+    } else {
+      btn.dataset.confirm = "1";
+      btn.textContent = "Tap again to confirm - this can't be undone";
+      setTimeout(function(){
+        if(btn.dataset.confirm === "1"){ btn.dataset.confirm=""; btn.textContent = "Clear history"; }
+      }, 5000);
+    }
+  });
+
+  // ---------- post-hoc audio analysis ----------
+  async function analyseAudio(src){
+    const buf = (src instanceof ArrayBuffer) ? src : await src.arrayBuffer();
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) throw new Error("no AudioContext");
+    const ctx = new Ctx();
+    const audio = await new Promise(function(res, rej){
+      const pr = ctx.decodeAudioData(buf.slice(0), res, rej);
+      if(pr && pr.then) pr.then(res, rej);
+    });
+    const ch = audio.getChannelData(0);
+    const sr = audio.sampleRate;
+    const win = Math.max(1, Math.floor(sr*0.04));
+    const series = [];
+    for(let i=0; i+win <= ch.length; i += win){
+      let acc = 0;
+      for(let j=0;j<win;j++){ const v = ch[i+j]; acc += v*v; }
+      series.push({ t:(i/sr)*1000, rms: Math.sqrt(acc/win) });
+    }
+    const durationMs = audio.duration*1000;
+    try{ ctx.close(); }catch(e){}
+    return { series: series, durationMs: durationMs };
+  }
+
+  // ---------- caption import ----------
+  function parseCaptions(raw){
+    const txt = String(raw).replace(/\r/g,"");
+    const lines = txt.split("\n");
+    const cues = [];
+    let cur = null;
+    const timeRe = /(\d{1,2}:)?\d{1,2}:\d{2}[.,]\d{1,3}\s*-->\s*(\d{1,2}:)?\d{1,2}:\d{2}[.,]\d{1,3}/;
+    const toMs = function(x){
+      const parts = x.trim().replace(",",".").split(":").map(parseFloat);
+      let sec = 0;
+      if(parts.length === 3) sec = parts[0]*3600 + parts[1]*60 + parts[2];
+      else if(parts.length === 2) sec = parts[0]*60 + parts[1];
+      else sec = parts[0];
+      return sec*1000;
+    };
+    for(let i=0;i<lines.length;i++){
+      const ln = lines[i].trim();
+      if(!ln){ if(cur && cur.text){ cues.push(cur); cur = null; } continue; }
+      if(/^WEBVTT/i.test(ln) || /^NOTE\b/i.test(ln) || /^STYLE\b/i.test(ln)) continue;
+      if(timeRe.test(ln)){ cur = { t: toMs(ln.split("-->")[0]), text: "" }; continue; }
+      if(/^\d+$/.test(ln) && !cur) continue;
+      if(cur){
+        const clean = ln.replace(/<[^>]*>/g,"").replace(/^-\s*/,"").trim();
+        if(clean) cur.text += (cur.text ? " " : "") + clean;
+      }
+    }
+    if(cur && cur.text) cues.push(cur);
+    const seen = [];
+    cues.forEach(function(c){
+      const prev = seen.length ? seen[seen.length-1].text : "";
+      if(c.text && c.text !== prev) seen.push(c);
+    });
+    return seen;
+  }
+
+  function setSourceNote(msg, warn){
+    const n = $("sourceNote"); n.textContent = msg; n.hidden = false;
+    n.className = "copy-note" + (warn ? " warn" : ""); announce(msg);
+  }
+  function setCapNote(msg, warn){
+    const n = $("capsNote"); n.textContent = msg; n.hidden = false;
+    n.className = "copy-note" + (warn ? " warn" : ""); announce(msg);
+  }
+
+  function finishTake(subtitle){
+    lastMetrics = computeMetrics();
+    renderResults(lastMetrics);
+    if(subtitle){ $("analysisSub").textContent = subtitle; }
+    renderDelta(lastMetrics);
+    prevTake = { fill:{total:lastMetrics.fill.total}, wpm:lastMetrics.wpm, durSec:lastMetrics.durSec };
+    takeNum++;
+    drawTrace();
+    document.querySelector(".analysis").scrollIntoView({ behavior:"smooth", block:"nearest" });
+  }
+
+  $("fileVideo").addEventListener("change", async function(ev){
+    const f = ev.target.files && ev.target.files[0];
+    if(!f) return;
+    clearErr();
+    setSourceNote("Reading " + f.name + "...", false);
+    try{
+      if(recURL){ URL.revokeObjectURL(recURL); }
+      recBlob = f;
+      recURL = URL.createObjectURL(f);
+      video.srcObject = null; video.src = recURL; video.muted = false;
+      video.setAttribute("controls",""); video.classList.add("playback");
+      viewport.classList.add("has-video");
+      isUploaded = true;
+      const res = await analyseAudio(f);
+      rmsSeries = res.series; elapsedMs = res.durationMs;
+      timerEl.textContent = fmt(elapsedMs/1000);
+      setStatus("review","Reviewing an uploaded recording");
+      btnAgain.hidden = false; btnAgain.disabled = false; btnSaveVideo.hidden = true;
+      finishTake("Loaded " + f.name + ". Add a transcript below to see pace and filler counts.");
+      setSourceNote("Analyzing: " + f.name, false);
+    }catch(e){
+      setSourceNote("Couldn't read the audio in that file. Try an mp4, webm, m4a, mp3, or wav.", true);
+    }
+  });
+
+  $("fileCaps").addEventListener("change", function(ev){
+    const f = ev.target.files && ev.target.files[0];
+    if(!f) return;
+    const rd = new FileReader();
+    rd.onload = function(){
+      const cues = parseCaptions(rd.result);
+      if(!cues.length){ setCapNote("No caption cues found in that file.", true); return; }
+      finals = cues.map(function(c){ return { t:c.t, text:c.text }; });
+      lastMetrics = computeMetrics();
+      renderResults(lastMetrics);
+      drawTrace();
+      setCapNote("Imported " + cues.length + " caption cues from " + f.name + ".", false);
+    };
+    rd.onerror = function(){ setCapNote("Couldn't read that caption file.", true); };
+    rd.readAsText(f);
+  });
+
+  // Single source of truth for the report — used by save, copy, zip, and print.
+  function buildReport(){
+    if(!lastMetrics) return "";
+    const m = lastMetrics, s = m.settings;
+    const name = $("studentName").value.trim();
+    const promptTxt = $("promptInput").value.trim();
+    const L = [];
+    L.push("# Rehearsal take \u2014 delivery report");
+    L.push("");
+    if(name) L.push("Speaker: " + name);
+    L.push("Date: " + new Date().toLocaleString());
+    if(promptTxt){ L.push(""); L.push("## Prompt"); L.push(promptTxt); }
+    L.push(""); L.push("## Delivery");
+    L.push("- Length: " + fmt(m.durSec) + (s.targetMax>0 ? ("  (target "+s.targetMin+"\u2013"+s.targetMax+" min)") : ""));
+    L.push("- Words: " + m.wc);
+    L.push("- Pace: " + m.wpm + " wpm  (target " + s.wpmLow + "\u2013" + s.wpmHigh + ")");
+    L.push("- Filler words: " + m.fill.total + (m.durSec>0 ? ("  ("+m.fillRate.toFixed(1)+"/min)") : ""));
+    const fk = Object.keys(m.fill.found);
+    if(fk.length){ L.push("  - " + fk.map(function(k){ return k+" \u00d7"+m.fill.found[k]; }).join(", ")); }
+    L.push("- Word variety: " + m.variety + "% unique");
+    if(m.repeats.length){ L.push("  - Most repeated: " + m.repeats.map(function(r){ return r.w+" \u00d7"+r.n; }).join(", ")); }
+    L.push("- Long pauses (estimated): " + m.pauses.count + (m.pauses.longest>0 ? ("  \u00b7 longest ~"+m.pauses.longest.toFixed(1)+"s") : ""));
+    if(m.energy && m.energy.ok){
+      L.push("- Vocal energy (relative to this take, not loudness):");
+      L.push("  - Variation: " + Math.round(m.energy.variation*100)
+        + (m.energy.variation < 0.28 ? " (fairly level)" : m.energy.variation < 0.75 ? " (good light and shade)" : " (very uneven)"));
+      if(m.energy.arcPct !== null){
+        L.push("  - First third \u2192 last third: " + (m.energy.arcPct>0?"+":"") + m.energy.arcPct + "%"
+          + (m.energy.arcPct <= -22 ? " (faded)" : m.energy.arcPct >= 22 ? " (built)" : " (steady)"));
+      }
+      if(m.energy.finishPct !== null && m.energy.finishPct <= -30){ L.push("  - Final words drop off"); }
+    }
+    const rub = readRubric(), rk = Object.keys(rub);
+    if(rk.length){
+      L.push(""); L.push("## Self-assessment");
+      rk.forEach(function(k){ L.push("- " + k + ": " + rub[k] + "/4"); });
+      const avg = rk.reduce(function(a,k){ return a+rub[k]; },0)/rk.length;
+      L.push("- Average: " + avg.toFixed(1) + "/4");
+    }
+    const w = $("reflectWorked").value.trim(), c = $("reflectChange").value.trim();
+    if(w || c){
+      L.push(""); L.push("## Reflection");
+      if(w) L.push("**What worked:** " + w);
+      if(c) L.push("**Next time:** " + c);
+    }
+    if(coachingText){
+      L.push(""); L.push("## Coaching");
+      L.push(coachingPlain());
+    }
+    L.push(""); L.push("## Transcript");
+    L.push(m.text || "(none captured)");
+    L.push(""); L.push("---");
+    L.push("Metrics come from an in-browser tool and are approximations, not a grade. The transcript is machine-made and may misread accents or names.");
+    return L.join("\n");
+  }
+
+  btnSaveReport.addEventListener("click", function(){
+    const r = buildReport();
+    if(!r) return;
+    download("rehearsal-report-" + stamp() + ".md", r, "text/markdown");
+    announce("Saving your take report.");
+  });
+
+  $("btnCopyReport").addEventListener("click", function(){
+    const r = buildReport();
+    if(!r){ flashShare("Record a take first.", true); return; }
+    copyText(r, function(){ flashShare("Report copied \u2014 paste it into your assignment.", false); },
+                function(){ flashShare("Couldn't copy. Use Save report instead.", true); });
+  });
+
+  $("btnPrint").addEventListener("click", function(){ window.print(); });
+
+  function flashShare(msg, warn){
+    const n = $("shareNote");
+    n.textContent = msg; n.hidden = false;
+    n.className = "copy-note" + (warn ? " warn" : "");
+    announce(msg);
+  }
+
+  // ---------- coaching paste-back ----------
+  let coachingText = "";
+  function coachingPlain(){
+    if(!coachingText) return "";
+    const prose = proseOnly(coachingText);
+    if(prose) return prose;
+    const o = extractCoachJSON(coachingText);
+    if(!o) return coachingText.trim();
+    const L = [o.opener];
+    if(Array.isArray(o.worked) && o.worked.length){
+      L.push(""); L.push("What worked:");
+      o.worked.forEach(function(x){ L.push("- " + x); });
+    }
+    if(Array.isArray(o.improve) && o.improve.length){
+      L.push(""); L.push("What to work on:");
+      o.improve.forEach(function(it){
+        L.push("- " + (it.focus||""));
+        if(it.why) L.push("  Why: " + it.why);
+        if(it["try"]) L.push("  Try: " + it["try"]);
+      });
+    }
+    if(o.next){ L.push(""); L.push("Next take: " + o.next); }
+    return L.join("\n");
+  }
+
+  $("btnAddCoaching").addEventListener("click", function(){
+    const raw = $("coachPaste").value.trim();
+    if(!raw){ flashCoach("Paste Claude's reply into the box first.", true); return; }
+    coachingText = raw;
+    renderCoaching(raw);
+    flashCoach("Coaching added to this take. It will be included when you save or print.", false);
+  });
+
+  $("btnClearCoaching").addEventListener("click", function(){
+    coachingText = "";
+    $("coachPaste").value = "";
+    const out = $("coachOut"); out.hidden = true; out.innerHTML = "";
+    flashCoach("Coaching cleared.", false);
+  });
+
+  function flashCoach(msg, warn){
+    const n = $("coachNote");
+    n.textContent = msg; n.hidden = false;
+    n.className = "copy-note" + (warn ? " warn" : "");
+    announce(msg);
+  }
+
+  // ---------- zip packaging (store-only, no library) ----------
+  const CRC_TABLE = (function(){
+    const t = new Uint32Array(256);
+    for(let i=0;i<256;i++){
+      let c = i;
+      for(let k=0;k<8;k++){ c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); }
+      t[i] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(u8){
+    let c = 0xFFFFFFFF;
+    for(let i=0;i<u8.length;i++){ c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); }
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function makeZip(files){
+    const enc = new TextEncoder();
+    const parts = [], central = [];
+    let offset = 0;
+    files.forEach(function(f){
+      const nameBytes = enc.encode(f.name);
+      const crc = crc32(f.data), size = f.data.length;
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true);
+      lh.setUint16(6, 0, true); lh.setUint16(8, 0, true);
+      lh.setUint16(10, 0, true); lh.setUint16(12, 0, true);
+      lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true);
+      lh.setUint16(26, nameBytes.length, true); lh.setUint16(28, 0, true);
+      parts.push(new Uint8Array(lh.buffer), nameBytes, f.data);
+
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true);
+      ch.setUint16(8, 0, true); ch.setUint16(10, 0, true);
+      ch.setUint16(12, 0, true); ch.setUint16(14, 0, true);
+      ch.setUint32(16, crc, true); ch.setUint32(20, size, true); ch.setUint32(24, size, true);
+      ch.setUint16(28, nameBytes.length, true); ch.setUint16(30, 0, true); ch.setUint16(32, 0, true);
+      ch.setUint16(34, 0, true); ch.setUint16(36, 0, true); ch.setUint32(38, 0, true);
+      ch.setUint32(42, offset, true);
+      central.push(new Uint8Array(ch.buffer), nameBytes);
+      offset += 30 + nameBytes.length + size;
+    });
+    let cdSize = 0;
+    central.forEach(function(c){ cdSize += c.length; });
+    const eocd = new DataView(new ArrayBuffer(22));
+    eocd.setUint32(0, 0x06054b50, true);
+    eocd.setUint16(4, 0, true); eocd.setUint16(6, 0, true);
+    eocd.setUint16(8, files.length, true); eocd.setUint16(10, files.length, true);
+    eocd.setUint32(12, cdSize, true); eocd.setUint32(16, offset, true);
+    eocd.setUint16(20, 0, true);
+    return new Blob(parts.concat(central, [new Uint8Array(eocd.buffer)]), { type:"application/zip" });
+  }
+
+  $("btnPackage").addEventListener("click", async function(){
+    if(!lastMetrics){ flashShare("Record a take first.", true); return; }
+    const btn = $("btnPackage");
+    btn.disabled = true;
+    flashShare("Building your package\u2026", false);
+    try{
+      const enc = new TextEncoder();
+      const name = ($("studentName").value.trim() || "take").replace(/[^\w\- ]/g,"").replace(/\s+/g,"-");
+      const files = [
+        { name: "report.md", data: enc.encode(buildReport()) },
+        { name: "transcript.txt", data: enc.encode(lastMetrics.text || "(none captured)") }
+      ];
+      if(recBlob){
+        const ext = isUploaded ? (recBlob.name && recBlob.name.split(".").pop()) || "webm" : recExt;
+        files.push({ name: "recording." + ext, data: new Uint8Array(await recBlob.arrayBuffer()) });
+      }
+      const zip = makeZip(files);
+      const mb = (zip.size/1048576).toFixed(1);
+      downloadBlob(name + "-" + stamp() + ".zip", zip);
+      flashShare("Package ready (" + mb + " MB) \u2014 check your downloads.", false);
+    }catch(e){
+      flashShare("Couldn't build the package. Try Save report and Save video separately.", true);
+    }
+    btn.disabled = false;
+  });
+
+  function downloadBlob(name, blob){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+
+  // ---------- utils ----------
+  function escapeHTML(str){
+    return String(str).replace(/[&<>"']/g, function(c){
+      return { "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c];
+    });
+  }
+  function stamp(){
+    const d = new Date(), p = function(n){ return (n<10?"0":"")+n; };
+    return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+"-"+p(d.getHours())+p(d.getMinutes());
+  }
+
+  // release hardware and blobs when leaving the page
+  window.addEventListener("pagehide", function(){
+    try{ if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); } }catch(e){}
+    try{ if(recURL){ URL.revokeObjectURL(recURL); } }catch(e){}
+    stopRecognition();
+  });
+
+  // ---------- init ----------
+  ringFill.style.strokeDashoffset = RING_C.toFixed(1);
+  // apply feature flags (elements stay in the DOM so their handlers remain valid)
+  if(!FEATURES.upload){ $("loadPanel").hidden = true; }
+  try{ localStorage.removeItem("rr_key"); }catch(e){}
+  try{
+    const savedAsst = localStorage.getItem("rr_assistant");
+    if(savedAsst && ASSISTANTS[savedAsst]) $("assistant").value = savedAsst;
+  }catch(e){}
+  refreshAssistant();
+  setStageState(false);
+  renderRubric();
+  renderHistory();
+  (function(){
+    // seed the delta bar from the last saved take so "vs last take" survives a reload
+    const t = loadTakes();
+    if(t.length){ const l = t[t.length-1]; prevTake = { fill:{total:l.fillers}, wpm:l.wpm, durSec:l.durSec }; }
+  })();
+  if(embedded){ $("embedNotice").hidden = false; }
+  if(!mediaSupported){
+    showErr(embedded ? EMBED_MSG
+      : "This browser can't reach the camera. Open the file over https or localhost (a secure context is required) in a recent Chrome, Edge, or Comet.");
+    btnEnable.disabled = true;
+  }
+  refreshTargetLabel();
+})();
+</script>
+</body>
+</html>
