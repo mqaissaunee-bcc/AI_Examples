@@ -417,6 +417,15 @@ canvas.trace{width:100%;height:60px;display:block;background:#20252e;border-radi
 .coach-prose .prose-h{font-size:.7rem;font-family:var(--font-mono);letter-spacing:.14em;
   text-transform:uppercase;color:var(--ink-soft);margin:1.1em 0 .4em;font-weight:600}
 .coach-prose strong{font-weight:600}
+.coach-more{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.coach-more>summary{cursor:pointer;font-size:.82rem;font-weight:600;color:var(--ink-soft);
+  list-style:none;display:inline-flex;align-items:center;gap:6px}
+.coach-more>summary::-webkit-details-marker{display:none}
+.coach-more>summary::after{content:"\25BC";font-size:.6rem;transition:transform .2s}
+.coach-more[open]>summary::after{transform:rotate(180deg)}
+.coach-more>summary:hover{color:var(--ink)}
+.coach-more>summary:focus-visible{outline:3px solid var(--lamp);outline-offset:3px;border-radius:4px}
+.coach-more .coach-prose{margin-top:10px}
 .assistant-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px}
 .assistant-row .field{flex:1 1 220px;margin:0}
 .open-link{
@@ -565,6 +574,8 @@ footer.site .program{color:var(--ink);font-weight:600}
   .scale-opts label{border:1px solid #ccc;background:#fff;color:#666;padding:3px 4px;font-size:8pt}
   .scale-opts label:has(input:checked){border:1.5px solid #000;background:#eee;color:#000}
   .coach-card{background:#fff;border:1px solid #999;border-left:3px solid #000}
+  .coach-more>summary{display:none}
+  .coach-more .coach-prose{display:block !important}
   .improve{background:#fff;border:1px solid #ddd}
   .coach-next{background:#f2f2f2}
   .rubric-total{background:#f2f2f2}
@@ -885,6 +896,7 @@ Time management</textarea>
               <label for="coachPaste">Paste the reply here <span id="pasteWho" style="font-weight:400;color:var(--ink-soft)"></span></label>
               <textarea id="coachPaste" rows="4" placeholder="Paste the whole reply here - the tool will pick out what it needs."></textarea>
             </div>
+            <p class="hint" style="margin:-6px 0 10px">The reply will end with a block of code. That's normal — it's how the tool reads the feedback. Just copy the whole reply, code and all.</p>
             <div class="t-actions">
               <button class="btn-solid btn-sm" id="btnAddCoaching" type="button">Add coaching to this take</button>
               <button class="btn-line btn-sm" id="btnClearCoaching" type="button">Clear</button>
@@ -1698,7 +1710,7 @@ Time management</textarea>
   // ---------- coaching handoff ----------
   const JSON_INSTR = 'Write your reply in TWO parts, in this order.\n\n'
     + 'PART 1 - the feedback itself, written for the student to read right here. Use clear headings and normal prose: an encouraging opening line, "What worked" with two specific things, "What to work on" with two or three prioritized items (each saying what to change, why, and what to try), and "For your next take" with a single focus. Warm and readable - no JSON, no code, just the coaching.\n\n'
-    + 'PART 2 - under a heading exactly like "--- Copy the block below back into the Rehearsal Room ---", output a single fenced code block marked json containing the same feedback in this shape: {"opener": string, "worked": [string, string], "improve": [{"focus": string, "why": string, "try": string}], "next": string}. Two or three items in "improve". No commentary inside the block.';
+    + 'PART 2 - under a heading exactly like "Everything below is for the Rehearsal Room", output a single fenced code block marked json containing the same feedback in this shape: {"opener": string, "worked": [string, string], "improve": [{"focus": string, "why": string, "try": string}], "next": string}. Two or three items in "improve". No commentary inside the block.';
 
   // ---------- assistant picker ----------
   // The prompt itself is assistant-agnostic - every major assistant handles it.
@@ -1815,29 +1827,59 @@ Time management</textarea>
       function(){ notifyCopy("Couldn't copy - select the transcript and copy manually.", true); });
   });
 
-  // A student may paste the whole reply (prose + code block) or just the block.
-  // Find the JSON either way; if there's none, keep whatever they pasted.
-  function extractCoachJSON(text){
-    const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    const candidates = [];
-    if(fence && fence[1]) candidates.push(fence[1].trim());
-    const first = text.indexOf("{"), last = text.lastIndexOf("}");
-    if(first !== -1 && last > first) candidates.push(text.slice(first, last+1));
-    for(let i=0;i<candidates.length;i++){
+  // Split a pasted reply into readable prose and the structured block.
+  // Copying from a chat window usually drops the ``` fences, so the block can
+  // arrive bare - we locate it by brace-matching, not by looking for fences.
+  function splitCoaching(text){
+    let prose = String(text), obj = null;
+
+    // 1. fenced block, if the fences survived the copy
+    const fence = prose.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if(fence){
       try{
-        const o = JSON.parse(candidates[i]);
-        if(o && o.opener) return o;
+        const o = JSON.parse(fence[1].trim());
+        if(o && o.opener){ obj = o; prose = prose.replace(fence[0], ""); }
       }catch(e){}
     }
-    return null;
+
+    // 2. otherwise scan for a balanced {...} that parses into our shape
+    if(!obj){
+      for(let i = prose.indexOf("{"); i !== -1; i = prose.indexOf("{", i+1)){
+        let depth = 0, inStr = false, esc = false, endIdx = -1;
+        for(let j = i; j < prose.length; j++){
+          const ch = prose[j];
+          if(esc){ esc = false; continue; }
+          if(ch === "\\"){ esc = true; continue; }
+          if(ch === '"'){ inStr = !inStr; continue; }
+          if(inStr) continue;
+          if(ch === "{") depth++;
+          else if(ch === "}"){ depth--; if(depth === 0){ endIdx = j; break; } }
+        }
+        if(endIdx === -1) break;
+        const slice = prose.slice(i, endIdx+1);
+        try{
+          const o = JSON.parse(slice);
+          if(o && o.opener){
+            obj = o;
+            prose = prose.slice(0, i) + prose.slice(endIdx+1);
+            break;
+          }
+        }catch(e){}
+      }
+    }
+
+    // 3. drop the hand-off heading and any leftover fence marks
+    prose = prose.replace(/^\s*-{0,3}\s*everything below is for the rehearsal room\s*-{0,3}\s*$/gim, "")
+                 .replace(/-{2,}\s*copy the block below[^\n]*/gi, "")
+                 .replace(/^\s*```(?:json)?\s*$/gim, "")
+                 .replace(/\n{3,}/g, "\n\n")
+                 .trim();
+
+    return { obj: obj, prose: prose };
   }
 
-  // Strip the copy-back block so the student doesn't see raw JSON in the tool.
-  function proseOnly(text){
-    return text.replace(/```(?:json)?[\s\S]*?```/gi,"")
-               .replace(/-{2,}\s*copy the block below[^\n]*/gi,"")
-               .trim();
-  }
+  function extractCoachJSON(text){ return splitCoaching(text).obj; }
+  function proseOnly(text){ return splitCoaching(text).prose; }
 
   // Render the assistant's prose safely: escape first, then apply light
   // formatting. Never inserts anything the assistant didn't write as markup.
@@ -1870,35 +1912,40 @@ Time management</textarea>
 
   function renderCoaching(text){
     const out = $("coachOut"); out.hidden = false;
-    const obj = extractCoachJSON(text);
-    const prose = proseOnly(text);
+    const split = splitCoaching(text);
+    const obj = split.obj, prose = split.prose;
     let h = '<div class="coach-card">';
-    if(prose){
-      h += '<div class="coach-prose">' + formatProse(prose) + '</div>';
-      if(obj && obj.next){
-        h += '<div class="coach-next"><span>Your focus next take</span>' + escapeHTML(obj.next) + '</div>';
-      }
-    } else if(obj){
-      // only the copy-back block was pasted - rebuild readable prose from it
-      h += '<div class="coach-prose"><p>' + escapeHTML(obj.opener || "") + '</p>';
+
+    if(obj){
+      h += '<p class="coach-opener">' + escapeHTML(obj.opener || "") + '</p>';
       if(Array.isArray(obj.worked) && obj.worked.length){
-        h += '<h4 class="prose-h">What worked</h4><ul>'
-           + obj.worked.map(function(w){ return "<li>" + escapeHTML(w) + "</li>"; }).join("") + "</ul>";
+        h += '<div class="coach-sec"><h4>What worked</h4><ul>'
+           + obj.worked.map(function(w){ return "<li>" + escapeHTML(w) + "</li>"; }).join("")
+           + "</ul></div>";
       }
       if(Array.isArray(obj.improve) && obj.improve.length){
-        h += '<h4 class="prose-h">What to work on</h4>';
+        h += '<div class="coach-sec"><h4>What to work on</h4>';
         obj.improve.forEach(function(it){
           h += '<div class="improve"><div class="imp-focus">' + escapeHTML(it.focus||"") + "</div>";
           if(it.why) h += '<div class="imp-why">' + escapeHTML(it.why) + "</div>";
           if(it["try"]) h += '<div class="imp-try"><b>Try:</b> ' + escapeHTML(it["try"]) + "</div>";
           h += "</div>";
         });
+        h += "</div>";
       }
-      h += "</div>";
-      if(obj.next){ h += '<div class="coach-next"><span>Your focus next take</span>' + escapeHTML(obj.next) + '</div>'; }
+      if(obj.next){
+        h += '<div class="coach-next"><span>Your focus next take</span>' + escapeHTML(obj.next) + "</div>";
+      }
+      if(prose){
+        h += '<details class="coach-more"><summary>Read the full feedback</summary>'
+           + '<div class="coach-prose">' + formatProse(prose) + "</div></details>";
+      }
+    } else if(prose){
+      h += '<div class="coach-prose">' + formatProse(prose) + "</div>";
     } else {
-      h += '<div class="coach-prose">' + formatProse(text) + '</div>';
+      h += '<div class="coach-prose">' + formatProse(text) + "</div>";
     }
+
     h += "</div>";
     out.innerHTML = h;
     announce("Coaching added.");
