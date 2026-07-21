@@ -83,6 +83,11 @@
   .act:focus-visible{outline:none}
   .act .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ai);box-shadow:0 0 6px rgba(22,64,122,.5);transition:background .3s,box-shadow .3s}
   .act[aria-pressed="false"] .dot{background:transparent;box-shadow:none;border:1px solid rgba(26,26,31,.4)}
+  #vol{-webkit-appearance:none;appearance:none;width:74px;height:4px;border-radius:2px;background:var(--line);outline:none;cursor:pointer;flex:none}
+  #vol::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:13px;height:13px;border-radius:50%;background:var(--text);cursor:pointer;border:none}
+  #vol::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;background:var(--text);cursor:pointer}
+  #vol:focus-visible{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--gold)}
+  @media (max-width:560px){ #vol{display:none} }
   input[type="range"]{width:64px;accent-color:var(--gold);height:24px;cursor:pointer}
   input[type="range"]:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gold-soft);border-radius:8px}
 
@@ -179,6 +184,9 @@
   <button class="act" id="autoBtn" aria-pressed="true" title="Drops and gentle currents when the surface is idle"><span class="dot" aria-hidden="true"></span><span class="txt">Auto</span></button>
   <button class="act" id="washBtn" title="Gradually rinse the ink away"><span class="glyph" lang="ja" aria-hidden="true">洗</span><span class="txt">Wash</span></button>
   <div class="sep" aria-hidden="true"></div>
+  <button class="act" id="soundBtn" aria-pressed="false" title="Zen ambience — drone, bells, and water"><span class="dot" aria-hidden="true"></span><span class="txt">Sound</span></button>
+  <input type="range" id="vol" min="0" max="100" value="50" aria-label="Sound volume">
+  <div class="sep" aria-hidden="true"></div>
   <button class="act" id="timeBtn" title="Clock or timer"><span class="glyph" aria-hidden="true">◷</span><span class="txt">Time</span></button>
   <button class="act" id="captureBtn" title="Save the surface as an image"><span class="glyph" aria-hidden="true">⤓</span><span class="txt">Capture</span></button>
   <button class="act" id="themeBtn" title="Light paper or dark water" aria-pressed="false"><span class="glyph" aria-hidden="true">◐</span><span class="txt">Theme</span></button>
@@ -205,6 +213,7 @@
       <span><kbd>1</kbd>–<kbd>4</kbd></span><span>Choose ink · <kbd>0</kbd> cycles colors</span>
       <span><kbd>Space</kbd></span><span>Drop a bead of ink</span>
       <span><kbd>A</kbd></span><span>Auto performance on/off</span>
+      <span><kbd>M</kbd></span><span>Zen ambience on/off</span>
       <span><kbd>D</kbd></span><span>Light paper / dark water</span>
       <span><kbd>T</kbd></span><span>Clock &amp; timer</span>
       <span><kbd>H</kbd></span><span>Hide the controls (focus view)</span>
@@ -694,29 +703,88 @@
     setTimeout(function(){ dropInk(0.5, 0.62, INKS.shu, 0.5); }, 950);
   }
 
-  /* ---------- timer chime (singing-bowl tone; no ambience) ---------- */
-  var actx = null;
-  function armAudio(){ // called from the Start gesture so the browser permits sound
-    if(actx){ if(actx.state==='suspended') actx.resume(); return; }
+  /* ---------- sound: generative ambience + timer chime (synthesized live, no files) ---------- */
+  var actx=null, master=null, spaceIn=null, ambBus=null, padFilter=null, bellTimer=null;
+  var soundOn=false, volume=0.5;
+  var scale=[220.00,261.63,293.66,329.63,392.00,440.00,523.25,587.33]; // A minor pentatonic across octaves
+
+  function initAudio(){
+    if(actx) return;
     var AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
-    try { actx = new AC(); } catch(e){ actx = null; }
+    try { actx = new AC(); } catch(e){ actx = null; return; }
+    master = actx.createGain(); master.gain.value = volume; master.connect(actx.destination);
+    // shared spatial tail (feedback delay) used by pad, bells, and chime
+    spaceIn = actx.createGain(); spaceIn.gain.value = 1.0;
+    var delay = actx.createDelay(1.0); delay.delayTime.value = 0.33;
+    var fb = actx.createGain(); fb.gain.value = 0.34;
+    var dlp = actx.createBiquadFilter(); dlp.type='lowpass'; dlp.frequency.value = 1700;
+    spaceIn.connect(delay); delay.connect(dlp); dlp.connect(fb); fb.connect(delay); delay.connect(master);
+    // ambient bus — faded in/out when sound is toggled
+    ambBus = actx.createGain(); ambBus.gain.value = 0.0; ambBus.connect(master); ambBus.connect(spaceIn);
+    // slow drone pad through a gently swept lowpass
+    padFilter = actx.createBiquadFilter(); padFilter.type='lowpass'; padFilter.frequency.value = 520;
+    var padLfo = actx.createOscillator(), lg = actx.createGain();
+    padLfo.frequency.value = 0.05; lg.gain.value = 220; padLfo.connect(lg); lg.connect(padFilter.frequency); padLfo.start();
+    [110, 164.81, 220, 329.63].forEach(function(f,i){
+      var o = actx.createOscillator(); o.type = i>=2 ? 'triangle' : 'sine'; o.frequency.value = f; o.detune.value = (i-1)*3;
+      var g = actx.createGain(); g.gain.value = [0.5,0.32,0.22,0.12][i];
+      o.connect(g); g.connect(padFilter); o.start();
+    });
+    padFilter.connect(ambBus);
+    // soft water/wind texture from filtered looping noise
+    var nb = actx.createBuffer(1, actx.sampleRate*2, actx.sampleRate), nd = nb.getChannelData(0);
+    for(var k=0;k<nd.length;k++) nd[k] = Math.random()*2-1;
+    var noise = actx.createBufferSource(); noise.buffer = nb; noise.loop = true;
+    var nbp = actx.createBiquadFilter(); nbp.type='bandpass'; nbp.frequency.value = 620; nbp.Q.value = 0.7;
+    var nlfo = actx.createOscillator(), nlg = actx.createGain();
+    nlfo.frequency.value = 0.08; nlg.gain.value = 300; nlfo.connect(nlg); nlg.connect(nbp.frequency); nlfo.start();
+    var ng = actx.createGain(); ng.gain.value = 0.05;
+    noise.connect(nbp); nbp.connect(ng); ng.connect(ambBus); noise.start();
   }
-  function chime(){
-    if(!actx) return;
+  function bell(freq, when, gain){
+    var o = actx.createOscillator(); o.type='sine'; o.frequency.value = freq;
+    var o2 = actx.createOscillator(); o2.type='sine'; o2.frequency.value = freq*2.0; o2.detune.value = 4;
+    var g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(gain, when+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 3.0 + Math.random()*1.6);
+    var g2 = actx.createGain(); g2.gain.value = 0.28; o2.connect(g2); g2.connect(g); o.connect(g);
+    g.connect(ambBus); g.connect(spaceIn);
+    o.start(when); o2.start(when); o.stop(when+5); o2.stop(when+5);
+  }
+  function scheduleBells(){
+    if(!soundOn || !actx) return;
+    bell(scale[Math.floor(Math.random()*scale.length)], actx.currentTime+0.02, 0.14);
+    bellTimer = setTimeout(scheduleBells, 4200 + Math.random()*5200);
+  }
+  function setSound(on){
+    soundOn = on;
+    if(typeof soundBtn !== 'undefined' && soundBtn) soundBtn.setAttribute('aria-pressed', on?'true':'false');
+    if(on){
+      initAudio();
+      if(!actx){ soundOn=false; if(typeof soundBtn !== 'undefined' && soundBtn) soundBtn.setAttribute('aria-pressed','false'); announce('Audio unavailable'); return; }
+      if(actx.state==='suspended') actx.resume();
+      ambBus.gain.cancelScheduledValues(actx.currentTime);
+      ambBus.gain.setTargetAtTime(0.9, actx.currentTime, 1.6);
+      scheduleBells();
+      announce('Sound on');
+    } else {
+      if(ambBus && actx){ ambBus.gain.cancelScheduledValues(actx.currentTime); ambBus.gain.setTargetAtTime(0.0, actx.currentTime, 0.8); }
+      if(bellTimer){ clearTimeout(bellTimer); bellTimer=null; }
+      announce('Sound off');
+    }
+  }
+  function armAudio(){ initAudio(); if(actx && actx.state==='suspended') actx.resume(); }
+  function chime(){ // timer completion tone; routes past the ambient bus so it rings whether sound is on or off
+    initAudio(); if(!actx) return;
     if(actx.state==='suspended') actx.resume();
     var t = actx.currentTime, base = 196.00;
-    var out = actx.createGain(); out.gain.value = 0.9; out.connect(actx.destination);
-    var delay = actx.createDelay(1.0); delay.delayTime.value = 0.28;
-    var fb = actx.createGain(); fb.gain.value = 0.3;
-    var dlp = actx.createBiquadFilter(); dlp.type='lowpass'; dlp.frequency.value = 1600;
-    delay.connect(dlp); dlp.connect(fb); fb.connect(delay); delay.connect(out);
     [1, 2.01, 2.78].forEach(function(mul, i){
       var o = actx.createOscillator(); o.type='sine'; o.frequency.value = base*mul;
       var g = actx.createGain();
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(i===0 ? 0.22 : 0.07, t+0.02);
+      g.gain.exponentialRampToValueAtTime(i===0 ? 0.24 : 0.08, t+0.02);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 5.5 - i*1.2);
-      o.connect(g); g.connect(out); g.connect(delay);
+      o.connect(g); g.connect(master); g.connect(spaceIn);
       o.start(t); o.stop(t + 6);
     });
   }
@@ -786,6 +854,8 @@
   var inksWrap = document.getElementById('inks');
   var autoBtn = document.getElementById('autoBtn');
   var washBtn = document.getElementById('washBtn');
+  var soundBtn = document.getElementById('soundBtn');
+  var vol = document.getElementById('vol');
   var captureBtn = document.getElementById('captureBtn');
   autoBtn.setAttribute('aria-pressed', String(autoFlow));
   var helpBtn = document.getElementById('helpBtn');
@@ -821,7 +891,7 @@
   var clockSeconds = settings.clockSeconds === true;
   function saveSettings(){
     try { localStorage.setItem(SKEY, JSON.stringify({
-      clockSeconds: clockSeconds
+      clockSeconds: clockSeconds, vol: Math.round(volume*100)
     })); } catch(e){}
   }
 
@@ -949,6 +1019,8 @@
   }
   autoBtn.addEventListener('click', function(){ autoFlow=!autoFlow; autoBtn.setAttribute('aria-pressed', String(autoFlow)); announce(autoFlow?'Auto performance on':'Auto performance off'); });
   washBtn.addEventListener('click', wash);
+  soundBtn.addEventListener('click', function(){ setSound(!soundOn); });
+  vol.addEventListener('input', function(){ volume = vol.value/100; if(master && actx) master.gain.setTargetAtTime(volume, actx.currentTime, 0.08); saveSettings(); });
   captureBtn.addEventListener('click', function(){ capDlg.showModal(); });
   helpBtn.addEventListener('click', function(){ helpDlg.showModal(); });
   helpClose.addEventListener('click', function(){ helpDlg.close(); });
@@ -972,6 +1044,7 @@
       case '4': selectInkByIndex(4); break;
       case ' ': e.preventDefault(); dropInk(0.2+Math.random()*0.6, 0.2+Math.random()*0.6, currentInk(true), 0.8+Math.random()*0.6); hideHint(); break;
       case 'a': case 'A': autoBtn.click(); break;
+      case 'm': case 'M': setSound(!soundOn); break;
       case 'h': case 'H': setFocus(!immersive); break;
       case 'Escape': if(immersive){ e.preventDefault(); setFocus(false); } break;
       case 'd': case 'D': themeBtn.click(); break;
@@ -1000,6 +1073,7 @@
   /* ---------- restore settings ---------- */
   applyTheme('paper'); // light is always the startup default; dark is a per-session toggle
   clockSecondsCb.checked = clockSeconds;
+  if(typeof settings.vol === 'number'){ volume = Math.max(0, Math.min(1, settings.vol/100)); vol.value = Math.round(volume*100); }
 
   /* ---------- boot ---------- */
   seed();
