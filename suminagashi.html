@@ -88,6 +88,8 @@
   #vol::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;background:var(--text);cursor:pointer}
   #vol:focus-visible{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--gold)}
   @media (max-width:560px){ #vol{display:none} }
+  #moodBtn{padding-top:6px;padding-bottom:6px}
+  #moodLabel{font-size:.76rem;letter-spacing:.06em;min-width:3.6em;text-align:center}
   input[type="range"]{width:64px;accent-color:var(--gold);height:24px;cursor:pointer}
   input[type="range"]:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gold-soft);border-radius:8px}
 
@@ -186,6 +188,7 @@
   <div class="sep" aria-hidden="true"></div>
   <button class="act" id="soundBtn" aria-pressed="false" title="Zen ambience — drone, bells, and water"><span class="dot" aria-hidden="true"></span><span class="txt">Sound</span></button>
   <input type="range" id="vol" min="0" max="100" value="50" aria-label="Sound volume">
+  <button class="act" id="moodBtn" title="Change ambience mood — Temple, Rain, Deep, Chimes" aria-label="Change ambience mood" hidden><span id="moodLabel">Temple</span></button>
   <div class="sep" aria-hidden="true"></div>
   <button class="act" id="timeBtn" title="Clock or timer"><span class="glyph" aria-hidden="true">◷</span><span class="txt">Time</span></button>
   <button class="act" id="captureBtn" title="Save the surface as an image"><span class="glyph" aria-hidden="true">⤓</span><span class="txt">Capture</span></button>
@@ -704,14 +707,62 @@
   }
 
   /* ---------- sound: generative ambience + timer chime (synthesized live, no files) ---------- */
-  var actx=null, master=null, spaceIn=null, ambBus=null, padFilter=null, bellTimer=null;
+  var actx=null, master=null, spaceIn=null, ambBus=null, padFilter=null, padSweep=null, noiseGain=null, noiseBP=null, bellTimer=null;
+  var padVoices=[];
   var soundOn=false, volume=0.5;
-  var scale=[220.00,261.63,293.66,329.63,392.00,440.00,523.25,587.33]; // A minor pentatonic across octaves
+
+  // Each mood is a set of synthesis parameters. Pads always use 4 voices so they can morph live.
+  var MOODS = {
+    temple: { label:'Temple',
+      scale:[220.00,261.63,293.66,329.63,392.00,440.00,523.25,587.33],
+      bellGain:0.14, bellMin:4200, bellSpan:5200,
+      padFreqs:[110,164.81,220,329.63], padGains:[0.5,0.32,0.22,0.12], padType:['sine','sine','triangle','triangle'], padCut:520, padSweep:220,
+      waterGain:0.05, waterFreq:620 },
+    rain:   { label:'Rain',
+      scale:[261.63,293.66,349.23,392.00,440.00,523.25],
+      bellGain:0.08, bellMin:7000, bellSpan:8000,
+      padFreqs:[98,146.83,196,293.66], padGains:[0.34,0.22,0.14,0.08], padType:['sine','sine','sine','triangle'], padCut:420, padSweep:140,
+      waterGain:0.15, waterFreq:1100 },
+    deep:   { label:'Deep',
+      scale:[146.83,174.61,196.00,220.00,261.63],
+      bellGain:0.10, bellMin:9000, bellSpan:9000,
+      padFreqs:[73.42,110,146.83,220], padGains:[0.6,0.4,0.24,0.1], padType:['sine','sine','sine','triangle'], padCut:360, padSweep:120,
+      waterGain:0.03, waterFreq:420 },
+    chimes: { label:'Chimes',
+      scale:[329.63,392.00,440.00,523.25,587.33,659.25,783.99],
+      bellGain:0.16, bellMin:2600, bellSpan:3600,
+      padFreqs:[130.81,196,261.63,392], padGains:[0.34,0.22,0.16,0.1], padType:['sine','sine','triangle','triangle'], padCut:640, padSweep:260,
+      waterGain:0.04, waterFreq:820 }
+  };
+  var MOOD_ORDER = ['temple','rain','deep','chimes'];
+  var moodName = 'temple';
+  // live bell parameters, refreshed from the current mood
+  var scale = MOODS.temple.scale, bellGain = MOODS.temple.bellGain, bellMin = MOODS.temple.bellMin, bellSpan = MOODS.temple.bellSpan;
+
+  function applyMood(name){
+    if(!MOODS[name]) name = 'temple';
+    moodName = name;
+    var M = MOODS[name];
+    scale = M.scale; bellGain = M.bellGain; bellMin = M.bellMin; bellSpan = M.bellSpan;
+    if(actx){ // morph the running pad/water toward the new mood
+      var t = actx.currentTime;
+      padVoices.forEach(function(v,i){
+        v.osc.frequency.setTargetAtTime(M.padFreqs[i], t, 0.6);
+        v.gain.gain.setTargetAtTime(M.padGains[i], t, 0.8);
+        v.osc.type = M.padType[i];
+      });
+      if(padFilter) padFilter.frequency.setTargetAtTime(M.padCut, t, 0.8);
+      if(padSweep) padSweep.gain.setTargetAtTime(M.padSweep, t, 0.8);
+      if(noiseGain) noiseGain.gain.setTargetAtTime(M.waterGain, t, 0.8);
+      if(noiseBP) noiseBP.frequency.setTargetAtTime(M.waterFreq, t, 0.8);
+    }
+  }
 
   function initAudio(){
     if(actx) return;
     var AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
     try { actx = new AC(); } catch(e){ actx = null; return; }
+    var M = MOODS[moodName];
     master = actx.createGain(); master.gain.value = volume; master.connect(actx.destination);
     // shared spatial tail (feedback delay) used by pad, bells, and chime
     spaceIn = actx.createGain(); spaceIn.gain.value = 1.0;
@@ -722,24 +773,26 @@
     // ambient bus — faded in/out when sound is toggled
     ambBus = actx.createGain(); ambBus.gain.value = 0.0; ambBus.connect(master); ambBus.connect(spaceIn);
     // slow drone pad through a gently swept lowpass
-    padFilter = actx.createBiquadFilter(); padFilter.type='lowpass'; padFilter.frequency.value = 520;
-    var padLfo = actx.createOscillator(), lg = actx.createGain();
-    padLfo.frequency.value = 0.05; lg.gain.value = 220; padLfo.connect(lg); lg.connect(padFilter.frequency); padLfo.start();
-    [110, 164.81, 220, 329.63].forEach(function(f,i){
-      var o = actx.createOscillator(); o.type = i>=2 ? 'triangle' : 'sine'; o.frequency.value = f; o.detune.value = (i-1)*3;
-      var g = actx.createGain(); g.gain.value = [0.5,0.32,0.22,0.12][i];
+    padFilter = actx.createBiquadFilter(); padFilter.type='lowpass'; padFilter.frequency.value = M.padCut;
+    var padLfo = actx.createOscillator(); padSweep = actx.createGain();
+    padLfo.frequency.value = 0.05; padSweep.gain.value = M.padSweep; padLfo.connect(padSweep); padSweep.connect(padFilter.frequency); padLfo.start();
+    padVoices = [];
+    M.padFreqs.forEach(function(f,i){
+      var o = actx.createOscillator(); o.type = M.padType[i]; o.frequency.value = f; o.detune.value = (i-1)*3;
+      var g = actx.createGain(); g.gain.value = M.padGains[i];
       o.connect(g); g.connect(padFilter); o.start();
+      padVoices.push({ osc:o, gain:g });
     });
     padFilter.connect(ambBus);
     // soft water/wind texture from filtered looping noise
     var nb = actx.createBuffer(1, actx.sampleRate*2, actx.sampleRate), nd = nb.getChannelData(0);
     for(var k=0;k<nd.length;k++) nd[k] = Math.random()*2-1;
     var noise = actx.createBufferSource(); noise.buffer = nb; noise.loop = true;
-    var nbp = actx.createBiquadFilter(); nbp.type='bandpass'; nbp.frequency.value = 620; nbp.Q.value = 0.7;
+    noiseBP = actx.createBiquadFilter(); noiseBP.type='bandpass'; noiseBP.frequency.value = M.waterFreq; noiseBP.Q.value = 0.7;
     var nlfo = actx.createOscillator(), nlg = actx.createGain();
-    nlfo.frequency.value = 0.08; nlg.gain.value = 300; nlfo.connect(nlg); nlg.connect(nbp.frequency); nlfo.start();
-    var ng = actx.createGain(); ng.gain.value = 0.05;
-    noise.connect(nbp); nbp.connect(ng); ng.connect(ambBus); noise.start();
+    nlfo.frequency.value = 0.08; nlg.gain.value = 300; nlfo.connect(nlg); nlg.connect(noiseBP.frequency); nlfo.start();
+    noiseGain = actx.createGain(); noiseGain.gain.value = M.waterGain;
+    noise.connect(noiseBP); noiseBP.connect(noiseGain); noiseGain.connect(ambBus); noise.start();
   }
   function bell(freq, when, gain){
     var o = actx.createOscillator(); o.type='sine'; o.frequency.value = freq;
@@ -753,12 +806,13 @@
   }
   function scheduleBells(){
     if(!soundOn || !actx) return;
-    bell(scale[Math.floor(Math.random()*scale.length)], actx.currentTime+0.02, 0.14);
-    bellTimer = setTimeout(scheduleBells, 4200 + Math.random()*5200);
+    bell(scale[Math.floor(Math.random()*scale.length)], actx.currentTime+0.02, bellGain);
+    bellTimer = setTimeout(scheduleBells, bellMin + Math.random()*bellSpan);
   }
   function setSound(on){
     soundOn = on;
     if(typeof soundBtn !== 'undefined' && soundBtn) soundBtn.setAttribute('aria-pressed', on?'true':'false');
+    if(typeof moodBtn !== 'undefined' && moodBtn) moodBtn.hidden = !on;
     if(on){
       initAudio();
       if(!actx){ soundOn=false; if(typeof soundBtn !== 'undefined' && soundBtn) soundBtn.setAttribute('aria-pressed','false'); announce('Audio unavailable'); return; }
@@ -856,6 +910,8 @@
   var washBtn = document.getElementById('washBtn');
   var soundBtn = document.getElementById('soundBtn');
   var vol = document.getElementById('vol');
+  var moodBtn = document.getElementById('moodBtn');
+  var moodLabel = document.getElementById('moodLabel');
   var captureBtn = document.getElementById('captureBtn');
   autoBtn.setAttribute('aria-pressed', String(autoFlow));
   var helpBtn = document.getElementById('helpBtn');
@@ -891,7 +947,7 @@
   var clockSeconds = settings.clockSeconds === true;
   function saveSettings(){
     try { localStorage.setItem(SKEY, JSON.stringify({
-      clockSeconds: clockSeconds, vol: Math.round(volume*100)
+      clockSeconds: clockSeconds, vol: Math.round(volume*100), mood: moodName
     })); } catch(e){}
   }
 
@@ -1021,6 +1077,12 @@
   washBtn.addEventListener('click', wash);
   soundBtn.addEventListener('click', function(){ setSound(!soundOn); });
   vol.addEventListener('input', function(){ volume = vol.value/100; if(master && actx) master.gain.setTargetAtTime(volume, actx.currentTime, 0.08); saveSettings(); });
+  function setMood(name){ applyMood(name); moodLabel.textContent = MOODS[moodName].label; saveSettings(); }
+  moodBtn.addEventListener('click', function(){
+    var i = MOOD_ORDER.indexOf(moodName);
+    setMood(MOOD_ORDER[(i+1) % MOOD_ORDER.length]);
+    announce('Mood: ' + MOODS[moodName].label);
+  });
   captureBtn.addEventListener('click', function(){ capDlg.showModal(); });
   helpBtn.addEventListener('click', function(){ helpDlg.showModal(); });
   helpClose.addEventListener('click', function(){ helpDlg.close(); });
@@ -1074,6 +1136,8 @@
   applyTheme('paper'); // light is always the startup default; dark is a per-session toggle
   clockSecondsCb.checked = clockSeconds;
   if(typeof settings.vol === 'number'){ volume = Math.max(0, Math.min(1, settings.vol/100)); vol.value = Math.round(volume*100); }
+  if(settings.mood && MOODS[settings.mood]) applyMood(settings.mood);
+  moodLabel.textContent = MOODS[moodName].label;
 
   /* ---------- boot ---------- */
   seed();
