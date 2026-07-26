@@ -2,28 +2,28 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.24
-  Date:     July 13, 2026
-  Features: Step 6 of the sub-term rollout — the picker is now
-            interactive. Clicking the "15-week" pill in the masthead
-            opens a dropdown showing every part-of-term that has at
-            least one snapshot in the loaded data. Selecting one:
-            updates state.activePartOfTerm, resets currentSnapshotId
-            (so currentSnapshot() picks the newest in the new POT),
-            persists to localStorage, and re-renders the whole
-            dashboard. Every view — KPIs, discipline table, section
-            detail, trends, movers, snapshot library — was routed
-            through activeSnapshots() in Step 3, so they update
-            automatically with no per-view changes needed.
-            An amber banner appears beneath the subline whenever the
-            active POT is not 15W: "▸ Viewing 7A · first half sections
-            only" with a "Back to 15-week" quick-reset button.
-            The picker pill also takes on an amber-tinted state when
-            non-default so the context indicator is doubled up. Menu
-            closes on outside click or Escape.
-            What's New content updated to announce the sub-term picker
-            (WHATS_NEW_VERSION bumped to 2026-07-13). Returning readers
-            see the UPDATED pill and the modal auto-opens on next visit.
+  Version:  v5.25
+  Date:     July 26, 2026
+  Features: FTE card now aggregates across all parts of term.
+            Previously the FTE headline was POT-filtered like every
+            other KPI on the strip, which produced misleading
+            percentages: comparing a 7A-only slice against a fall-total
+            goal (2,953) showed "5% of goal" when the college was
+            actually at ~60% overall.
+            Changes:
+            - Headline "College FTE" is now the sum of the newest
+              snapshot from each POT (15W + 11W + 7A + 7B).
+            - Delta compares that aggregate to the sum of each POT's
+              second-most-recent snapshot. POTs with only one snapshot
+              contribute their current value to both sides (net zero),
+              so the delta stays honest as new POTs come online.
+            - Label changed to "College FTE vs. fall goal" so the
+              scope difference from neighboring KPIs is explicit.
+            - New second sub-line "Your view (POT, N disciplines): X
+              FTE · Y% of college" — shows the current filter's
+              contribution to the college total. Respects both the POT
+              picker and discipline chips.
+            - Updated tooltip explains the aggregation.
             Built on v4.9 canonical baseline.
 -->
 <html lang="en">
@@ -836,6 +836,7 @@
   .kpi .delta.down { color: var(--down); }
   .kpi .delta.flat { color: var(--flat); }
   .kpi .sub { font-style: italic; color: var(--ink-soft); font-size: 12px; margin-top: 6px; }
+  .kpi .sub-view { font-style: italic; color: var(--ink-mute); font-size: 11px; margin-top: 3px; }
   .kpi .delta { cursor: help; }
   .kpi .bench {
     font-style: normal;
@@ -2079,7 +2080,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.24</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.25</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -2957,6 +2958,49 @@
     return fteFromRows(snap.rows);
   }
 
+  // Cross-POT college-wide FTE aggregation. Sums the newest snapshot of
+  // each part-of-term to produce a fall-total college FTE. This is the
+  // headline used on the FTE card, and it's *deliberately* independent
+  // of the active POT filter — the fall FTE goal (2,953) is a fall-total
+  // goal, so measuring progress against it requires the total. Comparing
+  // a POT-filtered slice against the whole-fall goal produces misleading
+  // percentages (e.g., 7A view against fall goal reads "5% of goal"
+  // when the college is actually near 60%).
+  function aggregateCollegeFTE() {
+    const potLatest = new Map();
+    state.snapshots.forEach(s => {
+      const pot = s.part_of_term || '15W';
+      const existing = potLatest.get(pot);
+      if (!existing || s.date > existing.date) potLatest.set(pot, s);
+    });
+    let total = 0;
+    potLatest.forEach(snap => { total += fteFromRows(snap.rows); });
+    return total;
+  }
+
+  // Previous aggregate for delta calculation. Uses each POT's
+  // second-most-recent snapshot as its "previous" contribution. POTs
+  // with only one snapshot contribute their current value to both
+  // sides (net zero) so they don't distort the delta. Returns null if
+  // NO POT has 2+ snapshots (in which case no delta is meaningful).
+  function previousAggregateCollegeFTE() {
+    const potGroups = new Map();
+    state.snapshots.forEach(s => {
+      const pot = s.part_of_term || '15W';
+      if (!potGroups.has(pot)) potGroups.set(pot, []);
+      potGroups.get(pot).push(s);
+    });
+    let total = 0;
+    let anyPriorHistory = false;
+    potGroups.forEach(snaps => {
+      snaps.sort((a, b) => a.date.localeCompare(b.date));
+      const target = snaps.length >= 2 ? snaps[snaps.length - 2] : snaps[snaps.length - 1];
+      total += fteFromRows(target.rows);
+      if (snaps.length >= 2) anyPriorHistory = true;
+    });
+    return anyPriorHistory ? total : null;
+  }
+
   function fteGoal() {
     return state.goals && state.goals.fte ? Number(state.goals.fte) : null;
   }
@@ -3266,41 +3310,57 @@
       ? `${(capacityNow - enrolledNow).toLocaleString()} seats remaining · College: ${cw.fill.toFixed(1)}% ${benchDelta(fillVsCollege, 'pp', 1)}`
       : `${(capacityNow - enrolledNow).toLocaleString()} seats remaining`;
 
-    // Fifth KPI: FTE vs. fall goal (only renders if a goal is set)
+    // Fifth KPI: College FTE vs. fall goal (only renders if a goal is set).
+    // This card is intentionally scoped differently from the other four
+    // KPIs on the strip — the other four show numbers filtered by the
+    // active POT (Sections/Enrollment/Fill/SCH for 7A only, etc.), while
+    // this one aggregates across all POTs. Rationale: the fall FTE goal
+    // (2,953) is a fall-total goal, so comparing a POT-scoped slice
+    // against it produces misleading percentages. The label says "College
+    // FTE" to signal the scope difference; a secondary sub-line ("Your
+    // view") shows the current view's contribution to the college total.
     const goal = fteGoal();
-    const snap = currentSnapshot();
+    const fteSnap = currentSnapshot();  // Used only for the "your view" gate — the headline aggregates across POTs regardless.
     let fteCard = '';
-    if (goal && snap) {
-      const collegeFTE = collegeWideFTE(snap);
+    if (goal && state.snapshots.length > 0) {
+      const collegeFTE = aggregateCollegeFTE();
       const collegePct = pctOfGoal(collegeFTE);
-      const prevFTE = prevSnap ? collegeWideFTE(prevSnap) : null;
-      const dFTE = prevFTE !== null ? collegeFTE - prevFTE : null;
+      const prevAggFTE = previousAggregateCollegeFTE();
+      const dFTE = prevAggFTE !== null ? collegeFTE - prevAggFTE : null;
       const dStr = dFTE !== null && Math.abs(dFTE) >= 0.05
-        ? `<span class="delta ${dFTE > 0 ? 'up' : 'down'}" title="Change in college-wide FTE since the previous snapshot">${dFTE > 0 ? '+' : ''}${fmtFloat(dFTE, 1)}</span>`
+        ? `<span class="delta ${dFTE > 0 ? 'up' : 'down'}" title="Change in college-wide FTE since previous aggregate (each POT's second-most-recent snapshot)">${dFTE > 0 ? '+' : ''}${fmtFloat(dFTE, 1)}</span>`
         : '';
 
-      // Your selection's contribution
+      // "Your view" — contribution of the active POT + discipline filter.
+      // Reads the same rows that Sections/Enrollment/etc. read (cur), so
+      // it's aligned with the other KPI cards on the strip.
       const yourFTE = fteFromRows(cur);
+      const yourPctOfCollege = collegeFTE > 0 ? (yourFTE / collegeFTE * 100) : 0;
+
+      const potLabel = partOfTermLabel(state.activePartOfTerm);
       const totalDisciplines = state.allDisciplines.length;
-      const showYourSelection =
+      const disciplinesFiltered =
         state.selectedDisciplines.size > 0 &&
         state.selectedDisciplines.size < totalDisciplines;
+      const viewLabel = disciplinesFiltered
+        ? `${potLabel}, ${state.selectedDisciplines.size} of ${totalDisciplines} disciplines`
+        : potLabel;
 
-      const sub = showYourSelection
-        ? `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · your selection: ${fmtFloat(yourFTE, 1)}`
-        : `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · ${fmtInt(Math.max(0, goal - collegeFTE))} to go`;
+      const sub = `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · ${fmtInt(Math.max(0, goal - collegeFTE))} to go`;
 
-      // Tooltip explains FTE, calculation, and goal scope. A custom CSS
-      // tooltip (not native title=) so it appears immediately on hover,
-      // stays put while the cursor is on the trigger, and renders with
-      // dashboard styling rather than OS chrome. Native title tooltips are
-      // unreliable: delayed, dismissed quickly, and styled inconsistently.
-      const fteTooltip = `Full-Time Equivalent (FTE) = Total Student Credit Hours ÷ 30 (Brookdale convention). Compared against the fall enrollment goal of ${goal.toLocaleString()}, set by the college. Goals reset each semester.`;
+      // Second sub-line rendered only when there's a current snapshot to
+      // draw from — avoids showing "Your view: 0.0 FTE · 0% of college"
+      // when the active POT has no data yet.
+      const subView = fteSnap
+        ? `Your view (${escapeHtml(viewLabel)}): ${fmtFloat(yourFTE, 1)} FTE · ${yourPctOfCollege.toFixed(0)}% of college`
+        : '';
+
+      const fteTooltip = `College FTE aggregates the newest snapshot of each part-of-term (15-week, 11-week, 7A, 7B). Delta compares that total to the sum of each POT's second-most-recent snapshot. FTE = Total Student Credit Hours ÷ 30 (Brookdale convention). Compared against the fall enrollment goal of ${goal.toLocaleString()}, set by the college. Goals reset each semester.`;
 
       fteCard = `
         <div class="kpi">
           <div class="label">
-            FTE vs. fall goal
+            College FTE vs. fall goal
             <span class="kpi-info-wrap">
               <span class="kpi-info" tabindex="0" role="button" aria-label="About FTE">i</span>
               <span class="kpi-tooltip" role="tooltip">${escapeHtml(fteTooltip)}</span>
@@ -3308,6 +3368,7 @@
           </div>
           <div class="value">${fmtFloat(collegeFTE, 1)} ${dStr}</div>
           <div class="sub">${sub}</div>
+          ${subView ? `<div class="sub-view">${subView}</div>` : ''}
         </div>
       `;
     }
