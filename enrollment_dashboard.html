@@ -2,32 +2,35 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.25
-  Date:     July 26, 2026
-  Features: FTE card now aggregates across all parts of term.
-            Previously the FTE headline was POT-filtered like every
-            other KPI on the strip, which produced misleading
-            percentages: comparing a 7A-only slice against a fall-total
-            goal (2,953) showed "5% of goal" when the college was
-            actually at ~60% overall.
+  Version:  v5.26
+  Date:     July 27, 2026
+  Features: Movers panel comparison window overhaul.
+            Problem: the old panel compared current snapshot against
+            the *earliest* snapshot on record (April 28), so sections
+            that filled up in June still showed as "+30" in July. The
+            "NEW" tag fired for any section added since April 28, which
+            included sections created weeks or months ago — misleading
+            for daily/weekly analysis.
             Changes:
-            - Headline "College FTE" is now the sum of the newest
-              snapshot from each POT (15W + 11W + 7A + 7B).
-            - Delta compares that aggregate to the sum of each POT's
-              second-most-recent snapshot. POTs with only one snapshot
-              contribute their current value to both sides (net zero),
-              so the delta stays honest as new POTs come online.
-            - Label changed to "College FTE vs. fall goal" so the
-              scope difference from neighboring KPIs is explicit.
-            - New second sub-line "Your view (POT, N disciplines): X
-              FTE · Y% of college" — shows the current filter's
-              contribution to the college total. Respects both the POT
-              picker and discipline chips.
-            - Updated tooltip explains the aggregation.
-            What's New bumped to 2026-07-26 to announce the change.
-            Returning readers see the UPDATED pill and the modal
-            auto-opens on next visit. Sub-term picker bullet retained
-            for anyone who hadn't yet seen the July 13 announcement.
+            - Default comparison is now snapshot-to-snapshot (last vs.
+              current). "NEW" now genuinely means "just added in the
+              latest snapshot."
+            - Stalled panel uses a wider window (~5 snapshots ≈ 1 week)
+              when in short-window mode, since 1-snapshot stall is
+              trivially true for most sections.
+            - New user-selectable toggle at the top of the Movers
+              section: "Since last snapshot" | "Since start". Choice
+              persists to localStorage. Preserves the long-view for
+              anyone doing term retrospective.
+            - Explicit date range label ("Jul 25 → Jul 27") shown so
+              the window is unambiguous.
+            - Minimum threshold in short-window mode (±2 students) to
+              filter day-to-day noise. NEW additions bypass this filter.
+              Long-window mode retains original ±1 sensitivity.
+            - Better empty-state messages ("No sections gained enough
+              to surface" etc.) rather than "None in current view."
+            What's New bumped to 2026-07-27 to announce all three
+            recent changes (movers, FTE aggregation, sub-term picker).
             Built on v4.9 canonical baseline.
 -->
 <html lang="en">
@@ -947,6 +950,62 @@
   .section-title .bulk-toggle:focus-visible {
     outline: 2px solid var(--info);
     outline-offset: 2px;
+  }
+
+  /* Movers section title carries both a window label and a toggle to
+     switch between comparison modes. Layout: title on the left, meta
+     info + toggle stacked/aligned on the right. */
+  .section-title.movers-title {
+    align-items: center;
+  }
+  .section-title .movers-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: 1;
+    justify-content: flex-end;
+  }
+  .section-title .movers-window-label {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    font-style: normal;
+  }
+  .section-title .movers-toggle {
+    display: inline-flex;
+    border: 1px solid var(--rule-strong);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .section-title .mw-btn {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: transparent;
+    border: none;
+    color: var(--ink-mute);
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .section-title .mw-btn + .mw-btn {
+    border-left: 1px solid var(--rule-strong);
+  }
+  .section-title .mw-btn:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .section-title .mw-btn.is-active {
+    background: var(--ink);
+    color: var(--surface);
+    font-weight: 600;
+  }
+  .section-title .mw-btn:focus-visible {
+    outline: 2px solid var(--info);
+    outline-offset: -1px;
   }
 
   .grid-auto {
@@ -2084,7 +2143,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.25</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.26</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -2125,6 +2184,7 @@
     DISCIPLINE_ROW_EXPANSION: 'enroll-disc-row-expansion',
     WHATS_NEW_SEEN: 'enroll-whats-new-seen',
     ACTIVE_PART_OF_TERM: 'enroll-active-part-of-term',
+    MOVER_WINDOW: 'enroll-mover-window',
   };
 
   // -----------------------------------------------------------------------
@@ -2141,10 +2201,11 @@
   // pill renders as "UPDATED" instead of "NEW", and the modal auto-opens
   // once on first load. First-time visitors (no stored value) see "NEW"
   // with no auto-open — the badge alone is their introduction.
-  const WHATS_NEW_VERSION = '2026-07-26';
+  const WHATS_NEW_VERSION = '2026-07-27';
   const WHATS_NEW_CONTENT = `
     <ul>
-      <li><strong>College FTE aggregates all sub-terms.</strong> The FTE card now shows fall-total FTE (15-week + 11-week + 7A + 7B combined) instead of only the currently-viewed sub-term's slice. A new sub-line shows your view's contribution: e.g., "Your view (15-week): 1,792.8 FTE · 92% of college." Progress toward the 2,953 fall goal is now measured against the full-college total.</li>
+      <li><strong>Movers panel now shows week-over-week.</strong> The Biggest Gainers, Stalled, and Lost Enrollment panels used to compare the current snapshot against the earliest snapshot on record — meaning a section that filled up in June still showed as "+30" in July. Now the default comparison is snapshot-to-snapshot, so the panels reflect what actually moved recently. A "Since start" toggle at the top of the Movers section preserves the long-view for term retrospective. The window is labeled so you can always see which dates are being compared. Small movements (±1 student) are filtered out to reduce daily noise.</li>
+      <li><strong>College FTE aggregates all sub-terms.</strong> The FTE card now shows fall-total FTE (15-week + 11-week + 7A + 7B combined) instead of only the currently-viewed sub-term's slice. A new sub-line shows your view's contribution: e.g., "Your view (15-week): 1,792.8 FTE · 92% of college." Progress toward the fall goal is now measured against the full-college total.</li>
       <li><strong>Sub-term picker.</strong> Click the "15-week" pill under the title to switch between 15-week, 11-week, 7A, and 7B. Every view — KPIs, discipline table, section detail, trends, movers — recalculates for the selected sub-term. An amber banner appears when you're viewing anything other than 15-week so you don't accidentally leave a screenshot in the wrong view.</li>
     </ul>
   `;
@@ -2164,6 +2225,17 @@
     // which matches the existing dashboard behavior when only 15W data
     // exists. Persisted to localStorage so the user's choice sticks.
     activePartOfTerm: '15W',
+
+    // Movers panel comparison window. 'previous' compares the current
+    // snapshot against the immediately-preceding one (short-view: what
+    // moved this week). 'start' compares against the earliest snapshot
+    // in the active POT's history (long-view: what moved since
+    // registration opened — useful for end-of-term retrospective).
+    // Default is 'previous' since the daily/weekly view is the more
+    // common analysis. Stalled panel uses a wider lookback (5 snapshots)
+    // when in 'previous' mode, since 1-snapshot stalled is trivially
+    // true for most sections. Persisted to localStorage.
+    moverWindow: 'previous',
 
     // User selections
     selectedDisciplines: new Set(),
@@ -2321,6 +2393,9 @@
 
       const apot = localStorage.getItem(STORAGE.ACTIVE_PART_OF_TERM);
       if (apot) state.activePartOfTerm = apot;
+
+      const mw = localStorage.getItem(STORAGE.MOVER_WINDOW);
+      if (mw === 'previous' || mw === 'start') state.moverWindow = mw;
     } catch (err) {
       console.error('Storage load error:', err);
     }
@@ -2336,6 +2411,7 @@
       localStorage.setItem(STORAGE.GROUPED_VIEW, String(state.groupedView));
       localStorage.setItem(STORAGE.DISCIPLINE_ROW_EXPANSION, JSON.stringify(state.disciplineRowExpansion));
       localStorage.setItem(STORAGE.ACTIVE_PART_OF_TERM, state.activePartOfTerm);
+      localStorage.setItem(STORAGE.MOVER_WINDOW, state.moverWindow);
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
     }
@@ -4978,20 +5054,46 @@
 
     const dates = snaps.map(s => fmtDateShort(s.date));
 
-    // Movers — biggest enrollment changes between first and last snapshot
-    const firstSnap = snaps[0];
+    // Movers — biggest enrollment changes over the selected comparison
+    // window. Two modes:
+    //   'previous' (default) → firstSnap is the snapshot immediately
+    //     before lastSnap. Answers "what moved since our last data
+    //     drop" — the daily/weekly momentum view chairs use.
+    //   'start' → firstSnap is snaps[0], the earliest snapshot in the
+    //     active POT's history. Answers "what moved since registration
+    //     opened" — the term-retrospective view.
+    // The Stalled panel uses a wider window in 'previous' mode
+    // (last 5 snapshots) since "no growth over one day" is trivially
+    // true for most sections; a week-long stall is a real signal.
+    const moverWindow = state.moverWindow || 'previous';
     const lastSnap = snaps[snaps.length - 1];
+    const firstSnap = moverWindow === 'previous'
+      ? snaps[snaps.length - 2]
+      : snaps[0];
+    // For the Stalled panel: if we're in short-window mode, look back
+    // ~5 snapshots (roughly a week at the current cadence). If we're in
+    // start-mode, use the same firstSnap as everything else.
+    const stalledLookback = moverWindow === 'previous'
+      ? snaps[Math.max(0, snaps.length - 6)]
+      : firstSnap;
+
     const allSections = new Set();
-    snaps.forEach(s => s.rows.forEach(r => {
+    // Only iterate the two comparison snapshots. Iterating all snaps
+    // (as the old code did) is expensive and unnecessary here.
+    [firstSnap, lastSnap, stalledLookback].forEach(s => s.rows.forEach(r => {
       if (state.selectedDisciplines.has(r._prefix)) allSections.add(r.Section);
     }));
 
+    // Build movers using the primary window (firstSnap → lastSnap)
     const movers = [...allSections].map(sec => {
       const fr = firstSnap.rows.find(r => r.Section === sec);
       const lr = lastSnap.rows.find(r => r.Section === sec);
       if (!lr) return null;
       const startEnr = fr ? fr['Enrolled Students'] : 0;
       const endEnr = lr['Enrolled Students'];
+      // Stalled uses its own (potentially wider) lookback for the growth check
+      const sr = stalledLookback.rows.find(r => r.Section === sec);
+      const stalledStartEnr = sr ? sr['Enrolled Students'] : 0;
       return {
         section: sec,
         title: lr['Course Title'],
@@ -5000,15 +5102,30 @@
         capacity: lr.Capacity,
         startEnr, endEnr,
         diff: endEnr - startEnr,
+        stalledDiff: endEnr - stalledStartEnr,
         startFill: fr ? fr['Section Fill %'] : 0,
         endFill: lr['Section Fill %'],
         isNew: !fr,
       };
     }).filter(Boolean);
 
-    const gainers = movers.filter(m => m.diff > 0).sort((a, b) => b.diff - a.diff).slice(0, 8);
-    const stalled = movers.filter(m => m.diff === 0 && m.endFill < 50).sort((a, b) => a.endEnr - b.endEnr).slice(0, 8);
-    const losers = movers.filter(m => m.diff < 0).sort((a, b) => a.diff - b.diff).slice(0, 8);
+    // Minimum threshold: only surface sections that moved by at least 2
+    // students. Filters day-to-day noise like +1/-1 that isn't
+    // actionable. Threshold applies in 'previous' mode; in 'start' mode
+    // we retain the original behavior (any movement surfaces).
+    const minMove = moverWindow === 'previous' ? 2 : 1;
+    const gainers = movers
+      .filter(m => m.diff >= minMove || m.isNew)
+      .sort((a, b) => b.diff - a.diff)
+      .slice(0, 8);
+    const stalled = movers
+      .filter(m => m.stalledDiff === 0 && m.endFill < 50)
+      .sort((a, b) => a.endEnr - b.endEnr)
+      .slice(0, 8);
+    const losers = movers
+      .filter(m => m.diff <= -minMove)
+      .sort((a, b) => a.diff - b.diff)
+      .slice(0, 8);
 
     // Waitlist pressure — aggregated by course CODE, not by section. Different
     // shape from the other three movers: it looks at the current snapshot
@@ -5051,10 +5168,21 @@
       ${renderMultiSeriesChart(series, dates, 'enr', 'Enrolled Students', null)}
       ${renderMultiSeriesChart(series, dates, 'fill', 'Fill Rate (%)', cwSeries)}
 
-      <div class="section-title">Movers</div>
+      <div class="section-title movers-title">
+        <span>Movers</span>
+        <span class="movers-meta">
+          <span class="movers-window-label">${moverWindow === 'previous'
+            ? `${fmtDate(firstSnap.date)} → ${fmtDate(lastSnap.date)}`
+            : `Since ${fmtDate(firstSnap.date)} (registration open)`}</span>
+          <span class="movers-toggle" role="tablist" aria-label="Comparison window">
+            <button type="button" class="mw-btn ${moverWindow === 'previous' ? 'is-active' : ''}" data-mover-window="previous" role="tab" aria-selected="${moverWindow === 'previous'}">Since last snapshot</button>
+            <button type="button" class="mw-btn ${moverWindow === 'start' ? 'is-active' : ''}" data-mover-window="start" role="tab" aria-selected="${moverWindow === 'start'}">Since start</button>
+          </span>
+        </span>
+      </div>
       <div class="grid-auto">
         ${renderMoverPanel('Biggest Gainers', gainers, 'up')}
-        ${renderMoverPanel('Stalled (no growth, under-filled)', stalled, 'flat')}
+        ${renderMoverPanel(moverWindow === 'previous' ? 'Stalled (no growth in ~1 week, under-filled)' : 'Stalled (no growth, under-filled)', stalled, 'flat')}
         ${renderMoverPanel('Lost Enrollment', losers, 'down')}
         ${renderWaitlistPanel(waitlists)}
       </div>
@@ -5143,9 +5271,14 @@
 
   function renderMoverPanel(title, items, kind) {
     if (items.length === 0) {
+      const emptyMsg = kind === 'up'
+        ? 'No sections gained enough to surface.'
+        : kind === 'down'
+        ? 'No sections lost enough to surface.'
+        : 'No stalled sections in current view.';
       return `<div class="panel">
         <h3>${escapeHtml(title)}</h3>
-        <div class="panel-sub">None in current view.</div>
+        <div class="panel-sub">${emptyMsg}</div>
       </div>`;
     }
     const rows = items.map(m => {
@@ -5610,6 +5743,22 @@
         render();
       });
     }
+
+    // -------------------------------------------------------------------
+    // Movers comparison window toggle
+    // -------------------------------------------------------------------
+    // Event delegation because the toggle is inside a re-rendered chunk
+    // of markup. Buttons carry data-mover-window="previous" or "start".
+    document.querySelectorAll('[data-mover-window]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.moverWindow;
+        if (mode !== 'previous' && mode !== 'start') return;
+        if (state.moverWindow === mode) return;
+        state.moverWindow = mode;
+        saveStorage();
+        render();
+      });
+    });
 
     // -------------------------------------------------------------------
     // Trend chart hover-isolate
