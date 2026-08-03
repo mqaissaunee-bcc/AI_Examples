@@ -2,26 +2,35 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.27
+  Version:  v5.28
   Date:     August 2, 2026
-  Features: Bug fix — College FTE aggregate now honors the currently-
-            viewed snapshot.
-            Problem: aggregateCollegeFTE() and previousAggregateCollegeFTE()
-            always iterated the full state.snapshots history and picked
-            the newest per POT, regardless of which snapshot the user
-            had selected in the Snapshot Library. Result: switching to
-            an older snapshot updated the "Your view" sub-line but left
-            the College FTE headline and delta frozen at the newest-
-            possible values. Delta always showed the same +22.0
-            regardless of viewed date. Percent-of-goal likewise never
-            moved.
-            Fix: both helpers now accept an optional reference snapshot
-            argument. Only snapshots dated on or before the reference
-            are considered. Passing the currently-viewed snapshot makes
-            the headline reflect "college aggregate as of this point
-            in time." Historical snapshots now show the correct
-            historical aggregate. Latest snapshot behaves identically
-            to before.
+  Features: Fall FTE goal celebration.
+            - Permanent card treatment: when aggregate college FTE >=
+              100% of goal, the FTE card gets a green tint, left-edge
+              accent, "Goal met" ribbon badge inline with the label,
+              and celebration sub-line wording ("goal met, +X above"
+              instead of "N to go"). Visible on every load once goal
+              is met; survives screenshots.
+            - One-time animated celebration: on the first load after
+              the aggregate crosses the goal, per user per term, a
+              full-viewport confetti fall plus centered "🎯 Fall Goal
+              Met" toast fires. Uses the Web Animations API for
+              performant particle motion. Duration ~4 seconds, click
+              anywhere to dismiss early.
+            - Trigger honesty: the animation triggers on the "as of
+              today" aggregate, NOT the currently-viewed snapshot's
+              aggregate. So browsing back to a historical snapshot
+              where goal was met doesn't retrigger; only the initial
+              crossing does.
+            - Persistence: celebrated-for-term stored in localStorage
+              (enroll-goal-met-celebrated). Once fired for e.g. "26FA",
+              won't fire again until term changes. Cleared automatically
+              when a new academic term appears in the manifest.
+            - Accessibility: prefers-reduced-motion suppresses the
+              animation entirely. The card treatment (non-animated)
+              still communicates the milestone.
+            - No What's New announcement — the celebration works better
+              as a discovered delight than a documented feature.
             Built on v4.9 canonical baseline.
 -->
 <html lang="en">
@@ -835,6 +844,98 @@
   .kpi .delta.flat { color: var(--flat); }
   .kpi .sub { font-style: italic; color: var(--ink-soft); font-size: 12px; margin-top: 6px; }
   .kpi .sub-view { font-style: italic; color: var(--ink-mute); font-size: 11px; margin-top: 3px; }
+
+  /* Goal-met card treatment. Applied to the FTE KPI card when the
+     aggregate college FTE has met or exceeded the fall goal. Purely
+     styling — visible on every load once goal is met, regardless of
+     whether the one-time celebration animation has fired. Survives
+     screenshots; readable in every theme. */
+  .kpi.goal-met {
+    background: linear-gradient(135deg,
+      color-mix(in srgb, var(--up) 8%, var(--surface-2)) 0%,
+      var(--surface-2) 60%);
+    border-color: var(--up);
+    border-left: 3px solid var(--up);
+  }
+  .kpi.goal-met .label {
+    color: var(--up);
+  }
+  .kpi.goal-met .sub {
+    color: var(--up);
+    font-weight: 500;
+  }
+  .goal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--up);
+    color: var(--surface);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 2px 7px;
+    border-radius: 999px;
+    text-transform: uppercase;
+  }
+  .goal-badge .ribbon { font-size: 10px; line-height: 1; }
+
+  /* One-time celebration overlay. Fixed-position container over the whole
+     viewport; particles inject inside on trigger. Toast pops centered
+     and fades. Click anywhere to dismiss early. Respects
+     prefers-reduced-motion — the whole overlay is suppressed for users
+     with that preference (card treatment above still applies). */
+  .goal-celebration {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    overflow: hidden;
+  }
+  .goal-celebration.is-active {
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .goal-celebration .confetti {
+    position: absolute;
+    width: 8px;
+    height: 12px;
+    will-change: transform, opacity;
+    pointer-events: none;
+    z-index: 9999;
+  }
+  .goal-celebration-toast {
+    position: fixed;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.5);
+    background: var(--up);
+    color: var(--surface);
+    font-family: 'Didot', 'Bodoni 72', Georgia, serif;
+    font-size: 34px;
+    padding: 18px 40px;
+    border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    opacity: 0;
+    z-index: 10000;
+    pointer-events: none;
+    text-align: center;
+    font-weight: 400;
+    white-space: nowrap;
+    letter-spacing: -0.005em;
+  }
+  .goal-celebration-toast.show {
+    animation: goal-toast-pop 3.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  @keyframes goal-toast-pop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+    12%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.03); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .goal-celebration { display: none; }
+  }
   .kpi .delta { cursor: help; }
   .kpi .bench {
     font-style: normal;
@@ -2134,7 +2235,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.27</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.28</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -2142,6 +2243,9 @@
 
 <div id="modalRoot"></div>
 <div id="toastRoot"></div>
+<div id="goalCelebration" class="goal-celebration" aria-hidden="true">
+  <div id="goalCelebrationToast" class="goal-celebration-toast">🎯 Fall Goal Met</div>
+</div>
 
 <script>
 (function () {
@@ -2176,6 +2280,7 @@
     WHATS_NEW_SEEN: 'enroll-whats-new-seen',
     ACTIVE_PART_OF_TERM: 'enroll-active-part-of-term',
     MOVER_WINDOW: 'enroll-mover-window',
+    GOAL_MET_CELEBRATED: 'enroll-goal-met-celebrated',
   };
 
   // -----------------------------------------------------------------------
@@ -2528,6 +2633,12 @@
       if (isFirstVisit) {
         openDisciplineModal();
       }
+
+      // Fire the goal-met celebration if the college aggregate has
+      // crossed the goal AND this user hasn't already been shown the
+      // celebration for the current term. Function no-ops for users
+      // who have already seen it or who have prefers-reduced-motion.
+      maybeCelebrateGoal();
     } catch (err) {
       console.error('Failed to load enrollment data:', err);
       state.loadStatus = 'error';
@@ -3430,7 +3541,16 @@
         ? `${potLabel}, ${state.selectedDisciplines.size} of ${totalDisciplines} disciplines`
         : potLabel;
 
-      const sub = `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · ${fmtInt(Math.max(0, goal - collegeFTE))} to go`;
+      // Goal-met detection: aggregate has hit or exceeded the goal.
+      // Card styling switches to green celebration mode; sub-line
+      // wording changes from "N to go" to "goal met, +X above."
+      // Only affects presentation — the one-time celebration animation
+      // is separately gated in maybeCelebrateGoal().
+      const goalMet = collegePct !== null && collegePct >= 100;
+      const overshoot = collegeFTE - goal;
+      const sub = goalMet
+        ? `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · goal met, +${fmtFloat(overshoot, 1)} above`
+        : `${collegePct.toFixed(1)}% of ${goal.toLocaleString()} · ${fmtInt(Math.max(0, goal - collegeFTE))} to go`;
 
       // Second sub-line rendered only when there's a current snapshot to
       // draw from — avoids showing "Your view: 0.0 FTE · 0% of college"
@@ -3441,10 +3561,15 @@
 
       const fteTooltip = `College FTE aggregates the newest snapshot of each part-of-term (15-week, 11-week, 7A, 7B). Delta compares that total to the sum of each POT's second-most-recent snapshot. FTE = Total Student Credit Hours ÷ 30 (Brookdale convention). Compared against the fall enrollment goal of ${goal.toLocaleString()}, set by the college. Goals reset each semester.`;
 
+      const goalBadge = goalMet
+        ? '<span class="goal-badge"><span class="ribbon" aria-hidden="true">🎯</span> Goal met</span>'
+        : '';
+
       fteCard = `
-        <div class="kpi">
+        <div class="kpi${goalMet ? ' goal-met' : ''}">
           <div class="label">
             College FTE vs. fall goal
+            ${goalBadge}
             <span class="kpi-info-wrap">
               <span class="kpi-info" tabindex="0" role="button" aria-label="About FTE">i</span>
               <span class="kpi-tooltip" role="tooltip">${escapeHtml(fteTooltip)}</span>
@@ -6076,6 +6201,136 @@
       // before the modal appears, rather than ambushing on page load.
       setTimeout(openWhatsNew, 400);
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Goal-met celebration
+  // -----------------------------------------------------------------------
+  // When the aggregate college FTE meets or exceeds the fall goal, fire
+  // a one-time confetti-and-toast celebration. Once per user per term
+  // (stored in localStorage as the term identifier, e.g. "26FA"). Users
+  // with prefers-reduced-motion see the permanent card treatment (a
+  // separate concern rendered inline in the FTE card) but skip the
+  // animated celebration entirely.
+  //
+  // Trigger uses the "as of today" aggregate (aggregateCollegeFTE() with
+  // no reference), NOT the currently-viewed snapshot's aggregate. That
+  // prevents retriggering when a user browses back to a historical
+  // snapshot where the aggregate was also above the goal.
+  const CONFETTI_COLORS = ['#1d9e75', '#2d5a3d', '#b06820', '#d4b675', '#185fa5', '#d4537e', '#7f77dd'];
+
+  function makeConfettiParticle(startX, startY) {
+    const p = document.createElement('div');
+    p.className = 'confetti';
+    p.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    p.style.left = startX + 'px';
+    p.style.top = startY + 'px';
+    // Mix shapes for visual variety
+    const roll = Math.random();
+    if (roll < 0.4) {
+      p.style.borderRadius = '50%';
+      p.style.width = '7px';
+      p.style.height = '7px';
+    } else if (roll < 0.7) {
+      p.style.width = '5px';
+      p.style.height = '10px';
+    }
+    return p;
+  }
+
+  function runGoalCelebration() {
+    const container = el('goalCelebration');
+    const toast = el('goalCelebrationToast');
+    if (!container || !toast) return;
+
+    container.setAttribute('aria-hidden', 'false');
+    container.classList.add('is-active');
+
+    // Confetti falls from top of viewport, sways, rotates, fades out.
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const count = 110;
+    const duration = 4400;
+
+    for (let i = 0; i < count; i++) {
+      const startX = Math.random() * viewportWidth;
+      const p = makeConfettiParticle(startX, -20);
+      container.appendChild(p);
+
+      const swayAmount = 60 + Math.random() * 80;
+      const swayCycles = 1.5 + Math.random();
+      const rotEnd = (Math.random() - 0.5) * 1800;
+      const stagger = Math.random() * 900;
+      const dur = duration + Math.random() * 800;
+
+      p.animate([
+        { transform: 'translate(0, 0) rotate(0deg)', opacity: 0 },
+        { transform: `translate(${Math.sin(swayCycles * 1) * swayAmount}px, ${viewportHeight * 0.3}px) rotate(${rotEnd * 0.3}deg)`, opacity: 1, offset: 0.25 },
+        { transform: `translate(${Math.sin(swayCycles * 2) * swayAmount}px, ${viewportHeight * 0.6}px) rotate(${rotEnd * 0.6}deg)`, opacity: 1, offset: 0.55 },
+        { transform: `translate(${Math.sin(swayCycles * 3) * swayAmount}px, ${viewportHeight + 40}px) rotate(${rotEnd}deg)`, opacity: 0.9, offset: 1 },
+      ], {
+        duration: dur,
+        delay: stagger,
+        easing: 'linear',
+        fill: 'forwards',
+      }).onfinish = () => p.remove();
+    }
+
+    // Toast pops in and fades. Restart animation cleanly on each fire.
+    toast.classList.remove('show');
+    void toast.offsetWidth;  // force reflow so the animation replays
+    toast.classList.add('show');
+
+    // Cleanup after full duration
+    const cleanup = () => {
+      container.classList.remove('is-active');
+      container.setAttribute('aria-hidden', 'true');
+      toast.classList.remove('show');
+      container.querySelectorAll('.confetti').forEach(el => el.remove());
+    };
+    const autoTimer = setTimeout(cleanup, 5500);
+
+    // Click anywhere on the overlay dismisses early
+    const clickDismiss = () => {
+      clearTimeout(autoTimer);
+      cleanup();
+      container.removeEventListener('click', clickDismiss);
+    };
+    container.addEventListener('click', clickDismiss);
+  }
+
+  function maybeCelebrateGoal() {
+    const goal = fteGoal();
+    if (!goal || state.snapshots.length === 0) return;
+
+    // "As of today" aggregate — deliberately ignores the currently-viewed
+    // snapshot, so browsing back through history doesn't retrigger.
+    const collegeFTE = aggregateCollegeFTE();
+    const pct = pctOfGoal(collegeFTE);
+    if (pct === null || pct < 100) return;
+
+    // Per-term persistence. Stores the term code so the same user gets
+    // one celebration per term (next semester's goal-met crossing will
+    // fire a fresh celebration).
+    const term = state.term || 'unknown';
+    let celebrated = null;
+    try { celebrated = localStorage.getItem(STORAGE.GOAL_MET_CELEBRATED); } catch (e) {}
+    if (celebrated === term) return;
+
+    // Mark celebrated first — even if animation fails or is suppressed
+    // by reduced-motion, we don't want to retry every page load.
+    try { localStorage.setItem(STORAGE.GOAL_MET_CELEBRATED, term); } catch (e) {}
+
+    // Suppress the animation for users with reduced-motion preference.
+    // The permanent card treatment (rendered inline via .goal-met class)
+    // still communicates the milestone to them.
+    const prefersReducedMotion = window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    // Small delay so the celebration lands after the dashboard has
+    // painted, giving the user context before the confetti drops.
+    setTimeout(runGoalCelebration, 600);
   }
 
   function openWhatsNew() {
