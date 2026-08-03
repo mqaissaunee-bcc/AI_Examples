@@ -2,35 +2,26 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.26
-  Date:     July 27, 2026
-  Features: Movers panel comparison window overhaul.
-            Problem: the old panel compared current snapshot against
-            the *earliest* snapshot on record (April 28), so sections
-            that filled up in June still showed as "+30" in July. The
-            "NEW" tag fired for any section added since April 28, which
-            included sections created weeks or months ago — misleading
-            for daily/weekly analysis.
-            Changes:
-            - Default comparison is now snapshot-to-snapshot (last vs.
-              current). "NEW" now genuinely means "just added in the
-              latest snapshot."
-            - Stalled panel uses a wider window (~5 snapshots ≈ 1 week)
-              when in short-window mode, since 1-snapshot stall is
-              trivially true for most sections.
-            - New user-selectable toggle at the top of the Movers
-              section: "Since last snapshot" | "Since start". Choice
-              persists to localStorage. Preserves the long-view for
-              anyone doing term retrospective.
-            - Explicit date range label ("Jul 25 → Jul 27") shown so
-              the window is unambiguous.
-            - Minimum threshold in short-window mode (±2 students) to
-              filter day-to-day noise. NEW additions bypass this filter.
-              Long-window mode retains original ±1 sensitivity.
-            - Better empty-state messages ("No sections gained enough
-              to surface" etc.) rather than "None in current view."
-            What's New bumped to 2026-07-27 to announce all three
-            recent changes (movers, FTE aggregation, sub-term picker).
+  Version:  v5.27
+  Date:     August 2, 2026
+  Features: Bug fix — College FTE aggregate now honors the currently-
+            viewed snapshot.
+            Problem: aggregateCollegeFTE() and previousAggregateCollegeFTE()
+            always iterated the full state.snapshots history and picked
+            the newest per POT, regardless of which snapshot the user
+            had selected in the Snapshot Library. Result: switching to
+            an older snapshot updated the "Your view" sub-line but left
+            the College FTE headline and delta frozen at the newest-
+            possible values. Delta always showed the same +22.0
+            regardless of viewed date. Percent-of-goal likewise never
+            moved.
+            Fix: both helpers now accept an optional reference snapshot
+            argument. Only snapshots dated on or before the reference
+            are considered. Passing the currently-viewed snapshot makes
+            the headline reflect "college aggregate as of this point
+            in time." Historical snapshots now show the correct
+            historical aggregate. Latest snapshot behaves identically
+            to before.
             Built on v4.9 canonical baseline.
 -->
 <html lang="en">
@@ -2143,7 +2134,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.26</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.27</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -3042,14 +3033,23 @@
   // Cross-POT college-wide FTE aggregation. Sums the newest snapshot of
   // each part-of-term to produce a fall-total college FTE. This is the
   // headline used on the FTE card, and it's *deliberately* independent
-  // of the active POT filter — the fall FTE goal (2,953) is a fall-total
+  // of the active POT filter — the fall FTE goal (3,335) is a fall-total
   // goal, so measuring progress against it requires the total. Comparing
   // a POT-filtered slice against the whole-fall goal produces misleading
   // percentages (e.g., 7A view against fall goal reads "5% of goal"
   // when the college is actually near 60%).
-  function aggregateCollegeFTE() {
+  //
+  // If referenceSnap is provided, snapshots dated *after* that snapshot
+  // are excluded — this is what lets a user click back to an older
+  // snapshot in the library and see the historical aggregate as it
+  // stood at that point in time, rather than the always-newest total.
+  // If referenceSnap is omitted, the whole history is considered
+  // (equivalent to "as of today").
+  function aggregateCollegeFTE(referenceSnap) {
+    const refDate = referenceSnap ? referenceSnap.date : null;
     const potLatest = new Map();
     state.snapshots.forEach(s => {
+      if (refDate && s.date > refDate) return;
       const pot = s.part_of_term || '15W';
       const existing = potLatest.get(pot);
       if (!existing || s.date > existing.date) potLatest.set(pot, s);
@@ -3060,13 +3060,16 @@
   }
 
   // Previous aggregate for delta calculation. Uses each POT's
-  // second-most-recent snapshot as its "previous" contribution. POTs
-  // with only one snapshot contribute their current value to both
-  // sides (net zero) so they don't distort the delta. Returns null if
-  // NO POT has 2+ snapshots (in which case no delta is meaningful).
-  function previousAggregateCollegeFTE() {
+  // second-most-recent snapshot (on or before the reference date) as
+  // its "previous" contribution. POTs with only one snapshot in the
+  // window contribute their current value to both sides (net zero) so
+  // they don't distort the delta. Returns null if NO POT has 2+
+  // snapshots (in which case no delta is meaningful).
+  function previousAggregateCollegeFTE(referenceSnap) {
+    const refDate = referenceSnap ? referenceSnap.date : null;
     const potGroups = new Map();
     state.snapshots.forEach(s => {
+      if (refDate && s.date > refDate) return;
       const pot = s.part_of_term || '15W';
       if (!potGroups.has(pot)) potGroups.set(pot, []);
       potGroups.get(pot).push(s);
@@ -3404,9 +3407,9 @@
     const fteSnap = currentSnapshot();  // Used only for the "your view" gate — the headline aggregates across POTs regardless.
     let fteCard = '';
     if (goal && state.snapshots.length > 0) {
-      const collegeFTE = aggregateCollegeFTE();
+      const collegeFTE = aggregateCollegeFTE(fteSnap);
       const collegePct = pctOfGoal(collegeFTE);
-      const prevAggFTE = previousAggregateCollegeFTE();
+      const prevAggFTE = previousAggregateCollegeFTE(fteSnap);
       const dFTE = prevAggFTE !== null ? collegeFTE - prevAggFTE : null;
       const dStr = dFTE !== null && Math.abs(dFTE) >= 0.05
         ? `<span class="delta ${dFTE > 0 ? 'up' : 'down'}" title="Change in college-wide FTE since previous aggregate (each POT's second-most-recent snapshot)">${dFTE > 0 ? '+' : ''}${fmtFloat(dFTE, 1)}</span>`
