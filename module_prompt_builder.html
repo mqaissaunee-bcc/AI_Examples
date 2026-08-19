@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Module Prompt Builder — build a prompt for an interactive single-file lesson</title>
+<meta name="description" content="Fill in dropdowns to generate a complete AI prompt for building an accessible, single-file HTML learning module — with built-in YouTube search, verification, and embed code generation.">
+<style>
+  :root{
+    --bg:#e9edf1;
+    --surface:#ffffff;
+    --surface-alt:#f4f7f9;
+    --surface-sunk:#e4eaef;
+    --ink:#14202a;
+    --ink-soft:#3d4f5e;
+    --muted:#5d6e7c;
+    --line:#c2ced8;
+    --line-soft:#dbe2e8;
+    --steel:#1d4e6f;
+    --steel-mid:#2c6d95;
+    --steel-soft:#dceaf3;
+    --steel-ink:#123a55;
+    --amber:#9a5511;
+    --amber-soft:#fbeedc;
+    --ok:#12603a;
+    --ok-soft:#e2f1e8;
+    --bad:#8f2224;
+    --bad-soft:#fbe6e6;
+    --focus:#9a5511;
+    --radius:7px;
+    --font-ui:"IBM Plex Sans","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f171e;
+      --surface:#18232d;
+      --surface-alt:#1e2b37;
+      --surface-sunk:#131d26;
+      --ink:#e9eff4;
+      --ink-soft:#c3cfda;
+      --muted:#9aabb8;
+      --line:#394b5b;
+      --line-soft:#293743;
+      --steel:#87b9dc;
+      --steel-mid:#a3cdea;
+      --steel-soft:#1f3648;
+      --steel-ink:#bcdcf2;
+      --amber:#e5a75c;
+      --amber-soft:#332514;
+      --ok:#8ed9ae;
+      --ok-soft:#173628;
+      --bad:#f2a3a3;
+      --bad-soft:#3a1e1e;
+      --focus:#e5a75c;
+    }
+  }
+  *{box-sizing:border-box;}
+  [hidden]{display:none !important;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:var(--font-ui);font-size:16px;line-height:1.55;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:60rem;margin:0 auto;padding:0 1rem 4rem;}
+  .skip-link{position:absolute;left:-9999px;background:var(--steel);color:#fff;padding:.75rem 1rem;z-index:60;}
+  .skip-link:focus{left:0;top:0;}
+  :focus-visible{outline:3px solid var(--focus);outline-offset:2px;}
+  h1,h2,h3,h4{line-height:1.2;margin:0;}
+  h1{font-size:clamp(1.4rem,1.15rem + 1.2vw,1.9rem);letter-spacing:-0.015em;}
+  h2{font-size:1.25rem;margin:0 0 .2rem;}
+  h3{font-size:1rem;margin:1.4rem 0 .5rem;color:var(--steel-ink);}
+  p{margin:.5rem 0;}
+  a{color:var(--steel);}
+
+  header.top{background:var(--steel);color:#fff;padding:1.5rem 0 1.25rem;border-bottom:4px solid var(--amber);}
+  header.top .wrap{padding-bottom:0;}
+  header.top h1{color:#fff;}
+  .kicker{font-size:.7rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--amber);margin:0 0 .4rem;}
+  @media (prefers-color-scheme: dark){ .kicker{color:#f0c48a;} }
+  header.top p.lede{color:#d9e7f1;margin:.4rem 0 0;font-size:.95rem;max-width:44rem;}
+
+  /* stepper */
+  .steps{display:flex;gap:.4rem;margin:1.1rem 0 1rem;flex-wrap:wrap;}
+  .step-chip{
+    flex:1 1 12rem;display:flex;align-items:center;gap:.55rem;min-height:44px;cursor:pointer;
+    background:var(--surface-sunk);border:1px solid var(--line);border-radius:var(--radius);
+    padding:.5rem .7rem;font:inherit;font-size:.88rem;font-weight:600;color:var(--ink-soft);text-align:left;
+  }
+  .step-chip:hover{background:var(--steel-soft);}
+  .step-chip[aria-current="step"]{background:var(--steel);color:#fff;border-color:var(--steel);}
+  .step-chip .n{
+    display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+    width:1.6rem;height:1.6rem;border-radius:50%;background:var(--surface);color:var(--steel-ink);
+    font-family:var(--font-mono);font-size:.8rem;font-weight:700;border:1px solid var(--line);
+  }
+  .step-chip[aria-current="step"] .n{background:var(--amber);color:#fff;border-color:var(--amber);}
+  .step-chip .done{font-size:.72rem;font-weight:400;opacity:.85;display:block;}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:1.1rem 1.15rem 1.5rem;}
+  .panel[hidden]{display:none;}
+  .panel > h2{padding-bottom:.5rem;border-bottom:2px solid var(--line-soft);margin-bottom:.6rem;}
+  .sub{color:var(--muted);font-size:.9rem;margin:0 0 1rem;}
+
+  fieldset{border:1px solid var(--line-soft);border-radius:var(--radius);padding:.85rem .9rem 1rem;margin:1.1rem 0;background:var(--surface-alt);}
+  legend{font-size:.74rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);padding:0 .4rem;}
+  @media (prefers-color-scheme: dark){ legend{color:var(--amber);} }
+
+  .row{display:grid;gap:.85rem;grid-template-columns:1fr;}
+  @media (min-width:660px){ .row.two{grid-template-columns:1fr 1fr;} .row.three{grid-template-columns:repeat(3,1fr);} }
+  .field{display:block;margin:0;}
+  .field > label,.lbl{display:block;font-size:.85rem;font-weight:600;color:var(--ink-soft);margin-bottom:.25rem;}
+  .req{color:var(--amber);font-weight:700;}
+  .hint{font-size:.79rem;color:var(--muted);margin:.25rem 0 0;}
+  input[type="text"],input[type="number"],select,textarea{
+    width:100%;min-height:44px;padding:.5rem .6rem;font:inherit;font-size:.95rem;
+    background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);
+  }
+  textarea{min-height:5rem;resize:vertical;line-height:1.5;}
+  select{cursor:pointer;}
+  input:invalid:not(:placeholder-shown){border-color:var(--bad);}
+  textarea:invalid:not(:placeholder-shown){border-color:var(--bad);}
+
+  .checks{display:grid;gap:.3rem;grid-template-columns:1fr;margin:0;}
+  @media (min-width:560px){ .checks.two{grid-template-columns:1fr 1fr;} .checks.three{grid-template-columns:repeat(3,1fr);} }
+  .check{display:flex;align-items:flex-start;gap:.5rem;min-height:34px;padding:.25rem .35rem;border-radius:5px;cursor:pointer;font-size:.9rem;}
+  .check:hover{background:var(--steel-soft);}
+  .check input{margin-top:.28rem;width:1.05rem;height:1.05rem;flex:0 0 auto;accent-color:var(--steel);}
+  .check span{line-height:1.35;}
+  .check .cnt{margin-left:auto;}
+  .check .cnt input{width:4.2rem;min-height:32px;padding:.15rem .3rem;text-align:center;font-family:var(--font-mono);font-size:.85rem;}
+
+  .btn{
+    font:inherit;font-size:.92rem;font-weight:600;min-height:44px;cursor:pointer;
+    background:var(--steel);color:#fff;border:1px solid var(--steel);border-radius:var(--radius);padding:.55rem 1rem;
+  }
+  .btn:hover{background:var(--steel-mid);border-color:var(--steel-mid);}
+  .btn.ghost{background:var(--surface);color:var(--steel);}
+  .btn.ghost:hover{background:var(--steel-soft);}
+  .btn.amber{background:var(--amber);border-color:var(--amber);color:#fff;}
+  .btn.amber:hover{filter:brightness(1.1);}
+  .btn.small{min-height:36px;padding:.3rem .6rem;font-size:.83rem;}
+  .btn[disabled]{opacity:.5;cursor:not-allowed;}
+  @media (prefers-color-scheme: dark){ .btn,.btn.amber{color:#0f171e;} }
+  .btn-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.1rem;}
+  .btn-row.end{justify-content:space-between;}
+  .status{font-size:.86rem;color:var(--ink-soft);margin:.6rem 0 0;min-height:1.3em;}
+  .status.err{color:var(--bad);font-weight:600;}
+
+  .note{background:var(--steel-soft);border-left:4px solid var(--steel-mid);border-radius:0 var(--radius) var(--radius) 0;padding:.7rem .85rem;font-size:.89rem;margin:1rem 0;}
+  .note strong{color:var(--steel-ink);}
+  .note.warn{background:var(--amber-soft);border-left-color:var(--amber);}
+
+  /* video verify list */
+  .vid-list{list-style:none;padding:0;margin:1rem 0 0;}
+  .vid-item{display:grid;grid-template-columns:auto 1fr;gap:.7rem;border:1px solid var(--line);border-radius:var(--radius);padding:.6rem;margin:.55rem 0;background:var(--surface-alt);align-items:start;}
+  .vid-item.bad{border-color:var(--bad);background:var(--bad-soft);}
+  .vid-item img{width:120px;height:auto;border-radius:5px;border:1px solid var(--line);display:block;background:var(--surface-sunk);}
+  .vid-item .no-thumb{width:120px;height:68px;border-radius:5px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--muted);text-align:center;padding:.2rem;}
+  .vid-t{font-weight:600;font-size:.92rem;margin:0;}
+  .vid-m{font-size:.8rem;color:var(--muted);margin:.1rem 0 .4rem;}
+  .vid-m .id{font-family:var(--font-mono);}
+  .badge{display:inline-block;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:.12rem .4rem;border-radius:3px;}
+  .badge.ok{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok);}
+  .badge.no{background:var(--bad-soft);color:var(--bad);border:1px solid var(--bad);}
+  .vid-ctl{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;margin-top:.4rem;}
+  .vid-ctl input[type="text"]{min-height:34px;font-size:.85rem;flex:1 1 12rem;width:auto;}
+
+  pre.out{
+    background:var(--surface-sunk);border:1px solid var(--line);border-radius:var(--radius);
+    padding:.8rem;font-family:var(--font-mono);font-size:.78rem;line-height:1.5;
+    white-space:pre-wrap;word-break:break-word;max-height:26rem;overflow:auto;margin:.6rem 0 0;color:var(--ink);
+  }
+  .out-card{border:1px solid var(--line);border-left:5px solid var(--steel-mid);border-radius:0 var(--radius) var(--radius) 0;padding:.85rem .9rem;margin:1rem 0;background:var(--surface-alt);}
+  .out-card h3{margin:0 0 .2rem;}
+  .out-card p.what{font-size:.87rem;color:var(--ink-soft);margin:0 0 .6rem;}
+  .handoff{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.6rem;}
+  .handoff a{
+    display:inline-flex;align-items:center;min-height:40px;padding:.35rem .75rem;font-size:.85rem;font-weight:600;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);color:var(--steel);text-decoration:none;
+  }
+  .handoff a:hover{background:var(--steel-soft);}
+
+  details.adv{border:1px solid var(--line-soft);border-radius:var(--radius);padding:.5rem .7rem;margin:1rem 0;background:var(--surface-alt);}
+  details.adv summary{cursor:pointer;font-weight:600;font-size:.9rem;color:var(--steel-ink);min-height:32px;padding:.25rem 0;}
+  details.adv[open] summary{margin-bottom:.5rem;border-bottom:1px solid var(--line-soft);}
+
+  footer.site{margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--line);font-size:.83rem;color:var(--muted);}
+  .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important;} }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="top">
+  <div class="wrap">
+    <p class="kicker">Faculty tool</p>
+    <h1>Interactive Module Prompt Builder</h1>
+    <p class="lede">Fill in the fields, get a complete prompt that produces an accessible single-file HTML learning module. Find and verify YouTube videos along the way so the prompt names real ones.</p>
+  </div>
+</header>
+
+<div class="wrap">
+<main id="main">
+
+  <nav aria-label="Builder steps">
+    <div class="steps">
+      <button type="button" class="step-chip" id="chip-1" aria-current="step" data-step="1"><span class="n">1</span><span>Describe the module<span class="done" id="done-1">Not started</span></span></button>
+      <button type="button" class="step-chip" id="chip-2" data-step="2"><span class="n">2</span><span>Videos<span class="done" id="done-2">Optional</span></span></button>
+      <button type="button" class="step-chip" id="chip-3" data-step="3"><span class="n">3</span><span>Copy your prompt<span class="done" id="done-3">Waiting</span></span></button>
+    </div>
+  </nav>
+
+  <!-- ================= STEP 1 ================= -->
+  <section class="panel" id="step-1" aria-labelledby="h-step1">
+    <h2 id="h-step1">Describe the module</h2>
+    <p class="sub">Only the topic is required. Everything else has a sensible default, and anything you leave blank is simply left out of the prompt.</p>
+
+    <fieldset>
+      <legend>What you are making</legend>
+      <div class="row two">
+        <div class="field">
+          <label for="f-type">Module type</label>
+          <select id="f-type" data-save>
+            <option value="reading">Reading engagement module (book, article, or text)</option>
+            <option value="concept">Concept explainer / mini-lesson</option>
+            <option value="case">Case study analysis</option>
+            <option value="lab">Lab or activity prep</option>
+            <option value="review">Exam or certification review</option>
+            <option value="skill">Step-by-step skills walkthrough</option>
+            <option value="sim">Interactive simulation or scenario</option>
+            <option value="fpd">Faculty professional development</option>
+            <option value="orient">Program or course orientation</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-title">Working title <span class="req" aria-hidden="true">*</span><span class="vh">required</span></label>
+          <input type="text" id="f-title" data-save required placeholder="e.g. Reading Countdown to Zero Day">
+        </div>
+      </div>
+      <div class="field" style="margin-top:.85rem">
+        <label for="f-topic">Topic, in one or two sentences <span class="req" aria-hidden="true">*</span><span class="vh">required</span></label>
+        <textarea id="f-topic" data-save required placeholder="What is this module actually about? Be specific — this drives everything the AI writes."></textarea>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Source material</legend>
+      <div class="row two">
+        <div class="field">
+          <label for="f-srctype">Is there an assigned source?</label>
+          <select id="f-srctype" data-save>
+            <option value="">No assigned source — topic only</option>
+            <option value="book">Book</option>
+            <option value="chapter">Textbook chapter</option>
+            <option value="article">Article or research paper</option>
+            <option value="film">Film or documentary</option>
+            <option value="case">Case study or incident report</option>
+            <option value="standard">Standard, framework, or spec</option>
+            <option value="dataset">Dataset or technical report</option>
+            <option value="podcast">Podcast or recorded talk</option>
+          </select>
+        </div>
+        <div class="field" id="wrap-srctitle" hidden>
+          <label for="f-srctitle">Source title and author</label>
+          <input type="text" id="f-srctitle" data-save placeholder="e.g. Countdown to Zero Day by Kim Zetter">
+        </div>
+      </div>
+      <div class="field" id="wrap-srcuse" hidden style="margin-top:.85rem">
+        <label for="f-srcuse">How the source is used in the course</label>
+        <input type="text" id="f-srcuse" data-save placeholder="e.g. anchor text for the historical incidents unit">
+      </div>
+      <div class="field" id="wrap-research" hidden style="margin-top:.85rem">
+        <label class="check" for="f-research"><input type="checkbox" id="f-research" data-save checked><span>Research the source first, then build — ask the AI to analyze context, themes, and typical academic use before writing anything</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Course and audience</legend>
+      <div class="row two">
+        <div class="field">
+          <label for="f-course">Course or discipline</label>
+          <input type="text" id="f-course" data-save placeholder="e.g. Cybersecurity, NETW 107">
+        </div>
+        <div class="field">
+          <label for="f-level">Level</label>
+          <select id="f-level" data-save>
+            <option>Introductory (100-level)</option>
+            <option>Developmental / preparatory</option>
+            <option>Intermediate (200-level)</option>
+            <option>Upper-division / advanced</option>
+            <option>Professional / workforce training</option>
+            <option>Faculty / staff</option>
+            <option>High school dual enrollment</option>
+            <option>General / mixed audience</option>
+          </select>
+        </div>
+      </div>
+      <p class="lbl" style="margin-top:.85rem" id="lbl-aud">Audience considerations</p>
+      <div class="checks two" role="group" aria-labelledby="lbl-aud">
+        <label class="check"><input type="checkbox" data-save data-group="aud" value="many multilingual learners"><span>Many multilingual learners</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="aud" value="many first-generation students"><span>Many first-generation students</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="aud" value="returning adult learners"><span>Returning adult learners</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="aud" value="widely varying prior technical experience"><span>Varying technical background</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="aud" value="fully online or asynchronous delivery"><span>Fully online / asynchronous</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="aud" value="students who may be reading on a phone"><span>Likely reading on a phone</span></label>
+      </div>
+      <div class="field" style="margin-top:.85rem">
+        <label for="f-audnotes">Anything else about your students</label>
+        <input type="text" id="f-audnotes" data-save placeholder="Optional">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Learning outcomes</legend>
+      <div class="row two">
+        <div class="field">
+          <label for="f-lo-mode">How should outcomes be handled?</label>
+          <select id="f-lo-mode" data-save>
+            <option value="approve">Propose outcomes and stop for my approval before building</option>
+            <option value="onepass">Propose outcomes and build in the same response</option>
+            <option value="mine">Use the outcomes I supply below</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-lo-count">How many outcomes</label>
+          <input type="number" id="f-lo-count" data-save value="6" min="2" max="10">
+        </div>
+      </div>
+      <div class="field" id="wrap-lo-text" hidden style="margin-top:.85rem">
+        <label for="f-lo-text">Your outcomes, one per line</label>
+        <textarea id="f-lo-text" data-save placeholder="Students will be able to…"></textarea>
+      </div>
+      <p class="lbl" style="margin-top:.85rem" id="lbl-bloom">Cognitive emphasis</p>
+      <div class="checks three" role="group" aria-labelledby="lbl-bloom">
+        <label class="check"><input type="checkbox" data-save data-group="bloom" value="remember and understand"><span>Remember / understand</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="bloom" value="apply" checked><span>Apply</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="bloom" value="analyze" checked><span>Analyze</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="bloom" value="evaluate" checked><span>Evaluate</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="bloom" value="create"><span>Create</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="bloom" value="metacognition and reflection on their own learning"><span>Metacognition</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Sections to include</legend>
+      <p class="hint" style="margin:0 0 .6rem">Check what belongs in the module. Where a number box appears, set how many items you want.</p>
+      <div class="checks two" role="group" aria-label="Module sections">
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="overview" checked><span>Core overview — context, key ideas, orientation</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="timeline" checked><span>Interactive timeline with click-to-reveal entries</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="close" checked><span>Close reading / deep analysis of key concepts</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="evidence"><span>Evidence, sources, and how claims are supported</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="map"><span>Concept or character relationship map</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="passages"><span>Passage or quote explorer with commentary</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="prepost"><span>Before / after prediction and reflection</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="steps"><span>Step-by-step walkthrough or procedure</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="compare"><span>Comparison table</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="group"><span>Small-group activity</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="writing"><span>Short writing assignments</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="instructor"><span>Instructor notes and outcome alignment map</span></label>
+      </div>
+      <div class="checks two" role="group" aria-label="Sections with counts" style="margin-top:.5rem">
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="reflect" checked><span>Reflection prompts</span><span class="cnt"><input type="number" data-save id="n-reflect" value="8" min="1" max="20" aria-label="Number of reflection prompts"></span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="discuss" checked><span>Discussion questions</span><span class="cnt"><input type="number" data-save id="n-discuss" value="8" min="1" max="20" aria-label="Number of discussion questions"></span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="quiz" checked><span>Self-check quiz questions</span><span class="cnt"><input type="number" data-save id="n-quiz" value="6" min="1" max="25" aria-label="Number of quiz questions"></span></label>
+        <label class="check"><input type="checkbox" data-save data-group="sec" value="glossary" checked><span>Glossary terms</span><span class="cnt"><input type="number" data-save id="n-gloss" value="20" min="1" max="60" aria-label="Number of glossary terms"></span></label>
+      </div>
+      <div class="row two" style="margin-top:.9rem">
+        <div class="field">
+          <label for="f-quizfb">Quiz feedback style</label>
+          <select id="f-quizfb" data-save>
+            <option value="peropt">Explain every option, right and wrong</option>
+            <option value="correct">Explain the correct answer only</option>
+            <option value="score">Score only, no explanations</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-nav">Navigation style</label>
+          <select id="f-nav" data-save>
+            <option value="tabs">Tabbed sections with arrow-key navigation</option>
+            <option value="accordion">Stacked accordion sections</option>
+            <option value="scroll">Single scrolling page with jump links</option>
+            <option value="wizard">Guided step-by-step wizard</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <details class="adv">
+      <summary>Design, technical, and accessibility settings</summary>
+      <div class="row two">
+        <div class="field">
+          <label for="f-format">Output format</label>
+          <select id="f-format" data-save>
+            <option value="single">One single-file HTML page (all CSS and JS inline)</option>
+            <option value="canvas">Canvas-safe HTML for the Rich Content Editor</option>
+            <option value="react">React component artifact</option>
+            <option value="doc">Plain document, no code</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-palette">Palette</label>
+          <select id="f-palette" data-save>
+            <option value="blue">Institutional blue and gray</option>
+            <option value="slate">Slate with a single warm accent</option>
+            <option value="green">Deep green and stone</option>
+            <option value="mono">High contrast, near-monochrome</option>
+            <option value="custom">Custom — I'll describe it below</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="wrap-palette" hidden style="margin-top:.85rem">
+        <label for="f-palettetext">Describe your palette or paste hex values</label>
+        <input type="text" id="f-palettetext" data-save placeholder="e.g. #14477d primary, #f4f6f8 background">
+      </div>
+      <p class="lbl" style="margin-top:.9rem" id="lbl-tech">Technical constraints</p>
+      <div class="checks two" role="group" aria-labelledby="lbl-tech">
+        <label class="check"><input type="checkbox" data-save data-group="tech" value="No external scripts, no CDN dependencies — the file must work offline" checked><span>No CDN or external scripts</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="tech" value="Content Security Policy safe: all event binding via addEventListener, no inline onclick handlers, no eval" checked><span>CSP-safe (no inline handlers)</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="tech" value="Must render correctly inside a Canvas LMS iframe with no horizontal scrolling" checked><span>Canvas iframe compatible</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="tech" value="Save student input to localStorage, wrapped in try/catch, with a clear-all control" checked><span>Save student work locally</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="tech" value="Include a button that copies all student responses to the clipboard for pasting into a discussion board"><span>Copy-responses button</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="tech" value="Keep the finished file under 200 KB" checked><span>Under 200 KB</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="tech" value="Support dark mode through a prefers-color-scheme media query using CSS custom properties" checked><span>Dark mode</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="tech" value="Include a print stylesheet so the module prints cleanly"><span>Print stylesheet</span></label>
+      </div>
+      <p class="lbl" style="margin-top:.9rem" id="lbl-a11y">Accessibility requirements</p>
+      <div class="checks two" role="group" aria-labelledby="lbl-a11y">
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="Semantic HTML5 landmarks and a logical heading hierarchy" checked><span>Semantic landmarks and headings</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="Every interactive element reachable and operable by keyboard, with visible focus styles" checked><span>Full keyboard operation</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="A skip link as the first focusable element" checked><span>Skip link</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="Colour contrast of at least 4.5:1 for body text and 3:1 for UI components" checked><span>WCAG AA contrast</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="Never use colour alone to convey state — always pair it with text or a symbol" checked><span>No color-only signaling</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="Tap targets at least 44 by 44 pixels" checked><span>44px tap targets</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="Honour prefers-reduced-motion and avoid flashing or distracting animation" checked><span>Reduced motion honored</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="Plain, student-friendly language; define every key term the first time it appears" checked><span>Plain language, terms defined</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="All content understandable without seeing images or colour; announce dynamic updates with aria-live" checked><span>Works without images/color</span></label>
+        <label class="check"><input type="checkbox" data-save data-group="a11y" value="Descriptive alt text on every image; empty alt on decorative images" checked><span>Alt text on images</span></label>
+      </div>
+      <div class="row two" style="margin-top:.9rem">
+        <div class="field">
+          <label for="f-copyright">Handling of source material</label>
+          <select id="f-copyright" data-save>
+            <option value="paraphrase">Paraphrase only — no verbatim quotes from the source</option>
+            <option value="short">Short attributed quotes allowed, under 15 words each</option>
+            <option value="publicdomain">Source is public domain or openly licensed — quoting is fine</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-sensitive">Sensitive content</label>
+          <select id="f-sensitive" data-save>
+            <option value="none">Nothing sensitive in this topic</option>
+            <option value="note">Topic includes difficult material — add a brief content note</option>
+            <option value="avoid">Avoid difficult material entirely</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="wrap-sensitive" hidden style="margin-top:.85rem">
+        <label for="f-sensitivetext">What should the content note cover?</label>
+        <input type="text" id="f-sensitivetext" data-save placeholder="e.g. this case involves industrial sabotage and loss of life">
+      </div>
+      <div class="field" style="margin-top:.85rem">
+        <label for="f-extra">Anything else the AI should know</label>
+        <textarea id="f-extra" data-save placeholder="Optional. House style, a required framework, an assignment it feeds into, a file naming convention."></textarea>
+      </div>
+    </details>
+
+    <div class="btn-row end">
+      <button type="button" class="btn ghost" id="reset-all">Start over</button>
+      <button type="button" class="btn" id="to-2">Next: videos</button>
+    </div>
+    <p class="status" id="s1-status" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- ================= STEP 2 ================= -->
+  <section class="panel" id="step-2" aria-labelledby="h-step2" hidden>
+    <h2 id="h-step2">Videos</h2>
+    <p class="sub">Optional. Skip this and the prompt simply won't mention video.</p>
+
+    <fieldset>
+      <legend>How to get videos</legend>
+      <div class="field">
+        <label for="f-vpath">Approach</label>
+        <select id="f-vpath" data-save>
+          <option value="none">No videos in this module</option>
+          <option value="ai">Let the AI find them — add video search instructions to the main prompt</option>
+          <option value="verify">I'll supply videos — verify IDs here and bake them into the prompt</option>
+          <option value="search">Generate a separate search prompt first, then come back and verify</option>
+        </select>
+      </div>
+      <p class="hint">The middle option is the reliable one: verified IDs mean the finished module never contains a dead embed. The AI-finds-them path is faster but you should still verify what it returns.</p>
+    </fieldset>
+
+    <div id="v-criteria" hidden>
+      <fieldset>
+        <legend>What kind of videos</legend>
+        <div class="row three">
+          <div class="field">
+            <label for="f-vcount">How many</label>
+            <input type="number" id="f-vcount" data-save value="4" min="1" max="12">
+          </div>
+          <div class="field">
+            <label for="f-vlen">Preferred length</label>
+            <select id="f-vlen" data-save>
+              <option value="">Any length</option>
+              <option value="under 5 minutes">Under 5 minutes</option>
+              <option value="5 to 15 minutes">5 to 15 minutes</option>
+              <option value="15 to 30 minutes">15 to 30 minutes</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-vplace">Placement</label>
+            <select id="f-vplace" data-save>
+              <option value="concept">Next to the concept each one explains</option>
+              <option value="grouped">Grouped in one resources section</option>
+              <option value="persection">One per module section</option>
+            </select>
+          </div>
+        </div>
+        <p class="lbl" style="margin-top:.9rem" id="lbl-vpri">Priorities</p>
+        <div class="checks two" role="group" aria-labelledby="lbl-vpri">
+          <label class="check"><input type="checkbox" data-save data-group="vpri" value="published within the last three years"><span>Recent (last 3 years)</span></label>
+          <label class="check"><input type="checkbox" data-save data-group="vpri" value="from a reputable, identifiable channel such as a university, vendor, or established educator" checked><span>Reputable source</span></label>
+          <label class="check"><input type="checkbox" data-save data-group="vpri" value="with accurate captions available" checked><span>Has captions</span></label>
+          <label class="check"><input type="checkbox" data-save data-group="vpri" value="animated or illustrated rather than lecture-on-camera"><span>Animated / illustrated</span></label>
+          <label class="check"><input type="checkbox" data-save data-group="vpri" value="representing a range of voices and perspectives"><span>Diverse perspectives</span></label>
+          <label class="check"><input type="checkbox" data-save data-group="vpri" value="free of paywalls, sign-ins, or heavy product marketing" checked><span>No paywall or sales pitch</span></label>
+        </div>
+        <div class="row two" style="margin-top:.9rem">
+          <div class="field">
+            <label for="f-vembed">Embed behavior</label>
+            <select id="f-vembed" data-save>
+              <option value="click">Click to load — nothing requested from YouTube until the student presses play</option>
+              <option value="iframe">Standard iframe, loads with the page</option>
+              <option value="link">Links only, no embedded player</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-vq">Watch-for questions per video</label>
+            <input type="number" id="f-vq" data-save value="2" min="0" max="5">
+          </div>
+        </div>
+        <p class="hint">Click-to-load keeps the page working offline and means no student's browser contacts Google just for opening the module. Canvas strips scripts from the Rich Content Editor, so Canvas-mode output falls back to standard iframes automatically.</p>
+      </fieldset>
+    </div>
+
+    <div id="v-searchbox" hidden>
+      <div class="out-card">
+        <h3>Video search prompt</h3>
+        <p class="what">Copy this, run it in any AI tool with web access, then bring the video IDs back here to verify.</p>
+        <div class="btn-row" style="margin-top:0">
+          <button type="button" class="btn" data-copy="out-search">Copy search prompt</button>
+        </div>
+        <div class="handoff">
+          <a href="https://claude.ai" rel="noopener noreferrer">Open Claude</a>
+          <a href="https://gemini.google.com" rel="noopener noreferrer">Open Gemini</a>
+          <a href="https://www.perplexity.ai" rel="noopener noreferrer">Open Perplexity</a>
+          <a href="https://copilot.microsoft.com" rel="noopener noreferrer">Open Copilot</a>
+        </div>
+        <p class="hint">Links open in this tab unless you choose otherwise — copy the prompt first.</p>
+        <pre class="out" id="out-search" tabindex="0"></pre>
+      </div>
+    </div>
+
+    <div id="v-verify" hidden>
+      <fieldset>
+        <legend>Verify video IDs</legend>
+        <p class="hint" style="margin:0 0 .6rem">Paste YouTube links or bare IDs, one per line. Accepts watch links, youtu.be short links, embed links, and Shorts. Each is checked against YouTube's public oEmbed endpoint to confirm it is real and publicly playable.</p>
+        <div class="field">
+          <label for="f-vinput">YouTube URLs or IDs</label>
+          <textarea id="f-vinput" data-save placeholder="https://www.youtube.com/watch?v=w5MV1Jeo76g&#10;https://youtu.be/EqNe55IzjAw&#10;zC_Pndpg8-c"></textarea>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn amber" id="verify-btn">Check these videos</button>
+          <button type="button" class="btn ghost small" id="clear-vids">Clear the list</button>
+        </div>
+        <p class="status" id="verify-status" role="status" aria-live="polite"></p>
+        <ul class="vid-list" id="vid-list"></ul>
+      </fieldset>
+    </div>
+
+    <div class="btn-row end">
+      <button type="button" class="btn ghost" id="back-1">Back</button>
+      <button type="button" class="btn" id="to-3">Next: get your prompt</button>
+    </div>
+  </section>
+
+  <!-- ================= STEP 3 ================= -->
+  <section class="panel" id="step-3" aria-labelledby="h-step3" hidden>
+    <h2 id="h-step3">Copy your prompt</h2>
+    <p class="sub">Paste any of these into Claude. If you chose the approval workflow, expect a list of outcomes back first — approve or edit them, and the module gets built on the next turn.</p>
+
+    <div class="out-card">
+      <h3>1 · The prompt, without video</h3>
+      <p class="what">The complete build instruction on its own. Use this if you are handling video separately or not at all.</p>
+      <div class="btn-row" style="margin-top:0">
+        <button type="button" class="btn" data-copy="out-prompt">Copy prompt</button>
+        <button type="button" class="btn ghost small" data-download="out-prompt" data-filename="module-prompt.md">Download as .md</button>
+      </div>
+      <pre class="out" id="out-prompt" tabindex="0"></pre>
+    </div>
+
+    <div class="out-card" id="card-full">
+      <h3>2 · The prompt with your videos built in</h3>
+      <p class="what">Same prompt, plus the verified video titles, channels, and IDs, with placement instructions. This is the one to use if you verified videos in step 2.</p>
+      <div class="btn-row" style="margin-top:0">
+        <button type="button" class="btn" data-copy="out-full">Copy prompt with videos</button>
+        <button type="button" class="btn ghost small" data-download="out-full" data-filename="module-prompt-with-videos.md">Download as .md</button>
+      </div>
+      <pre class="out" id="out-full" tabindex="0"></pre>
+    </div>
+
+    <div class="out-card" id="card-embed">
+      <h3>3 · Ready-to-paste video embed code</h3>
+      <p class="what">Standalone HTML for your verified videos. Drop it into a page you already have, or hand it to the AI so it does not have to write the embed logic itself.</p>
+      <div class="btn-row" style="margin-top:0">
+        <button type="button" class="btn" data-copy="out-embed">Copy embed code</button>
+        <button type="button" class="btn ghost small" data-download="out-embed" data-filename="video-embeds.html">Download as .html</button>
+      </div>
+      <pre class="out" id="out-embed" tabindex="0"></pre>
+    </div>
+
+    <div class="out-card">
+      <h3>4 · Everything</h3>
+      <p class="what">Prompt, video data, and embed code in one block.</p>
+      <div class="btn-row" style="margin-top:0">
+        <button type="button" class="btn amber" data-copy="out-all">Copy everything</button>
+        <button type="button" class="btn ghost small" data-download="out-all" data-filename="module-prompt-complete.md">Download as .md</button>
+      </div>
+      <pre class="out" id="out-all" tabindex="0"></pre>
+    </div>
+
+    <p class="status" id="copy-status" role="status" aria-live="polite"></p>
+
+    <div class="note warn">
+      <p style="margin:0"><strong>Before you assign it.</strong> Open the finished module in a sandbox Canvas page and check three things: that embeds are permitted at your institution, that keyboard navigation reaches every control, and that the quiz feedback actually matches the questions. AI-built modules are usually right and occasionally confidently wrong.</p>
+    </div>
+
+    <div class="btn-row end">
+      <button type="button" class="btn ghost" id="back-2">Back</button>
+      <button type="button" class="btn ghost" id="reset-all-2">Start over</button>
+    </div>
+  </section>
+
+  <footer class="site">
+    <p>Interactive Module Prompt Builder · Brookdale Community College · 2026. Everything you enter stays in this browser. Video verification queries YouTube's public oEmbed endpoint and nothing else.</p>
+  </footer>
+</main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var PREFIX = "module-prompt-builder-v1:";
+  function save(k, v) { try { localStorage.setItem(PREFIX + k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(PREFIX + k); } catch (e) { return null; } }
+  function wipe() {
+    try {
+      var kill = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf(PREFIX) === 0) { kill.push(k); }
+      }
+      kill.forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) {}
+  }
+
+  function $(id) { return document.getElementById(id); }
+  function val(id) { var el = $(id); return el ? el.value.trim() : ""; }
+  function num(id) { var el = $(id); return el ? parseInt(el.value, 10) || 0 : 0; }
+  function group(name) {
+    var out = [];
+    Array.prototype.forEach.call(document.querySelectorAll('input[data-group="' + name + '"]'), function (c) {
+      if (c.checked) { out.push(c.value); }
+    });
+    return out;
+  }
+  function has(name, v) { return group(name).indexOf(v) !== -1; }
+  function list(arr) { 
+    if (!arr.length) { return ""; }
+    if (arr.length === 1) { return arr[0]; }
+    return arr.slice(0, -1).join(", ") + " and " + arr[arr.length - 1];
+  }
+
+  /* ---------- persistence for every field ---------- */
+  var fields = document.querySelectorAll("[data-save]");
+  Array.prototype.forEach.call(fields, function (el, i) {
+    var key = el.id || (el.getAttribute("data-group") + ":" + i);
+    var stored = load(key);
+    if (stored !== null) {
+      if (el.type === "checkbox") { el.checked = stored === "1"; }
+      else { el.value = stored; }
+    }
+    el.addEventListener("change", function () {
+      save(key, el.type === "checkbox" ? (el.checked ? "1" : "0") : el.value);
+      syncVisibility();
+      render();
+    });
+    if (el.tagName === "TEXTAREA" || el.type === "text" || el.type === "number") {
+      el.addEventListener("input", function () {
+        save(key, el.value);
+        render();
+      });
+    }
+  });
+
+  /* ---------- conditional fields ---------- */
+  function show(id, on) { var el = $(id); if (el) { el.hidden = !on; } }
+  function syncVisibility() {
+    var src = val("f-srctype");
+    show("wrap-srctitle", !!src);
+    show("wrap-srcuse", !!src);
+    show("wrap-research", !!src);
+    show("wrap-lo-text", val("f-lo-mode") === "mine");
+    show("wrap-palette", val("f-palette") === "custom");
+    show("wrap-sensitive", val("f-sensitive") === "note");
+    var vp = val("f-vpath");
+    show("v-criteria", vp !== "none");
+    show("v-searchbox", vp === "search");
+    show("v-verify", vp === "verify" || vp === "search");
+    show("card-full", vp !== "none");
+    show("card-embed", (vp === "verify" || vp === "search"));
+  }
+
+  /* ---------- steps ---------- */
+  var current = 1;
+  function goto(n) {
+    current = n;
+    [1, 2, 3].forEach(function (i) {
+      $("step-" + i).hidden = i !== n;
+      var chip = $("chip-" + i);
+      if (i === n) { chip.setAttribute("aria-current", "step"); }
+      else { chip.removeAttribute("aria-current"); }
+    });
+    if (n === 3) { render(); }
+    $("step-" + n).scrollIntoView({ block: "start" });
+    var h = $("step-" + n).querySelector("h2");
+    if (h) { h.setAttribute("tabindex", "-1"); h.focus(); }
+    updateChips();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".step-chip"), function (c) {
+    c.addEventListener("click", function () { goto(parseInt(c.getAttribute("data-step"), 10)); });
+  });
+  $("to-2").addEventListener("click", function () {
+    if (!val("f-title") || !val("f-topic")) {
+      var s = $("s1-status");
+      s.className = "status err";
+      s.textContent = "Add a working title and a topic before continuing — those two drive everything else.";
+      (val("f-title") ? $("f-topic") : $("f-title")).focus();
+      return;
+    }
+    $("s1-status").textContent = "";
+    $("s1-status").className = "status";
+    goto(2);
+  });
+  $("back-1").addEventListener("click", function () { goto(1); });
+  $("to-3").addEventListener("click", function () { goto(3); });
+  $("back-2").addEventListener("click", function () { goto(2); });
+
+  function updateChips() {
+    $("done-1").textContent = val("f-title") ? "Ready" : "Not started";
+    var vp = val("f-vpath");
+    var okCount = videos.filter(function (v) { return v.ok; }).length;
+    $("done-2").textContent = vp === "none" ? "No videos" : (okCount ? okCount + " verified" : "In progress");
+    $("done-3").textContent = val("f-title") ? "Ready to copy" : "Waiting";
+  }
+
+  /* ---------- video verification ---------- */
+  var videos = [];
+
+  function extractId(raw) {
+    raw = raw.trim();
+    if (!raw) { return null; }
+    var pats = [
+      /[?&]v=([a-zA-Z0-9_-]{11})/,
+      /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/live\/([a-zA-Z0-9_-]{11})/
+    ];
+    for (var i = 0; i < pats.length; i++) {
+      var m = raw.match(pats[i]);
+      if (m) { return m[1]; }
+    }
+    if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) { return raw; }
+    return null;
+  }
+
+  function verifyId(id) {
+    var url = "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D" + id + "&format=json";
+    return fetch(url).then(function (res) {
+      if (res.ok) {
+        return res.json().then(function (d) {
+          return { ok: true, title: d.title, channel: d.author_name };
+        });
+      }
+      if (res.status === 401) { return { ok: false, reason: "Private, embedding disabled, or region restricted" }; }
+      if (res.status === 404) { return { ok: false, reason: "Not found — the ID is wrong or the video was deleted" }; }
+      return { ok: false, reason: "YouTube returned HTTP " + res.status };
+    }).catch(function () {
+      return { ok: false, reason: "Could not reach YouTube. Check your connection, or type the title and channel in by hand below." };
+    });
+  }
+
+  function renderVideos() {
+    var ul = $("vid-list");
+    ul.innerHTML = "";
+    videos.forEach(function (v, i) {
+      var li = document.createElement("li");
+      li.className = "vid-item" + (v.ok ? "" : " bad");
+
+      var thumbWrap = document.createElement("div");
+      if (v.ok) {
+        var img = document.createElement("img");
+        img.src = "https://img.youtube.com/vi/" + v.id + "/mqdefault.jpg";
+        img.alt = "";
+        img.width = 120;
+        thumbWrap.appendChild(img);
+      } else {
+        var nt = document.createElement("div");
+        nt.className = "no-thumb";
+        nt.textContent = "No preview";
+        thumbWrap.appendChild(nt);
+      }
+
+      var body = document.createElement("div");
+
+      var t = document.createElement("p");
+      t.className = "vid-t";
+      t.textContent = v.title || "(untitled)";
+
+      var m = document.createElement("p");
+      m.className = "vid-m";
+      var badge = document.createElement("span");
+      badge.className = "badge " + (v.ok ? "ok" : "no");
+      badge.textContent = v.ok ? "Verified" : "Problem";
+      m.appendChild(badge);
+      m.appendChild(document.createTextNode(" "));
+      var meta = document.createElement("span");
+      meta.innerHTML = (v.channel ? v.channel + " · " : "") + '<span class="id">' + v.id + "</span>" + (v.ok ? "" : " · " + v.reason);
+      m.appendChild(meta);
+
+      var ctl = document.createElement("div");
+      ctl.className = "vid-ctl";
+
+      var placeIn = document.createElement("input");
+      placeIn.type = "text";
+      placeIn.value = v.place || "";
+      placeIn.placeholder = "Where this goes, e.g. attack chain, stage 2";
+      placeIn.setAttribute("aria-label", "Placement note for " + (v.title || v.id));
+      placeIn.addEventListener("input", function () { v.place = placeIn.value; render(); });
+
+      function ctlBtn(label, aria, fn, disabled) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn ghost small";
+        b.textContent = label;
+        b.setAttribute("aria-label", aria);
+        if (disabled) { b.disabled = true; }
+        b.addEventListener("click", fn);
+        return b;
+      }
+
+      ctl.appendChild(placeIn);
+      ctl.appendChild(ctlBtn("\u2191", "Move " + (v.title || v.id) + " earlier", function () {
+        if (i === 0) { return; }
+        var tmp = videos[i - 1]; videos[i - 1] = videos[i]; videos[i] = tmp;
+        renderVideos(); render();
+      }, i === 0));
+      ctl.appendChild(ctlBtn("\u2193", "Move " + (v.title || v.id) + " later", function () {
+        if (i === videos.length - 1) { return; }
+        var tmp = videos[i + 1]; videos[i + 1] = videos[i]; videos[i] = tmp;
+        renderVideos(); render();
+      }, i === videos.length - 1));
+      ctl.appendChild(ctlBtn("Remove", "Remove " + (v.title || v.id) + " from the list", function () {
+        videos.splice(i, 1);
+        renderVideos(); render(); updateChips();
+      }));
+
+      body.appendChild(t);
+      body.appendChild(m);
+      if (!v.ok) {
+        var manual = document.createElement("div");
+        manual.className = "vid-ctl";
+        var ti = document.createElement("input");
+        ti.type = "text";
+        ti.placeholder = "Type the title by hand";
+        ti.setAttribute("aria-label", "Enter title manually for video " + v.id);
+        ti.value = v.title || "";
+        ti.addEventListener("input", function () { v.title = ti.value; render(); });
+        var ci = document.createElement("input");
+        ci.type = "text";
+        ci.placeholder = "Channel";
+        ci.setAttribute("aria-label", "Enter channel manually for video " + v.id);
+        ci.value = v.channel || "";
+        ci.addEventListener("input", function () { v.channel = ci.value; render(); });
+        manual.appendChild(ti);
+        manual.appendChild(ci);
+        body.appendChild(manual);
+      }
+      body.appendChild(ctl);
+
+      li.appendChild(thumbWrap);
+      li.appendChild(body);
+      ul.appendChild(li);
+    });
+    saveVideos();
+  }
+
+  function saveVideos() {
+    try { save("videos", JSON.stringify(videos)); } catch (e) {}
+  }
+  (function restoreVideos() {
+    var raw = load("videos");
+    if (!raw) { return; }
+    try {
+      var parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) { videos = parsed; }
+    } catch (e) {}
+  })();
+
+  $("verify-btn").addEventListener("click", function () {
+    var lines = val("f-vinput").split(/[\n,\s]+/).filter(Boolean);
+    var status = $("verify-status");
+    if (!lines.length) {
+      status.className = "status err";
+      status.textContent = "Paste at least one YouTube link or ID first.";
+      return;
+    }
+    var ids = [];
+    var bad = [];
+    lines.forEach(function (l) {
+      var id = extractId(l);
+      if (id) { if (ids.indexOf(id) === -1) { ids.push(id); } }
+      else { bad.push(l); }
+    });
+    status.className = "status";
+    status.textContent = "Checking " + ids.length + (ids.length === 1 ? " video" : " videos") + "…";
+
+    var jobs = ids.map(function (id) {
+      return verifyId(id).then(function (r) {
+        var existing = null;
+        videos.forEach(function (v) { if (v.id === id) { existing = v; } });
+        var rec = existing || { id: id, place: "" };
+        rec.ok = r.ok;
+        rec.title = r.title || rec.title || "";
+        rec.channel = r.channel || rec.channel || "";
+        rec.reason = r.reason || "";
+        if (!existing) { videos.push(rec); }
+      });
+    });
+
+    Promise.all(jobs).then(function () {
+      renderVideos();
+      render();
+      updateChips();
+      var good = videos.filter(function (v) { return v.ok; }).length;
+      var msg = good + " of " + videos.length + " verified.";
+      if (bad.length) { msg += " Could not read " + bad.length + " line" + (bad.length === 1 ? "" : "s") + " as a YouTube link or ID."; }
+      status.className = good === videos.length ? "status" : "status err";
+      status.textContent = msg;
+    });
+  });
+
+  $("clear-vids").addEventListener("click", function () {
+    videos = [];
+    renderVideos();
+    render();
+    updateChips();
+    $("verify-status").textContent = "List cleared.";
+    $("verify-status").className = "status";
+  });
+
+  /* ---------- prompt construction ---------- */
+  var TYPE_LABEL = {
+    reading: "an interactive reading engagement module",
+    concept: "an interactive concept explainer",
+    case: "an interactive case study analysis",
+    lab: "an interactive lab preparation module",
+    review: "an interactive exam review module",
+    skill: "an interactive step-by-step skills walkthrough",
+    sim: "an interactive scenario simulation",
+    fpd: "an interactive faculty professional development module",
+    orient: "an interactive orientation module"
+  };
+  var SECTION_SPEC = {
+    overview: "Core overview — orient the learner: what this is, why it matters, and the handful of ideas to track throughout.",
+    timeline: "Interactive timeline — dated entries the learner selects to reveal a short explanation and one guiding question each. Include controls to open and close all entries.",
+    close: "Close reading and analysis — unpack the central concepts in depth, with short accessible explanations and at least one worked example or applied task.",
+    evidence: "Evidence and sources — teach the difference between primary and secondary sources, and between evidence and inference, using material from this topic.",
+    map: "Relationship map — a text-based, click-to-reveal map of how the key people, systems, or ideas connect. Every relationship must be readable as text, not only as lines or colours.",
+    passages: "Passage explorer — significant moments or excerpts, each with commentary and one or two analytical questions revealed on selection.",
+    prepost: "Before and after — paired prediction and reflection fields so learners record expectations first and compare them afterwards.",
+    steps: "Procedure walkthrough — numbered steps with what to do, what to expect, and what to check before moving on.",
+    compare: "Comparison table — a semantic HTML table with a caption and row headers, comparing the options or approaches that matter here.",
+    group: "Small-group activity — a concrete in-class exercise with grouping, timing, and a reporting-out step.",
+    writing: "Short writing assignments — several one-paragraph prompts suitable for a discussion board or low-stakes grade.",
+    instructor: "Instructor notes — a short section mapping every activity to the learning outcome it serves, with estimated time on task."
+  };
+
+  function buildPromptLines(includeVideos) {
+    var L = [];
+    var type = val("f-type");
+    var typeLabel = TYPE_LABEL[type] || "an interactive learning module";
+    var fmt = val("f-format");
+    var src = val("f-srctype");
+    var srcTitle = val("f-srctitle");
+    var loMode = val("f-lo-mode");
+    var loCount = num("f-lo-count");
+    var secs = group("sec");
+
+    L.push("# Build " + typeLabel);
+    L.push("");
+    L.push("You are an expert instructional designer and front-end developer. Build " + typeLabel + " as described below. Work carefully — this will be used with real students.");
+    L.push("");
+
+    L.push("## What it covers");
+    L.push("");
+    L.push("- **Working title:** " + val("f-title"));
+    L.push("- **Topic:** " + val("f-topic"));
+    if (val("f-course")) { L.push("- **Course or discipline:** " + val("f-course")); }
+    L.push("- **Level:** " + val("f-level"));
+    if (src) {
+      L.push("- **Assigned source:** " + (src === "book" ? "Book" : src.charAt(0).toUpperCase() + src.slice(1)) + (srcTitle ? " — " + srcTitle : ""));
+      if (val("f-srcuse")) { L.push("- **How the source is used:** " + val("f-srcuse")); }
+    }
+    var aud = group("aud");
+    if (aud.length || val("f-audnotes")) {
+      L.push("- **Audience:** " + list(aud) + (val("f-audnotes") ? (aud.length ? ". " : "") + val("f-audnotes") : ""));
+    }
+    L.push("");
+
+    if (src && $("f-research").checked) {
+      L.push("## Step one: research before you write");
+      L.push("");
+      L.push("Before producing anything, research and analyze the source: who made it, what genre or form it belongs to, its historical and disciplinary context, its major themes or arguments, and how it is typically used in courses in this discipline. Ground everything that follows in that analysis rather than in generic description. If you are uncertain which work is meant, say so and confirm before continuing.");
+      L.push("");
+    }
+
+    L.push("## Learning outcomes");
+    L.push("");
+    if (loMode === "mine") {
+      L.push("Align every part of the module to these outcomes, which are already set:");
+      L.push("");
+      val("f-lo-text").split("\n").filter(Boolean).forEach(function (line, i) {
+        L.push((i + 1) + ". " + line.trim().replace(/^\d+[\.\)]\s*/, ""));
+      });
+    } else {
+      L.push("Propose " + loCount + " student-friendly learning outcomes appropriate to this level and discipline. Write them as things the learner will be able to *do*, not topics they will be exposed to, and make each one answerable from the module and its source material.");
+      var bloom = group("bloom");
+      if (bloom.length) { L.push(""); L.push("Emphasize these cognitive levels: " + list(bloom) + "."); }
+      L.push("");
+      if (loMode === "approve") {
+        L.push("**Stop after presenting the outcomes.** Show them as a clear numbered list and ask me to approve each one, revise any I want changed, and add any course-specific outcomes of my own. Do not build the module until I confirm the final list.");
+      } else {
+        L.push("Present the outcomes as a numbered list at the top of your response, then build the module in the same response, aligned to them.");
+      }
+    }
+    L.push("");
+
+    if (secs.length) {
+      L.push("## Required sections");
+      L.push("");
+      L.push("Organize the module using " + ({
+        tabs: "tabbed sections. Implement the tabs with role=\"tablist\", role=\"tab\", aria-selected, and aria-controls, with left and right arrow key navigation and only the active tab in the tab order",
+        accordion: "stacked accordion sections, each a button with aria-expanded controlling its panel",
+        scroll: "a single scrolling page with a jump-link navigation list at the top",
+        wizard: "a guided step-by-step wizard with next and back controls and a visible progress indicator"
+      }[val("f-nav")] || "tabbed sections") + ".");
+      L.push("");
+      Object.keys(SECTION_SPEC).forEach(function (k) {
+        if (secs.indexOf(k) !== -1) { L.push("- **" + SECTION_SPEC[k].split(" — ")[0] + "** — " + SECTION_SPEC[k].split(" — ").slice(1).join(" — ")); }
+      });
+      if (secs.indexOf("reflect") !== -1) {
+        L.push("- **Reflection prompts** — " + num("n-reflect") + " open-ended prompts with a saved text area under each. Mix quick-writes, metacognitive prompts about how the learner is actually studying, and prompts connecting the material to their life, community, or professional goals.");
+      }
+      if (secs.indexOf("discuss") !== -1) {
+        L.push("- **Discussion questions** — " + num("n-discuss") + " questions, clearly labeled and sequenced from concrete comprehension through analysis and evaluation to open-ended creation. Label each with the cognitive level and the outcome it serves.");
+      }
+      if (secs.indexOf("glossary") !== -1) {
+        L.push("- **Glossary** — about " + num("n-gloss") + " key terms in plain language, each with a short \"why this matters in this course\" note. Include a filter box. Order them the way a learner will meet them, not alphabetically.");
+      }
+      L.push("");
+    }
+
+    if (secs.indexOf("quiz") !== -1) {
+      L.push("## Self-check quiz");
+      L.push("");
+      L.push("Include " + num("n-quiz") + " multiple-choice questions with four options each, covering the key ideas, evidence, and terminology the outcomes name.");
+      var fb = val("f-quizfb");
+      if (fb === "peropt") {
+        L.push("");
+        L.push("When a learner selects an option, immediately show feedback for **that specific option** — not just right or wrong, but why. Distractors must be plausible and each distractor's feedback must explain the specific misconception it represents and point back to the relevant content. Score the first attempt only, allow learners to keep exploring the other options afterwards, and say so in the interface.");
+      } else if (fb === "correct") {
+        L.push("");
+        L.push("On answering, indicate whether the choice was right and explain the correct answer.");
+      } else {
+        L.push("");
+        L.push("Report a score at the end without per-question explanations.");
+      }
+      L.push("");
+      L.push("Shuffle the answer options. Never signal correctness with colour alone — pair it with text.");
+      L.push("");
+    }
+
+    if (includeVideos) {
+      var vpath = val("f-vpath");
+      var ok = videos.filter(function (v) { return v.ok || v.title; });
+      if (vpath !== "none") {
+        L.push("## Videos");
+        L.push("");
+        if (ok.length) {
+          L.push("Embed these " + ok.length + " videos. They have been verified as real and publicly playable — use these exact IDs and do not substitute others.");
+          L.push("");
+          ok.forEach(function (v, i) {
+            L.push((i + 1) + ". **" + (v.title || "(title unknown)") + "**" + (v.channel ? " — " + v.channel : "") + "  ");
+            L.push("   Video ID: `" + v.id + "` · https://www.youtube.com/watch?v=" + v.id + (v.place ? "  \n   Place it: " + v.place : ""));
+          });
+          L.push("");
+        } else if (vpath === "ai") {
+          L.push("Find and include " + num("f-vcount") + " short videos that genuinely support the outcomes. Search for them rather than recalling them, and **verify every video ID resolves to a real, publicly playable video before including it** — a dead embed in a student module is worse than no video. State the title and channel for each so I can check them.");
+          var pri = group("vpri");
+          if (pri.length) { L.push(""); L.push("Prefer videos " + list(pri) + "."); }
+          if (val("f-vlen")) { L.push("Target length: " + val("f-vlen") + "."); }
+          L.push("");
+        }
+        var place = { concept: "Place each video immediately next to the concept it explains, not collected in a resources list at the end.", grouped: "Collect the videos in a single clearly labeled resources section.", persection: "Place one video in each major section." }[val("f-vplace")];
+        if (place) { L.push(place); }
+        var embed = val("f-vembed");
+        if (embed === "click" && fmt !== "canvas") {
+          L.push("");
+          L.push("Use a click-to-load pattern: render a labeled placeholder button, and only inject the iframe when the learner presses it, so nothing is requested from YouTube until they choose to watch. Embed through youtube-nocookie.com, give every iframe a title attribute, and include a visible fallback link to the video in case the frame is blocked.");
+        } else if (embed === "link") {
+          L.push("");
+          L.push("Do not embed players. List each video as a clearly labeled link with its title and channel.");
+        } else {
+          L.push("");
+          L.push("Use standard responsive iframes with a 16:9 aspect ratio, a title attribute on each, and a visible fallback link.");
+        }
+        var vq = num("f-vq");
+        if (vq > 0) {
+          L.push("");
+          L.push("Give each video " + vq + " \"watch for\" question" + (vq === 1 ? "" : "s") + " that tie it back to the module's own content, so watching is part of the work rather than decoration.");
+        }
+        L.push("");
+      }
+    }
+
+    L.push("## Accessibility");
+    L.push("");
+    var a11y = group("a11y");
+    if (a11y.length) {
+      L.push("These are requirements, not suggestions. Target WCAG 2.1 AA.");
+      L.push("");
+      a11y.forEach(function (a) { L.push("- " + a + "."); });
+      L.push("");
+    }
+
+    L.push("## Technical requirements");
+    L.push("");
+    L.push("- " + ({
+      single: "Deliver one complete, self-contained HTML5 file with all CSS and JavaScript inline",
+      canvas: "Deliver HTML suitable for pasting into the Canvas Rich Content Editor in HTML view — inline styles, simplified structure, and no script tags, since Canvas strips them",
+      react: "Deliver a single React component with a default export and no required props",
+      doc: "Deliver a plain document with no code — headings, prose, and lists only"
+    }[fmt] || "Deliver one complete, self-contained HTML5 file") + ".");
+    group("tech").forEach(function (t) { L.push("- " + t + "."); });
+    var pal = val("f-palette");
+    var palText = {
+      blue: "an institutional blue and gray palette on a light background, with strong contrast",
+      slate: "a slate palette with one warm accent used sparingly",
+      green: "a deep green and warm stone palette",
+      mono: "a near-monochrome high-contrast palette",
+      custom: val("f-palettetext") || "the palette described by the instructor"
+    }[pal];
+    L.push("- Use " + palText + ", defined as CSS custom properties on :root so the whole theme can be changed in one place.");
+    L.push("- Mobile first. It must work at 360 pixels wide with no horizontal scrolling.");
+    L.push("");
+
+    L.push("## Content and tone");
+    L.push("");
+    L.push("- Write for the audience described above. Short sentences, concrete examples, and no unexplained jargon.");
+    L.push("- Prefer explanation over decoration. Every interactive element should teach something that static text could not.");
+    var cr = val("f-copyright");
+    if (cr === "paraphrase") {
+      L.push("- **Do not reproduce copyrighted text.** Paraphrase entirely. Where a specific passage matters, point the learner to where it appears and have them read it themselves rather than reprinting it.");
+    } else if (cr === "short") {
+      L.push("- Keep any direct quotation under fifteen words, attributed, and rare. Paraphrase everything else.");
+    } else {
+      L.push("- The source is public domain or openly licensed, so quoting it directly is fine. Attribute quotations anyway.");
+    }
+    var sens = val("f-sensitive");
+    if (sens === "note") {
+      L.push("- This topic includes difficult material" + (val("f-sensitivetext") ? ": " + val("f-sensitivetext") : "") + ". Treat it factually and without graphic detail, and include a brief content note near the top telling learners what to expect.");
+    } else if (sens === "avoid") {
+      L.push("- Avoid distressing material. If a difficult topic is unavoidable, describe it neutrally and briefly.");
+    }
+    if (val("f-extra")) {
+      L.push("- " + val("f-extra"));
+    }
+    L.push("");
+
+    L.push("## Before you deliver");
+    L.push("");
+    L.push("- Check that every interactive control works and that nothing references an element that does not exist.");
+    L.push("- Check that the quiz feedback matches the questions and that the marked answers are actually correct.");
+    L.push("- Check that every section you were asked for is present, with the counts requested.");
+    if (fmt === "single") {
+      var slug = (val("f-title") || "module").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+      L.push("- Deliver the finished file ready to save as `" + (slug || "module") + ".html` and use directly in a learning management system.");
+    }
+
+    return L.join("\n");
+  }
+
+  function buildSearchPrompt() {
+    var L = [];
+    L.push("Find " + num("f-vcount") + " YouTube videos I can use in a course module.");
+    L.push("");
+    L.push("**Topic:** " + val("f-topic"));
+    if (val("f-course")) { L.push("**Course:** " + val("f-course")); }
+    L.push("**Audience:** " + val("f-level") + (group("aud").length ? ", " + list(group("aud")) : ""));
+    if (val("f-vlen")) { L.push("**Length:** " + val("f-vlen")); }
+    var pri = group("vpri");
+    if (pri.length) { L.push("**Prefer videos:** " + list(pri)); }
+    L.push("");
+    L.push("Search the web for these — do not answer from memory, because video IDs recalled from memory are usually wrong. For each video, confirm it is currently public and playable.");
+    L.push("");
+    L.push("Return a simple list. For each video give: the exact title, the channel name, the length, the full watch URL, and one sentence on what it contributes to this specific topic. No commentary beyond that.");
+    return L.join("\n");
+  }
+
+  function buildEmbedBlock() {
+    var ok = videos.filter(function (v) { return v.ok || v.title; });
+    if (!ok.length) { return "Verify at least one video in step 2 and the embed code will appear here."; }
+    var mode = val("f-vembed");
+    var fmt = val("f-format");
+    var canvasMode = fmt === "canvas";
+    var out = [];
+
+    if (mode === "link" ) {
+      out.push('<ul class="video-links">');
+      ok.forEach(function (v) {
+        out.push('  <li><a href="https://www.youtube.com/watch?v=' + v.id + '" rel="noopener noreferrer">' + esc(v.title || v.id) + '</a>' + (v.channel ? " — " + esc(v.channel) : "") + '</li>');
+      });
+      out.push("</ul>");
+      return out.join("\n");
+    }
+
+    if (canvasMode || mode === "iframe") {
+      out.push("<!-- Responsive YouTube embeds. " + (canvasMode ? "Canvas Rich Content Editor mode: inline styles, no scripts." : "Paste into any page.") + " -->");
+      ok.forEach(function (v) {
+        out.push('<div style="margin:1.25rem 0;">');
+        out.push('  <h3 style="font-size:1.05rem;margin:0 0 .2rem;">' + esc(v.title || v.id) + "</h3>");
+        if (v.channel) { out.push('  <p style="font-size:.85rem;color:#5a6b7c;margin:0 0 .5rem;">' + esc(v.channel) + " &middot; YouTube</p>"); }
+        out.push('  <div style="position:relative;width:100%;padding-top:56.25%;">');
+        out.push('    <iframe src="https://www.youtube-nocookie.com/embed/' + v.id + '" title="' + esc(v.title || v.id) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>');
+        out.push("  </div>");
+        out.push('  <p style="font-size:.85rem;margin:.4rem 0 0;"><a href="https://www.youtube.com/watch?v=' + v.id + '" rel="noopener noreferrer">Watch on YouTube instead</a> &mdash; use this if the player does not appear.</p>');
+        out.push("</div>");
+      });
+      return out.join("\n");
+    }
+
+    // click-to-load
+    out.push("<!-- Click-to-load YouTube embeds. Nothing is requested from YouTube until the learner presses play. -->");
+    out.push("<style>");
+    out.push(".vid{border:1px solid #c3ced8;border-left:5px solid #2c6d95;border-radius:0 6px 6px 0;background:#f6f8fa;padding:.85rem .9rem;margin:1.1rem 0;font-family:system-ui,sans-serif;}");
+    out.push(".vid h3{margin:0 0 .15rem;font-size:1rem;}");
+    out.push(".vid .meta{font-size:.85rem;color:#5a6b7c;margin:0 0 .5rem;}");
+    out.push(".vid-frame{position:relative;width:100%;padding-top:56.25%;background:#dbe6f2;border:1px solid #c3ced8;border-radius:6px;overflow:hidden;}");
+    out.push(".vid-frame iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;}");
+    out.push(".vid-play{position:absolute;top:0;left:0;width:100%;height:100%;cursor:pointer;background:#dbe6f2;border:0;color:#123a55;font:inherit;font-size:.95rem;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;padding:1rem;text-align:center;}");
+    out.push(".vid-play:hover{background:#fff;}");
+    out.push(".vid-play .sub{font-weight:400;font-size:.82rem;color:#3f5163;}");
+    out.push(".vid .fallback{font-size:.85rem;margin:.5rem 0 0;}");
+    out.push("</style>");
+    ok.forEach(function (v) {
+      out.push('<div class="vid">');
+      out.push('  <h3>' + esc(v.title || v.id) + "</h3>");
+      out.push('  <p class="meta">' + esc(v.channel || "YouTube") + (v.channel ? " &middot; YouTube" : "") + (v.place ? " &middot; " + esc(v.place) : "") + "</p>");
+      out.push('  <div class="vid-frame" data-yt="' + v.id + '">');
+      out.push('    <button type="button" class="vid-play" aria-label="Load and play the video: ' + esc(v.title || v.id) + (v.channel ? ", from " + esc(v.channel) : "") + ' on YouTube"><span aria-hidden="true">&#9654;</span><span>Load and play this video</span><span class="sub">Nothing is requested from YouTube until you select this.</span></button>');
+      out.push("  </div>");
+      out.push('  <p class="fallback"><a href="https://www.youtube.com/watch?v=' + v.id + '" rel="noopener noreferrer">Watch on YouTube instead</a> &mdash; use this if the player does not appear.</p>');
+      out.push("</div>");
+    });
+    out.push("<" + "script>");
+    out.push("(function(){");
+    out.push("  var frames = document.querySelectorAll('.vid-frame[data-yt]');");
+    out.push("  Array.prototype.forEach.call(frames, function(f){");
+    out.push("    var btn = f.querySelector('.vid-play');");
+    out.push("    if(!btn){return;}");
+    out.push("    btn.addEventListener('click', function(){");
+    out.push("      var id = f.getAttribute('data-yt');");
+    out.push("      var title = btn.getAttribute('aria-label') || 'YouTube video';");
+    out.push("      var ifr = document.createElement('iframe');");
+    out.push("      ifr.setAttribute('src','https://www.youtube-nocookie.com/embed/' + id + '?rel=0&modestbranding=1');");
+    out.push("      ifr.setAttribute('title', title);");
+    out.push("      ifr.setAttribute('allow','accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture');");
+    out.push("      ifr.setAttribute('allowfullscreen','');");
+    out.push("      ifr.setAttribute('loading','lazy');");
+    out.push("      f.innerHTML = '';");
+    out.push("      f.appendChild(ifr);");
+    out.push("      ifr.focus();");
+    out.push("    });");
+    out.push("  });");
+    out.push("})();");
+    out.push("<" + "/script>");
+    return out.join("\n");
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function render() {
+    $("out-prompt").textContent = buildPromptLines(false);
+    $("out-full").textContent = buildPromptLines(true);
+    $("out-search").textContent = buildSearchPrompt();
+    var embed = buildEmbedBlock();
+    $("out-embed").textContent = embed;
+    var all = buildPromptLines(true);
+    if (videos.filter(function (v) { return v.ok || v.title; }).length) {
+      all += "\n\n---\n\n## Ready-made embed code\n\nYou may use this embed markup directly rather than writing your own:\n\n```html\n" + embed + "\n```\n";
+    }
+    $("out-all").textContent = all;
+    updateChips();
+  }
+
+  /* ---------- copy and download ---------- */
+  function flash(msg, bad) {
+    var s = $("copy-status");
+    s.className = bad ? "status err" : "status";
+    s.textContent = msg;
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (b) {
+    b.addEventListener("click", function () {
+      var text = $(b.getAttribute("data-copy")).textContent;
+      if (!text.trim()) { flash("Nothing to copy yet.", true); return; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          var orig = b.textContent;
+          b.textContent = "Copied";
+          flash("Copied. Paste it into Claude.");
+          setTimeout(function () { b.textContent = orig; }, 1800);
+        }, function () {
+          flash("This browser blocked the copy. Select the text in the box and copy it manually.", true);
+        });
+      } else {
+        flash("This browser does not support copying from the page. Select the text and copy it manually.", true);
+      }
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-download]"), function (b) {
+    b.addEventListener("click", function () {
+      var text = $(b.getAttribute("data-download")).textContent;
+      var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = b.getAttribute("data-filename") || "prompt.txt";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      flash("Downloaded " + a.download + ".");
+    });
+  });
+
+  function resetAll() {
+    if (!window.confirm("Clear every field and start over?")) { return; }
+    wipe();
+    window.location.reload();
+  }
+  $("reset-all").addEventListener("click", resetAll);
+  $("reset-all-2").addEventListener("click", resetAll);
+
+  syncVisibility();
+  renderVideos();
+  render();
+  updateChips();
+})();
+</script>
+</body>
+</html>
