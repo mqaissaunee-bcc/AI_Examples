@@ -655,8 +655,9 @@ tr:last-child td{border-bottom:none;}
             The bank lands in <em>Quizzes → Manage Question Banks</em>. Tick <em>Overwrite assessment content with matching IDs</em> only when you mean to replace an existing bank.</div>
           </details>
           <details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:600;">📗 D2L Brightspace</summary>
-            <div style="margin:6px 0 0 12px;">Course → <em>Course Admin</em> → <em>Import / Export / Copy Components</em> → <em>Import Components</em> → upload the ZIP → <em>Import All Components</em>.
-            Questions appear in <em>Quizzes → Question Library</em>. If the QTI 2.1 package is rejected, re-export using the <strong>QTI 1.2 fallback</strong> option — some Brightspace versions only accept 1.2.</div>
+            <div style="margin:6px 0 0 12px;">Use the <strong>Question Library (D2L QTI 1.2)</strong> export — Brightspace's importer is built on QTI 1.2, and QTI 2.1 packages often import as empty question shells.<br><br>
+            <strong>Path:</strong> <em>Quizzes</em> → <em>Question Library</em> → <em>Import</em> → <em>Upload a File</em> → drop the ZIP → review the preview → <em>Import</em>.<br><br>
+            <strong>If questions still import blank:</strong> export any existing quiz out of Brightspace (<em>Course Admin → Import/Export/Copy Components → Export Components → Quizzes</em>), unzip it, and compare its <code>questiondb.xml</code> to this tool's. Your instance's dialect is the authoritative reference.</div>
           </details>
           <details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:600;">🎓 Moodle</summary>
             <div style="margin:6px 0 0 12px;">Course → <em>More</em> → <em>Question bank</em> → <em>Import</em> → choose <em>Moodle XML format</em> (or <em>GIFT format</em> for the .txt) → upload → <em>Import</em>.
@@ -706,8 +707,9 @@ tr:last-child td{border-bottom:none;}
               <option value="qti12-topic">🎨 Canvas QTI 1.2 ZIP — split by domain/topic</option>
             </optgroup>
             <optgroup label="D2L Brightspace">
-              <option value="d2l-qti21-zip">📗 Brightspace QTI 2.1 ZIP — recommended</option>
-              <option value="d2l-qti12-zip">📗 Brightspace QTI 1.2 ZIP — fallback if 2.1 is rejected</option>
+              <option value="d2l-native">📗 Brightspace Question Library (D2L QTI 1.2) — recommended</option>
+              <option value="d2l-qti21-zip">📗 Brightspace QTI 2.1 ZIP — only if your admin confirms 2.1 support</option>
+              <option value="d2l-qti12-zip">📗 Brightspace generic QTI 1.2 ZIP — last resort</option>
             </optgroup>
             <optgroup label="Moodle">
               <option value="moodle-xml">🎓 Moodle XML — recommended (all question types)</option>
@@ -2529,6 +2531,254 @@ async function makeD2LZip(questions, bankName, pts, mathMode){
 }
 
 // ====================================================
+// D2L BRIGHTSPACE — NATIVE QUESTION LIBRARY PACKAGE
+// Brightspace's importer is built on QTI 1.2, not 2.1.
+// D2L's own export is a zip containing imsmanifest.xml
+// plus questiondb.xml using the d2l_2p0 dialect below.
+// ====================================================
+var D2L_NS='http://desire2learn.com/xsd/d2lcp_v2p0';
+
+function d2lQuestionType(t){
+  switch(t){
+    case 'true_false': return 'True/False';
+    case 'multiple_answers': case 'multi_select': return 'Multi-Select';
+    case 'matching': case 'match': return 'Matching';
+    case 'essay': case 'command_response': return 'Written Response';
+    case 'short_answer': case 'fill_in_the_blank': case 'numerical': return 'Short Answer';
+    default: return 'Multiple Choice';
+  }
+}
+
+function buildD2LQuestionDB(questions, bankName, pts, mathMode){
+  var H=function(s){ return escXml(htmlFor(s,mathMode)); };
+  var P=function(s){ return escXml(stripLatex(s)); };
+  var base=1000;
+
+  var items=questions.map(function(q,idx){
+    var n=base+idx+1;
+    var t=(q.type||'multiple_choice').toLowerCase();
+    var qt=d2lQuestionType(t);
+    var points=qPoints(q,pts);
+    var title=escXml((q.stem||('Question '+(idx+1))).replace(/\s+/g,' ').substring(0,60));
+    var rid='RESP_'+n;
+    var stem=H(q.stem||'');
+    var rat=q.rationale||'';
+
+    var mdFields=[
+      ['qmd_computerscored', (qt==='Written Response')?'no':'yes'],
+      ['qmd_questiontype', qt],
+      ['qmd_status','Normal'],
+      ['qmd_weighting', String(points)]
+    ];
+    if(q.difficulty) mdFields.push(['qmd_difficulty', q.difficulty]);
+    var md='    <itemmetadata>\n      <qtimetadata>\n'+mdFields.map(function(kv){
+      return '        <qti_metadatafield>\n'+
+             '          <fieldlabel>'+kv[0]+'</fieldlabel>\n'+
+             '          <fieldentry>'+escXml(kv[1])+'</fieldentry>\n'+
+             '        </qti_metadatafield>';
+    }).join('\n')+'\n      </qtimetadata>\n    </itemmetadata>';
+
+    var head='  <item d2l_2p0:id="'+n+'" ident="OBJ_'+n+'" label="QUES_'+n+'" d2l_2p0:page="1" title="'+title+'">\n'+md+'\n';
+    var fbBlocks=[];
+    function feedback(id, text){
+      fbBlocks.push('    <itemfeedback ident="'+id+'">\n'+
+        '      <flow_mat><material><mattext texttype="text/html">'+H(text)+'</mattext></material></flow_mat>\n'+
+        '    </itemfeedback>');
+      return '        <displayfeedback linkrefid="'+id+'" feedbacktype="Response"/>\n';
+    }
+    function outcomes(max){
+      return '      <outcomes>\n'+
+             '        <decvar varname="que_score" vartype="Decimal" defaultval="0" minvalue="0" maxvalue="'+max+'"/>\n'+
+             '      </outcomes>\n';
+    }
+
+    // ---------- WRITTEN RESPONSE (manually graded) ----------
+    if(qt==='Written Response'){
+      var body='    <presentation>\n      <flow>\n'+
+        '        <material><mattext texttype="text/html">'+stem+'</mattext></material>\n'+
+        '        <response_str ident="'+rid+'" rcardinality="Single">\n'+
+        '          <render_fib rows="10" columns="80" fibtype="String"/>\n'+
+        '        </response_str>\n'+
+        '      </flow>\n    </presentation>\n';
+      var guidance=(q.correct?('Model answer: '+q.correct):'')+(rat?(q.correct?'<br><br>':'')+rat:'');
+      var rp='    <resprocessing>\n'+outcomes(points);
+      if(guidance){
+        rp+='      <respcondition continue="Yes">\n        <conditionvar><other/></conditionvar>\n'+
+            feedback('FB_'+n+'_G', guidance)+'      </respcondition>\n';
+      }
+      rp+='    </resprocessing>\n';
+      return head+body+rp+(fbBlocks.length?fbBlocks.join('\n')+'\n':'')+'  </item>';
+    }
+
+    // ---------- SHORT ANSWER (also carries fill-in-blank + numerical) ----------
+    if(qt==='Short Answer'){
+      var answers=[q.correct].concat(q.alternates||[])
+        .filter(function(a){return a!=null&&String(a).trim()!=='';})
+        .map(function(a){return String(a).trim();});
+      if(!answers.length) answers=[''];
+      var body2='    <presentation>\n      <flow>\n'+
+        '        <material><mattext texttype="text/html">'+stem+'</mattext></material>\n'+
+        '        <response_str ident="'+rid+'" rcardinality="Single">\n'+
+        '          <render_fib rows="1" columns="40" fibtype="String"/>\n'+
+        '        </response_str>\n'+
+        '      </flow>\n    </presentation>\n';
+      var rp2='    <resprocessing>\n'+outcomes(points);
+      answers.forEach(function(a,ai){
+        rp2+='      <respcondition continue="No" title="'+(ai===0?'correct':'alt_'+ai)+'">\n'+
+             '        <conditionvar><varequal respident="'+rid+'" case="No">'+P(a)+'</varequal></conditionvar>\n'+
+             '        <setvar varname="que_score" action="Set">'+points+'</setvar>\n';
+        if(ai===0&&rat) rp2+=feedback('FB_'+n+'_C', rat);
+        rp2+='      </respcondition>\n';
+      });
+      rp2+='    </resprocessing>\n';
+      return head+body2+rp2+(fbBlocks.length?fbBlocks.join('\n')+'\n':'')+'  </item>';
+    }
+
+    // ---------- MATCHING ----------
+    if(qt==='Matching'){
+      var pairs=(q.pairs||[]).filter(function(p){return p&&p.term&&p.definition;});
+      if(pairs.length>=2){
+        var per=Math.round((points/pairs.length)*10000)/10000;
+        var lids='', rp3='    <resprocessing>\n'+outcomes(points);
+        pairs.forEach(function(p,pi){
+          var prid='RESP_'+n+'_'+(pi+1);
+          var opts=pairs.map(function(p2,pj){
+            return '              <flow_label>\n'+
+                   '                <response_label ident="ANSW_'+n+'_'+(pj+1)+'">\n'+
+                   '                  <flow_mat><material><mattext texttype="text/html">'+H(p2.definition)+'</mattext></material></flow_mat>\n'+
+                   '                </response_label>\n'+
+                   '              </flow_label>';
+          }).join('\n');
+          lids+='        <material><mattext texttype="text/html">'+H(p.term)+'</mattext></material>\n'+
+                '        <response_lid ident="'+prid+'" rcardinality="Single">\n'+
+                '          <render_choice shuffle="yes">\n'+opts+'\n          </render_choice>\n'+
+                '        </response_lid>\n';
+          rp3+='      <respcondition continue="Yes" title="pair_'+(pi+1)+'">\n'+
+               '        <conditionvar><varequal respident="'+prid+'">ANSW_'+n+'_'+(pi+1)+'</varequal></conditionvar>\n'+
+               '        <setvar varname="que_score" action="Add">'+per+'</setvar>\n'+
+               '      </respcondition>\n';
+        });
+        if(rat){
+          rp3+='      <respcondition continue="Yes">\n        <conditionvar><other/></conditionvar>\n'+
+               feedback('FB_'+n+'_G', rat)+'      </respcondition>\n';
+        }
+        rp3+='    </resprocessing>\n';
+        var body3='    <presentation>\n      <flow>\n'+
+          '        <material><mattext texttype="text/html">'+stem+'</mattext></material>\n'+
+          lids+'      </flow>\n    </presentation>\n';
+        return head+body3+rp3+(fbBlocks.length?fbBlocks.join('\n')+'\n':'')+'  </item>';
+      }
+      qt='Multiple Choice'; // not enough pairs — fall through
+    }
+
+    // ---------- CHOICE-BASED: Multiple Choice / True-False / Multi-Select ----------
+    var choices=(q.choices||[]).filter(function(c){return c&&String(c.text||'').trim()!=='';});
+    if(qt==='True/False'&&choices.length<2) choices=[{letter:'A',text:'True'},{letter:'B',text:'False'}];
+    if(!choices.length) choices=[{letter:'A',text:'(no choices supplied)'}];
+    var multi=(qt==='Multi-Select');
+    var keys=correctLetters(q).filter(function(L){return choices.some(function(c){return c.letter===L;});});
+    if(!keys.length) keys=[choices[0].letter];
+
+    var labels=choices.map(function(c,ci){
+      return '            <flow_label>\n'+
+             '              <response_label ident="ANSW_'+n+'_'+(ci+1)+'">\n'+
+             '                <flow_mat><material><mattext texttype="text/html">'+H(c.text)+'</mattext></material></flow_mat>\n'+
+             '              </response_label>\n'+
+             '            </flow_label>';
+    }).join('\n');
+
+    var body4='    <presentation>\n      <flow>\n'+
+      '        <material><mattext texttype="text/html">'+stem+'</mattext></material>\n'+
+      '        <response_lid ident="'+rid+'" rcardinality="'+(multi?'Multiple':'Single')+'">\n'+
+      '          <render_choice shuffle="no">\n'+labels+'\n          </render_choice>\n'+
+      '        </response_lid>\n'+
+      '      </flow>\n    </presentation>\n';
+
+    var rp4='    <resprocessing>\n'+outcomes(points);
+    if(multi){
+      var nCorrect=choices.filter(function(c){return keys.indexOf(c.letter)>=0;}).length||1;
+      var per2=Math.round((points/nCorrect)*10000)/10000;
+      choices.forEach(function(c,ci){
+        if(keys.indexOf(c.letter)<0) return;
+        rp4+='      <respcondition continue="Yes" title="correct_'+(ci+1)+'">\n'+
+             '        <conditionvar><varequal respident="'+rid+'">ANSW_'+n+'_'+(ci+1)+'</varequal></conditionvar>\n'+
+             '        <setvar varname="que_score" action="Add">'+per2+'</setvar>\n'+
+             '      </respcondition>\n';
+      });
+      if(rat){
+        rp4+='      <respcondition continue="Yes">\n        <conditionvar><other/></conditionvar>\n'+
+             feedback('FB_'+n+'_G', rat)+'      </respcondition>\n';
+      }
+    } else {
+      var ki=choices.findIndex(function(c){return c.letter===keys[0];});
+      if(ki<0) ki=0;
+      rp4+='      <respcondition continue="No" title="correct">\n'+
+           '        <conditionvar><varequal respident="'+rid+'">ANSW_'+n+'_'+(ki+1)+'</varequal></conditionvar>\n'+
+           '        <setvar varname="que_score" action="Set">'+points+'</setvar>\n'+
+           (rat?feedback('FB_'+n+'_C', rat):'')+
+           '      </respcondition>\n';
+      if(rat){
+        rp4+='      <respcondition continue="Yes" title="incorrect">\n'+
+             '        <conditionvar><other/></conditionvar>\n'+
+             feedback('FB_'+n+'_I', rat)+'      </respcondition>\n';
+      }
+    }
+    rp4+='    </resprocessing>\n';
+    return head+body4+rp4+(fbBlocks.length?fbBlocks.join('\n')+'\n':'')+'  </item>';
+  }).join('\n');
+
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<questestinterop>\n'+
+'  <objectbank ident="QLIB_1" xmlns:d2l_2p0="'+D2L_NS+'">\n'+
+'    <section d2l_2p0:id="1" ident="SECT_1" title="'+escXml(bankName)+'">\n'+
+'      <presentation_material>\n'+
+'        <flow_mat>\n          <flow_mat>\n            <material>\n'+
+'              <mattext texttype="text/plain">'+escXml(bankName)+'</mattext>\n'+
+'            </material>\n          </flow_mat>\n        </flow_mat>\n'+
+'      </presentation_material>\n'+
+'      <sectionproc_extension>\n'+
+'        <d2l_2p0:display_section_name>no</d2l_2p0:display_section_name>\n'+
+'        <d2l_2p0:display_section_line>no</d2l_2p0:display_section_line>\n'+
+'        <d2l_2p0:type_display_section>0</d2l_2p0:type_display_section>\n'+
+'      </sectionproc_extension>\n'+
+items+'\n'+
+'    </section>\n'+
+'  </objectbank>\n'+
+'</questestinterop>';
+}
+
+function buildD2LNativeManifest(bankName){
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<manifest identifier="MAN_'+safeSlug(bankName,'bank')+'"\n'+
+'  xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"\n'+
+'  xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_v1p2"\n'+
+'  xmlns:d2l_2p0="'+D2L_NS+'"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imscp_v1p1 http://www.imsglobal.org/xsd/imscp_v1p1p2.xsd">\n'+
+'  <metadata>\n'+
+'    <schema>IMS Content</schema>\n'+
+'    <schemaversion>1.1.3</schemaversion>\n'+
+'    <imsmd:lom><imsmd:general>\n'+
+'      <imsmd:title><imsmd:langstring xml:lang="en">'+escXml(bankName)+'</imsmd:langstring></imsmd:title>\n'+
+'    </imsmd:general></imsmd:lom>\n'+
+'  </metadata>\n'+
+'  <organizations/>\n'+
+'  <resources>\n'+
+'    <resource identifier="RES_QLIB_1" type="imsqti_xmlv1p2" href="questiondb.xml">\n'+
+'      <file href="questiondb.xml"/>\n'+
+'    </resource>\n'+
+'  </resources>\n'+
+'</manifest>';
+}
+
+async function makeD2LNativeZip(questions, bankName, pts, mathMode){
+  return await zipBlob([
+    {name:'imsmanifest.xml', data:buildD2LNativeManifest(bankName)},
+    {name:'questiondb.xml',  data:buildD2LQuestionDB(questions,bankName,pts,mathMode)}
+  ]);
+}
+
+// ====================================================
 // MOODLE XML  (moodle.org/mod/quiz — native import)
 // ====================================================
 function cdata(s){ return '<![CDATA['+String(s==null?'':s).replace(/\]\]>/g,']]&gt;')+']]>'; }
@@ -2800,6 +3050,7 @@ function updateExportButtonLabel(){
   const f=$('expFormat').value, b=$('btnExport');
   const map={
     'qti12':'⬇ Download Canvas QTI','qti12-diff':'⬇ Download Canvas QTI','qti12-topic':'⬇ Download Canvas QTI',
+    'd2l-native':'⬇ Download Brightspace Package',
     'd2l-qti21-zip':'⬇ Download Brightspace QTI','d2l-qti12-zip':'⬇ Download Brightspace QTI',
     'moodle-xml':'⬇ Download Moodle XML','gift':'⬇ Download Moodle GIFT',
     'gift-diff':'⬇ Download Moodle GIFT','gift-topic':'⬇ Download Moodle GIFT',
@@ -2875,6 +3126,9 @@ $('btnExport').addEventListener('click', async()=>{
       const mr=buildMoodleXML(qs,bankName,pts,mathMode);
       dlBlob(new Blob([mr.xml],{type:'application/xml;charset=utf-8'}),fileBase+'_Moodle.xml');
       toast('✓ Moodle XML — '+mr.exported+' questions'+(mr.skipped?' ('+mr.skipped+' skipped)':'')+'. Import via: Question bank → Import → Moodle XML format.','success');
+    }else if(fmt==='d2l-native'){
+      dlBlob(await makeD2LNativeZip(qs,bankName,pts,mathMode),fileBase+'_D2L_QuestionLibrary.zip');
+      toast('Brightspace package downloaded. Import via: Quizzes → Question Library → Import → Upload a File.','success');
     }else if(fmt==='d2l-qti21-zip'){
       dlBlob(await makeD2LZip(qs,bankName,pts,mathMode),fileBase+'_Brightspace_QTI21.zip');
       toast('Brightspace QTI 2.1 ZIP downloaded. Import via: Course Admin → Import/Export/Copy Components.','success');
