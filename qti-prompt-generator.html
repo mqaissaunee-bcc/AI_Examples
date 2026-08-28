@@ -655,9 +655,10 @@ tr:last-child td{border-bottom:none;}
             The bank lands in <em>Quizzes → Manage Question Banks</em>. Tick <em>Overwrite assessment content with matching IDs</em> only when you mean to replace an existing bank.</div>
           </details>
           <details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:600;">📗 D2L Brightspace</summary>
-            <div style="margin:6px 0 0 12px;">Use the <strong>Question Library (D2L QTI 1.2)</strong> export — Brightspace's importer is built on QTI 1.2, and QTI 2.1 packages often import as empty question shells.<br><br>
-            <strong>Path:</strong> <em>Quizzes</em> → <em>Question Library</em> → <em>Import</em> → <em>Upload a File</em> → drop the ZIP → review the preview → <em>Import</em>.<br><br>
-            <strong>If questions still import blank:</strong> export any existing quiz out of Brightspace (<em>Course Admin → Import/Export/Copy Components → Export Components → Quizzes</em>), unzip it, and compare its <code>questiondb.xml</code> to this tool's. Your instance's dialect is the authoritative reference.</div>
+            <div style="margin:6px 0 0 12px;">Use the <strong>Question Library CSV</strong> export. The same upload dialog that takes a QTI ZIP also takes a CSV, and D2L publishes an exact template for it — so the CSV is the reliable path. The QTI ZIP options are kept for experimentation only.<br><br>
+            <strong>Path:</strong> <em>Quizzes</em> → <em>Question Library</em> → <em>Import</em> → <em>Upload a File</em> → drop the CSV → review the preview → <em>Import</em>.<br><br>
+            <strong>Note:</strong> the CSV carries MC, True/False, Multi-Select, Matching, Short Answer, and Written Response, plus points, difficulty, and feedback. It imports into the Question Library only — build the quiz from those questions afterwards.<br><br>
+            <strong>Math:</strong> set <em>Math / LaTeX handling</em> above to <em>Flatten to plain text</em> before exporting CSV. Brightspace stores equations as MathML via its own equation editor and will show raw <code>\(…\)</code> literally on a CSV import.</div>
           </details>
           <details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:600;">🎓 Moodle</summary>
             <div style="margin:6px 0 0 12px;">Course → <em>More</em> → <em>Question bank</em> → <em>Import</em> → choose <em>Moodle XML format</em> (or <em>GIFT format</em> for the .txt) → upload → <em>Import</em>.
@@ -707,9 +708,10 @@ tr:last-child td{border-bottom:none;}
               <option value="qti12-topic">🎨 Canvas QTI 1.2 ZIP — split by domain/topic</option>
             </optgroup>
             <optgroup label="D2L Brightspace">
-              <option value="d2l-native">📗 Brightspace Question Library (D2L QTI 1.2) — recommended</option>
-              <option value="d2l-qti21-zip">📗 Brightspace QTI 2.1 ZIP — only if your admin confirms 2.1 support</option>
-              <option value="d2l-qti12-zip">📗 Brightspace generic QTI 1.2 ZIP — last resort</option>
+              <option value="d2l-csv">📗 Brightspace Question Library CSV — recommended</option>
+              <option value="d2l-native">📗 Brightspace QTI 1.2 ZIP — experimental, unverified</option>
+              <option value="d2l-qti21-zip">📗 Brightspace QTI 2.1 ZIP — experimental, unverified</option>
+              <option value="d2l-qti12-zip">📗 Brightspace generic QTI 1.2 ZIP — experimental</option>
             </optgroup>
             <optgroup label="Moodle">
               <option value="moodle-xml">🎓 Moodle XML — recommended (all question types)</option>
@@ -1688,6 +1690,8 @@ function normalizeQuestion(q,i){
     alternates: (q.alternates||q.accepted_answers||[]).map(String),
     tolerance: q.tolerance,
     pairs: pairs,
+    items: (q.items||q.sequence||q.order||[]).map(String),
+    hint: q.hint||'',
     objective: q.objective||q.learning_objective||'',
     points: q.points,
     rationale: q.rationale||q.worked_solution||q.explanation||q.feedback||''
@@ -2779,6 +2783,136 @@ async function makeD2LNativeZip(questions, bankName, pts, mathMode){
 }
 
 // ====================================================
+// D2L BRIGHTSPACE — QUESTION LIBRARY CSV
+// Built to D2L's published import template (the same
+// spec as "Download template CSV" in the upload dialog).
+// Row shape: key, col2, col3, col4, col5 — always 5 cols.
+// ====================================================
+function d2lCsvType(t){
+  switch(t){
+    case 'ordering': case 'order': case 'sequence': return 'O';
+    case 'true_false': return 'TF';
+    case 'multiple_answers': case 'multi_select': return 'MS';
+    case 'matching': case 'match': return 'M';
+    case 'essay': case 'command_response': return 'WR';
+    case 'short_answer': case 'fill_in_the_blank': case 'numerical': return 'SA';
+    default: return 'MC';
+  }
+}
+function d2lDifficulty(d){
+  return (d==='easy')?1:(d==='hard')?5:3;
+}
+/**
+ * Returns {text, flag} for a D2L CSV cell pair. The HTML flag is only set when
+ * the value actually contains markup — D2L's own template leaves it blank for
+ * plain text, and flagging plain text as HTML risks mangling bare & < >.
+ */
+function d2lText(s, mathMode){
+  var v=(mathMode==='tex')?dollarToTex(s):stripLatex(s);
+  v=String(v==null?'':v).replace(/\r/g,'');
+  if(/<(p|br|div|ul|ol|li|table|pre|code|img|strong|em|b|i|span|h[1-6])\b/i.test(v))
+    return {text:v, flag:'HTML'};
+  if(/\n/.test(v)){
+    var esc=v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return {text:esc.replace(/\n[ \t]*\n+/g,'<br><br>').replace(/\n/g,'<br>'), flag:'HTML'};
+  }
+  return {text:v, flag:''};
+}
+
+function csvCell(v){
+  var s=(v==null)?'':String(v);
+  // Excel/D2L both choke on raw newlines outside quotes; quoting handles it.
+  return /[",\n\r]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function csvRow(cells){
+  var r=cells.slice(0,5);
+  while(r.length<5) r.push('');
+  return r.map(csvCell).join(',');
+}
+
+function buildD2LCSV(questions, bankName, pts, mathMode){
+  var rows=[], exported=0, skipped=0;
+  var TX=function(s){ return d2lText(s,mathMode); };
+  var PLAIN=function(s){ return String(stripLatex(s)||'').replace(/\s+/g,' ').trim(); };
+
+  rows.push(csvRow(['// Brightspace Question Library import \u2014 '+PLAIN(bankName)]));
+  rows.push(csvRow(['// Generated '+new Date().toISOString()]));
+  rows.push(csvRow([]));
+
+  questions.forEach(function(q,i){
+    var t=(q.type||'multiple_choice').toLowerCase();
+    var type=d2lCsvType(t);
+    var points=qPoints(q,pts);
+    if(!String(q.stem||'').trim()){ skipped++; return; }
+
+    var choices=(q.choices||[]).filter(function(c){return c&&String(c.text||'').trim()!=='';});
+    var keys=correctLetters(q).filter(function(L){return choices.some(function(c){return c.letter===L;});});
+    var pairs=(q.pairs||[]).filter(function(p){return p&&p.term&&p.definition;});
+    var items=(q.items||q.sequence||[]).filter(function(x){return x!=null&&String(x).trim()!=='';});
+
+    if(type==='M'&&pairs.length<2) type='MC';
+    if(type==='O'&&items.length<2) type='MC';
+    if(type==='TF'&&choices.length<2){ choices=[{letter:'A',text:'True'},{letter:'B',text:'False'}]; }
+    if((type==='MC'||type==='MS'||type==='TF')&&!choices.length){ skipped++; return; }
+    if((type==='MC'||type==='MS'||type==='TF')&&!keys.length) keys=[choices[0].letter];
+
+    var answers=[q.correct].concat(q.alternates||[])
+      .filter(function(a){return a!=null&&String(a).trim()!=='';})
+      .map(function(a){return String(a).trim();});
+    if(type==='SA'&&!answers.length){ skipped++; return; }
+
+    var stem=TX(q.stem);
+    rows.push(csvRow(['NewQuestion',type]));
+    rows.push(csvRow(['ID',safeSlug(bankName,'QB')+'-'+(i+1)]));
+    rows.push(csvRow(['Title',PLAIN(q.stem).substring(0,80)]));
+    rows.push(csvRow(['QuestionText',stem.text,stem.flag]));
+    rows.push(csvRow(['Points',points]));
+    rows.push(csvRow(['Difficulty',d2lDifficulty(q.difficulty)]));
+
+    if(type==='WR'){
+      if(q.correct) rows.push(csvRow(['AnswerKey',PLAIN(q.correct)]));
+    } else if(type==='SA'){
+      rows.push(csvRow(['InputBox',(t==='fill_in_the_blank'||t==='numerical')?1:3,40]));
+      answers.forEach(function(a){ rows.push(csvRow(['Answer',100,PLAIN(a)])); });
+    } else if(type==='TF'){
+      var trueIsCorrect = /^\s*true\b/i.test(choices[0].text)
+        ? keys[0]===choices[0].letter
+        : keys[0]!==choices[0].letter;
+      rows.push(csvRow(['TRUE', trueIsCorrect?100:0]));
+      rows.push(csvRow(['FALSE', trueIsCorrect?0:100]));
+    } else if(type==='M'){
+      // Template puts text in column 3 and shows no HTML flag for Choice/Match.
+      rows.push(csvRow(['Scoring','EquallyWeighted']));
+      pairs.forEach(function(p,pi){ rows.push(csvRow(['Choice',pi+1,PLAIN(p.term)])); });
+      pairs.forEach(function(p,pi){ rows.push(csvRow(['Match',pi+1,PLAIN(p.definition)])); });
+    } else if(type==='O'){
+      // Ordering: column 2 is the text, column 3 the HTML flag, column 4 feedback.
+      rows.push(csvRow(['Scoring','RightMinusWrong']));
+      items.forEach(function(x){ rows.push(csvRow(['Item',PLAIN(x),'NOT HTML'])); });
+    } else if(type==='MS'){
+      rows.push(csvRow(['Scoring','RightAnswers']));
+      choices.forEach(function(c){
+        var o=TX(c.text);
+        rows.push(csvRow(['Option', keys.indexOf(c.letter)>=0?1:0, o.text, o.flag]));
+      });
+    } else { // MC — Option weights are percentages
+      choices.forEach(function(c){
+        var o=TX(c.text);
+        rows.push(csvRow(['Option', keys.indexOf(c.letter)>=0?100:0, o.text, o.flag]));
+      });
+    }
+
+    if(q.hint) rows.push(csvRow(['Hint',TX(q.hint).text]));
+    if(q.rationale){ var fb=TX(q.rationale); rows.push(csvRow(['Feedback',fb.text])); }
+    rows.push(csvRow([]));
+    exported++;
+  });
+
+  // D2L's own template is plain UTF-8 with CRLF and no BOM and no trailing newline.
+  return {csv:rows.join('\r\n'), exported:exported, skipped:skipped};
+}
+
+// ====================================================
 // MOODLE XML  (moodle.org/mod/quiz — native import)
 // ====================================================
 function cdata(s){ return '<![CDATA['+String(s==null?'':s).replace(/\]\]>/g,']]&gt;')+']]>'; }
@@ -3050,6 +3184,7 @@ function updateExportButtonLabel(){
   const f=$('expFormat').value, b=$('btnExport');
   const map={
     'qti12':'⬇ Download Canvas QTI','qti12-diff':'⬇ Download Canvas QTI','qti12-topic':'⬇ Download Canvas QTI',
+    'd2l-csv':'⬇ Download Brightspace CSV',
     'd2l-native':'⬇ Download Brightspace Package',
     'd2l-qti21-zip':'⬇ Download Brightspace QTI','d2l-qti12-zip':'⬇ Download Brightspace QTI',
     'moodle-xml':'⬇ Download Moodle XML','gift':'⬇ Download Moodle GIFT',
@@ -3126,6 +3261,10 @@ $('btnExport').addEventListener('click', async()=>{
       const mr=buildMoodleXML(qs,bankName,pts,mathMode);
       dlBlob(new Blob([mr.xml],{type:'application/xml;charset=utf-8'}),fileBase+'_Moodle.xml');
       toast('✓ Moodle XML — '+mr.exported+' questions'+(mr.skipped?' ('+mr.skipped+' skipped)':'')+'. Import via: Question bank → Import → Moodle XML format.','success');
+    }else if(fmt==='d2l-csv'){
+      const cr=buildD2LCSV(qs,bankName,pts,mathMode);
+      dlBlob(new Blob([cr.csv],{type:'text/csv;charset=utf-8'}),fileBase+'_D2L_QuestionLibrary.csv');
+      toast('✓ Brightspace CSV — '+cr.exported+' questions'+(cr.skipped?' ('+cr.skipped+' skipped)':'')+'. Import via: Quizzes → Question Library → Import → Upload a File.','success');
     }else if(fmt==='d2l-native'){
       dlBlob(await makeD2LNativeZip(qs,bankName,pts,mathMode),fileBase+'_D2L_QuestionLibrary.zip');
       toast('Brightspace package downloaded. Import via: Quizzes → Question Library → Import → Upload a File.','success');
