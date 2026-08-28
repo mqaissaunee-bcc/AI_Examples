@@ -649,7 +649,20 @@ tr:last-child td{border-bottom:none;}
 
       <div class="warn-banner" role="note">
         <span class="banner-icon">📋</span>
-        <div><strong>Canvas Import reminder:</strong> After downloading, go to your Canvas course → <em>Settings</em> → <em>Import Course Content</em> → <em>QTI .zip file</em> → select the ZIP → <em>Import</em>. Your question bank will appear in Quizzes → Question Banks.</div>
+        <div id="importHelp"><strong>Import reminder:</strong> pick your LMS below for step-by-step instructions.
+          <details style="margin-top:8px;"><summary style="cursor:pointer;font-weight:600;">🎨 Canvas</summary>
+            <div style="margin:6px 0 0 12px;">Course → <em>Settings</em> → <em>Import Course Content</em> → <em>QTI .zip file</em> → choose the ZIP → <em>Import</em>.
+            The bank lands in <em>Quizzes → Manage Question Banks</em>. Tick <em>Overwrite assessment content with matching IDs</em> only when you mean to replace an existing bank.</div>
+          </details>
+          <details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:600;">📗 D2L Brightspace</summary>
+            <div style="margin:6px 0 0 12px;">Course → <em>Course Admin</em> → <em>Import / Export / Copy Components</em> → <em>Import Components</em> → upload the ZIP → <em>Import All Components</em>.
+            Questions appear in <em>Quizzes → Question Library</em>. If the QTI 2.1 package is rejected, re-export using the <strong>QTI 1.2 fallback</strong> option — some Brightspace versions only accept 1.2.</div>
+          </details>
+          <details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:600;">🎓 Moodle</summary>
+            <div style="margin:6px 0 0 12px;">Course → <em>More</em> → <em>Question bank</em> → <em>Import</em> → choose <em>Moodle XML format</em> (or <em>GIFT format</em> for the .txt) → upload → <em>Import</em>.
+            Moodle XML is the better choice: it carries matching, multi-answer, and numerical tolerance, which GIFT handles less reliably.</div>
+          </details>
+        </div>
       </div>
 
       <div class="form-row">
@@ -687,17 +700,33 @@ tr:last-child td{border-bottom:none;}
         <div class="form-row" style="margin-bottom:16px;">
           <label class="field-label" for="expFormat">Export Format</label>
           <select id="expFormat">
-            <option value="qti12">Canvas QTI 1.2 ZIP — single bank (recommended)</option>
-            <option value="qti12-diff">Canvas QTI 1.2 ZIP — split by difficulty (up to 3 banks)</option>
-            <option value="qti12-topic">Canvas QTI 1.2 ZIP — split by domain/topic</option>
-            <option value="gift">🎓 Moodle GIFT — single category</option>
-            <option value="gift-diff">🎓 Moodle GIFT — split by difficulty</option>
-            <option value="gift-topic">🎓 Moodle GIFT — split by topic/domain</option>
-            <option value="json">JSON (archive / backup)</option>
-            <option value="csv">CSV (spreadsheet review)</option>
-            <option value="studyguide">📄 Student Study Guide (printable HTML — no answers)</option>
-          <option value="d2l-qti21-zip">📗 D2L Brightspace QTI 2.1 — ZIP package</option>
-          <option value="d2l-qti21-xml">📗 D2L Brightspace QTI 2.1 — Single XML file</option>
+            <optgroup label="Canvas">
+              <option value="qti12">🎨 Canvas QTI 1.2 ZIP — single bank (recommended)</option>
+              <option value="qti12-diff">🎨 Canvas QTI 1.2 ZIP — split by difficulty</option>
+              <option value="qti12-topic">🎨 Canvas QTI 1.2 ZIP — split by domain/topic</option>
+            </optgroup>
+            <optgroup label="D2L Brightspace">
+              <option value="d2l-qti21-zip">📗 Brightspace QTI 2.1 ZIP — recommended</option>
+              <option value="d2l-qti12-zip">📗 Brightspace QTI 1.2 ZIP — fallback if 2.1 is rejected</option>
+            </optgroup>
+            <optgroup label="Moodle">
+              <option value="moodle-xml">🎓 Moodle XML — recommended (all question types)</option>
+              <option value="gift">🎓 Moodle GIFT — single category</option>
+              <option value="gift-diff">🎓 Moodle GIFT — split by difficulty</option>
+              <option value="gift-topic">🎓 Moodle GIFT — split by topic/domain</option>
+            </optgroup>
+            <optgroup label="Other">
+              <option value="json">JSON (archive / backup)</option>
+              <option value="csv">CSV (spreadsheet review)</option>
+              <option value="studyguide">📄 Student Study Guide (printable HTML — no answers)</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:16px;">
+          <label class="field-label" for="expMath">Math / LaTeX handling</label>
+          <select id="expMath">
+            <option value="tex">Keep LaTeX, convert $…$ to \(…\) — renders in Canvas, Brightspace &amp; Moodle</option>
+            <option value="plain">Flatten to plain text — safest if your LMS has math rendering off</option>
           </select>
         </div>
 
@@ -1073,26 +1102,41 @@ function loadScript(src){
     document.head.appendChild(s);
   });
 }
-async function loadJSZipLib(){ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'); }
-async function loadMammoth(){ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js'); }
+// NOTE: ZIP reading/writing is now built in (see zipBlob / unzipEntries).
+// Only DOCX and PDF text extraction still need an external parser; both are
+// optional conveniences and fail with a clear message if the CDN is blocked.
+async function loadMammoth(){
+  if(window.mammoth) return;
+  try{ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js'); }
+  catch(e){ throw new Error('DOCX reader could not load (network/CSP blocked). Paste the text instead, or upload a .txt/.md file.'); }
+}
 async function loadPDFjs(){
   if(window.pdfjsLib) return;
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  try{ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'); }
+  catch(e){ throw new Error('PDF reader could not load (network/CSP blocked). Paste the text instead, or upload a .txt/.md file.'); }
   window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
 
 async function extractPptx(file){
-  await loadJSZipLib();
-  const zip=await JSZip.loadAsync(await file.arrayBuffer());
-  const slides=Object.keys(zip.files)
-    .filter(n=>/^ppt\/slides\/slide\d+\.xml$/.test(n))
-    .sort((a,b)=>parseInt(a.match(/\d+/)[0])-parseInt(b.match(/\d+/)[0]));
+  // Uses the built-in ZIP reader — no external library, works offline and under CSP.
+  const entries=await unzipEntries(await file.arrayBuffer(),
+    n=>/^ppt\/(slides\/slide|notesSlides\/notesSlide)\d+\.xml$/.test(n));
+  const dec=new TextDecoder();
+  const names=Object.keys(entries).sort((a,b)=>{
+    const sa=a.indexOf('notesSlides')>=0?1:0, sb=b.indexOf('notesSlides')>=0?1:0;
+    if(sa!==sb) return sa-sb;
+    return parseInt(a.match(/(\d+)\.xml$/)[1])-parseInt(b.match(/(\d+)\.xml$/)[1]);
+  });
   const texts=[];
-  for(const s of slides){
-    const xml=await zip.files[s].async('text');
-    const runs=[...xml.matchAll(/<a:t[^>]*>([^<]+)<\/a:t>/g)].map(m=>m[1].trim()).filter(Boolean);
+  for(const n of names){
+    const xml=dec.decode(entries[n]);
+    const runs=[...xml.matchAll(/<a:t[^>]*>([^<]*)<\/a:t>/g)]
+      .map(m=>m[1].replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+                  .replace(/&quot;/g,'"').replace(/&apos;/g,"'").trim())
+      .filter(Boolean);
     if(runs.length) texts.push(runs.join(' '));
   }
+  if(!texts.length) throw new Error('No readable text found in that .pptx (it may be image-only).');
   return texts.join('\n\n');
 }
 
@@ -1561,7 +1605,116 @@ let parsedQuestions = [];
 function normalizeDiff(d){
   if(!d) return 'medium';
   const v = String(d).toLowerCase().trim();
+  if(['easy','simple','basic','low'].includes(v)) return 'easy';
+  if(['hard','difficult','advanced','high','challenging'].includes(v)) return 'hard';
   return ['easy','medium','hard'].includes(v) ? v : 'medium';
+}
+
+/** Accept the many shapes an LLM returns for `choices`. */
+function normChoices(raw){
+  const arr=[];
+  const push=(letter,text)=>{
+    const t=(text==null?'':String(text)).trim();
+    let L=String(letter==null?'':letter).trim().toUpperCase().replace(/[^A-Z]/g,'').charAt(0);
+    if(!L) L=String.fromCharCode(65+arr.length);
+    arr.push({letter:L,text:t});
+  };
+  if(Array.isArray(raw)){
+    raw.forEach((c,i)=>{
+      if(c==null) return;
+      if(typeof c==='string'){
+        const m=c.match(/^\s*([A-Za-z])[).:\-]\s+(.*)$/);   // "A) text"
+        return m?push(m[1],m[2]):push(String.fromCharCode(65+i),c);
+      }
+      push(c.letter??c.id??c.key??c.label??String.fromCharCode(65+i),
+           c.text??c.value??c.answer??c.content??'');
+    });
+  } else if(raw && typeof raw==='object'){
+    Object.keys(raw).forEach(k=>push(k,raw[k]));
+  }
+  const seen=Object.create(null);
+  arr.forEach((c,i)=>{
+    if(!/^[A-Z]$/.test(c.letter)||seen[c.letter]) c.letter=String.fromCharCode(65+i);
+    seen[c.letter]=1;
+  });
+  return arr;
+}
+
+/** Resolve a `correct` value (letter, index, or full answer text) to a choice letter. */
+function letterFor(val, choices){
+  if(val==null) return '';
+  const s=String(val).trim();
+  if(!s) return '';
+  const lead=s.toUpperCase().charAt(0);
+  if(/^[A-Z]$/.test(lead) && s.length<=2 && choices.some(c=>c.letter===lead)) return lead;
+  if(/^\d+$/.test(s)){
+    const i=parseInt(s,10);
+    if(choices[i]) return choices[i].letter;
+    if(choices[i-1]) return choices[i-1].letter;
+  }
+  const m=choices.find(c=>String(c.text).trim().toLowerCase()===s.toLowerCase());
+  if(m) return m.letter;
+  return /^[A-Z]$/.test(lead)?lead:'';
+}
+
+function normalizeQuestion(q,i){
+  const type=String(q.type||'multiple_choice').toLowerCase().trim();
+  const choices=normChoices(q.choices);
+  const rawCorrect=Array.isArray(q.correct)?q.correct
+    : (Array.isArray(q.correct_answers)?q.correct_answers:[q.correct??q.answer]);
+  const openType=['essay','command_response','short_answer','fill_in_the_blank','numerical'].includes(type);
+  let letters=[];
+  if(!openType){
+    letters=rawCorrect.map(v=>letterFor(v,choices))
+      .filter(L=>L && choices.some(c=>c.letter===L));
+    letters=letters.filter((v,ix)=>letters.indexOf(v)===ix);
+  }
+  const pairs=(q.pairs||q.matches||[]).map(p=>{
+    if(Array.isArray(p)) return {term:String(p[0]??''),definition:String(p[1]??'')};
+    return {term:String(p.term??p.left??p.premise??''),definition:String(p.definition??p.right??p.response??'')};
+  }).filter(p=>p.term||p.definition);
+  return {
+    id: q.id||('q'+(i+1)),
+    type: type,
+    bloom: q.bloom||'Apply',
+    difficulty: normalizeDiff(q.difficulty),
+    domain: q.domain||q.topic||'',
+    stem: String(q.stem??q.question??q.text??'').trim(),
+    choices: choices,
+    correct: openType ? String(q.correct??q.answer??'') : (letters[0]||(choices[0]&&choices[0].letter)||'A'),
+    correctLetters: letters,
+    alternates: (q.alternates||q.accepted_answers||[]).map(String),
+    tolerance: q.tolerance,
+    pairs: pairs,
+    objective: q.objective||q.learning_objective||'',
+    points: q.points,
+    rationale: q.rationale||q.worked_solution||q.explanation||q.feedback||''
+  };
+}
+
+/** Non-fatal quality checks — surfaced so bad banks never reach the LMS silently. */
+function auditQuestions(qs){
+  const warn=[], ids=Object.create(null);
+  qs.forEach((q,i)=>{
+    const tag='Q'+(i+1);
+    if(!q.stem) warn.push(tag+': empty stem.');
+    if(ids[q.id]) warn.push(tag+': duplicate id "'+q.id+'" (auto-renumbered on export).');
+    ids[q.id]=1;
+    const open=['essay','command_response','short_answer','fill_in_the_blank','numerical'].includes(q.type);
+    const isMatch=(q.type==='matching'||q.type==='match');
+    if(isMatch){
+      if(q.pairs.length<2) warn.push(tag+': matching question needs at least 2 pairs — will export as multiple choice.');
+    } else if(!open){
+      if(q.choices.length<2) warn.push(tag+': fewer than 2 answer choices.');
+      if(!q.correctLetters.length) warn.push(tag+': correct answer "'+(q.correct||'')+'" does not match any choice — defaulted to A.');
+      if(q.choices.some(c=>!c.text)) warn.push(tag+': one or more blank answer choices.');
+    } else if(q.type!=='essay'&&q.type!=='command_response'&&!String(q.correct).trim()){
+      warn.push(tag+': no answer key supplied for an auto-graded open question.');
+    }
+    if(q.type==='numerical'&&!isFinite(parseFloat(q.correct))) warn.push(tag+': numerical answer is not a number.');
+    if(!q.rationale) warn.push(tag+': no rationale (feedback will be blank in the LMS).');
+  });
+  return warn;
 }
 
 function parseJSON(raw){
@@ -1583,22 +1736,23 @@ $('btnValidate').addEventListener('click',()=>{
     if(!Array.isArray(arr)||arr.length===0) throw new Error('Response is not a non-empty JSON array.');
 
     // Normalize
-    parsedQuestions = arr.map((q,i)=>({
-      id: q.id||'q'+(i+1),
-      type: q.type||'multiple_choice',
-      bloom: q.bloom||'Apply',
-      difficulty: normalizeDiff(q.difficulty),
-      domain: q.domain||'',
-      stem: q.stem||'',
-      choices: q.choices||[],
-      correct: q.correct||'A',
-      rationale: q.rationale||''
-    }));
+    parsedQuestions = arr.map(normalizeQuestion);
+    const warnings = auditQuestions(parsedQuestions);
 
-    vm.className='info-banner';
-    vm.innerHTML=`<span class="banner-icon">✅</span><div><strong>Valid! ${parsedQuestions.length} questions parsed successfully.</strong> Review the preview below, then download your Canvas QTI ZIP.</div>`;
-    vm.style.background='rgba(0,102,0,.07)';
-    vm.style.borderColor='rgba(0,102,0,.3)';
+    if(warnings.length){
+      vm.className='warn-banner';
+      vm.innerHTML=`<span class="banner-icon">⚠️</span><div><strong>${parsedQuestions.length} questions parsed, ${warnings.length} issue(s) found.</strong>
+        These will still export, but review them first.
+        <ul style="margin:8px 0 0 18px;padding:0;">${warnings.slice(0,15).map(w=>`<li>${escH(w)}</li>`).join('')}</ul>
+        ${warnings.length>15?`<div style="margin-top:6px;"><em>…and ${warnings.length-15} more.</em></div>`:''}</div>`;
+      vm.style.background='';
+      vm.style.borderColor='';
+    } else {
+      vm.className='info-banner';
+      vm.innerHTML=`<span class="banner-icon">✅</span><div><strong>Valid! ${parsedQuestions.length} questions parsed, no issues found.</strong> Review the preview below, then pick an export format.</div>`;
+      vm.style.background='rgba(0,102,0,.07)';
+      vm.style.borderColor='rgba(0,102,0,.3)';
+    }
 
     renderPreview();
     pw.style.display='block';
@@ -1827,456 +1981,656 @@ function moveQuestion(idx, dir){
 // ====================================================
 // EXPORT
 // ====================================================
-async function loadJSZip(){ await loadJSZipLib(); }
+// ====================================================
+// ZIP WRITER — dependency-free (no CDN, CSP-safe)
+// Uses native CompressionStream when available, falls
+// back to STORED entries. Every LMS accepts both.
+// ====================================================
+var _CRC_TABLE=(function(){var t=new Uint32Array(256);for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++){c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);}t[n]=c>>>0;}return t;})();
+function crc32(buf){var c=0xFFFFFFFF;for(var i=0;i<buf.length;i++){c=_CRC_TABLE[(c^buf[i])&0xFF]^(c>>>8);}return (c^0xFFFFFFFF)>>>0;}
 
-function buildQTIXML(questions, bankName, pts){
-  const ident=bankName.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40)||'QB';
-  const PG_OPEN=new Set(['fill_in_the_blank','short_answer','command_response','essay']);
-  function pgQType(t){
-    if(t==='fill_in_the_blank'||t==='short_answer'||t==='command_response') return 'short_answer_question';
-    if(t==='essay') return 'essay_question';
-    return 'multiple_choice_question';
+async function deflateRaw(bytes){
+  if(typeof CompressionStream==='undefined') return null;
+  try{
+    var cs=new CompressionStream('deflate-raw');
+    var ab=await new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer();
+    return new Uint8Array(ab);
+  }catch(e){ return null; }
+}
+async function inflateRaw(bytes){
+  if(typeof DecompressionStream==='undefined')
+    throw new Error('This browser cannot read compressed ZIP files. Use Chrome/Edge 80+, Firefox 113+, or Safari 16.4+.');
+  var ds=new DecompressionStream('deflate-raw');
+  var ab=await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+  return new Uint8Array(ab);
+}
+
+/**
+ * Build a ZIP Blob. files = [{name:'a/b.xml', data:'<xml/>'|Uint8Array}]
+ */
+async function zipBlob(files){
+  var enc=new TextEncoder(), parts=[], central=[], offset=0;
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    var nameBytes=enc.encode(f.name);
+    var raw=(typeof f.data==='string')?enc.encode(f.data):f.data;
+    var crc=crc32(raw);
+    var method=0, body=raw;
+    var def=await deflateRaw(raw);
+    if(def && def.length < raw.length){ method=8; body=def; }
+
+    var lfh=new Uint8Array(30+nameBytes.length), dv=new DataView(lfh.buffer);
+    dv.setUint32(0,0x04034b50,true);
+    dv.setUint16(4,20,true);
+    dv.setUint16(6,0x0800,true);          // UTF-8 filename flag
+    dv.setUint16(8,method,true);
+    dv.setUint16(10,0,true);              // time 00:00
+    dv.setUint16(12,0x21,true);           // date 1980-01-01
+    dv.setUint32(14,crc,true);
+    dv.setUint32(18,body.length,true);
+    dv.setUint32(22,raw.length,true);
+    dv.setUint16(26,nameBytes.length,true);
+    dv.setUint16(28,0,true);
+    lfh.set(nameBytes,30);
+    parts.push(lfh,body);
+
+    var cd=new Uint8Array(46+nameBytes.length), cv=new DataView(cd.buffer);
+    cv.setUint32(0,0x02014b50,true);
+    cv.setUint16(4,20,true); cv.setUint16(6,20,true);
+    cv.setUint16(8,0x0800,true);
+    cv.setUint16(10,method,true);
+    cv.setUint16(12,0,true); cv.setUint16(14,0x21,true);
+    cv.setUint32(16,crc,true);
+    cv.setUint32(20,body.length,true);
+    cv.setUint32(24,raw.length,true);
+    cv.setUint16(28,nameBytes.length,true);
+    cv.setUint32(38,0x81a40000,true);     // external attrs: regular file 0644
+    cv.setUint32(42,offset,true);
+    cd.set(nameBytes,46);
+    central.push(cd);
+
+    offset+=lfh.length+body.length;
   }
-  const items=questions.map((q,i)=>{
-    const qid='item_'+(i+1)+'_'+ident;
-    const qtype=(q.type||'multiple_choice').toLowerCase();
-    const isOE=PG_OPEN.has(qtype);
-    const cqt=pgQType(qtype);
-    const isFITB=(qtype==='fill_in_the_blank');
-    const isEssay=(qtype==='essay');
-    const modelAnswer=escX(q.correct||'');
-    let presentation,resprocessing;
-    if(isOE){
-      presentation=`<presentation>
-        <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
-        <response_str ident="response1" rcardinality="Single">
-          <render_fib rows="${isFITB?1:5}" columns="${isFITB?40:60}"/>
-        </response_str>
-      </presentation>`;
-      if(isFITB){
-        resprocessing=`<resprocessing>
-        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
-        <respcondition continue="No">
-          <conditionvar><varequal respident="response1" case="No">${modelAnswer}</varequal></conditionvar>
-          <setvar action="Set" varname="SCORE">${pts}</setvar>
-          <displayfeedback feedbacktype="Response" linkrefid="fb_correct"/>
-        </respcondition>
-        <respcondition continue="Yes">
-          <conditionvar><other/></conditionvar>
-          <displayfeedback feedbacktype="Response" linkrefid="fb_incorrect"/>
-        </respcondition>
-      </resprocessing>
-      <itemfeedback ident="fb_correct"><flow_mat><material>
-        <mattext texttype="text/plain">Correct! ${modelAnswer}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
-      </material></flow_mat></itemfeedback>
-      <itemfeedback ident="fb_incorrect"><flow_mat><material>
-        <mattext texttype="text/plain">Incorrect. Correct answer: ${modelAnswer}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
-      </material></flow_mat></itemfeedback>`;
-      }else{
-        resprocessing=`<resprocessing>
-        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
-        <respcondition continue="Yes">
-          <conditionvar><other/></conditionvar>
-          <displayfeedback feedbacktype="Response" linkrefid="fb"/>
-        </respcondition>
-      </resprocessing>
-      <itemfeedback ident="fb"><flow_mat><material>
-        <mattext texttype="text/plain">${isEssay?'Rubric / model answer':'Model answer'}: ${modelAnswer}${q.rationale?'\n\n'+escX(q.rationale):''}</mattext>
-      </material></flow_mat></itemfeedback>`;
+  var cdSize=0; central.forEach(function(c){cdSize+=c.length;});
+  var eocd=new Uint8Array(22), ev=new DataView(eocd.buffer);
+  ev.setUint32(0,0x06054b50,true);
+  ev.setUint16(8,files.length,true);
+  ev.setUint16(10,files.length,true);
+  ev.setUint32(12,cdSize,true);
+  ev.setUint32(16,offset,true);
+  return new Blob(parts.concat(central,[eocd]),{type:'application/zip'});
+}
+
+/** Read selected entries from a ZIP ArrayBuffer. filter(name)->bool */
+async function unzipEntries(arrayBuffer, filter){
+  var u8=new Uint8Array(arrayBuffer), dv=new DataView(arrayBuffer), eocd=-1;
+  var floor=Math.max(0,u8.length-22-65558);
+  for(var i=u8.length-22;i>=floor;i--){ if(dv.getUint32(i,true)===0x06054b50){eocd=i;break;} }
+  if(eocd<0) throw new Error('Not a valid ZIP/Office file.');
+  var count=dv.getUint16(eocd+10,true), p=dv.getUint32(eocd+16,true);
+  var dec=new TextDecoder(), out={};
+  for(var n=0;n<count;n++){
+    if(p+46>u8.length || dv.getUint32(p,true)!==0x02014b50) break;
+    var method=dv.getUint16(p+10,true);
+    var compSize=dv.getUint32(p+20,true);
+    var nameLen=dv.getUint16(p+28,true), extraLen=dv.getUint16(p+30,true), cmtLen=dv.getUint16(p+32,true);
+    var lho=dv.getUint32(p+42,true);
+    var name=dec.decode(u8.subarray(p+46,p+46+nameLen));
+    p+=46+nameLen+extraLen+cmtLen;
+    if(filter && !filter(name)) continue;
+    var lNameLen=dv.getUint16(lho+26,true), lExtraLen=dv.getUint16(lho+28,true);
+    var start=lho+30+lNameLen+lExtraLen;
+    var body=u8.subarray(start,start+compSize);
+    out[name]=(method===0)?body:await inflateRaw(body);
+  }
+  return out;
+}
+
+// ====================================================
+// SHARED HELPERS
+// ====================================================
+function safeSlug(s,fallback){
+  var v=String(s==null?'':s).replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').substring(0,48);
+  return v||fallback||'bank';
+}
+/** Canvas/Brightspace render LaTeX only with \( \) / \[ \] delimiters. */
+function dollarToTex(s){
+  return String(s==null?'':s)
+    .replace(/\$\$([\s\S]+?)\$\$/g,function(m,g){return '\\['+g+'\\]';})
+    .replace(/(^|[^\\$])\$([^$\n]+?)\$/g,function(m,pre,g){return pre+'\\('+g+'\\)';});
+}
+/** Collapse blank lines — GIFT treats a blank line as a record separator. */
+function oneBlock(s){ return String(s==null?'':s).replace(/\r/g,'').replace(/\n[ \t]*\n+/g,'\n').trim(); }
+
+/** Plain text with newlines -> HTML. Leaves existing markup untouched. */
+function asHtml(s){
+  var v=String(s==null?'':s);
+  if(/<(p|br|div|ul|ol|li|table|pre|code|img|strong|em|h[1-6])\b/i.test(v)) return v;
+  return v.replace(/\r/g,'').replace(/\n[ \t]*\n+/g,'<br><br>').replace(/\n/g,'<br>');
+}
+
+/** Math handling for a target: 'tex' keeps LaTeX (delimited), 'plain' flattens it. */
+function mathFor(s,mode){
+  return (mode==='plain') ? stripLatex(s) : dollarToTex(s);
+}
+/** Math handling + line-break preservation, for text/html fields. */
+function htmlFor(s,mode){ return asHtml(mathFor(s,mode)); }
+
+function qPoints(q,defaultPts){
+  var p=parseFloat(q&&q.points);
+  return (isFinite(p)&&p>0)?p:defaultPts;
+}
+function correctLetters(q){
+  if(Array.isArray(q.correctLetters)&&q.correctLetters.length) return q.correctLetters;
+  var c=String(q.correct||'A').toUpperCase().replace(/[^A-Z]/g,'');
+  return c?c.split(''):['A'];
+}
+
+// ====================================================
+// CANVAS / GENERIC QTI 1.2
+// ====================================================
+function qti12Type(t){
+  switch(t){
+    case 'true_false': return 'true_false_question';
+    case 'multiple_answers': case 'multi_select': return 'multiple_answers_question';
+    case 'matching': case 'match': return 'matching_question';
+    case 'numerical': return 'numerical_question';
+    case 'essay': case 'command_response': return 'essay_question';
+    case 'fill_in_the_blank': case 'short_answer': return 'short_answer_question';
+    default: return 'multiple_choice_question';
+  }
+}
+
+function buildQTIXML(questions, bankName, pts, opts){
+  opts=opts||{};
+  var mathMode=opts.mathMode||'tex';
+  var ident=safeSlug(bankName,'QB');
+  var seen={};
+
+  function meta(q,cqt,points){
+    var f=[
+      ['question_type',cqt],
+      ['points_possible',String(points)],
+      ['assessment_question_identifierref','aq_'+ident+'_'+q._i]
+    ];
+    if(q.bloom) f.push(['bloom_level',q.bloom]);
+    if(q.difficulty) f.push(['difficulty',q.difficulty]);
+    if(q.domain) f.push(['domain',q.domain]);
+    if(q.objective) f.push(['learning_objective',q.objective]);
+    return '      <itemmetadata><qtimetadata>\n'+f.map(function(kv){
+      return '        <qtimetadatafield><fieldlabel>'+kv[0]+'</fieldlabel><fieldentry>'+escX(kv[1])+'</fieldentry></qtimetadatafield>';
+    }).join('\n')+'\n      </qtimetadata></itemmetadata>';
+  }
+  function stemMat(q){
+    return '        <material><mattext texttype="text/html">'+escX(htmlFor(q.stem,mathMode))+'</mattext></material>';
+  }
+  function fbBlock(id,text){
+    return '      <itemfeedback ident="'+id+'"><flow_mat><material>'+
+      '<mattext texttype="text/html">'+escX(htmlFor(text,mathMode))+'</mattext></material></flow_mat></itemfeedback>';
+  }
+
+  var items=questions.map(function(q,i){
+    q._i=i+1;
+    var t=(q.type||'multiple_choice').toLowerCase();
+    var cqt=qti12Type(t);
+    var points=qPoints(q,pts);
+    var qid='i_'+ident+'_'+(i+1);
+    if(seen[qid]) qid=qid+'_'+i;
+    seen[qid]=1;
+    var title=escX((q.stem||('Question '+(i+1))).replace(/\s+/g,' ').substring(0,80));
+    var rat=q.rationale||'';
+    var body='';
+
+    // ---------- MATCHING ----------
+    if(cqt==='matching_question'){
+      var pairs=(q.pairs||[]).filter(function(p){return p&&(p.term||p.definition);});
+      if(pairs.length){
+        var defIds=pairs.map(function(p,pi){return 2000+pi;});
+        var lids=pairs.map(function(p,pi){
+          var opts2=pairs.map(function(p2,pj){
+            return '            <response_label ident="'+defIds[pj]+'"><material><mattext texttype="text/plain">'+escX(mathFor(p2.definition,mathMode))+'</mattext></material></response_label>';
+          }).join('\n');
+          return '        <response_lid ident="response_'+(pi+1)+'">\n'+
+                 '          <material><mattext texttype="text/plain">'+escX(mathFor(p.term,mathMode))+'</mattext></material>\n'+
+                 '          <render_choice>\n'+opts2+'\n          </render_choice>\n'+
+                 '        </response_lid>';
+        }).join('\n');
+        var per=Math.round((points/pairs.length)*10000)/10000;
+        var conds=pairs.map(function(p,pi){
+          return '        <respcondition>\n'+
+                 '          <conditionvar><varequal respident="response_'+(pi+1)+'">'+defIds[pi]+'</varequal></conditionvar>\n'+
+                 '          <setvar action="Add" varname="SCORE">'+per+'</setvar>\n'+
+                 '        </respcondition>';
+        }).join('\n');
+        body='      <presentation>\n'+stemMat(q)+'\n'+lids+'\n      </presentation>\n'+
+             '      <resprocessing>\n'+
+             '        <outcomes><decvar maxvalue="'+points+'" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>\n'+
+             conds+'\n      </resprocessing>\n'+
+             (rat?fbBlock('general_fb',rat)+'\n':'');
+        return '    <item ident="'+qid+'" title="'+title+'">\n'+meta(q,cqt,points)+'\n'+body+'    </item>';
       }
-    }else{
-      const choices=(q.choices||[]).map(c=>`          <response_label ident="${c.letter}">
-            <material><mattext texttype="text/plain">${escX(c.text)}</mattext></material>
-          </response_label>`).join('\n');
-      presentation=`<presentation>
-        <material><mattext texttype="text/html">${escX(q.stem)}</mattext></material>
-        <response_lid ident="response1" rcardinality="Single"><render_choice>
-${choices}
-        </render_choice></response_lid>
-      </presentation>`;
-      resprocessing=`<resprocessing>
-        <outcomes><decvar maxvalue="${pts}" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
-        <respcondition continue="No">
-          <conditionvar><varequal respident="response1">${escX(q.correct)}</varequal></conditionvar>
-          <setvar action="Set" varname="SCORE">${pts}</setvar>
-          <displayfeedback feedbacktype="Response" linkrefid="fb"/>
-        </respcondition>
-      </resprocessing>
-      <itemfeedback ident="fb"><flow_mat><material>
-        <mattext texttype="text/plain">${escX(q.rationale||'Correct!')}</mattext>
-      </material></flow_mat></itemfeedback>`;
+      cqt='multiple_choice_question'; // no pairs supplied — degrade gracefully
     }
-    return `    <item ident="${qid}" title="${escX(q.stem.substring(0,80))}">
-      <itemmetadata><qtimetadata>
-        <qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>${cqt}</fieldentry></qtimetadatafield>
-        <qtimetadatafield><fieldlabel>points_possible</fieldlabel><fieldentry>${pts}</fieldentry></qtimetadatafield>
-        <qtimetadatafield><fieldlabel>bloom_level</fieldlabel><fieldentry>${escX(q.bloom)}</fieldentry></qtimetadatafield>
-        <qtimetadatafield><fieldlabel>difficulty</fieldlabel><fieldentry>${escX(q.difficulty)}</fieldentry></qtimetadatafield>
-        ${q.objective?`<qtimetadatafield><fieldlabel>learning_objective</fieldlabel><fieldentry>${escX(q.objective)}</fieldentry></qtimetadatafield>`:''}
-      </qtimetadata></itemmetadata>
-      ${presentation}
-      ${resprocessing}
-    </item>`;
+
+    // ---------- OPEN RESPONSE ----------
+    if(cqt==='essay_question'||cqt==='short_answer_question'||cqt==='numerical_question'){
+      var isFITB=(cqt==='short_answer_question');
+      var isNum=(cqt==='numerical_question');
+      var model=escX(mathFor(q.correct,mathMode));
+      var render=isNum
+        ? '          <render_fib fibtype="Decimal"><response_label ident="answer1" rshuffle="No"/></render_fib>'
+        : '          <render_fib rows="'+(isFITB?1:6)+'" columns="'+(isFITB?40:70)+'"/>';
+      body='      <presentation>\n'+stemMat(q)+'\n'+
+           '        <response_str ident="response1" rcardinality="Single">\n'+render+'\n        </response_str>\n'+
+           '      </presentation>\n';
+
+      if(isNum){
+        var target=parseFloat(q.correct);
+        var tol=parseFloat(q.tolerance);
+        if(!isFinite(target)) target=0;
+        if(!isFinite(tol)||tol<0) tol=Math.abs(target)*0.01;
+        body+='      <resprocessing>\n'+
+              '        <outcomes><decvar maxvalue="'+points+'" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>\n'+
+              '        <respcondition continue="No">\n'+
+              '          <conditionvar><or><varequal respident="response1">'+target+'</varequal>'+
+              '<and><vargte respident="response1">'+(target-tol)+'</vargte><varlte respident="response1">'+(target+tol)+'</varlte></and></or></conditionvar>\n'+
+              '          <setvar action="Set" varname="SCORE">'+points+'</setvar>\n'+
+              '          <displayfeedback feedbacktype="Response" linkrefid="fb_correct"/>\n'+
+              '        </respcondition>\n'+
+              '      </resprocessing>\n'+
+              fbBlock('fb_correct','Correct. '+(q.correct||'')+(rat?'<br><br>'+rat:''))+'\n';
+      } else if(isFITB){
+        // Accept the model answer plus any alternates supplied in q.alternates[]
+        var alts=[q.correct].concat(q.alternates||[]).filter(function(a){return a!=null&&String(a).trim()!=='';});
+        var vars=alts.map(function(a){return '<varequal respident="response1" case="No">'+escX(String(a).trim())+'</varequal>';}).join('');
+        body+='      <resprocessing>\n'+
+              '        <outcomes><decvar maxvalue="'+points+'" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>\n'+
+              '        <respcondition continue="No">\n'+
+              '          <conditionvar>'+(alts.length>1?'<or>'+vars+'</or>':vars)+'</conditionvar>\n'+
+              '          <setvar action="Set" varname="SCORE">'+points+'</setvar>\n'+
+              '          <displayfeedback feedbacktype="Response" linkrefid="fb_correct"/>\n'+
+              '        </respcondition>\n'+
+              '        <respcondition continue="Yes"><conditionvar><other/></conditionvar>'+
+              '<displayfeedback feedbacktype="Response" linkrefid="fb_incorrect"/></respcondition>\n'+
+              '      </resprocessing>\n'+
+              fbBlock('fb_correct','Correct: '+(q.correct||'')+(rat?'<br><br>'+rat:''))+'\n'+
+              fbBlock('fb_incorrect','Correct answer: '+(q.correct||'')+(rat?'<br><br>'+rat:''))+'\n';
+      } else {
+        body+='      <resprocessing>\n'+
+              '        <outcomes><decvar maxvalue="'+points+'" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>\n'+
+              '        <respcondition continue="Yes"><conditionvar><other/></conditionvar>'+
+              '<displayfeedback feedbacktype="Response" linkrefid="fb"/></respcondition>\n'+
+              '      </resprocessing>\n'+
+              fbBlock('fb','Model answer / rubric: '+(q.correct||'')+(rat?'<br><br>'+rat:''))+'\n';
+      }
+      return '    <item ident="'+qid+'" title="'+title+'">\n'+meta(q,cqt,points)+'\n'+body+'    </item>';
+    }
+
+    // ---------- CHOICE-BASED (MC / TF / multi-answer) ----------
+    var choices=(q.choices||[]).filter(function(c){return c&&String(c.text||'').trim()!=='';});
+    if(cqt==='true_false_question'&&choices.length<2){
+      choices=[{letter:'A',text:'True'},{letter:'B',text:'False'}];
+    }
+    if(!choices.length){ choices=[{letter:'A',text:'(no choices supplied)'}]; }
+    var multi=(cqt==='multiple_answers_question');
+    var keys=correctLetters(q).filter(function(L){return choices.some(function(c){return c.letter===L;});});
+    if(!keys.length) keys=[choices[0].letter];
+
+    var labels=choices.map(function(c){
+      return '          <response_label ident="'+escX(c.letter)+'">\n'+
+             '            <material><mattext texttype="text/html">'+escX(htmlFor(c.text,mathMode))+'</mattext></material>\n'+
+             '          </response_label>';
+    }).join('\n');
+
+    body='      <presentation>\n'+stemMat(q)+'\n'+
+         '        <response_lid ident="response1" rcardinality="'+(multi?'Multiple':'Single')+'">\n'+
+         '          <render_choice>\n'+labels+'\n          </render_choice>\n'+
+         '        </response_lid>\n      </presentation>\n';
+
+    var cond;
+    if(multi){
+      var inner=choices.map(function(c){
+        return keys.indexOf(c.letter)>=0
+          ? '<varequal respident="response1">'+escX(c.letter)+'</varequal>'
+          : '<not><varequal respident="response1">'+escX(c.letter)+'</varequal></not>';
+      }).join('');
+      cond='<and>'+inner+'</and>';
+    } else {
+      cond='<varequal respident="response1">'+escX(keys[0])+'</varequal>';
+    }
+
+    body+='      <resprocessing>\n'+
+          '        <outcomes><decvar maxvalue="'+points+'" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>\n'+
+          '        <respcondition continue="No">\n'+
+          '          <conditionvar>'+cond+'</conditionvar>\n'+
+          '          <setvar action="Set" varname="SCORE">'+points+'</setvar>\n'+
+          '          <displayfeedback feedbacktype="Response" linkrefid="fb_correct"/>\n'+
+          '        </respcondition>\n'+
+          '        <respcondition continue="Yes"><conditionvar><other/></conditionvar>'+
+          '<displayfeedback feedbacktype="Response" linkrefid="fb_general"/></respcondition>\n'+
+          '      </resprocessing>\n'+
+          fbBlock('fb_correct',rat||'Correct.')+'\n'+
+          fbBlock('fb_general',rat||'')+'\n';
+
+    return '    <item ident="'+qid+'" title="'+title+'">\n'+meta(q,cqt,points)+'\n'+body+'    </item>';
   }).join('\n\n');
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<questestinterop xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://www.imsglobal.org/xsd/ims_qtiasiv1p2 http://www.imsglobal.org/xsd/ims_qtiasiv1p2p1.xsd">
-  <objectbank ident="${ident}">
-    <qtimetadata><qtimetadatafield><fieldlabel>bank_title</fieldlabel><fieldentry>${escX(bankName)}</fieldentry></qtimetadatafield></qtimetadata>
-${items}
-  </objectbank>
-</questestinterop>`;
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<questestinterop xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/ims_qtiasiv1p2 http://www.imsglobal.org/xsd/ims_qtiasiv1p2p1.xsd">\n'+
+'  <objectbank ident="'+ident+'">\n'+
+'    <qtimetadata><qtimetadatafield><fieldlabel>bank_title</fieldlabel><fieldentry>'+escX(bankName)+'</fieldentry></qtimetadatafield></qtimetadata>\n'+
+items+'\n'+
+'  </objectbank>\n'+
+'</questestinterop>';
 }
 
-function buildManifest(entries){
-  const resources=entries.map(e=>`    <resource identifier="res_${e.ident}" type="imsqti_xmlv1p2"><file href="${e.file}"/></resource>`).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="man_${Date.now()}" xmlns="http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1">
-  <metadata><schema>IMS Content</schema><schemaversion>1.1.3</schemaversion></metadata>
-  <organizations/>
-  <resources>\n${resources}\n  </resources>
-</manifest>`;
+function buildManifest(entries, bankName){
+  var stamp=Date.now();
+  var resources=entries.map(function(e){
+    return '    <resource identifier="res_'+e.ident+'" type="imsqti_xmlv1p2" href="'+e.file+'">\n'+
+           '      <file href="'+e.file+'"/>\n'+
+           '    </resource>';
+  }).join('\n');
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
+'<manifest identifier="man_'+stamp+'"\n'+
+'  xmlns="http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1"\n'+
+'  xmlns:lom="http://ltsc.ieee.org/xsd/imsccv1p1/LOM/resource"\n'+
+'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
+'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsccv1p1/imscp_v1p1 http://www.imsglobal.org/profile/cc/ccv1p1/ccv1p1_imscp_v1p2_v1p0.xsd">\n'+
+'  <metadata>\n'+
+'    <schema>IMS Content</schema>\n'+
+'    <schemaversion>1.1.3</schemaversion>\n'+
+'  </metadata>\n'+
+'  <organizations/>\n'+
+'  <resources>\n'+resources+'\n  </resources>\n'+
+'</manifest>';
 }
 
-async function makeZip(banks, pts){
-  await loadJSZip();
-  const zip=new JSZip(), entries=[];
-  for(const b of banks){
-    const ident=b.name.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
-    const fname=ident+'.xml';
-    zip.file(fname,buildQTIXML(b.questions,b.name,pts));
-    entries.push({ident,file:fname});
-  }
-  zip.file('imsmanifest.xml',buildManifest(entries));
-  return await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+async function makeZip(banks, pts, opts){
+  var files=[], entries=[], used={};
+  banks.forEach(function(b){
+    var ident=safeSlug(b.name,'bank');
+    var n=1, base=ident;
+    while(used[ident]){ ident=base+'_'+(++n); }
+    used[ident]=1;
+    var fname=ident+'.xml';
+    files.push({name:fname,data:buildQTIXML(b.questions,b.name,pts,opts)});
+    entries.push({ident:ident,file:fname});
+  });
+  files.push({name:'imsmanifest.xml',data:buildManifest(entries,banks[0]&&banks[0].name)});
+  return await zipBlob(files);
 }
 
-
-// ================================================================
-// D2L BRIGHTSPACE QTI 2.1 BUILDER
-// ================================================================
-
+// ====================================================
+// D2L BRIGHTSPACE
+// ====================================================
 function escXml(s){
-  return String(s||'')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&apos;');
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
 }
 
-// Strip LaTeX delimiters for plain-text contexts (D2L renders its own math)
+// Flatten LaTeX for plain-text contexts
 function stripLatex(s){
-  return String(s||'')
-    .replace(/\$\$([^$]+)\$\$/g,'$1')
-    .replace(/\$([^$\n]+)\$/g,'$1')
+  return String(s==null?'':s)
+    .replace(/\$\$([\s\S]+?)\$\$/g,'$1')
+    .replace(/\\\[([\s\S]+?)\\\]/g,'$1')
+    .replace(/\\\(([\s\S]+?)\\\)/g,'$1')
+    .replace(/\$([^$\n]+?)\$/g,'$1')
     .replace(/\\text\{([^}]*)\}/g,'$1')
-    .replace(/\\cdot/g,'·')
+    .replace(/\\cdot/g,'\u00b7')
+    .replace(/\\times/g,'\u00d7')
+    .replace(/\\pm/g,'\u00b1')
+    .replace(/\\degree|\\circ/g,'\u00b0')
     .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)')
     .replace(/\\sqrt\{([^}]+)\}/g,'sqrt($1)')
+    .replace(/\^\{([^}]+)\}/g,'^$1')
+    .replace(/_\{([^}]+)\}/g,'_$1')
     .replace(/\\[a-zA-Z]+\{([^}]*)\}/g,'$1')
     .replace(/\\[a-zA-Z]+/g,'')
     .replace(/[{}]/g,'')
+    .replace(/[ \t]{2,}/g,' ')
     .trim();
 }
 
-function buildD2LQTI21XML(questions, bankName){
-  var now = new Date().toISOString();
-  var safeName = escXml(bankName);
-
-  // Map tool question types → QTI 2.1 interaction types
-  function getInteractionType(q){
-    var t = (q.type||'').toLowerCase();
-    if(t==='essay'||t==='command_response') return 'extendedText';
-    if(t==='short_answer') return 'extendedTextShort';
-    if(t==='fill_in_the_blank') return 'textEntry';
-    return 'choice'; // numerical_mc, conceptual, symbolic, default
-  }
-
-  function buildChoiceItem(q, idx){
-    var qid = 'q_'+(q.id||idx);
-    var stem = escXml(stripLatex(q.stem||''));
-    var choices = (q.choices||[]);
-    var correctLetter = (q.correct||'A').toUpperCase();
-    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
-
-    // Build choice identifiers
-    var choiceIds = choices.map(function(c){ return 'ch_'+qid+'_'+c.letter.toUpperCase(); });
-    var correctId = 'ch_'+qid+'_'+correctLetter;
-
-    var choicesXml = choices.map(function(c,ci){
-      return '        <simpleChoice identifier="'+choiceIds[ci]+'">'+escXml(stripLatex(c.text))+'</simpleChoice>';
-    }).join('\n');
-
-    var feedbackXml = feedback
-      ? '\n  <modalFeedback identifier="fb_'+qid+'_correct" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
-      : '';
-
-    var feedbackRef = feedback
-      ? '\n    <setOutcomeValue identifier="FEEDBACK">\n      <baseValue baseType="identifier">fb_'+qid+'_correct</baseValue>\n    </setOutcomeValue>'
-      : '';
-
-    return '<!-- Question '+(idx+1)+': '+escXml((q.type||'mc'))+' | '+escXml(q.difficulty||'medium')+' -->\n'+
+/** One well-formed QTI 2.1 assessmentItem document. */
+function buildD2LItemXML(q, idx, bankName, pts, mathMode){
+  var safeName=escXml(bankName);
+  var qid='q_'+(idx+1);
+  var points=qPoints(q,pts||1);
+  var t=(q.type||'').toLowerCase();
+  var itype = (t==='essay'||t==='command_response') ? 'extendedText'
+            : (t==='short_answer') ? 'extendedTextShort'
+            : (t==='fill_in_the_blank'||t==='numerical') ? 'textEntry'
+            : 'choice';
+  var multi=(t==='multiple_answers'||t==='multi_select');
+  var M=function(s){ return escXml(mathFor(s,mathMode)).replace(/\n[ \t]*\n+/g,'&lt;br/&gt;&lt;br/&gt;').replace(/\n/g,' '); };
+  var stem=M(q.stem||'');
+  var feedback=(q.rationale||q.worked_solution||'');
+  var fbText=feedback?M(feedback):'';
+  var head='<?xml version="1.0" encoding="UTF-8"?>\n'+
 '<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
 '  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
 '  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
-'  identifier="'+qid+'"\n'+
-'  title="'+safeName+' Q'+(idx+1)+'"\n'+
-'  adaptive="false"\n'+
-'  timeDependent="false">\n'+
-'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">\n'+
-'    <correctResponse>\n'+
-'      <value>'+correctId+'</value>\n'+
-'    </correctResponse>\n'+
-'  </responseDeclaration>\n'+
-'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
-'    <defaultValue><value>0</value></defaultValue>\n'+
-'  </outcomeDeclaration>\n'+
-(feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '')+
+'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
+'  adaptive="false" timeDependent="false">\n';
+  var fbDecl=fbText?'  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n':'';
+  var fbMod=fbText?'  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+fbText+'</p></modalFeedback>\n':'';
+  var fbSet=fbText?'\n        <setOutcomeValue identifier="FEEDBACK"><baseValue baseType="identifier">fb_'+qid+'</baseValue></setOutcomeValue>':'';
+  var scoreDecl='  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>0</value></defaultValue>\n  </outcomeDeclaration>\n'+
+'  <outcomeDeclaration identifier="MAXSCORE" cardinality="single" baseType="float">\n'+
+'    <defaultValue><value>'+points+'</value></defaultValue>\n  </outcomeDeclaration>\n';
+
+  if(itype==='choice'){
+    var choices=(q.choices||[]).filter(function(c){return c&&String(c.text||'').trim()!=='';});
+    if(t==='true_false'&&choices.length<2) choices=[{letter:'A',text:'True'},{letter:'B',text:'False'}];
+    if(!choices.length) choices=[{letter:'A',text:'(no choices supplied)'}];
+    var keys=correctLetters(q).filter(function(L){return choices.some(function(c){return c.letter===L;});});
+    if(!keys.length) keys=[choices[0].letter];
+    var vals=keys.map(function(L){return '      <value>ch_'+qid+'_'+L+'</value>';}).join('\n');
+    var chXml=choices.map(function(c){
+      return '        <simpleChoice identifier="ch_'+qid+'_'+escXml(c.letter)+'">'+M(c.text)+'</simpleChoice>';
+    }).join('\n');
+    return head+
+'  <responseDeclaration identifier="RESPONSE" cardinality="'+(multi?'multiple':'single')+'" baseType="identifier">\n'+
+'    <correctResponse>\n'+vals+'\n    </correctResponse>\n'+
+'  </responseDeclaration>\n'+scoreDecl+fbDecl+
 '  <itemBody>\n'+
-'    <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1">\n'+
-'      <prompt>'+stem+'</prompt>\n'+
-choicesXml+'\n'+
+'    <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="'+(multi?keys.length:1)+'">\n'+
+'      <prompt>'+stem+'</prompt>\n'+chXml+'\n'+
 '    </choiceInteraction>\n'+
 '  </itemBody>\n'+
 '  <responseProcessing>\n'+
 '    <responseCondition>\n'+
 '      <responseIf>\n'+
 '        <match><variable identifier="RESPONSE"/><correct identifier="RESPONSE"/></match>\n'+
-'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">1</baseValue></setOutcomeValue>'+
-feedbackRef+'\n'+
+'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">'+points+'</baseValue></setOutcomeValue>'+fbSet+'\n'+
 '      </responseIf>\n'+
+'      <responseElse>\n'+
+'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">0</baseValue></setOutcomeValue>'+fbSet+'\n'+
+'      </responseElse>\n'+
 '    </responseCondition>\n'+
-'  </responseProcessing>\n'+
-feedbackXml+'\n'+
+'  </responseProcessing>\n'+fbMod+
 '</assessmentItem>';
   }
 
-  function buildTextEntryItem(q, idx){
-    var qid = 'q_'+(q.id||idx);
-    var stem = escXml(stripLatex(q.stem||''));
-    var correct = escXml(stripLatex(q.correct||''));
-    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
-    var feedbackXml = feedback
-      ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
-      : '';
-
-    return '<!-- Question '+(idx+1)+': fill_in_the_blank -->\n'+
-'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
-'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
-'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
-'  identifier="'+qid+'"\n'+
-'  title="'+safeName+' Q'+(idx+1)+'"\n'+
-'  adaptive="false" timeDependent="false">\n'+
-'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string">\n'+
-'    <correctResponse><value>'+correct+'</value></correctResponse>\n'+
-'  </responseDeclaration>\n'+
-'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
-'    <defaultValue><value>0</value></defaultValue>\n'+
-'  </outcomeDeclaration>\n'+
-(feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '')+
-'  <itemBody>\n'+
-'    <p>'+stem+'</p>\n'+
-'    <textEntryInteraction responseIdentifier="RESPONSE" expectedLength="30"/>\n'+
+  if(itype==='textEntry'){
+    var isNum=(t==='numerical');
+    var base=isNum?'float':'string';
+    var ans=isNum?(parseFloat(q.correct)||0):M(q.correct||'');
+    return head+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="'+base+'">\n'+
+'    <correctResponse><value>'+ans+'</value></correctResponse>\n'+
+'  </responseDeclaration>\n'+scoreDecl+fbDecl+
+'  <itemBody>\n    <p>'+stem+'</p>\n'+
+'    <textEntryInteraction responseIdentifier="RESPONSE" expectedLength="'+(isNum?12:40)+'"/>\n'+
 '  </itemBody>\n'+
-'  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p1/rptemplates/match_correct"/>\n'+
-feedbackXml+'\n'+
+'  <responseProcessing>\n'+
+'    <responseCondition>\n'+
+'      <responseIf>\n'+
+'        <match><variable identifier="RESPONSE"/><correct identifier="RESPONSE"/></match>\n'+
+'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">'+points+'</baseValue></setOutcomeValue>'+fbSet+'\n'+
+'      </responseIf>\n'+
+'      <responseElse>\n'+
+'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">0</baseValue></setOutcomeValue>'+fbSet+'\n'+
+'      </responseElse>\n'+
+'    </responseCondition>\n'+
+'  </responseProcessing>\n'+fbMod+
 '</assessmentItem>';
   }
 
-  function buildExtendedTextItem(q, idx, isShort){
-    var qid = 'q_'+(q.id||idx);
-    var stem = escXml(stripLatex(q.stem||''));
-    var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
-    var feedbackXml = feedback
-      ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show">\n    <p>'+feedback+'</p>\n  </modalFeedback>'
-      : '';
-    var expectedLines = isShort ? '3' : '10';
-    var expectedChars = isShort ? '200' : '1000';
-
-    return '<!-- Question '+(idx+1)+': '+(isShort?'short_answer':'essay')+' -->\n'+
-'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
-'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
-'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
-'  identifier="'+qid+'"\n'+
-'  title="'+safeName+' Q'+(idx+1)+'"\n'+
-'  adaptive="false" timeDependent="false">\n'+
-'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>\n'+
-'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
-'    <defaultValue><value>0</value></defaultValue>\n'+
-'  </outcomeDeclaration>\n'+
-(feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '')+
+  // extendedText / extendedTextShort — manually graded
+  var isShort=(itype==='extendedTextShort');
+  return head+
+'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>\n'+scoreDecl+fbDecl+
 '  <itemBody>\n'+
-'    <extendedTextInteraction responseIdentifier="RESPONSE"\n'+
-'      expectedLines="'+expectedLines+'" expectedLength="'+expectedChars+'">\n'+
+'    <extendedTextInteraction responseIdentifier="RESPONSE" expectedLines="'+(isShort?3:10)+'" expectedLength="'+(isShort?200:1000)+'">\n'+
 '      <prompt>'+stem+'</prompt>\n'+
 '    </extendedTextInteraction>\n'+
-'  </itemBody>\n'+
-feedbackXml+'\n'+
+'  </itemBody>\n'+fbMod+
 '</assessmentItem>';
-  }
-
-  // Build all items
-  var items = questions.map(function(q, idx){
-    var itype = getInteractionType(q);
-    if(itype === 'textEntry')        return buildTextEntryItem(q, idx);
-    if(itype === 'extendedTextShort') return buildExtendedTextItem(q, idx, true);
-    if(itype === 'extendedText')      return buildExtendedTextItem(q, idx, false);
-    return buildChoiceItem(q, idx);
-  });
-
-  // Wrap in assessmentTest
-  var itemRefs = questions.map(function(q, idx){
-    return '      <assessmentItemRef identifier="q_'+(q.id||idx)+'" href="q_'+(q.id||idx)+'.xml" required="false" fixed="false"/>';
-  }).join('\n');
-
-  // For single-file export, embed all items concatenated with XML declarations
-  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
-'<!-- D2L Brightspace QTI 2.1 Export -->\n'+
-'<!-- Bank: '+safeName+' | '+questions.length+' questions | Generated: '+now+' -->\n'+
-'<!-- Import via: D2L > Course Admin > Import/Export/Copy Components > Import Components -->\n\n'+
-items.join('\n\n<!-- ─────────────────────────────────────────── -->\n\n');
 }
 
 function buildD2LManifest(questions, bankName){
-  var safeName = escXml(bankName);
-  var now = new Date().toISOString();
-  var resources = questions.map(function(q, idx){
-    var qid = 'q_'+(q.id||idx);
-    return '    <resource identifier="'+qid+'" type="imsqti_item_xmlv2p1" href="'+qid+'.xml">\n'+
-'      <file href="'+qid+'.xml"/>\n'+
-'    </resource>';
+  var safeName=escXml(bankName);
+  var resources=questions.map(function(q,idx){
+    var qid='q_'+(idx+1);
+    return '    <resource identifier="RES_'+qid+'" type="imsqti_item_xmlv2p1" href="items/'+qid+'.xml">\n'+
+           '      <file href="items/'+qid+'.xml"/>\n'+
+           '    </resource>';
   }).join('\n');
-
   return '<?xml version="1.0" encoding="UTF-8"?>\n'+
 '<manifest xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"\n'+
 '  xmlns:imsmd="http://www.imsglobal.org/xsd/imsmd_v1p2"\n'+
 '  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
 '  xsi:schemaLocation="http://www.imsglobal.org/xsd/imscp_v1p1 http://www.imsglobal.org/xsd/imscp_v1p1p2.xsd"\n'+
-'  identifier="'+safeName.replace(/\s+/g,'_')+'_manifest">\n'+
+'  identifier="MAN_'+safeSlug(bankName,'bank')+'">\n'+
 '  <metadata>\n'+
 '    <schema>IMS Content</schema>\n'+
 '    <schemaversion>1.1.3</schemaversion>\n'+
-'    <imsmd:lom>\n'+
-'      <imsmd:general>\n'+
-'        <imsmd:title><imsmd:langstring xml:lang="en">'+safeName+'</imsmd:langstring></imsmd:title>\n'+
-'      </imsmd:general>\n'+
-'    </imsmd:lom>\n'+
+'    <imsmd:lom><imsmd:general>\n'+
+'      <imsmd:title><imsmd:langstring xml:lang="en">'+safeName+'</imsmd:langstring></imsmd:title>\n'+
+'    </imsmd:general></imsmd:lom>\n'+
 '  </metadata>\n'+
 '  <organizations/>\n'+
-'  <resources>\n'+
-resources+'\n'+
-'  </resources>\n'+
+'  <resources>\n'+resources+'\n  </resources>\n'+
 '</manifest>';
 }
 
-function buildD2LItemXML(q, idx, bankName){
-  var safeName = escXml(bankName);
-  var qid = 'q_'+(q.id||idx);
-  var itype = (function(){
-    var t = (q.type||'').toLowerCase();
-    if(t==='essay'||t==='command_response') return 'extendedText';
-    if(t==='short_answer') return 'extendedTextShort';
-    if(t==='fill_in_the_blank') return 'textEntry';
-    return 'choice';
-  })();
-
-  var stem = escXml(stripLatex(q.stem||''));
-  var feedback = q.worked_solution ? escXml(stripLatex(q.worked_solution)) : '';
-
-  if(itype === 'choice'){
-    var choices = (q.choices||[]);
-    var correctLetter = (q.correct||'A').toUpperCase();
-    var correctId = 'ch_'+qid+'_'+correctLetter;
-    var choicesXml = choices.map(function(c){
-      return '        <simpleChoice identifier="ch_'+qid+'_'+c.letter.toUpperCase()+'">'+escXml(stripLatex(c.text))+'</simpleChoice>';
-    }).join('\n');
-    var feedbackXml = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
-    var feedbackDecl = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
-    var feedbackRef = feedback ? '\n        <setOutcomeValue identifier="FEEDBACK"><baseValue baseType="identifier">fb_'+qid+'</baseValue></setOutcomeValue>' : '';
-
-    return '<?xml version="1.0" encoding="UTF-8"?>\n'+
-'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
-'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
-'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
-'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
-'  adaptive="false" timeDependent="false">\n'+
-'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">\n'+
-'    <correctResponse><value>'+correctId+'</value></correctResponse>\n'+
-'  </responseDeclaration>\n'+
-'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
-'    <defaultValue><value>0</value></defaultValue>\n'+
-'  </outcomeDeclaration>\n'+
-feedbackDecl+
-'  <itemBody>\n'+
-'    <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1">\n'+
-'      <prompt>'+stem+'</prompt>\n'+
-choicesXml+'\n'+
-'    </choiceInteraction>\n'+
-'  </itemBody>\n'+
-'  <responseProcessing>\n'+
-'    <responseCondition>\n'+
-'      <responseIf>\n'+
-'        <match><variable identifier="RESPONSE"/><correct identifier="RESPONSE"/></match>\n'+
-'        <setOutcomeValue identifier="SCORE"><baseValue baseType="float">1</baseValue></setOutcomeValue>'+feedbackRef+'\n'+
-'      </responseIf>\n'+
-'    </responseCondition>\n'+
-'  </responseProcessing>\n'+
-feedbackXml+'\n'+
-'</assessmentItem>';
-  }
-
-  if(itype === 'textEntry'){
-    var correct = escXml(stripLatex(q.correct||''));
-    var feedbackXml2 = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
-    var feedbackDecl2 = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
-    return '<?xml version="1.0" encoding="UTF-8"?>\n'+
-'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
-'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
-'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
-'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
-'  adaptive="false" timeDependent="false">\n'+
-'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string">\n'+
-'    <correctResponse><value>'+correct+'</value></correctResponse>\n'+
-'  </responseDeclaration>\n'+
-'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
-'    <defaultValue><value>0</value></defaultValue>\n'+
-'  </outcomeDeclaration>\n'+
-feedbackDecl2+
-'  <itemBody><p>'+stem+'</p>\n'+
-'    <textEntryInteraction responseIdentifier="RESPONSE" expectedLength="30"/>\n'+
-'  </itemBody>\n'+
-'  <responseProcessing template="http://www.imsglobal.org/question/qti_v2p1/rptemplates/match_correct"/>\n'+
-feedbackXml2+'\n'+
-'</assessmentItem>';
-  }
-
-  // extendedText / extendedTextShort
-  var isShort = itype === 'extendedTextShort';
-  var feedbackXml3 = feedback ? '\n  <modalFeedback identifier="fb_'+qid+'" outcomeIdentifier="FEEDBACK" showHide="show"><p>'+feedback+'</p></modalFeedback>' : '';
-  var feedbackDecl3 = feedback ? '  <outcomeDeclaration identifier="FEEDBACK" cardinality="single" baseType="identifier"/>\n' : '';
-  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
-'<assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1"\n'+
-'  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'+
-'  xsi:schemaLocation="http://www.imsglobal.org/xsd/imsqti_v2p1 http://www.imsglobal.org/xsd/imsqti_v2p1.xsd"\n'+
-'  identifier="'+qid+'" title="'+safeName+' Q'+(idx+1)+'"\n'+
-'  adaptive="false" timeDependent="false">\n'+
-'  <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="string"/>\n'+
-'  <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float">\n'+
-'    <defaultValue><value>0</value></defaultValue>\n'+
-'  </outcomeDeclaration>\n'+
-feedbackDecl3+
-'  <itemBody>\n'+
-'    <extendedTextInteraction responseIdentifier="RESPONSE"\n'+
-'      expectedLines="'+(isShort?'3':'10')+'" expectedLength="'+(isShort?'200':'1000')+'">\n'+
-'      <prompt>'+stem+'</prompt>\n'+
-'    </extendedTextInteraction>\n'+
-'  </itemBody>\n'+
-feedbackXml3+'\n'+
-'</assessmentItem>';
+async function makeD2LZip(questions, bankName, pts, mathMode){
+  var files=[{name:'imsmanifest.xml',data:buildD2LManifest(questions,bankName)}];
+  questions.forEach(function(q,idx){
+    files.push({name:'items/q_'+(idx+1)+'.xml',data:buildD2LItemXML(q,idx,bankName,pts,mathMode)});
+  });
+  return await zipBlob(files);
 }
+
+// ====================================================
+// MOODLE XML  (moodle.org/mod/quiz — native import)
+// ====================================================
+function cdata(s){ return '<![CDATA['+String(s==null?'':s).replace(/\]\]>/g,']]&gt;')+']]>'; }
+
+function buildMoodleXML(questions, categoryName, pts, mathMode){
+  var out=['<?xml version="1.0" encoding="UTF-8"?>','<quiz>'];
+  out.push('  <question type="category">');
+  out.push('    <category><text>$course$/top/'+escXml(categoryName)+'</text></category>');
+  out.push('    <info format="html"><text>'+cdata('Generated '+new Date().toISOString())+'</text></info>');
+  out.push('  </question>');
+
+  var exported=0, skipped=0;
+  var M=function(s){ return mathFor(s,mathMode); };
+
+  questions.forEach(function(q,i){
+    var t=(q.type||'multiple_choice').toLowerCase();
+    var points=qPoints(q,pts);
+    var name=escXml((q.stem||('Question '+(i+1))).replace(/\s+/g,' ').substring(0,80));
+    var stem=M(q.stem||'');
+    var gfb=q.rationale?'    <generalfeedback format="html"><text>'+cdata(M(q.rationale))+'</text></generalfeedback>\n':'';
+    var head='  <question type="%T%">\n'+
+             '    <name><text>'+name+'</text></name>\n'+
+             '    <questiontext format="html"><text>'+cdata(stem)+'</text></questiontext>\n'+
+             gfb+
+             '    <defaultgrade>'+points+'</defaultgrade>\n'+
+             '    <penalty>0</penalty>\n'+
+             '    <hidden>0</hidden>\n';
+    var choices=(q.choices||[]).filter(function(c){return c&&String(c.text||'').trim()!=='';});
+    var keys=correctLetters(q);
+
+    if(t==='essay'||t==='command_response'){
+      out.push(head.replace('%T%','essay')+
+        '    <responseformat>editor</responseformat>\n'+
+        '    <responsefieldlines>10</responsefieldlines>\n'+
+        '    <attachments>0</attachments>\n'+
+        '    <graderinfo format="html"><text>'+cdata(M(q.correct||q.rationale||''))+'</text></graderinfo>\n'+
+        '  </question>');
+      exported++; return;
+    }
+    if(t==='true_false'){
+      var isTrue=(keys[0]==='A');
+      var tf=choices.length>=2?(String(choices[0].text).trim().toLowerCase().indexOf('true')===0?isTrue:!isTrue):isTrue;
+      out.push(head.replace('%T%','truefalse')+
+        '    <answer fraction="'+(tf?100:0)+'" format="moodle_auto_format"><text>true</text><feedback format="html"><text></text></feedback></answer>\n'+
+        '    <answer fraction="'+(tf?0:100)+'" format="moodle_auto_format"><text>false</text><feedback format="html"><text></text></feedback></answer>\n'+
+        '  </question>');
+      exported++; return;
+    }
+    if(t==='numerical'){
+      var target=parseFloat(q.correct); if(!isFinite(target)) target=0;
+      var tol=parseFloat(q.tolerance); if(!isFinite(tol)||tol<0) tol=Math.abs(target)*0.01;
+      out.push(head.replace('%T%','numerical')+
+        '    <answer fraction="100" format="moodle_auto_format"><text>'+target+'</text>'+
+        '<feedback format="html"><text></text></feedback><tolerance>'+tol+'</tolerance></answer>\n'+
+        '  </question>');
+      exported++; return;
+    }
+    if(t==='short_answer'||t==='fill_in_the_blank'){
+      var alts=[q.correct].concat(q.alternates||[]).filter(function(a){return a!=null&&String(a).trim()!=='';});
+      if(!alts.length){ skipped++; return; }
+      var ansXml=alts.map(function(a){
+        return '    <answer fraction="100" format="moodle_auto_format"><text>'+escXml(stripLatex(a))+'</text>'+
+               '<feedback format="html"><text></text></feedback></answer>';
+      }).join('\n');
+      out.push(head.replace('%T%','shortanswer')+'    <usecase>0</usecase>\n'+ansXml+'\n  </question>');
+      exported++; return;
+    }
+    if(t==='matching'||t==='match'){
+      var pairs=(q.pairs||[]).filter(function(p){return p&&p.term&&p.definition;});
+      if(pairs.length<2){ skipped++; return; }
+      var sub=pairs.map(function(p){
+        return '    <subquestion format="html"><text>'+cdata(M(p.term))+'</text>'+
+               '<answer><text>'+escXml(stripLatex(p.definition))+'</text></answer></subquestion>';
+      }).join('\n');
+      out.push(head.replace('%T%','matching')+'    <shuffleanswers>true</shuffleanswers>\n'+sub+'\n  </question>');
+      exported++; return;
+    }
+
+    // multichoice (single or multiple)
+    if(!choices.length){ skipped++; return; }
+    var multi=(t==='multiple_answers'||t==='multi_select')||keys.length>1;
+    var valid=keys.filter(function(L){return choices.some(function(c){return c.letter===L;});});
+    if(!valid.length) valid=[choices[0].letter];
+    var share=multi?Math.round((100/valid.length)*100000)/100000:100;
+    var wrongFrac=multi?(-Math.round((100/Math.max(1,choices.length-valid.length))*100000)/100000):0;
+    var ansXml2=choices.map(function(c){
+      var isC=valid.indexOf(c.letter)>=0;
+      return '    <answer fraction="'+(isC?share:wrongFrac)+'" format="html"><text>'+cdata(M(c.text))+'</text>'+
+             '<feedback format="html"><text></text></feedback></answer>';
+    }).join('\n');
+    out.push(head.replace('%T%','multichoice')+
+      '    <single>'+(multi?'false':'true')+'</single>\n'+
+      '    <shuffleanswers>true</shuffleanswers>\n'+
+      '    <answernumbering>abc</answernumbering>\n'+
+      ansXml2+'\n  </question>');
+    exported++;
+  });
+
+  out.push('</quiz>');
+  return {xml:out.join('\n'), exported:exported, skipped:skipped};
+}
+
 
 
 function generateStudyGuide(questions, bankName, courseTitle){
@@ -2372,7 +2726,7 @@ function escGIFT(s){
   return String(s||'').replace(/([~=#{}:\\])/g,'\\$1');
 }
 function buildGIFT(questions,categoryName){
-  const SKIP=new Set(['command_response','analysis']);
+  const SKIP=new Set(['analysis']);
   const lines=[];
   lines.push('// Moodle GIFT export \u2014 generated '+new Date().toISOString());
   lines.push('');
@@ -2382,32 +2736,51 @@ function buildGIFT(questions,categoryName){
   questions.forEach(function(q,idx){
     var t=(q.type||'multiple_choice').toLowerCase();
     if(SKIP.has(t)){skipped++;return;}
-    var title=escGIFT((q.stem||'Q'+(idx+1)).slice(0,80).replace(/\n/g,' '));
-    var stem=escGIFT(q.stem||'');
-    var fb=q.rationale?'\n####'+escGIFT(q.rationale):'';
+    var title=escGIFT((q.stem||('Q'+(idx+1))).replace(/\s+/g,' ').slice(0,80));
+    var stem=escGIFT(oneBlock(stripLatex(q.stem||'')));
+    var fb=q.rationale?'\n####'+escGIFT(oneBlock(stripLatex(q.rationale))):'';
     var meta='// Q'+(idx+1)+' | '+(q.bloom||'')+' | '+(q.difficulty||'');
     if(t==='true_false'){
       var ans=(q.correct||'A').trim().toUpperCase().charAt(0)==='A'?'TRUE':'FALSE';
       lines.push(meta);lines.push('::'+title+'::'+stem+'{'+ans+fb+'}');lines.push('');exported++;return;
     }
-    if(t==='essay'){
-      var m=q.correct?'\n####Model answer: '+escGIFT(q.correct):'';
+    if(t==='numerical'){
+      var nt=parseFloat(q.correct); if(!isFinite(nt)) nt=0;
+      var ntol=parseFloat(q.tolerance); if(!isFinite(ntol)||ntol<0) ntol=Math.abs(nt)*0.01;
+      lines.push(meta);lines.push('::'+title+'::'+stem+'{#'+nt+':'+ntol+fb+'}');lines.push('');exported++;return;
+    }
+    if(t==='multiple_answers'||t==='multi_select'){
+      var mc=q.choices||[]; if(!mc.length){skipped++;return;}
+      var mk=(q.correctLetters&&q.correctLetters.length)?q.correctLetters:[String(q.correct||'A').toUpperCase().charAt(0)];
+      var nCorrect=mc.filter(function(c){return mk.indexOf(c.letter)>=0;}).length||1;
+      var nWrong=Math.max(1,mc.length-nCorrect);
+      var right=Math.round((100/nCorrect)*1000)/1000, wrong=Math.round((100/nWrong)*1000)/1000;
+      var ml=mc.map(function(c){
+        return '    ~%'+(mk.indexOf(c.letter)>=0?right:'-'+wrong)+'%'+escGIFT(oneBlock(stripLatex(c.text||'')));
+      }).join('\n');
+      lines.push(meta);lines.push('::'+title+'::'+stem+'{\n'+ml+fb+'\n}');lines.push('');exported++;return;
+    }
+    if(t==='essay'||t==='command_response'){
+      var m=q.correct?'\n####Model answer: '+escGIFT(oneBlock(stripLatex(q.correct))):'';
       lines.push(meta);lines.push('::'+title+'::'+stem+'{'+m+'}');lines.push('');exported++;return;
     }
     if(t==='short_answer'||t==='fill_in_the_blank'){
       var ds=(t==='fill_in_the_blank')?stem.replace(/___+/g,'____'):stem;
-      var a2=escGIFT(q.correct||(q.choices&&q.choices[0]&&q.choices[0].text)||'');
-      var alt=(q.choices&&q.choices[0]&&q.choices[0].text&&q.choices[0].text.trim()!==(q.correct||'').trim())?'\n    =%100%'+escGIFT(q.choices[0].text):'';
+      var a2=escGIFT(oneBlock(stripLatex(q.correct||'')));
+      if(!a2){skipped++;return;}
+      var alt=(q.alternates||[]).filter(Boolean).map(function(a){return '\n    ='+escGIFT(oneBlock(stripLatex(a)));}).join('');
       lines.push(meta);lines.push('::'+title+'::'+ds+'{='+a2+alt+fb+'}');lines.push('');exported++;return;
     }
     if(t==='match'||t==='matching'){
       var pairs=q.pairs||[];if(!pairs.length){skipped++;return;}
-      var pl=pairs.map(function(p){return '    ='+escGIFT(p.term||'')+' -> '+escGIFT(p.definition||'');}).join('\n');
+      if(pairs.length<2){skipped++;return;}
+      var pl=pairs.map(function(p){return '    ='+escGIFT(oneBlock(stripLatex(p.term||'')))+' -> '+escGIFT(oneBlock(stripLatex(p.definition||'')));}).join('\n');
       lines.push(meta);lines.push('::'+title+'::'+stem+'{\n'+pl+'\n}');lines.push('');exported++;return;
     }
     var choices=q.choices||[];if(!choices.length){skipped++;return;}
-    var ci='ABCD'.indexOf((q.correct||'A').trim().toUpperCase().charAt(0));if(ci<0)ci=0;
-    var cl=choices.map(function(c,i2){return '    '+(i2===ci?'=':'~%0%')+escGIFT(c.text||'');}).join('\n');
+    var key=(q.correctLetters&&q.correctLetters[0])||String(q.correct||'A').toUpperCase().charAt(0);
+    if(!choices.some(function(c){return c.letter===key;})) key=choices[0].letter;
+    var cl=choices.map(function(c){return '    '+(c.letter===key?'=':'~')+escGIFT(oneBlock(stripLatex(c.text||'')));}).join('\n');
     lines.push(meta);lines.push('::'+title+'::'+stem+'{\n'+cl+fb+'\n}');lines.push('');exported++;
   });
   lines.push('// Exported: '+exported+' | Skipped: '+skipped);
@@ -2423,48 +2796,65 @@ function dlBlob(blob,fname){
   a.href=u;a.download=fname;a.click();setTimeout(()=>URL.revokeObjectURL(u),5000);
 }
 
+function updateExportButtonLabel(){
+  const f=$('expFormat').value, b=$('btnExport');
+  const map={
+    'qti12':'⬇ Download Canvas QTI','qti12-diff':'⬇ Download Canvas QTI','qti12-topic':'⬇ Download Canvas QTI',
+    'd2l-qti21-zip':'⬇ Download Brightspace QTI','d2l-qti12-zip':'⬇ Download Brightspace QTI',
+    'moodle-xml':'⬇ Download Moodle XML','gift':'⬇ Download Moodle GIFT',
+    'gift-diff':'⬇ Download Moodle GIFT','gift-topic':'⬇ Download Moodle GIFT',
+    'json':'⬇ Download JSON','csv':'⬇ Download CSV','studyguide':'⬇ Download Study Guide'
+  };
+  b.innerHTML=map[f]||'⬇ Download Export';
+}
+$('expFormat').addEventListener('change', updateExportButtonLabel);
+updateExportButtonLabel();
+
 $('btnExport').addEventListener('click', async()=>{
   if(!parsedQuestions.length){ toast('Validate questions first.','error'); return; }
   const bankName=$('expBankName').value.trim()||'Question Bank';
   const pts=parseFloat($('expPoints').value)||1;
   const fmt=$('expFormat').value;
+  const mathMode=($('expMath')&&$('expMath').value)||'tex';
+  const opts={mathMode:mathMode};
   const qs=parsedQuestions;
+  const fileBase=safeSlug(bankName,'Question_Bank');
 
   $('btnExport').disabled=true;
   $('btnExport').textContent='Exporting…';
 
   try{
     if(fmt==='json'){
-      dlBlob(new Blob([JSON.stringify({bankName,generated:new Date().toISOString(),questions:qs},null,2)],{type:'application/json'}),bankName.replace(/\s+/g,'_')+'_questions.json');
+      dlBlob(new Blob([JSON.stringify({bankName,generated:new Date().toISOString(),questions:qs},null,2)],{type:'application/json'}),fileBase+'_questions.json');
       toast('JSON exported!','success');
     }else if(fmt==='csv'){
       const rows=[['#','Type','Bloom','Difficulty','Domain','Stem','A','B','C','D','Correct','Rationale']];
       qs.forEach((q,i)=>rows.push([i+1,q.type,q.bloom,q.difficulty,q.domain,q.stem,
         q.choices[0]?.text||'',q.choices[1]?.text||'',q.choices[2]?.text||'',q.choices[3]?.text||'',q.correct,q.rationale]));
       const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
-      dlBlob(new Blob([csv],{type:'text/csv'}),bankName.replace(/\s+/g,'_')+'_questions.csv');
+      dlBlob(new Blob([csv],{type:'text/csv'}),fileBase+'_questions.csv');
       toast('CSV exported!','success');
     }else if(fmt==='qti12-diff'){
       const g={easy:[],medium:[],hard:[]};
       qs.forEach(q=>(g[q.difficulty]||g.medium).push(q));
       const banks=Object.entries(g).filter(([,v])=>v.length).map(([d,v])=>({name:`${bankName} — ${d.charAt(0).toUpperCase()+d.slice(1)}`,questions:v}));
-      dlBlob(await makeZip(banks,pts),bankName.replace(/\s+/g,'_')+'_by-difficulty_QTI.zip');
+      dlBlob(await makeZip(banks,pts,opts),fileBase+'_by-difficulty_QTI.zip');
       toast('Exported '+banks.length+' difficulty banks!','success');
     }else if(fmt==='qti12-topic'){
       const g={};
       qs.forEach(q=>{const d=q.domain||'General';if(!g[d])g[d]=[];g[d].push(q);});
       const banks=Object.entries(g).map(([d,v])=>({name:`${bankName} — ${d}`,questions:v}));
-      dlBlob(await makeZip(banks,pts),bankName.replace(/\s+/g,'_')+'_by-topic_QTI.zip');
+      dlBlob(await makeZip(banks,pts,opts),fileBase+'_by-topic_QTI.zip');
       toast('Exported '+banks.length+' topic banks!','success');
     }else if(fmt==='studyguide'){
       const courseTitle=$('courseTitle')?.value?.trim()||'';
       const html=generateStudyGuide(qs,bankName,courseTitle);
-      dlBlob(new Blob([html],{type:'text/html'}),bankName.replace(/\s+/g,'_')+'_StudyGuide.html');
+      dlBlob(new Blob([html],{type:'text/html'}),fileBase+'_StudyGuide.html');
       toast('Study guide downloaded!','success');
 
     }else if(fmt==='gift'){
       var gr=buildGIFTBlob(qs,bankName);
-      dlBlob(gr.blob,bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_Moodle.gift.txt');
+      dlBlob(gr.blob,fileBase+'_Moodle.gift.txt');
       toast('\u2713 Moodle GIFT \u2014 '+gr.exported+' questions'+(gr.skipped?' ('+gr.skipped+' skipped)':'')+'.','success');
     }else if(fmt==='gift-diff'){
       var dg={easy:[],medium:[],hard:[]};
@@ -2472,36 +2862,36 @@ $('btnExport').addEventListener('click', async()=>{
       var dp=Object.entries(dg).filter(function(e){return e[1].length;});
       var dc='',de=0,ds=0;
       dp.forEach(function(e){var r=buildGIFT(e[1],bankName+' \u2014 '+e[0].charAt(0).toUpperCase()+e[0].slice(1));dc+=r.text+'\n\n';de+=r.exported;ds+=r.skipped;});
-      dlBlob(new Blob([dc],{type:'text/plain;charset=utf-8'}),bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_by-difficulty_Moodle.gift.txt');
+      dlBlob(new Blob([dc],{type:'text/plain;charset=utf-8'}),fileBase+'_by-difficulty_Moodle.gift.txt');
       toast('\u2713 Moodle GIFT (by difficulty) \u2014 '+de+' questions across '+dp.length+' categories'+(ds?' ('+ds+' skipped)':'')+'.','success');
     }else if(fmt==='gift-topic'){
       var tg={};
       qs.forEach(function(q){var d=q.domain||'General';if(!tg[d])tg[d]=[];tg[d].push(q);});
       var tc='',te=0,ts=0;
       Object.entries(tg).forEach(function(e){var r=buildGIFT(e[1],bankName+' \u2014 '+e[0]);tc+=r.text+'\n\n';te+=r.exported;ts+=r.skipped;});
-      dlBlob(new Blob([tc],{type:'text/plain;charset=utf-8'}),bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_by-topic_Moodle.gift.txt');
+      dlBlob(new Blob([tc],{type:'text/plain;charset=utf-8'}),fileBase+'_by-topic_Moodle.gift.txt');
       toast('\u2713 Moodle GIFT (by topic) \u2014 '+te+' questions across '+Object.keys(tg).length+' categories'+(ts?' ('+ts+' skipped)':'')+'.','success');
-    }else if(fmt==='d2l-qti21-xml'){
-      const xml=buildD2LQTI21XML(qs,bankName);
-      dlBlob(new Blob([xml],{type:'application/xml'}),bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_D2L_QTI21.xml');
-      toast('D2L QTI 2.1 XML downloaded! Import via: Course Admin → Import/Export/Copy Components.','success');
+    }else if(fmt==='moodle-xml'){
+      const mr=buildMoodleXML(qs,bankName,pts,mathMode);
+      dlBlob(new Blob([mr.xml],{type:'application/xml;charset=utf-8'}),fileBase+'_Moodle.xml');
+      toast('✓ Moodle XML — '+mr.exported+' questions'+(mr.skipped?' ('+mr.skipped+' skipped)':'')+'. Import via: Question bank → Import → Moodle XML format.','success');
     }else if(fmt==='d2l-qti21-zip'){
-      const zip=new JSZip();
-      zip.file('imsmanifest.xml',buildD2LManifest(qs,bankName));
-      qs.forEach(function(q,idx){ var qid='q_'+(q.id||idx); zip.file(qid+'.xml',buildD2LItemXML(q,idx,bankName)); });
-      const blob=await zip.generateAsync({type:'blob'});
-      dlBlob(blob,bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_D2L_QTI21.zip');
-      toast('D2L QTI 2.1 ZIP downloaded! Import via: Course Admin → Import/Export/Copy Components.','success');
+      dlBlob(await makeD2LZip(qs,bankName,pts,mathMode),fileBase+'_Brightspace_QTI21.zip');
+      toast('Brightspace QTI 2.1 ZIP downloaded. Import via: Course Admin → Import/Export/Copy Components.','success');
+    }else if(fmt==='d2l-qti12-zip'){
+      dlBlob(await makeZip([{name:bankName,questions:qs}],pts,opts),fileBase+'_Brightspace_QTI12.zip');
+      toast('Brightspace QTI 1.2 ZIP downloaded. Use this if Brightspace rejects the 2.1 package.','success');
     }else{
-      const blob=await makeZip([{name:bankName,questions:qs}],pts);
-      dlBlob(blob,bankName.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')+'_QTI.zip');
+      dlBlob(await makeZip([{name:bankName,questions:qs}],pts,opts),fileBase+'_Canvas_QTI.zip');
       toast('Canvas QTI ZIP downloaded!','success');
     }
-  }catch(err){ toast('Export failed: '+err.message,'error'); }
+  }catch(err){
+    console.error('Export failed:',err);
+    toast('Export failed: '+(err&&err.message?err.message:String(err)),'error');
+  }
 
-  var _pgFmt=$('expFormat').value;
   $('btnExport').disabled=false;
-  $('btnExport').innerHTML=_pgFmt.startsWith('gift')?'⬇ Download Moodle GIFT':'⬇ Download Canvas QTI';
+  updateExportButtonLabel();
 });
 
 // HOW IT WORKS MODAL
