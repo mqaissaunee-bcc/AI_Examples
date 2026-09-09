@@ -2,47 +2,47 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.28
-  Date:     August 2, 2026
-  Features: Fall FTE goal celebration.
-            - Permanent card treatment: when aggregate college FTE >=
-              100% of goal, the FTE card gets a green tint, left-edge
-              accent, "Goal met" ribbon badge inline with the label,
-              and celebration sub-line wording ("goal met, +X above"
-              instead of "N to go"). Visible on every load once goal
-              is met; survives screenshots.
-            - One-time animated celebration: on the first load after
-              the aggregate crosses the goal, per user per term, a
-              full-viewport confetti fall plus centered "🎯 Fall Goal
-              Met" toast fires. Uses the Web Animations API for
-              performant particle motion. Duration ~4 seconds, click
-              anywhere to dismiss early.
-            - Trigger honesty: the animation triggers on the "as of
-              today" aggregate, NOT the currently-viewed snapshot's
-              aggregate. So browsing back to a historical snapshot
-              where goal was met doesn't retrigger; only the initial
-              crossing does.
-            - Persistence: celebrated-for-term stored in localStorage
-              (enroll-goal-met-celebrated). Once fired for e.g. "26FA",
-              won't fire again until term changes. Cleared automatically
-              when a new academic term appears in the manifest.
-            - Accessibility: prefers-reduced-motion suppresses the
-              animation entirely. The card treatment (non-animated)
-              still communicates the milestone.
-            - No What's New announcement — the celebration works better
-              as a discovered delight than a documented feature.
-            Built on v4.9 canonical baseline.
+  Version:  v5.29
+  Date:     September 8, 2026
+  Features: Dual-stack data ingest — accepts both per-POT files and
+            single combined files.
+            Pipeline changes (generate_manifest.py):
+            - New combined-file support behind ENABLE_COMBINED_FILES
+              flag. When true, files matching 26FAR_*_MMDDYY.xlsx are
+              recognized as combined files carrying all POTs in one
+              spreadsheet. Pipeline reads each, groups by Term column
+              (26FA / 26FA11 / 26FA7A / 26FA7B) and emits one manifest
+              entry per POT with a new pot_term_filter field.
+            - Loose per-POT files now supported via filename-prefix
+              detection (26FA_, 26FA11_, 26FA7A_, 26FA7B_) in addition
+              to the existing subfolder structure. Subfolder wins when
+              both are present.
+            - Collision policy: when a date has both a combined and a
+              per-POT file for the same POT, the combined file wins
+              silently. Individual files that would collide get dropped
+              from the manifest with a summary count in the log.
+            Client changes (this file):
+            - Sheet-name detection now accepts both "Individual Sects
+              All" (per-POT convention) and "Query result" (combined-
+              file convention). Same column set on both, so downstream
+              ingest is unaffected.
+            - New resolveRowsForEntry() applies pot_term_filter when
+              present and defensively deduplicates by (Section, Term).
+              No-op for per-POT files. Prevents double-counting on
+              combined files where Colleague hasn't fully consolidated
+              multi-meeting rows.
+            Reversibility: flip ENABLE_COMBINED_FILES to False in the
+            pipeline and rerun. Manifest regenerates without any
+            combined-file entries; client's pot_term_filter handling
+            becomes inert. No dashboard code change needed to revert.
+            No What's New announcement — pipeline-only change, no
+            user-facing feature. Built on v4.9 canonical baseline.
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Enrollment Dashboard</title>
-<!-- Inline favicon — no files to upload. Paste in <head>. -->
-<!-- Crisp vector for modern browsers: -->
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiI+CjxkZWZzPjxjbGlwUGF0aCBpZD0iYmdjbGlwIj48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjYxLjQiIHJ5PSI2MS40Ii8+PC9jbGlwUGF0aD48L2RlZnM+CjxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiByeD0iNjEuNCIgcnk9IjYxLjQiIGZpbGw9IiNmZmZkZjgiLz4KPGcgY2xpcC1wYXRoPSJ1cmwoI2JnY2xpcCkiPjx0ZXh0IHg9IjI2MC4wMCIgeT0iMzA0LjAwIiBmb250LXNpemU9IjQ3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9ImNlbnRyYWwiIGZvbnQtZmFtaWx5PSInQXBwbGUgQ29sb3IgRW1vamknLCdTZWdvZSBVSSBFbW9qaScsJ05vdG8gQ29sb3IgRW1vamknLCdTZWdvZSBVSSBTeW1ib2wnLHNhbnMtc2VyaWYiPvCfk4o8L3RleHQ+PC9nPgo8L3N2Zz4K">
-<!-- PNG fallback for older browsers (optional, delete if not needed): -->
-<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,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">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
@@ -2240,7 +2240,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.28</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.29</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -2551,7 +2551,9 @@
       try {
         const data = new Uint8Array(ev.target.result);
         const wb = XLSX.read(data, { type: 'array' });
-        const sheetName = wb.SheetNames.find(n => /individual\s*sect/i.test(n)) || wb.SheetNames[0];
+        const sheetName = wb.SheetNames.find(n => /individual\s*sect/i.test(n))
+                       || wb.SheetNames.find(n => /query\s*result/i.test(n))
+                       || wb.SheetNames[0];
         const sheet = wb.Sheets[sheetName];
         const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
         ingestRows(rawRows, file.name);
@@ -2610,10 +2612,18 @@
       for (const { entry, buf } of results) {
         try {
           const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
-          const sheetName = wb.SheetNames.find(n => /individual\s*sect/i.test(n)) || wb.SheetNames[0];
+          // Sheet-name detection: prefer the per-POT convention ("Individual
+          // Sects All"), fall back to the combined-file convention ("Query
+          // result"), then anything else as a last resort. Both conventions
+          // ship the same column set, so the ingest logic is oblivious to
+          // which sheet was used.
+          const sheetName = wb.SheetNames.find(n => /individual\s*sect/i.test(n))
+                         || wb.SheetNames.find(n => /query\s*result/i.test(n))
+                         || wb.SheetNames[0];
           const sheet = wb.Sheets[sheetName];
           const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
-          ingestRowsSilent(rawRows, entry.file, entry.date, entry.part_of_term);
+          const rows = resolveRowsForEntry(rawRows, entry);
+          ingestRowsSilent(rows, entry.file, entry.date, entry.part_of_term);
         } catch (err) {
           console.error(`Failed to parse ${entry.file}:`, err);
         }
@@ -2650,6 +2660,45 @@
       state.loadError = err.message || String(err);
       render();
     }
+  }
+
+  // Apply the manifest entry's optional pot_term_filter, then defensively
+  // deduplicate by (Section, Term). Used during manifest-driven load to
+  // handle combined files where one source contains rows from multiple POTs.
+  //
+  // pot_term_filter comes from the manifest when the pipeline splits a
+  // combined 26FAR_ file into one snapshot entry per POT — each entry
+  // carries the Term column value that identifies its rows ("26FA" for 15W,
+  // "26FA11" for 11W, etc.). No-op for entries without this field, so
+  // per-POT files pass through unchanged.
+  //
+  // Deduplication is a defensive layer against combined files where
+  // Colleague hasn't fully consolidated multi-meeting sections. Laura's
+  // Sept 2 file is cleanly consolidated so dedup is a no-op on it, but
+  // if a future combined file has multi-block rows they'd double-count
+  // enrollment without this. Also safe for per-POT files where sections
+  // are already unique per Term — dedup finds nothing to drop.
+  function resolveRowsForEntry(rawRows, entry) {
+    let rows = rawRows;
+
+    if (entry && entry.pot_term_filter) {
+      rows = rows.filter(r => {
+        const term = r.Term != null ? String(r.Term).trim() : '';
+        return term === entry.pot_term_filter;
+      });
+    }
+
+    const seen = new Set();
+    const dedup = [];
+    for (const r of rows) {
+      const secKey = r.Section != null ? String(r.Section).trim() : '';
+      const termKey = r.Term != null ? String(r.Term).trim() : '';
+      const key = `${secKey}||${termKey}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      dedup.push(r);
+    }
+    return dedup;
   }
 
   // Like ingestRows, but used during manifest load — does not toast or modify
