@@ -2,29 +2,34 @@
 """
 Generate manifest.json for the enrollment dashboard.
 
-Discovers snapshot files in data/26FA/ and writes data/26FA/manifest.json
-listing each snapshot with its date, part-of-term, source file, and any
-required content filter. Preserves custom top-level manifest fields (goals,
-etc.) across regenerations.
+Discovers snapshot files in the specified data directory and writes
+<data_dir>/manifest.json listing each snapshot with its date, part-of-term,
+source file, and any required content filter. Preserves custom top-level
+manifest fields (goals, etc.) across regenerations.
 
-Two file paths supported:
+The term code is derived from the data directory name — data/26FA/ → 26FA,
+data/27SP/ → 27SP, etc. All POT patterns are built dynamically from the term
+code, so this script works for future semesters without modification.
+
+Two file paths supported per term:
 
   1. Per-POT files (legacy).
-     Filename patterns:  26FA_*_MMDDYY.xlsx    → 15W
-                         26FA11_*_MMDDYY.xlsx  → 11W
-                         26FA7A_*_MMDDYY.xlsx  → 7A
-                         26FA7B_*_MMDDYY.xlsx  → 7B
-     Location: subfolder (data/26FA/15W/, etc.) preferred, or loose in
-     data/26FA/. Subfolder location takes precedence over filename prefix
+     Filename patterns (using 26FA as the term-code example):
+       26FA_*_MMDDYY.xlsx    → 15W
+       26FA11_*_MMDDYY.xlsx  → 11W
+       26FA7A_*_MMDDYY.xlsx  → 7A
+       26FA7B_*_MMDDYY.xlsx  → 7B
+     Location: subfolder (<data_dir>/15W/, etc.) preferred, or loose in
+     <data_dir>/. Subfolder location takes precedence over filename prefix
      when both are present.
      Manifest: one entry per file.
 
   2. Combined files (new).
-     Filename pattern: 26FAR_*_MMDDYY.xlsx
-     Location: loose in data/26FA/
+     Filename pattern: <term>R_*_MMDDYY.xlsx  (e.g. 26FAR_...)
+     Location: loose in <data_dir>/
      Content: one xlsx containing rows from every POT. POT is identified
-     by the "Term" column: "26FA" = 15W, "26FA11" = 11W, "26FA7A" = 7A,
-     "26FA7B" = 7B.
+     by the "Term" column: <term> = 15W, <term>11 = 11W, <term>7A = 7A,
+     <term>7B = 7B.
      Manifest: one entry per POT actually present in the file, all pointing
      at the same source file with a "pot_term_filter" field indicating which
      Term value to keep at ingest.
@@ -36,10 +41,14 @@ only per-POT files land in the manifest. Existing per-POT flow is untouched.
 Collision policy: if a date has both a combined file AND per-POT files for
 POTs covered by the combined file, the combined file wins silently. The
 per-POT files for those POTs get dropped from the manifest for that date.
-This supports a gradual transition where Laura may leave stale per-POT
-files in place briefly while moving to combined-only.
+This supports a gradual transition where a stale per-POT file may briefly
+coexist with a combined file for the same date.
+
+Usage:
+    python3 generate_manifest.py --data-dir data/26FA
 """
 
+import argparse
 import json
 import pathlib
 import re
@@ -62,34 +71,39 @@ ENABLE_COMBINED_FILES = True
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
-DATA_ROOT = pathlib.Path('data/26FA')
-TERM_CODE = '26FA'
-
-# Subfolder names by POT.
 POT_SUBFOLDERS = ['15W', '11W', '7A', '7B']
-
-# Filename prefix → POT for loose per-POT files. Order matters: more-specific
-# patterns are checked first so '26FA11_' doesn't match '26FA_'.
-INDIVIDUAL_PREFIX_MAP = [
-    ('11W', re.compile(r'^26FA11[_ ]', re.IGNORECASE)),
-    ('7A',  re.compile(r'^26FA7A[_ ]', re.IGNORECASE)),
-    ('7B',  re.compile(r'^26FA7B[_ ]', re.IGNORECASE)),
-    ('15W', re.compile(r'^26FA[_ ]',   re.IGNORECASE)),  # Fallback for plain 26FA_
-]
-
-# Combined-file prefix — 26FAR_ (Colleague's naming for the report-style query).
-COMBINED_PREFIX_PATTERN = re.compile(r'^26FAR[_ ]', re.IGNORECASE)
-
-# Term column values → POT identifier. Used to split combined-file rows.
-TERM_TO_POT = {
-    '26FA':   '15W',
-    '26FA11': '11W',
-    '26FA7A': '7A',
-    '26FA7B': '7B',
-}
-
-# Sheet names to try when reading a file, in preferred order.
 SHEET_NAMES = ['Individual Sects All', 'Query result']
+
+
+def build_config(term_code):
+    """
+    Build the term-specific patterns and mappings from a term code (e.g. '26FA').
+    All prefix regexes and Term-value → POT mappings derive from this so the
+    same script works for any current or future term.
+    """
+    escaped = re.escape(term_code)
+    return {
+        'term_code': term_code,
+        # Combined-file prefix — e.g. 26FAR_ (Colleague's naming for the
+        # report-style query that returns all POTs in one file).
+        'combined_pattern': re.compile(rf'^{escaped}R[_ ]', re.IGNORECASE),
+        # Filename prefix → POT for loose per-POT files. Order matters:
+        # more-specific patterns are checked first so '26FA11_' doesn't
+        # match '26FA_' by accident.
+        'individual_prefix_map': [
+            ('11W', re.compile(rf'^{escaped}11[_ ]', re.IGNORECASE)),
+            ('7A',  re.compile(rf'^{escaped}7A[_ ]', re.IGNORECASE)),
+            ('7B',  re.compile(rf'^{escaped}7B[_ ]', re.IGNORECASE)),
+            ('15W', re.compile(rf'^{escaped}[_ ]',   re.IGNORECASE)),
+        ],
+        # Term column values → POT identifier. Used to split combined rows.
+        'term_to_pot': {
+            term_code:            '15W',
+            f'{term_code}11':     '11W',
+            f'{term_code}7A':     '7A',
+            f'{term_code}7B':     '7B',
+        },
+    }
 
 
 # ==============================================================================
@@ -110,22 +124,18 @@ def parse_date_from_filename(filename):
         return None
 
 
-def detect_individual_pot_from_filename(filename):
-    """
-    Detect POT from a per-POT filename prefix. Returns POT string, or None
-    if the filename doesn't match any known individual pattern (which
-    includes combined files, which are handled separately).
-    """
-    if COMBINED_PREFIX_PATTERN.match(filename):
-        return None  # Not an individual file
-    for pot, pattern in INDIVIDUAL_PREFIX_MAP:
+def detect_individual_pot_from_filename(filename, config):
+    """Detect POT from a per-POT filename prefix. Returns POT string or None."""
+    if config['combined_pattern'].match(filename):
+        return None
+    for pot, pattern in config['individual_prefix_map']:
         if pattern.match(filename):
             return pot
     return None
 
 
-def is_combined_file(filename):
-    return bool(COMBINED_PREFIX_PATTERN.match(filename))
+def is_combined_file(filename, config):
+    return bool(config['combined_pattern'].match(filename))
 
 
 # ==============================================================================
@@ -134,8 +144,7 @@ def is_combined_file(filename):
 def read_sheet(path):
     """
     Read the appropriate sheet from an xlsx file. Tries known sheet names in
-    order; returns a DataFrame plus the sheet name used. Raises RuntimeError
-    if none of the known sheets are present.
+    order. Raises RuntimeError if none present.
     """
     xls = pd.ExcelFile(path)
     for name in SHEET_NAMES:
@@ -151,7 +160,7 @@ def read_sheet(path):
 # ==============================================================================
 # DISCOVERY
 # ==============================================================================
-def discover_individual_snapshots(data_root):
+def discover_individual_snapshots(data_root, config):
     """
     Find per-POT files in subfolders or loose in data_root. Returns a list of
     dicts: {'file': relpath_from_data_root, 'date': date, 'pot': pot_code}.
@@ -160,7 +169,6 @@ def discover_individual_snapshots(data_root):
     results = []
     seen_paths = set()
 
-    # Subfolder-based (canonical)
     for pot in POT_SUBFOLDERS:
         pot_dir = data_root / pot
         if not pot_dir.exists():
@@ -175,13 +183,12 @@ def discover_individual_snapshots(data_root):
             results.append({'file': rel, 'date': date_val, 'pot': pot})
             seen_paths.add(xlsx_path.resolve())
 
-    # Loose files in data_root
     for xlsx_path in sorted(data_root.glob('*.xlsx')):
         if xlsx_path.resolve() in seen_paths:
             continue
-        if is_combined_file(xlsx_path.name):
-            continue  # Combined files handled separately
-        pot = detect_individual_pot_from_filename(xlsx_path.name)
+        if is_combined_file(xlsx_path.name, config):
+            continue
+        pot = detect_individual_pot_from_filename(xlsx_path.name, config)
         if not pot:
             print(f"  WARNING: could not detect POT from loose file {xlsx_path.name} — skipping",
                   file=sys.stderr)
@@ -196,23 +203,18 @@ def discover_individual_snapshots(data_root):
     return results
 
 
-def discover_combined_snapshots(data_root):
+def discover_combined_snapshots(data_root, config):
     """
-    Find combined files (26FAR_*) in data_root. Reads each to determine which
-    POTs are present via the Term column. Returns a list of dicts:
-      {
-        'file': filename,
-        'date': date,
-        'pot_map': { pot_code: term_value, ... },  # POTs present in this file
-      }
-    Skips files that can't be parsed with clear warnings.
+    Find combined files in data_root. Reads each to determine which POTs are
+    present via the Term column. Returns a list of dicts:
+      {'file': filename, 'date': date, 'pot_map': {pot: term_value, ...}}
     """
     if not ENABLE_COMBINED_FILES:
         return []
 
     results = []
     for xlsx_path in sorted(data_root.glob('*.xlsx')):
-        if not is_combined_file(xlsx_path.name):
+        if not is_combined_file(xlsx_path.name, config):
             continue
 
         date_val = parse_date_from_filename(xlsx_path.name)
@@ -222,7 +224,7 @@ def discover_combined_snapshots(data_root):
             continue
 
         try:
-            df, sheet_used = read_sheet(xlsx_path)
+            df, _sheet_used = read_sheet(xlsx_path)
         except RuntimeError as e:
             print(f"  WARNING: {e} — skipping", file=sys.stderr)
             continue
@@ -232,14 +234,12 @@ def discover_combined_snapshots(data_root):
                   file=sys.stderr)
             continue
 
-        # Discover which POTs are present via Term column values
         term_values = set(df['Term'].astype(str).dropna().unique())
-        pot_map = {}  # pot -> term_value
+        pot_map = {}
         unrecognized = []
         for term_val in term_values:
-            pot = TERM_TO_POT.get(term_val)
+            pot = config['term_to_pot'].get(term_val)
             if pot:
-                # If somehow two Term values map to the same POT, prefer the first
                 pot_map.setdefault(pot, term_val)
             else:
                 unrecognized.append(term_val)
@@ -271,13 +271,11 @@ def build_snapshot_entries(individual, combined):
     """
     snapshots = []
 
-    # (date_iso, pot) pairs covered by combined files
     combined_coverage = set()
     for c in combined:
         for pot in c['pot_map']:
             combined_coverage.add((c['date'].isoformat(), pot))
 
-    # Combined entries (one per POT within each combined file)
     for c in combined:
         for pot, term_val in sorted(c['pot_map'].items()):
             snapshots.append({
@@ -288,7 +286,6 @@ def build_snapshot_entries(individual, combined):
                 'pot_term_filter': term_val,
             })
 
-    # Individual entries — skip collisions
     dropped_by_collision = 0
     for i in individual:
         key = (i['date'].isoformat(), i['pot'])
@@ -302,7 +299,6 @@ def build_snapshot_entries(individual, combined):
             'file': i['file'],
         })
 
-    # Deterministic sort: date ascending, then POT
     snapshots.sort(key=lambda s: (s['date'], s['part_of_term']))
     return snapshots, dropped_by_collision
 
@@ -320,17 +316,16 @@ def load_existing_manifest(manifest_path):
         return {}
 
 
-def write_manifest(data_root, snapshots):
+def write_manifest(data_root, term_code, snapshots):
     """Assemble and write the manifest, preserving custom top-level fields."""
     manifest_path = data_root / 'manifest.json'
     existing = load_existing_manifest(manifest_path)
 
-    # Keys auto-generated by this script; anything else is preserved.
     auto_generated_keys = {'term', 'updated', 'snapshots'}
     preserved = {k: v for k, v in existing.items() if k not in auto_generated_keys}
 
     manifest = {
-        'term': TERM_CODE,
+        'term': term_code,
         'updated': datetime.now(timezone.utc).isoformat(),
         **preserved,
         'snapshots': snapshots,
@@ -347,19 +342,35 @@ def write_manifest(data_root, snapshots):
 # MAIN
 # ==============================================================================
 def main():
-    if not DATA_ROOT.exists():
-        print(f"ERROR: data directory {DATA_ROOT} does not exist", file=sys.stderr)
+    parser = argparse.ArgumentParser(
+        description="Generate manifest.json for an enrollment dashboard term folder."
+    )
+    parser.add_argument(
+        '--data-dir', type=pathlib.Path, required=True,
+        help='Path to the term data folder (e.g. data/26FA)',
+    )
+    args = parser.parse_args()
+
+    data_root = args.data_dir
+    if not data_root.exists():
+        print(f"ERROR: {data_root} does not exist", file=sys.stderr)
+        return 1
+    if not data_root.is_dir():
+        print(f"ERROR: {data_root} is not a directory", file=sys.stderr)
         return 1
 
-    print(f"Scanning {DATA_ROOT}...")
+    term_code = data_root.name
+    config = build_config(term_code)
+
+    print(f"Scanning {data_root} (term: {term_code})...")
     print(f"  Combined-file support: {'ENABLED' if ENABLE_COMBINED_FILES else 'DISABLED'}")
 
-    individual = discover_individual_snapshots(DATA_ROOT)
-    combined = discover_combined_snapshots(DATA_ROOT)
+    individual = discover_individual_snapshots(data_root, config)
+    combined = discover_combined_snapshots(data_root, config)
 
     snapshots, dropped_by_collision = build_snapshot_entries(individual, combined)
 
-    manifest_path = write_manifest(DATA_ROOT, snapshots)
+    manifest_path = write_manifest(data_root, term_code, snapshots)
 
     combined_entries = sum(1 for s in snapshots if 'pot_term_filter' in s)
     individual_entries = len(snapshots) - combined_entries
