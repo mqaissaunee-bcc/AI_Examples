@@ -536,7 +536,7 @@ footer .program{color:var(--cyan);font-weight:600;}
         <div class="exp-item"><span class="ei-ico">&#128273;</span><div class="ei-txt"><div class="ei-name">Instructor Answer Key (HTML)</div><div class="ei-desc">Every part with final answer, worked solution, and computation-check result.</div></div><button class="btn btn-amber" id="expKey">Download</button></div>
         <div class="exp-item"><span class="ei-ico">&#127891;</span><div class="ei-txt"><div class="ei-name">Canvas Submission Page (HTML)</div><div class="ei-desc">Problems + figures formatted to paste into a Canvas Assignment description. Pair with a File Upload submission so students upload their work.</div></div><button class="btn btn-amber" id="expCanvas">Download</button></div>
         <div class="exp-item"><span class="ei-ico">&#128253;</span><div class="ei-txt"><div class="ei-name">In-class Examples (HTML &middot; present &amp; reveal)</div><div class="ei-desc">Self-contained page for working problems live: switch between scrolling and slide view; each problem reveals its answer first, then the full worked solution, on click.</div></div><button class="btn btn-amber" id="expInclass">Download</button></div>
-        <div class="exp-item"><span class="ei-ico">&#127760;</span><div class="ei-txt"><div class="ei-name">In-class &rarr; Canvas / LMS page (copy HTML)</div><div class="ei-desc">Native click-to-reveal accordions, inline styles, LaTeX as \(&hellip;\) &mdash; paste straight into a Canvas page&rsquo;s HTML editor (&lt;/&gt;). No script, no stylesheet (Canvas strips those). Upload figures with the image tool.</div></div><button class="btn btn-ghost" id="expInclassCanvas">Copy HTML</button></div>
+        <div class="exp-item"><span class="ei-ico">&#127760;</span><div class="ei-txt"><div class="ei-name">In-class &rarr; Canvas / LMS page (copy HTML)</div><div class="ei-desc">Native click-to-reveal accordions, inline styles, and math as Canvas equation images that render on save &mdash; paste straight into a Canvas page&rsquo;s HTML editor (&lt;/&gt;). No script or stylesheet needed. Upload figures with the image tool.</div></div><button class="btn btn-ghost" id="expInclassCanvas">Copy HTML</button></div>
         <div class="exp-item"><span class="ei-ico">&#128190;</span><div class="ei-txt"><div class="ei-name">Exam JSON (backup / reload)</div><div class="ei-desc">Save the full exam — reload it later in Step 1 to keep editing.</div></div><button class="btn btn-ghost" id="expJson">Download</button></div>
       </div>
       <div class="status" id="exportMsg" role="alert" aria-live="polite"></div>
@@ -623,15 +623,24 @@ function renderLatex(s){
   }).join('');
 }
 /* Canvas/LMS math: Canvas MathJax uses \(...\) inline and $$...$$ display — it does NOT treat $...$ as math. */
+/* Canvas/LMS math: emit Canvas native equation images. Canvas renders these server-side on every
+   instance (the /equation_images/ service), so math shows even where Canvas does NOT auto-process
+   $...$ / $$ delimiters in pasted HTML. data-equation-content also lets Canvas re-render client-side. */
+function eqImgCanvas(latex,display){
+  const raw=String(latex).trim();
+  const a=escAttr(raw);
+  const img='<img class="equation_image" data-equation-content="'+a+'" src="/equation_images/'+encodeURIComponent(raw)+'" alt="LaTeX: '+a+'" title="'+a+'">';
+  return display?'<span style="display:block;text-align:center;margin:10px 0;">'+img+'</span>':img;
+}
 function renderLatexCanvas(s){
   if(!s) return '';
   const plainDollar=/^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|[\d.,]+%?)\$$/;
   return String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g).map(p=>{
     if(!p) return '';
-    if(p.startsWith('$$')&&p.endsWith('$$')) return '$$'+escH(p.slice(2,-2))+'$$';      // display: keep $$
+    if(p.startsWith('$$')&&p.endsWith('$$')) return eqImgCanvas(p.slice(2,-2),true);   // display equation
     if(p[0]==='$'&&p.length>1&&p.endsWith('$')){
-      if(plainDollar.test(p)) return escH(p.slice(1,-1));                                // literal money: drop $
-      return '\\('+escH(p.slice(1,-1))+'\\)';                                            // inline math → \( \)
+      if(plainDollar.test(p)) return escH(p.slice(1,-1));                              // literal money: drop $
+      return eqImgCanvas(p.slice(1,-1),false);                                         // inline equation
     }
     return escH(p);
   }).join('');
@@ -1543,7 +1552,7 @@ function inclassCanvasFragment(){
   const meta=examMeta();
   const RL=renderLatexCanvas;
   const showPts=$('inclassPoints')&&$('inclassPoints').checked;
-  const banner='<p style="border:1px dashed #9cc6ef;background:#e8f3ff;color:#22405e;padding:10px 13px;border-radius:6px;font-size:0.9em;"><strong>Instructor note (delete before publishing):</strong> Paste this into a Canvas page with the HTML editor (the <code>&lt;/&gt;</code> button). The Show Answer / Show Full Solution boxes are native click-to-reveal &mdash; no script needed. Upload any figures with the image tool. Math renders automatically.</p>';
+  const banner='<p style="border:1px dashed #9cc6ef;background:#e8f3ff;color:#22405e;padding:10px 13px;border-radius:6px;font-size:0.9em;"><strong>Instructor note (delete before publishing):</strong> Paste this into a Canvas page with the HTML editor (the <code>&lt;/&gt;</code> button), then Save. The Show Answer / Show Full Solution boxes are native click-to-reveal &mdash; no script needed. Math is embedded as Canvas equations and renders on save. Upload any figures with the image tool.</p>';
   const header='<h2 style="color:#003366;margin:0 0 4px;">'+escH(meta.examTitle)+'</h2>'+
     (meta.courseTitle?'<p style="color:#006666;font-weight:bold;margin:0 0 10px;">'+escH(meta.courseTitle)+'</p>':'')+
     (meta.instructions?'<p style="background:#f4f4ee;border-left:4px solid #006666;padding:9px 12px;border-radius:3px;">'+escH(meta.instructions)+'</p>':'');
