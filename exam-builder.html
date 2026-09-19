@@ -510,7 +510,7 @@ footer .program{color:var(--cyan);font-weight:600;}
 
 <section class="panel" id="tab-export" role="tabpanel" aria-labelledby="t-export">
 <div class="wrap">
-  <div class="head"><h2>Export</h2><p>Printable student exam (work space, no answers), instructor answer key (worked solutions + checks), a Canvas file-upload page, and an in-class presenter page that reveals answers then full solutions on click. Plus a JSON backup you can reload.</p></div>
+  <div class="head"><h2>Export</h2><p>Printable student exam (work space, no answers), instructor answer key (worked solutions + checks), a Canvas file-upload page, and in-class examples in two forms: a browser presenter page (page/slide, click-to-reveal) and a Canvas-native version you paste straight into a page. Plus a JSON backup you can reload.</p></div>
   <div id="exportEmpty" class="empty"><div class="ico">&#11015;</div><div style="font-family:var(--mono);font-size:.8rem;">Validate problems in Step 3 first.</div></div>
   <div id="exportReady" style="display:none;">
     <div class="vbar" id="vbar" role="status" aria-live="polite">
@@ -534,6 +534,7 @@ footer .program{color:var(--cyan);font-weight:600;}
         <div class="exp-item"><span class="ei-ico">&#128273;</span><div class="ei-txt"><div class="ei-name">Instructor Answer Key (HTML)</div><div class="ei-desc">Every part with final answer, worked solution, and computation-check result.</div></div><button class="btn btn-amber" id="expKey">Download</button></div>
         <div class="exp-item"><span class="ei-ico">&#127891;</span><div class="ei-txt"><div class="ei-name">Canvas Submission Page (HTML)</div><div class="ei-desc">Problems + figures formatted to paste into a Canvas Assignment description. Pair with a File Upload submission so students upload their work.</div></div><button class="btn btn-amber" id="expCanvas">Download</button></div>
         <div class="exp-item"><span class="ei-ico">&#128253;</span><div class="ei-txt"><div class="ei-name">In-class Examples (HTML &middot; present &amp; reveal)</div><div class="ei-desc">Self-contained page for working problems live: switch between scrolling and slide view; each problem reveals its answer first, then the full worked solution, on click.</div></div><button class="btn btn-amber" id="expInclass">Download</button></div>
+        <div class="exp-item"><span class="ei-ico">&#127760;</span><div class="ei-txt"><div class="ei-name">In-class &rarr; Canvas / LMS page (copy HTML)</div><div class="ei-desc">Native click-to-reveal accordions, inline styles, LaTeX as \(&hellip;\) &mdash; paste straight into a Canvas page&rsquo;s HTML editor (&lt;/&gt;). No script, no stylesheet (Canvas strips those). Upload figures with the image tool.</div></div><button class="btn btn-ghost" id="expInclassCanvas">Copy HTML</button></div>
         <div class="exp-item"><span class="ei-ico">&#128190;</span><div class="ei-txt"><div class="ei-name">Exam JSON (backup / reload)</div><div class="ei-desc">Save the full exam — reload it later in Step 1 to keep editing.</div></div><button class="btn btn-ghost" id="expJson">Download</button></div>
       </div>
       <div class="status" id="exportMsg" role="alert" aria-live="polite"></div>
@@ -551,7 +552,7 @@ footer .program{color:var(--cyan);font-weight:600;}
       <li><b>Configure</b> — pick a type (Exam, Weekly Homework, or In-class Examples), set the header, and add one slot per chapter/topic. Use <b>Quick Build</b> to generate the whole set at once from a difficulty mix and defaults, then fine-tune any slot (type, points, parts, figure).</li>
       <li><b>Generate &amp; run the prompt</b> — copy the prompt into your LLM (Claude recommended for LaTeX and figure specs). It returns one structured problem per slot.</li>
       <li><b>Review &amp; verify</b> — validate the JSON, then check each problem: confirm the computation check passes, the figure matches the given values, and the worked solution is correct. Mark each verified.</li>
-      <li><b>Export</b> — download the student exam, answer key, Canvas page, or an in-class presenter page (page/slide views; reveals the answer, then the full solution, on click).</li>
+      <li><b>Export</b> — download the student exam, answer key, Canvas page, or an in-class presenter page (page/slide, reveal answer then full solution). In-class also copies as Canvas-native HTML — native click-to-reveal accordions you paste straight into a Canvas page.</li>
     </ol>
   </div>
   <div class="card"><h3>&#129518; Figures</h3>
@@ -616,6 +617,20 @@ function renderLatex(s){
   const plainDollar=/^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|[\d.,]+%?)\$$/;
   return String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g).map(p=>{
     if(p && p[0]==='$' && !p.startsWith('$$') && plainDollar.test(p)) p=p.slice(1,-1);
+    return escH(p);
+  }).join('');
+}
+/* Canvas/LMS math: Canvas MathJax uses \(...\) inline and $$...$$ display — it does NOT treat $...$ as math. */
+function renderLatexCanvas(s){
+  if(!s) return '';
+  const plainDollar=/^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|[\d.,]+%?)\$$/;
+  return String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g).map(p=>{
+    if(!p) return '';
+    if(p.startsWith('$$')&&p.endsWith('$$')) return '$$'+escH(p.slice(2,-2))+'$$';      // display: keep $$
+    if(p[0]==='$'&&p.length>1&&p.endsWith('$')){
+      if(plainDollar.test(p)) return escH(p.slice(1,-1));                                // literal money: drop $
+      return '\\('+escH(p.slice(1,-1))+'\\)';                                            // inline math → \( \)
+    }
     return escH(p);
   }).join('');
 }
@@ -1516,6 +1531,32 @@ body.slide .slide-nav .ic-btn:hover{background:#003366;color:#fff}
     bar+'<div class="page">'+header+probs+'</div>'+nav+KATEX_TAIL+IC_JS+'</body></html>';
 }
 
+function inclassCanvasFragment(){
+  const meta=examMeta();
+  const RL=renderLatexCanvas;
+  const banner='<p style="border:1px dashed #9cc6ef;background:#e8f3ff;color:#22405e;padding:10px 13px;border-radius:6px;font-size:0.9em;"><strong>Instructor note (delete before publishing):</strong> Paste this into a Canvas page with the HTML editor (the <code>&lt;/&gt;</code> button). The Show Answer / Show Full Solution boxes are native click-to-reveal &mdash; no script needed. Upload any figures with the image tool. Math renders automatically.</p>';
+  const header='<h2 style="color:#003366;margin:0 0 4px;">'+escH(meta.examTitle)+'</h2>'+
+    (meta.courseTitle?'<p style="color:#006666;font-weight:bold;margin:0 0 10px;">'+escH(meta.courseTitle)+'</p>':'')+
+    (meta.instructions?'<p style="background:#f4f4ee;border-left:4px solid #006666;padding:9px 12px;border-radius:3px;">'+escH(meta.instructions)+'</p>':'');
+  const probs=problems.map((p,i)=>{
+    const tpts=p.points||p.parts.reduce((a,x)=>a+(x.points||0),0);
+    const partsPrompts=p.parts.map(pt=>'<p style="margin:8px 0;"><strong>'+(pt.letter?'('+escH(pt.letter)+') ':'')+'</strong>'+RL(pt.prompt||'')+(pt.points?' <span style="color:#666;font-size:0.85em;">['+pt.points+' pts]</span>':'')+'</p>').join('');
+    const ansItems=p.parts.map(pt=>pt.answer?('<p style="margin:4px 0;">'+(pt.letter?'('+escH(pt.letter)+') ':'')+'<strong>'+RL(pt.answer)+'</strong>'+(pt.units?' '+escH(pt.units):'')+'</p>'):'').join('');
+    let fig='';
+    const f=p.figure||{mode:'none'};
+    if(f.mode==='exhibit'&&f.text) fig='<pre style="font-family:\'Courier New\',monospace;font-size:0.85em;white-space:pre-wrap;background:#f6f6f2;border:1px solid #ccc;border-radius:4px;padding:10px 12px;">'+escH(f.text)+'</pre>';
+    else if(f.mode==='image') fig='<p style="border:1px dashed #bbb;background:#fafafa;color:#666;font-style:italic;padding:10px 12px;border-radius:4px;">[ Figure'+(f.caption?': '+escH(f.caption):'')+' &mdash; upload the image here in Canvas (Insert &#9656; Image) ]</p>';
+    const ansBox=ansItems?'<details style="margin-top:10px;border:1px solid #006840;border-radius:6px;background:#eef6ee;padding:2px 12px;"><summary style="cursor:pointer;font-weight:bold;color:#044e30;padding:8px 0;">Show Answer <small style="font-weight:normal;color:#666;">(click to reveal)</small></summary><div style="padding:2px 0 10px;">'+ansItems+'</div></details>':'';
+    const solBox=p.worked_solution?'<details style="margin-top:8px;border:1px solid #e0c080;border-radius:6px;background:#fff8ee;padding:2px 12px;"><summary style="cursor:pointer;font-weight:bold;color:#8a5000;padding:8px 0;">Show Full Solution <small style="font-weight:normal;color:#666;">(click to reveal)</small></summary><div style="padding:2px 0 10px;">'+RL(p.worked_solution)+'</div></details>':'';
+    return '<div style="margin:0 0 22px;padding:0 0 16px;border-bottom:1px solid #ccc;">'+
+      '<h3 style="color:#003366;margin:0 0 2px;">Problem '+(i+1)+' <span style="font-size:0.7em;color:#666;font-weight:normal;">'+tpts+' points</span></h3>'+
+      (p.label?'<p style="color:#006666;font-style:italic;margin:0 0 6px;">'+escH(p.label)+'</p>':'')+
+      (p.stem?'<p style="margin:0 0 10px;">'+RL(p.stem)+'</p>':'')+
+      fig+partsPrompts+ansBox+solBox+'</div>';
+  }).join('');
+  return banner+header+probs;
+}
+
 function guardExport(){
   if(!problems.length){toast('Validate problems first.','error');return false;}
   const total=problems.length,done=problems.filter((p,i)=>verified[p.id||('p'+i)]).length;
@@ -1526,6 +1567,14 @@ $('expStudent').addEventListener('click',()=>{if(!guardExport())return;dl(new Bl
 $('expKey').addEventListener('click',()=>{if(!problems.length){toast('Validate first.','error');return;}dl(new Blob([answerKeyHtml()],{type:'text/html'}),safeName()+'_answer_key.html');toast('Answer key downloaded.','success');});
 $('expCanvas').addEventListener('click',()=>{if(!guardExport())return;dl(new Blob([canvasHtml()],{type:'text/html'}),safeName()+'_canvas.html');toast('Canvas page downloaded.','success');});
 $('expInclass').addEventListener('click',()=>{if(!guardExport())return;dl(new Blob([inclassHtml()],{type:'text/html'}),safeName()+'_inclass.html');toast('In-class examples downloaded.','success');});
+$('expInclassCanvas').addEventListener('click',()=>{
+  if(!guardExport())return;
+  const frag=inclassCanvasFragment();
+  navigator.clipboard.writeText(frag).then(
+    ()=>toast('Canvas HTML copied — paste into your page\u2019s HTML editor (</>).','success'),
+    ()=>{dl(new Blob([frag],{type:'text/html'}),safeName()+'_canvas_inclass.html');toast('Clipboard blocked — downloaded the HTML instead; open it and copy the source.','info');}
+  );
+});
 $('expJson').addEventListener('click',()=>{
   const data={assignMode,meta:examMeta(),defaults:{unitSystem:$('unitSystem').value,sigFigs:$('sigFigs').value,defaultTol:$('defaultTol').value},imgStyle:($('imgStyle')?$('imgStyle').value:''),lessonUrl:$('lessonUrl').value.trim(),slots:slots.map(s=>({label:s.label,subject:s.subject,topic:s.topic,difficulty:s.difficulty,points:s.points,parts:s.parts,figure:s.figure,sourceUrl:s.sourceUrl})),generated:new Date().toISOString(),problems};
   dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),safeName()+(assignMode==='hw'?'_homework.json':'_exam.json'));toast('JSON saved.','success');
