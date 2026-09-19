@@ -525,6 +525,8 @@ footer .program{color:var(--cyan);font-weight:600;}
           <select id="includeRationale"><option value="full" selected>Full worked solutions + rationale</option><option value="answers">Final answers only</option></select></div>
         <div class="field"><label class="lab" for="workSpace">Student work space</label>
           <select id="workSpace"><option value="medium" selected>Medium box per part</option><option value="large">Large box per part</option><option value="lines">Ruled lines</option><option value="none">None (upload work)</option></select></div>
+        <div class="field"><label class="lab" for="inclassPoints">In-class page</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;min-height:44px;"><input type="checkbox" id="inclassPoints" style="width:auto;min-height:auto;accent-color:var(--cyan);"> Show points</label></div>
       </div>
     </div>
     <div class="card">
@@ -803,6 +805,9 @@ document.addEventListener('DOMContentLoaded',renderSlots);
 
 /* ════════════════ assignment mode (exam / homework) ════════════════ */
 let assignMode='exam';
+const GRADING_INSTR='Show all work for full credit. Clearly box each final answer and include units. Partial credit is awarded for correct method.';
+const INCLASS_INSTR='We\u2019ll work through these together in class.';
+let instrTouched=false;
 function applyMode(){
   const hw=assignMode==='hw', ic=assignMode==='inclass', exam=assignMode==='exam';
   $('modeExam').classList.toggle('on',exam); $('modeExam').setAttribute('aria-checked',exam.toString());
@@ -829,10 +834,12 @@ function applyMode(){
     : 'One slot per chapter/topic. In <b>exam</b> mode each slot has its own reference URL.';
   $('addFourEng').style.display=hw?'none':'';
   document.querySelectorAll('.slot-url-field').forEach(el=>el.style.display=hw?'none':'');
+  if(!instrTouched){ $('instructions').value = ic ? INCLASS_INSTR : GRADING_INSTR; }
 }
 $('modeExam').addEventListener('click',()=>{assignMode='exam';applyMode();});
 $('modeHw').addEventListener('click',()=>{assignMode='hw';applyMode();});
 $('modeInclass').addEventListener('click',()=>{assignMode='inclass';applyMode();});
+$('instructions').addEventListener('input',()=>{instrTouched=true;});
 document.addEventListener('DOMContentLoaded',applyMode);
 
 /* ════════════════ prompt builder ════════════════ */
@@ -1474,12 +1481,13 @@ function docShell(title,inner){
 
 function inclassHtml(){
   const meta=examMeta();
+  const showPts=$('inclassPoints')&&$('inclassPoints').checked;
   const probs=problems.map((p,i)=>{
     const tpts=p.points||p.parts.reduce((a,x)=>a+(x.points||0),0);
-    const partsPrompts=p.parts.map(pt=>'<div class="part"><span class="part-q">'+(pt.letter?'('+escH(pt.letter)+') ':'')+'</span>'+renderLatex(pt.prompt||'')+(pt.points?'<span class="pl">['+pt.points+' pts]</span>':'')+'</div>').join('');
+    const partsPrompts=p.parts.map(pt=>'<div class="part"><span class="part-q">'+(pt.letter?'('+escH(pt.letter)+') ':'')+'</span>'+renderLatex(pt.prompt||'')+(showPts&&pt.points?'<span class="pl">['+pt.points+' pts]</span>':'')+'</div>').join('');
     const ansItems=p.parts.map(pt=>pt.answer?('<span class="ai">'+(pt.letter?'('+escH(pt.letter)+') ':'')+'<b>'+renderLatex(pt.answer)+'</b>'+(pt.units?' '+escH(pt.units):'')+'</span>'):'').join('');
     const aId='ans-'+i, sId='sol-'+i;
-    return '<div class="prob" id="prob-'+i+'"><div class="prob-h"><span class="pn">Problem '+(i+1)+'</span><span class="pp">'+tpts+' points</span></div>'+
+    return '<div class="prob" id="prob-'+i+'"><div class="prob-h"><span class="pn">Problem '+(i+1)+'</span>'+(showPts?'<span class="pp">'+tpts+' points</span>':'')+'</div>'+
       (p.label?'<div class="prob-label">'+escH(p.label)+'</div>':'')+
       (p.stem?'<div class="stem">'+renderLatex(p.stem)+'</div>':'')+
       figureExportHtml(p.figure)+partsPrompts+
@@ -1534,13 +1542,14 @@ body.slide .slide-nav .ic-btn:hover{background:#003366;color:#fff}
 function inclassCanvasFragment(){
   const meta=examMeta();
   const RL=renderLatexCanvas;
+  const showPts=$('inclassPoints')&&$('inclassPoints').checked;
   const banner='<p style="border:1px dashed #9cc6ef;background:#e8f3ff;color:#22405e;padding:10px 13px;border-radius:6px;font-size:0.9em;"><strong>Instructor note (delete before publishing):</strong> Paste this into a Canvas page with the HTML editor (the <code>&lt;/&gt;</code> button). The Show Answer / Show Full Solution boxes are native click-to-reveal &mdash; no script needed. Upload any figures with the image tool. Math renders automatically.</p>';
   const header='<h2 style="color:#003366;margin:0 0 4px;">'+escH(meta.examTitle)+'</h2>'+
     (meta.courseTitle?'<p style="color:#006666;font-weight:bold;margin:0 0 10px;">'+escH(meta.courseTitle)+'</p>':'')+
     (meta.instructions?'<p style="background:#f4f4ee;border-left:4px solid #006666;padding:9px 12px;border-radius:3px;">'+escH(meta.instructions)+'</p>':'');
   const probs=problems.map((p,i)=>{
     const tpts=p.points||p.parts.reduce((a,x)=>a+(x.points||0),0);
-    const partsPrompts=p.parts.map(pt=>'<p style="margin:8px 0;"><strong>'+(pt.letter?'('+escH(pt.letter)+') ':'')+'</strong>'+RL(pt.prompt||'')+(pt.points?' <span style="color:#666;font-size:0.85em;">['+pt.points+' pts]</span>':'')+'</p>').join('');
+    const partsPrompts=p.parts.map(pt=>'<p style="margin:8px 0;"><strong>'+(pt.letter?'('+escH(pt.letter)+') ':'')+'</strong>'+RL(pt.prompt||'')+(showPts&&pt.points?' <span style="color:#666;font-size:0.85em;">['+pt.points+' pts]</span>':'')+'</p>').join('');
     const ansItems=p.parts.map(pt=>pt.answer?('<p style="margin:4px 0;">'+(pt.letter?'('+escH(pt.letter)+') ':'')+'<strong>'+RL(pt.answer)+'</strong>'+(pt.units?' '+escH(pt.units):'')+'</p>'):'').join('');
     let fig='';
     const f=p.figure||{mode:'none'};
@@ -1549,7 +1558,7 @@ function inclassCanvasFragment(){
     const ansBox=ansItems?'<details style="margin-top:10px;border:1px solid #006840;border-radius:6px;background:#eef6ee;padding:2px 12px;"><summary style="cursor:pointer;font-weight:bold;color:#044e30;padding:8px 0;">Show Answer <small style="font-weight:normal;color:#666;">(click to reveal)</small></summary><div style="padding:2px 0 10px;">'+ansItems+'</div></details>':'';
     const solBox=p.worked_solution?'<details style="margin-top:8px;border:1px solid #e0c080;border-radius:6px;background:#fff8ee;padding:2px 12px;"><summary style="cursor:pointer;font-weight:bold;color:#8a5000;padding:8px 0;">Show Full Solution <small style="font-weight:normal;color:#666;">(click to reveal)</small></summary><div style="padding:2px 0 10px;">'+RL(p.worked_solution)+'</div></details>':'';
     return '<div style="margin:0 0 22px;padding:0 0 16px;border-bottom:1px solid #ccc;">'+
-      '<h3 style="color:#003366;margin:0 0 2px;">Problem '+(i+1)+' <span style="font-size:0.7em;color:#666;font-weight:normal;">'+tpts+' points</span></h3>'+
+      '<h3 style="color:#003366;margin:0 0 2px;">Problem '+(i+1)+(showPts?' <span style="font-size:0.7em;color:#666;font-weight:normal;">'+tpts+' points</span>':'')+'</h3>'+
       (p.label?'<p style="color:#006666;font-style:italic;margin:0 0 6px;">'+escH(p.label)+'</p>':'')+
       (p.stem?'<p style="margin:0 0 10px;">'+RL(p.stem)+'</p>':'')+
       fig+partsPrompts+ansBox+solBox+'</div>';
@@ -1589,7 +1598,7 @@ $('loadExamInput').addEventListener('change',()=>{
     try{
       const d=JSON.parse(ev.target.result);
       if(d.assignMode){assignMode=(d.assignMode==='hw'||d.assignMode==='inclass')?d.assignMode:'exam';applyMode();}
-      if(d.meta){$('courseTitle').value=d.meta.courseTitle||'';$('examTitle').value=d.meta.examTitle||'';$('instructor').value=d.meta.instructor||'';$('timeLimit').value=d.meta.timeLimit||'';$('dueDate').value=d.meta.dueDate||'';$('instructions').value=d.meta.instructions||'';$('honorPledge').value=d.meta.honorPledge||'';}
+      if(d.meta){$('courseTitle').value=d.meta.courseTitle||'';$('examTitle').value=d.meta.examTitle||'';$('instructor').value=d.meta.instructor||'';$('timeLimit').value=d.meta.timeLimit||'';$('dueDate').value=d.meta.dueDate||'';$('instructions').value=d.meta.instructions||'';$('honorPledge').value=d.meta.honorPledge||'';instrTouched=true;}
       if(d.defaults){$('unitSystem').value=d.defaults.unitSystem||'SI';$('sigFigs').value=d.defaults.sigFigs||'3';$('defaultTol').value=d.defaults.defaultTol||'2';}
       if(d.lessonUrl!=null)$('lessonUrl').value=d.lessonUrl;
       if(d.imgStyle!=null&&$('imgStyle'))$('imgStyle').value=d.imgStyle;
