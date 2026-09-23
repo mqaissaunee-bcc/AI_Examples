@@ -241,6 +241,14 @@ label{cursor:pointer;}
 .qb-apply>span{display:inline-flex;gap:6px;align-items:center;}
 .qb-apply input,.qb-apply select{max-width:118px;}
 .qb-set{padding:8px 12px;min-height:38px;font-size:.68rem;}
+.bp-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+.bp-row input{min-height:38px;}
+.bp-row .bp-label{flex:0 0 84px;}
+.bp-row .bp-url{flex:1 1 170px;}
+.bp-row .bp-count{flex:0 0 62px;}
+.bp-row .bp-topics{flex:2 1 210px;}
+.bp-row .bp-del{flex:0 0 auto;background:none;border:1px solid var(--border);border-radius:6px;width:36px;height:38px;cursor:pointer;color:var(--red);font-size:1.1rem;line-height:1;}
+.bp-row .bp-del:hover{background:color-mix(in srgb,var(--red) 10%,transparent);}
 .img-prompt{font-family:var(--body);font-size:.82rem;width:100%;resize:vertical;line-height:1.5;}
 .img-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;}
 .upload-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:var(--radius);font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;border:1px solid var(--cyan);color:var(--cyan);background:transparent;min-height:40px;}
@@ -382,23 +390,47 @@ footer .program{color:var(--cyan);font-weight:600;}
   </div>
 
   <div class="card">
-    <h3>&#9889; Quick Build</h3>
-    <p class="hint" style="margin-bottom:12px;">Set a difficulty mix and defaults, then generate every problem slot in one step. You can still fine-tune any slot below.</p>
+    <h3>&#9889; Quick Build &mdash; Blueprint</h3>
+    <p class="hint" style="margin-bottom:12px;">Describe the exam by chapter and build every slot at once. Add a chapter per reading, set how many questions and (optionally) which topics, then generate. Fine-tune any slot below afterward.</p>
+    <div id="bpChapters"></div>
+    <button class="btn btn-ghost" id="bpAddChapter" style="margin:2px 0 14px;">+ Add chapter</button>
+
     <div class="qb-grid">
-      <div class="field"><label class="lab" for="qbEasy">Easy</label><input type="number" id="qbEasy" value="1" min="0" max="30" step="1"></div>
-      <div class="field"><label class="lab" for="qbMed">Medium</label><input type="number" id="qbMed" value="3" min="0" max="30" step="1"></div>
-      <div class="field"><label class="lab" for="qbHard">Hard</label><input type="number" id="qbHard" value="1" min="0" max="30" step="1"></div>
-      <div class="field"><label class="lab" for="qbTotal">Total problems</label><input type="number" id="qbTotal" value="5" readonly tabindex="-1" style="background:var(--surface-2);"></div>
+      <div class="field"><label class="lab" for="bpSubject">Subject</label><select id="bpSubject"></select></div>
+      <div class="field"><label class="lab" for="bpParts">Parts each</label><input type="number" id="bpParts" value="1" min="1" max="6" step="1"></div>
+      <div class="field"><label class="lab" for="bpFigure">Figures</label><select id="bpFigure"><option value="auto">Let the LLM decide</option><option value="image">Figure (image prompt)</option><option value="exhibit">Exhibit block</option><option value="none">No figure</option></select></div>
+      <div class="field"><label class="lab" for="bpTotal">Total questions</label><input type="number" id="bpTotal" value="0" readonly tabindex="-1" style="background:var(--surface-2);"></div>
     </div>
-    <div class="qb-grid" style="margin-top:10px;">
-      <div class="field"><label class="lab" for="qbSubject">Default subject</label><select id="qbSubject"></select></div>
-      <div class="field"><label class="lab" for="qbPoints">Points each</label><input type="number" id="qbPoints" value="20" min="1" max="100" step="1"></div>
-      <div class="field"><label class="lab" for="qbParts">Parts each</label><input type="number" id="qbParts" value="2" min="1" max="6" step="1"></div>
-      <div class="field"><label class="lab" for="qbFigure">Figures</label><select id="qbFigure"><option value="auto">Let the LLM decide</option><option value="image">Figure (image prompt)</option><option value="exhibit">Exhibit block</option><option value="none">No figure</option></select></div>
+
+    <div style="margin-top:12px;">
+      <div class="lab" style="margin-bottom:6px;">Difficulty spread (relative weights, distributed across all chapters)</div>
+      <div class="qb-apply">
+        <span>Easy <input type="number" id="bpEasy" value="1" min="0" max="40" style="max-width:70px;"></span>
+        <span>Medium <input type="number" id="bpMed" value="2" min="0" max="40" style="max-width:70px;"></span>
+        <span>Hard <input type="number" id="bpHard" value="1" min="0" max="40" style="max-width:70px;"></span>
+      </div>
     </div>
-    <div class="btnrow" style="margin-top:12px;">
-      <button class="btn btn-primary" id="qbGenerate">&#9889; Generate Problem Slots</button>
+
+    <div style="margin-top:12px;">
+      <div class="lab" style="margin-bottom:6px;">Points</div>
+      <div class="qb-apply">
+        <span><label style="display:inline-flex;gap:6px;align-items:center;"><input type="radio" name="bpPtMode" value="per" checked style="width:auto;min-height:auto;accent-color:var(--cyan);"> Per question</label> <input type="number" id="bpPerPts" value="20" min="1" max="100" style="max-width:80px;"></span>
+        <span><label style="display:inline-flex;gap:6px;align-items:center;"><input type="radio" name="bpPtMode" value="total" style="width:auto;min-height:auto;accent-color:var(--cyan);"> Total</label> <input type="number" id="bpTotPts" value="100" min="1" max="1000" style="max-width:90px;"> <select id="bpPtWeight" style="max-width:150px;"><option value="equal">split equally</option><option value="difficulty">weight by difficulty</option></select></span>
+      </div>
     </div>
+
+    <div class="btnrow" style="margin-top:14px;">
+      <button class="btn btn-primary" id="bpGenerate">&#9889; Generate Problem Slots</button>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
+      <div class="lab" style="margin-bottom:8px;">Make an in-class companion for these chapters</div>
+      <div class="qb-apply">
+        <button class="btn btn-ghost" id="bpInclassReuse">Reuse these questions in-class</button>
+        <button class="btn btn-ghost" id="bpInclassFresh">Fresh examples, same chapters</button>
+      </div>
+    </div>
+
     <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
       <div class="lab" style="margin-bottom:8px;">Apply to all existing problems</div>
       <div class="qb-apply">
@@ -551,7 +583,7 @@ footer .program{color:var(--cyan);font-weight:600;}
   <div class="head"><h2>How This Tool Works</h2><p>A workflow for turning chapter coverage into a verified, traditional exam.</p></div>
   <div class="card"><h3>&#128260; Workflow</h3>
     <ol class="glist">
-      <li><b>Configure</b> — pick a type (Exam, Weekly Homework, or In-class Examples), set the header, and add one slot per chapter/topic. Use <b>Quick Build</b> to generate the whole set at once from a difficulty mix and defaults, then fine-tune any slot (type, points, parts, figure).</li>
+      <li><b>Configure</b> — pick a type (Exam, Weekly Homework, or In-class Examples), set the header, and add one slot per chapter/topic. Use <b>Quick Build &mdash; Blueprint</b> to describe the exam by chapter (reading URL, how many questions, optional topics) and generate every slot at once, with difficulty spread and points distributed for you — then fine-tune any slot. A one-click companion turns the same chapters into in-class examples.</li>
       <li><b>Generate &amp; run the prompt</b> — copy the prompt into your LLM (Claude recommended for LaTeX and figure specs). It returns one structured problem per slot.</li>
       <li><b>Review &amp; verify</b> — validate the JSON, then check each problem: confirm the computation check passes, the figure matches the given values, and the worked solution is correct. Mark each verified.</li>
       <li><b>Export</b> — download the student exam, answer key, Canvas page, or an in-class presenter page (page/slide; reveal the answer, walk the solution one step at a time, or jump to the full solution). In-class also copies as Canvas-native HTML — native click-to-reveal accordions, including per-step boxes, that you paste straight into a Canvas page.</li>
@@ -778,22 +810,93 @@ $('addFourEng').addEventListener('click',()=>{
   ];
   renderSlots(); toast('Added 4 engineering slots.','success');
 });
-/* Quick Build (bulk) */
+/* Quick Build — Blueprint (bulk, by chapter) */
 (function(){
   const g=id=>document.getElementById(id);
-  function syncTotal(){const t=(+g('qbEasy').value||0)+(+g('qbMed').value||0)+(+g('qbHard').value||0);g('qbTotal').value=t;}
-  ['qbEasy','qbMed','qbHard'].forEach(id=>g(id).addEventListener('input',syncTotal));
-  if(g('qbSubject'))g('qbSubject').innerHTML=subjectOptions('engtech-kinematics');
-  g('qbGenerate').addEventListener('click',()=>{
-    const e=+g('qbEasy').value||0,m=+g('qbMed').value||0,h=+g('qbHard').value||0,total=e+m+h;
-    if(total<1){toast('Set at least one problem in the difficulty mix.','error');return;}
-    if(total>40){toast('Cap is 40 problems — trim the mix.','error');return;}
-    if(slots.length && !confirm('Replace the current '+slots.length+' slot(s) with '+total+' new problem(s)?'))return;
-    const subj=g('qbSubject').value,pts=Math.max(1,+g('qbPoints').value||20),parts=Math.max(1,+g('qbParts').value||1),fig=g('qbFigure').value;
-    const diffs=[].concat(Array(e).fill('easy'),Array(m).fill('medium'),Array(h).fill('hard'));
-    slots=diffs.map((d,i)=>newSlot({label:'Problem '+(i+1),subject:subj,difficulty:d,points:pts,parts:parts,figure:fig}));
-    renderSlots(); toast(total+' problem slots generated.','success');
+  let bp=[{label:'Ch. 1',url:'',count:7,topics:''},{label:'Ch. 2',url:'',count:7,topics:''}];
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  function syncTotal(){g('bpTotal').value=bp.reduce((a,c)=>a+Math.max(0,+c.count||0),0);}
+  function render(){
+    const host=g('bpChapters'); if(!host)return; host.innerHTML='';
+    bp.forEach((c,i)=>{
+      const row=document.createElement('div'); row.className='bp-row'; row.dataset.idx=i;
+      row.innerHTML='<input class="bp-label" placeholder="Ch. 12" value="'+esc(c.label)+'">'+
+        '<input class="bp-url" placeholder="Reference URL (optional)" value="'+esc(c.url)+'">'+
+        '<input class="bp-count" type="number" min="1" max="30" value="'+(c.count||1)+'" title="# questions">'+
+        '<input class="bp-topics" placeholder="Topics (optional, comma-separated) — blank = auto-spread" value="'+esc(c.topics)+'">'+
+        '<button class="bp-del" title="Remove chapter" data-del="'+i+'">&times;</button>';
+      host.appendChild(row);
+    });
+    syncTotal();
+  }
+  g('bpChapters').addEventListener('input',e=>{
+    const row=e.target.closest('.bp-row'); if(!row)return; const i=+row.dataset.idx; if(!bp[i])return;
+    if(e.target.classList.contains('bp-label'))bp[i].label=e.target.value;
+    else if(e.target.classList.contains('bp-url'))bp[i].url=e.target.value;
+    else if(e.target.classList.contains('bp-count')){bp[i].count=+e.target.value||0;syncTotal();}
+    else if(e.target.classList.contains('bp-topics'))bp[i].topics=e.target.value;
   });
+  g('bpChapters').addEventListener('click',e=>{
+    const b=e.target.closest('[data-del]'); if(!b)return;
+    if(bp.length<=1){toast('Keep at least one chapter.','error');return;}
+    bp.splice(+b.dataset.del,1); render();
+  });
+  g('bpAddChapter').addEventListener('click',()=>{bp.push({label:'Ch. '+(bp.length+1),url:'',count:5,topics:''});render();});
+  if(g('bpSubject'))g('bpSubject').innerHTML=subjectOptions('engtech-kinematics');
+
+  function spreadDifficulty(total,e,m,h){
+    const S=e+m+h; if(!S||total<=0)return Array(Math.max(0,total)).fill('medium');
+    const t={easy:Math.round(total*e/S),medium:Math.round(total*m/S),hard:Math.round(total*h/S)};
+    let s=t.easy+t.medium+t.hard;
+    while(s<total){t.medium++;s++;} while(s>total){if(t.medium>0)t.medium--;else if(t.easy>0)t.easy--;else t.hard--;s--;}
+    const list=[],pool={easy:t.easy,medium:t.medium,hard:t.hard},order=['easy','medium','hard']; let left=total;
+    while(left>0){for(const d of order){if(pool[d]>0){list.push(d);pool[d]--;left--;if(left<=0)break;}}}
+    return list;
+  }
+  function spreadPoints(total,mode,perQ,totPts,weight,diffs){
+    if(mode!=='total')return Array(total).fill(perQ);
+    if(weight==='difficulty'){
+      const w={easy:1,medium:1.5,hard:2},ws=diffs.map(d=>w[d]||1),sw=ws.reduce((a,x)=>a+x,0)||1;
+      let pts=ws.map(x=>Math.max(1,Math.round(totPts*x/sw))),s=pts.reduce((a,x)=>a+x,0),i=0;
+      while(s<totPts){pts[i%total]++;s++;i++;} while(s>totPts){if(pts[i%total]>1){pts[i%total]--;s--;}i++;}
+      return pts;
+    }
+    const base=Math.floor(totPts/total),rem=totPts-base*total;
+    return Array.from({length:total},(_,k)=>base+(k<rem?1:0));
+  }
+  g('bpGenerate').addEventListener('click',()=>{
+    const chapters=bp.map(c=>({label:(c.label||'').trim(),url:(c.url||'').trim(),count:Math.max(0,Math.min(30,+c.count||0)),topics:(c.topics||'').split(',').map(t=>t.trim()).filter(Boolean)})).filter(c=>c.count>0);
+    const total=chapters.reduce((a,c)=>a+c.count,0);
+    if(total<1){toast('Add at least one chapter with a question count.','error');return;}
+    if(total>40){toast('Cap is 40 questions — trim the counts.','error');return;}
+    if(slots.length && !confirm('Replace the current '+slots.length+' slot(s) with '+total+' new question(s)?'))return;
+    const e=+g('bpEasy').value||0,m=+g('bpMed').value||0,h=+g('bpHard').value||0;
+    const subj=g('bpSubject').value,parts=Math.max(1,+g('bpParts').value||1),fig=g('bpFigure').value;
+    const mode=(document.querySelector('input[name="bpPtMode"]:checked')||{}).value||'per';
+    const perQ=Math.max(1,+g('bpPerPts').value||20),totPts=Math.max(1,+g('bpTotPts').value||100),weight=g('bpPtWeight').value;
+    const diffs=spreadDifficulty(total,e,m,h),pts=spreadPoints(total,mode,perQ,totPts,weight,diffs);
+    const out=[]; let idx=0;
+    chapters.forEach((c,ci)=>{
+      for(let k=0;k<c.count;k++){
+        const topic=c.topics.length?c.topics[k%c.topics.length]:'';
+        out.push(newSlot({label:(c.label||('Ch. '+(ci+1)))+' \u00b7 Q'+(k+1),subject:subj,topic:topic,difficulty:diffs[idx],points:pts[idx],parts:parts,figure:fig,sourceUrl:c.url}));
+        idx++;
+      }
+    });
+    slots=out; renderSlots();
+    toast(total+' questions across '+chapters.length+' chapter(s) generated.','success');
+  });
+  g('bpInclassReuse').addEventListener('click',()=>{
+    if(!problems.length){toast('Generate & validate the exam first, then reuse it.','error');return;}
+    assignMode='inclass';applyMode();switchTab('export');
+    toast('Switched to In-class — export the in-class page (same questions).','success');
+  });
+  g('bpInclassFresh').addEventListener('click',()=>{
+    if(!slots.length){toast('Generate the blueprint first.','error');return;}
+    assignMode='inclass';applyMode();switchTab('prompt');
+    toast('Switched to In-class — copy the prompt to generate fresh examples on these chapters.','success');
+  });
+  render();
   document.querySelectorAll('.qb-set').forEach(btn=>btn.addEventListener('click',()=>{
     if(!slots.length){toast('No slots yet — generate or add some first.','error');return;}
     const f=btn.dataset.qbset; let val;
