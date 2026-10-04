@@ -120,6 +120,8 @@ legend{font-weight:600;padding:0 .3rem}
 .run-head h3{flex:1 1 14rem;font-family:var(--serif);font-size:1.2rem;font-weight:600}
 .run-settings{font-size:.86rem;color:var(--muted)}
 .prompt{font-family:var(--mono);font-size:.88rem}
+.vname{margin:0 0 .6rem;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+button.small{min-height:36px;padding:.25rem .7rem;font-size:.86rem}
 .run-foot{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-top:.6rem}
 .chars{font-size:.86rem;color:var(--muted);margin-right:auto}
 .stale{font-size:.86rem;color:var(--warn);background:var(--warn-soft);padding:.25rem .5rem;border-radius:var(--r-sm)}
@@ -286,6 +288,7 @@ html{scroll-behavior:smooth}
       <label class="check"><input type="checkbox" id="opt-recap"> Each video opens with a short bridge from the previous one</label>
       <label class="check"><input type="checkbox" id="opt-tease"> Each video ends by previewing the next one</label>
       <label class="check"><input type="checkbox" id="opt-fence"> Tell each video which topics belong to other videos, so it leaves them out</label>
+      <label class="check"><input type="checkbox" id="opt-number"> Number the videos (01, 02, 03…) and ask for that title on the opening slide</label>
       <label class="check"><input type="checkbox" id="opt-terms"> List key terms to explain (taken from bold text in the source, or from the AI plan)</label>
     </fieldset>
   </section>
@@ -298,6 +301,7 @@ html{scroll-behavior:smooth}
       <li>In Gemini Notebook, open the notebook that holds this source and make sure every source is selected.</li>
       <li>In the Studio panel, select the pencil icon on Video Overview.</li>
       <li>Choose the format and visual style shown on the card, paste the prompt, and generate. Videos generate in the background, so you can start the next one while the last one finishes.</li>
+      <li>If the title in the Studio list doesn't match the card's name, rename it there if your version allows, and use the name when you download the video file.</li>
       <li>Check off each video here as you go. Your progress stays in this browser.</li>
     </ol>
     <div class="field">
@@ -351,7 +355,7 @@ function defaults(){return {
   sourceName:'',sourceKind:'',blocks:[],level:null,breaks:[],titles:{},meta:{},overrides:{},done:{},nVideos:null,nbLink:'',
   settings:{course:'',series:'',seriesAuto:true,audience:'Community college students in an introductory course',
     tone:'Clear, friendly, and precise, like a good instructor',format:'Explainer',style:'Auto-select',extras:'',
-    firstIntro:true,recap:true,tease:true,fence:true,terms:true}
+    firstIntro:true,recap:true,tease:true,fence:true,terms:true,number:true}
 };}
 function load(){
   try{var s=JSON.parse(localStorage.getItem(KEY));if(!s)return null;var d=defaults();
@@ -589,10 +593,13 @@ function getEpisodes(){
 }
 
 /* ---------- Prompt building ---------- */
+function pad(n,total){return String(n).padStart(String(total).length<2?2:String(total).length,'0');}
+function videoName(ep,eps){return pad(ep.n,eps.length)+' '+ep.title;}
 function buildPrompt(ep,i,eps){
   var S=state.settings,n=eps.length,L=[],m=state.meta[ep.id]||null;
   var series=S.series.trim()||'this topic';
   L.push('This is Episode '+(i+1)+' of '+n+' in a video series'+(S.course.trim()?' for '+S.course.trim():'')+' called "'+series+'". Audience: '+stripPunct(S.audience||'general learners')+'.');
+  if(S.number)L.push('Title this video "'+videoName(ep,eps)+'", and show that exact title on the opening slide.');
   if(n>1&&i===0&&S.firstIntro)L.push('Open by briefly introducing the series and what it will cover, then begin the lesson.');
   if(i>0&&S.recap)L.push('Start with a one- or two-sentence bridge from Episode '+i+', "'+eps[i-1].title+'", without re-teaching it.');
   var scope=ep.sections.map(function(s){return s.sub.length?s.title+' (including '+s.sub.slice(0,8).join('; ')+')':s.title;}).join('; ');
@@ -670,6 +677,7 @@ function renderRun(){
     return '<li class="run b'+((i%6)+1)+(done?' done':'')+'" id="run-'+esc(e.id)+'">'+
       '<div class="run-head"><span class="ep-num c'+((i%6)+1)+'" aria-hidden="true">'+e.n+'</span><h3>Video '+e.n+': '+esc(e.title)+'</h3>'+
       '<span class="run-settings">'+esc(S.format)+', '+esc(S.style)+' style</span></div>'+
+      (S.number?'<p class="vname">Name: <strong>'+esc(videoName(e,eps))+'</strong> <button class="quiet small" data-copyname="'+esc(e.id)+'">Copy name</button></p>':'')+
       '<label class="sr-only" for="p-'+esc(e.id)+'">Prompt for video '+e.n+'</label>'+
       '<textarea class="prompt" id="p-'+esc(e.id)+'" data-ep="'+esc(e.id)+'" rows="'+rows+'">'+esc(p.text)+'</textarea>'+
       '<div class="run-foot"><span class="chars" id="c-'+esc(e.id)+'">'+fmt(p.text.length)+' characters'+(p.edited?', edited':'')+'</span>'+
@@ -804,7 +812,7 @@ function allPromptsText(md){
     out.push((S.course?'Course: '+S.course+'  \n':'')+'Audience: '+S.audience+'  \nFormat: '+S.format+'  \nVisual style: '+S.style+'  \nSource: '+state.sourceName,'');}
   eps.forEach(function(e,i){
     var p=promptFor(e,i,eps).text;
-    if(md)out.push('## Video '+e.n+': '+e.title,'','```text',p,'```','');
+    if(md)out.push('## '+(S.number?videoName(e,eps):'Video '+e.n+': '+e.title),'','```text',p,'```','');
     else out.push('Video '+e.n+': '+e.title+'\n\n'+p);
   });
   return md?out.join('\n'):out.join('\n\n---\n\n');
@@ -880,7 +888,7 @@ $('#btn-clear-ai').addEventListener('click',function(){state.meta={};save();rend
 
 // Settings
 var fields={course:'#set-course',series:'#set-series',audience:'#set-audience',tone:'#set-tone',format:'#set-format',style:'#set-style',extras:'#set-extras'};
-var checks={firstIntro:'#opt-intro',recap:'#opt-recap',tease:'#opt-tease',fence:'#opt-fence',terms:'#opt-terms'};
+var checks={number:'#opt-number',firstIntro:'#opt-intro',recap:'#opt-recap',tease:'#opt-tease',fence:'#opt-fence',terms:'#opt-terms'};
 Object.keys(fields).forEach(function(k){
   var el=$(fields[k]);el.value=state.settings[k];
   el.addEventListener(el.tagName==='SELECT'?'change':'input',function(){state.settings[k]=el.value;if(k==='series')state.settings.seriesAuto=false;save();renderRunSoon();});
@@ -902,6 +910,8 @@ runList.addEventListener('input',function(e){
 });
 runList.addEventListener('focusout',function(e){if(e.target.classList.contains('prompt')){var id=e.target.getAttribute('data-ep');var hadBtn=!!document.querySelector('[data-reset="'+id+'"]');if(hadBtn!==!!state.overrides[id])renderRun();}});
 runList.addEventListener('click',function(e){
+  var cn=e.target.closest('[data-copyname]');
+  if(cn){var eps3=getEpisodes(),ep3=eps3.find(function(x){return x.id===cn.getAttribute('data-copyname');});if(ep3)copyText(videoName(ep3,eps3),'Video name');return;}
   var co=e.target.closest('[data-copyopen]');
   if(co){
     var ta2=document.getElementById('p-'+co.getAttribute('data-copyopen'));
