@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Series Planner for NotebookLM</title>
+<meta name="description" content="Turn a document, web page, or PDF into a sequence of NotebookLM Video Overview prompts that together cover the whole source.">
+<style>
+:root{
+  --bg:#F2F4F7; --surface:#FFFFFF; --surface-2:#E9EDF3; --ink:#18202E; --muted:#525D70; --line:#CBD2DD;
+  --accent:#2B3990; --accent-ink:#FFFFFF; --accent-soft:#E1E5F8;
+  --warn:#7A4F00; --warn-soft:#FFF1CC; --ok:#1B6248; --ok-soft:#DDF1E8; --err:#9B2C1F; --err-soft:#FBE3DE;
+  --seg1:#DCE1FA; --seg2:#FBE6B0; --seg3:#CDE9DF; --seg4:#EBDDF6; --seg5:#F7D8CC; --seg6:#D6E7F6;
+  --focus:#C47F00;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;
+  --r-sm:6px; --r-md:12px;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#10141C; --surface:#182030; --surface-2:#222C40; --ink:#E7EBF2; --muted:#A6B0C2; --line:#36425A;
+    --accent:#9FADF7; --accent-ink:#10141C; --accent-soft:#283260;
+    --warn:#F2C35B; --warn-soft:#3A2E10; --ok:#80D6B0; --ok-soft:#173A2D; --err:#F4A193; --err-soft:#43201A;
+    --seg1:#2E3768; --seg2:#5A4614; --seg3:#1F4A3E; --seg4:#45315C; --seg5:#5A3326; --seg6:#24405A;
+    --focus:#F2C35B;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:1rem;line-height:1.55}
+.skip-link{position:absolute;left:-9999px;top:0;background:var(--accent);color:var(--accent-ink);padding:.6rem 1rem;z-index:10;border-radius:0 0 var(--r-sm) 0}
+.skip-link:focus{left:0}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.wrap{max-width:1080px;margin:0 auto;padding:0 1rem}
+header.site{padding:2.5rem 0 1.5rem}
+header.site h1{font-family:var(--serif);font-weight:600;font-size:clamp(1.9rem,4.5vw,2.9rem);line-height:1.1;margin:0 0 .6rem;letter-spacing:-.01em;max-width:20ch}
+header.site p{margin:0;color:var(--muted);max-width:62ch;font-size:1.05rem}
+main{padding-bottom:3rem}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:1.25rem;margin:0 0 1.25rem}
+@media(min-width:768px){.step{padding:1.75rem 2rem}}
+.step>h2{display:flex;align-items:baseline;gap:.75rem;font-family:var(--serif);font-weight:600;font-size:1.55rem;margin:0 0 .35rem}
+.step-num{font-size:2.4rem;line-height:1;color:var(--accent);min-width:1.3ch}
+.step-intro{margin:0 0 1.1rem;color:var(--muted);max-width:68ch}
+h3{font-size:1.05rem;margin:0}
+button,.btn{font:inherit;min-height:44px;min-width:44px;padding:.55rem 1rem;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface-2);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.quiet{background:transparent}
+button[disabled]{opacity:.55;cursor:not-allowed}
+label{font-weight:600;font-size:.95rem}
+input[type=text],input[type=url],input[type=number],select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:.55rem .7rem;min-height:44px;width:100%}
+textarea{resize:vertical;line-height:1.5}
+.hint{font-size:.88rem;color:var(--muted);font-weight:400;margin:.25rem 0 0}
+.row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}
+.field{margin:0 0 1rem}
+.field>label{display:block;margin-bottom:.3rem}
+
+/* Tabs */
+.tabs{display:flex;gap:.25rem;border-bottom:1px solid var(--line);margin-bottom:1rem;flex-wrap:wrap}
+.tabs [role=tab]{border:none;border-bottom:3px solid transparent;border-radius:0;background:transparent;padding:.6rem .9rem;color:var(--muted);font-weight:600}
+.tabs [role=tab][aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+.drop{display:block;border:2px dashed var(--line);border-radius:var(--r-md);padding:1.5rem;text-align:center;background:var(--surface-2);cursor:pointer;font-weight:400}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{display:block;font-size:1.05rem;margin-bottom:.2rem}
+.status{margin:1rem 0 0;padding:.7rem .9rem;border-radius:var(--r-sm);border-left:4px solid var(--line);background:var(--surface-2)}
+.status:empty{display:none}
+.status.ok{border-color:var(--ok);background:var(--ok-soft)}
+.status.error{border-color:var(--err);background:var(--err-soft)}
+.status.info{border-color:var(--accent);background:var(--accent-soft)}
+
+/* Plan */
+.controls{display:grid;gap:1rem;grid-template-columns:1fr;margin-bottom:1.25rem}
+@media(min-width:720px){.controls{grid-template-columns:1.4fr 1fr}}
+.n-row{display:flex;gap:.5rem}
+.n-row input{max-width:6rem}
+.strip{display:flex;gap:3px;margin:.25rem 0 .4rem;border-radius:var(--r-sm);overflow:hidden}
+.seg{flex-basis:0;min-width:44px;border:none;border-radius:0;padding:.5rem .25rem;font-weight:700;font-family:var(--serif);font-size:1.1rem;color:var(--ink);border-bottom:4px solid rgba(0,0,0,.18)}
+.c1{background:var(--seg1)}.c2{background:var(--seg2)}.c3{background:var(--seg3)}.c4{background:var(--seg4)}.c5{background:var(--seg5)}.c6{background:var(--seg6)}
+.strip-note{margin:0 0 1.25rem;font-size:.9rem;color:var(--muted)}
+.episodes{list-style:none;margin:0;padding:0}
+.ep{border:1px solid var(--line);border-radius:var(--r-md);margin:0 0 .9rem;overflow:hidden}
+.ep-head{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;padding:.7rem .9rem}
+.ep-num{font-family:var(--serif);font-weight:700;font-size:1.35rem;min-width:2.2rem;height:2.2rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:var(--ink)}
+.ep-head .ep-title{flex:1 1 16rem;font-weight:600}
+.ep-meta{font-size:.88rem;color:var(--muted)}
+.secs{list-style:none;margin:0;padding:0;background:var(--surface)}
+.sec{display:flex;flex-wrap:wrap;gap:.4rem .9rem;align-items:center;padding:.6rem .9rem;border-top:1px solid var(--line)}
+.sec-main{flex:1 1 18rem;min-width:0}
+.sec-title{font-weight:600}
+.sec-sub{display:block;font-size:.86rem;color:var(--muted);overflow-wrap:anywhere}
+.sec-words{font-size:.86rem;color:var(--muted);white-space:nowrap}
+.sec-btn{font-size:.88rem;padding:.4rem .75rem}
+details.ai{margin-top:1.5rem;border:1px solid var(--line);border-radius:var(--r-md);padding:.4rem 1rem 1rem;background:var(--surface-2)}
+details.ai summary{cursor:pointer;font-weight:600;padding:.6rem 0;min-height:44px;display:flex;align-items:center}
+details.ai p{max-width:68ch}
+
+/* Settings */
+.grid2{display:grid;gap:0 1.25rem;grid-template-columns:1fr}
+@media(min-width:720px){.grid2{grid-template-columns:1fr 1fr}}
+fieldset{border:1px solid var(--line);border-radius:var(--r-md);padding:.75rem 1rem 1rem;margin:0}
+legend{font-weight:600;padding:0 .3rem}
+.check{display:flex;gap:.6rem;align-items:flex-start;font-weight:400;margin:.45rem 0;min-height:32px}
+.check input{width:1.2rem;height:1.2rem;margin-top:.2rem;flex:none;accent-color:var(--accent)}
+
+/* Run sheet */
+.howto{margin:0 0 1.25rem;padding-left:1.3rem;max-width:70ch}
+.howto li{margin:.2rem 0}
+.run-tools{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:1.1rem}
+.progress-text{margin-left:auto;font-weight:600}
+.runs{list-style:none;margin:0;padding:0}
+.run{border:1px solid var(--line);border-left-width:6px;border-radius:var(--r-md);padding:.9rem 1rem 1rem;margin:0 0 1rem}
+.run.done{opacity:.72}
+.run-head{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:.6rem}
+.run-head h3{flex:1 1 14rem;font-family:var(--serif);font-size:1.2rem;font-weight:600}
+.run-settings{font-size:.86rem;color:var(--muted)}
+.prompt{font-family:var(--mono);font-size:.88rem}
+.run-foot{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-top:.6rem}
+.chars{font-size:.86rem;color:var(--muted);margin-right:auto}
+.stale{font-size:.86rem;color:var(--warn);background:var(--warn-soft);padding:.25rem .5rem;border-radius:var(--r-sm)}
+.b1{border-left-color:var(--seg1)}.b2{border-left-color:var(--seg2)}.b3{border-left-color:var(--seg3)}.b4{border-left-color:var(--seg4)}.b5{border-left-color:var(--seg5)}.b6{border-left-color:var(--seg6)}
+.empty{color:var(--muted);font-style:italic;margin:0}
+footer{padding:1.5rem 0 2.5rem;color:var(--muted);font-size:.88rem}
+footer p{margin:.2rem 0;max-width:72ch}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+html{scroll-behavior:smooth}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<header class="site">
+  <div class="wrap">
+    <h1>Video Series Planner for NotebookLM</h1>
+    <p>Give it the same source you load into NotebookLM. It splits the material into a sequence of videos and writes one Video Overview prompt for each, so the whole series covers everything without repeating itself.</p>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+
+  <!-- STEP 1 -->
+  <section class="step" aria-labelledby="h-source">
+    <h2 id="h-source"><span class="step-num" aria-hidden="true">1</span>Add your source</h2>
+    <p class="step-intro">Use the same material that's in your notebook. Headings in the source become the building blocks of the series.</p>
+
+    <div class="tabs" role="tablist" aria-label="Source type">
+      <button role="tab" id="tab-paste" aria-controls="panel-paste" aria-selected="true" tabindex="0">Paste text</button>
+      <button role="tab" id="tab-file" aria-controls="panel-file" aria-selected="false" tabindex="-1">Upload a file</button>
+      <button role="tab" id="tab-url" aria-controls="panel-url" aria-selected="false" tabindex="-1">Web address</button>
+    </div>
+
+    <div role="tabpanel" id="panel-paste" aria-labelledby="tab-paste">
+      <div class="field">
+        <label for="paste-text">Source text</label>
+        <textarea id="paste-text" rows="9" placeholder="Paste a chapter, lecture notes, or a whole web page. Markdown headings (#, ##), numbered headings (2.1 Subnet masks), and ALL CAPS headings are recognized."></textarea>
+      </div>
+      <div class="row">
+        <button class="primary" id="btn-use-text">Use this text</button>
+        <button class="quiet" id="btn-sample">Load a sample</button>
+      </div>
+    </div>
+
+    <div role="tabpanel" id="panel-file" aria-labelledby="tab-file" hidden>
+      <label class="drop" id="drop" for="file-input">
+        <strong>Choose a file or drop it here</strong>
+        PDF, HTML, Markdown, or plain text. For Word files, save as PDF first.
+      </label>
+      <input type="file" id="file-input" class="sr-only" accept=".pdf,.txt,.md,.markdown,.html,.htm,application/pdf,text/plain,text/html,text/markdown">
+      <p class="hint">PDF headings are found by font size. The PDF reader loads from cdnjs the first time you use it.</p>
+    </div>
+
+    <div role="tabpanel" id="panel-url" aria-labelledby="tab-url" hidden>
+      <div class="field">
+        <label for="url-input">Page address</label>
+        <input type="url" id="url-input" placeholder="https://example.edu/module-3.html" autocomplete="url">
+        <p class="hint">Pages on the same site as this tool load directly. Most other sites block this; if yours does, open the page, select all, copy, and use Paste text.</p>
+      </div>
+      <button class="primary" id="btn-fetch">Load page</button>
+    </div>
+
+    <p class="status" id="source-status" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step" aria-labelledby="h-plan">
+    <h2 id="h-plan" tabindex="-1"><span class="step-num" aria-hidden="true">2</span>Plan the series</h2>
+    <p class="step-intro">Here's the proposed split. Move the breaks wherever you like: each video runs from its first section until the next video starts.</p>
+
+    <p class="empty" id="plan-empty">Add a source in step 1 to see a proposed split.</p>
+    <div id="plan-body" hidden>
+      <div class="controls">
+        <div>
+          <label for="level-select">Split the source at</label>
+          <select id="level-select"></select>
+          <p class="hint">Coarser levels give fewer, bigger building blocks.</p>
+        </div>
+        <div>
+          <label for="n-videos">Number of videos</label>
+          <div class="n-row">
+            <input type="number" id="n-videos" min="1" max="40" inputmode="numeric">
+            <button id="btn-resplit">Re-split evenly</button>
+          </div>
+          <p class="hint">Re-splitting replaces your manual breaks.</p>
+        </div>
+      </div>
+
+      <div class="strip" id="strip" role="group" aria-label="Videos, sized by amount of source content. Select one to jump to it."></div>
+      <p class="strip-note" id="strip-note"></p>
+
+      <ol class="episodes" id="episode-list"></ol>
+
+      <details class="ai" id="ai-box">
+        <summary>Refine the plan with an AI chatbot (optional)</summary>
+        <p>Copy this prompt into Copilot Chat, Claude, or another chatbot. It includes only your outline (section titles, word counts, and short excerpts), not the full source. Paste the reply below to get better titles, learning objectives, and key concepts in every video prompt.</p>
+        <div class="row" style="margin-bottom:1rem">
+          <button id="btn-copy-meta">Copy AI prompt</button>
+        </div>
+        <div class="field">
+          <label for="ai-reply">Chatbot's reply</label>
+          <textarea id="ai-reply" rows="6" placeholder='Paste the JSON reply here. It starts with {"episodes":'></textarea>
+        </div>
+        <div class="row">
+          <button class="primary" id="btn-apply-ai">Apply AI plan</button>
+          <button class="quiet" id="btn-clear-ai">Remove AI details</button>
+        </div>
+        <p class="status" id="ai-status" role="status" aria-live="polite"></p>
+      </details>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step" aria-labelledby="h-voice">
+    <h2 id="h-voice"><span class="step-num" aria-hidden="true">3</span>Set the voice</h2>
+    <p class="step-intro">These details go into every prompt.</p>
+    <div class="grid2">
+      <div class="field">
+        <label for="set-course">Course <span class="hint">(optional)</span></label>
+        <input type="text" id="set-course" placeholder="NETW 110 Networking Fundamentals">
+      </div>
+      <div class="field">
+        <label for="set-series">Series title</label>
+        <input type="text" id="set-series" placeholder="Subnetting Fundamentals">
+      </div>
+      <div class="field">
+        <label for="set-audience">Audience</label>
+        <input type="text" id="set-audience" list="audience-list">
+        <datalist id="audience-list">
+          <option value="Community college students in an introductory course">
+          <option value="Community college students with some background in the subject">
+          <option value="Adult learners preparing for a certification exam">
+          <option value="Faculty colleagues in a professional development session">
+          <option value="High school students in a dual-enrollment course">
+        </datalist>
+      </div>
+      <div class="field">
+        <label for="set-tone">Tone</label>
+        <input type="text" id="set-tone">
+      </div>
+      <div class="field">
+        <label for="set-format">Video format</label>
+        <select id="set-format">
+          <option>Explainer</option><option>Brief</option><option>Cinematic</option>
+        </select>
+        <p class="hint">Chosen in NotebookLM's customize panel. Shown on each card as a reminder.</p>
+      </div>
+      <div class="field">
+        <label for="set-style">Visual style</label>
+        <select id="set-style">
+          <option>Auto-select</option><option>Classic</option><option>Whiteboard</option><option>Watercolor</option><option>Retro Print</option><option>Heritage</option><option>Papercraft</option><option>Kawaii</option><option>Anime</option>
+        </select>
+        <p class="hint">Pick the same style every time so the series looks consistent.</p>
+      </div>
+    </div>
+    <div class="field">
+      <label for="set-extras">Extra instructions for every video <span class="hint">(optional)</span></label>
+      <textarea id="set-extras" rows="3" placeholder="e.g., Use one real-world example for each idea. End with a question viewers can answer on their own."></textarea>
+    </div>
+    <fieldset>
+      <legend>Series continuity</legend>
+      <label class="check"><input type="checkbox" id="opt-intro"> Video 1 briefly introduces the whole series</label>
+      <label class="check"><input type="checkbox" id="opt-recap"> Each video opens with a short bridge from the previous one</label>
+      <label class="check"><input type="checkbox" id="opt-tease"> Each video ends by previewing the next one</label>
+      <label class="check"><input type="checkbox" id="opt-fence"> Tell each video which topics belong to other videos, so it leaves them out</label>
+      <label class="check"><input type="checkbox" id="opt-terms"> List key terms to explain (taken from bold text in the source, or from the AI plan)</label>
+    </fieldset>
+  </section>
+
+  <!-- STEP 4 -->
+  <section class="step" aria-labelledby="h-run">
+    <h2 id="h-run"><span class="step-num" aria-hidden="true">4</span>Run the prompts</h2>
+    <p class="step-intro">Generate one video at a time in the same notebook.</p>
+    <ol class="howto">
+      <li>In NotebookLM, open the notebook that holds this source and make sure it's selected.</li>
+      <li>In the Studio panel, select the pencil icon on Video Overview.</li>
+      <li>Choose the format and visual style shown on the card, paste the prompt, and generate.</li>
+      <li>Check off each video here as you go. Your progress stays in this browser.</li>
+    </ol>
+    <div class="run-tools">
+      <button id="btn-copy-all">Copy all prompts</button>
+      <button id="btn-download">Download prompts (.md)</button>
+      <button class="quiet" id="btn-reset">Start over</button>
+      <span class="progress-text" id="progress-text" aria-live="polite"></span>
+    </div>
+    <p class="empty" id="run-empty">Prompts appear here once you add a source.</p>
+    <ol class="runs" id="run-list"></ol>
+  </section>
+
+  <p class="sr-only" id="live" aria-live="polite"></p>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Built for faculty at Brookdale Community College, 2026.</p>
+    <p>Everything runs in your browser. Your source isn't uploaded anywhere; the only network requests are the page you ask it to load and the PDF reader library.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+'use strict';
+var KEY='nblm-series-planner-v1';
+var PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+var PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+var $=function(s){return document.querySelector(s);};
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function wc(s){var m=String(s||'').match(/\S+/g);return m?m.length:0;}
+function uniq(a){var seen=new Set();return a.filter(function(x){var k=String(x).toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});}
+function clamp(n,a,b){return Math.max(a,Math.min(b,n));}
+function fmt(n){return Number(n).toLocaleString();}
+function clean(s){return String(s).replace(/\*\*|__|`/g,'').replace(/\s+/g,' ').replace(/\s*#+\s*$/,'').trim();}
+function firstWords(s,n){var w=String(s).split(/\s+/).slice(0,n).join(' ');return w.replace(/[.,;:]+$/,'')+'…';}
+function stripPunct(s){return String(s).trim().replace(/[.\s]+$/,'');}
+function plural(n,w){return fmt(n)+' '+w+(n===1?'':'s');}
+
+/* ---------- State ---------- */
+function defaults(){return {
+  sourceName:'',sourceKind:'',blocks:[],level:null,breaks:[],titles:{},meta:{},overrides:{},done:{},nVideos:null,
+  settings:{course:'',series:'',seriesAuto:true,audience:'Community college students in an introductory course',
+    tone:'Clear, friendly, and precise, like a good instructor',format:'Explainer',style:'Auto-select',extras:'',
+    firstIntro:true,recap:true,tease:true,fence:true,terms:true}
+};}
+function load(){
+  try{var s=JSON.parse(localStorage.getItem(KEY));if(!s)return null;var d=defaults();
+    Object.keys(d).forEach(function(k){if(!(k in s))s[k]=d[k];});
+    s.settings=Object.assign(d.settings,s.settings||{});return s;}catch(e){return null;}
+}
+var state=load()||defaults();
+var saveTimer=null;
+function save(){clearTimeout(saveTimer);saveTimer=setTimeout(function(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}},200);}
+function announce(msg){var l=$('#live');l.textContent='';setTimeout(function(){l.textContent=msg;},30);}
+function setStatus(el,kind,msg){el.className='status '+kind;el.textContent=msg;}
+
+/* ---------- Text parsing ---------- */
+function mkPara(x){
+  var terms=[];
+  x=x.replace(/\*\*([^*]{2,60})\*\*|__([^_]{2,60})__/g,function(m,a,b){terms.push(a||b);return a||b;});
+  x=x.replace(/^([-*•]|\d+[.)])\s+/,'').replace(/[`*]/g,'').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/\s+/g,' ').trim();
+  return x?{t:'p',x:x,k:terms}:null;
+}
+function headingOf(s,prev,next,loose){
+  var m;
+  if((m=s.match(/^(#{1,6})\s+(.+?)\s*#*$/)))return {l:Math.min(m[1].length,4),x:clean(m[2])};
+  if(s.length>110)return null;
+  var endsPunct=/[.,;!?]$/.test(s);
+  if(!endsPunct&&/^(chapter|module|unit|lesson|part|section|topic|week)\s+([0-9]+|[IVXLC]+|[A-Z])\b/i.test(s))return {l:1,x:clean(s)};
+  if(!endsPunct&&(m=s.match(/^(\d+(?:\.\d+){1,3})\.?\s+([A-Z(].*)$/))&&wc(m[2])<=14)return {l:Math.min(m[1].split('.').length,4),x:clean(s)};
+  if(!endsPunct&&(m=s.match(/^(\d+)[.)]?\s+([A-Z].*)$/))&&wc(m[2])<=10&&!prev&&!/^\d+[.)]?\s/.test(next))return {l:1,x:clean(s)};
+  var letters=s.replace(/[^A-Za-z]/g,'');
+  if(!endsPunct&&letters.length>=4&&letters===letters.toUpperCase()&&wc(s)<=10)return {l:2,x:clean(s)};
+  if(loose&&!endsPunct&&!/:$/.test(s)&&!prev&&next&&next.length>60&&wc(s)<=10&&/^[A-Z0-9]/.test(s))return {l:3,x:clean(s)};
+  return null;
+}
+function scanText(lines,loose){
+  var blocks=[],para=[];
+  function flush(){if(para.length){var p=mkPara(para.join(' '));if(p)blocks.push(p);para=[];}}
+  for(var i=0;i<lines.length;i++){
+    var s=lines[i].trim();
+    if(!s){flush();continue;}
+    var h=headingOf(s,(lines[i-1]||'').trim(),(lines[i+1]||'').trim(),loose);
+    if(h){flush();blocks.push({t:'h',l:h.l,x:h.x});}
+    else if(/^([-*•]|\d+[.)])\s+/.test(s)){flush();para.push(s);flush();}
+    else para.push(s);
+  }
+  flush();return blocks;
+}
+function synthesize(blocks){
+  var out=[],acc=0,n=0;
+  blocks.forEach(function(b){if(b.t!=='p')return;if(acc===0){n++;out.push({t:'h',l:2,x:'Part '+n+': '+firstWords(b.x,7)});}out.push(b);acc+=wc(b.x);if(acc>=350)acc=0;});
+  return out;
+}
+function parseText(raw){
+  var lines=String(raw).replace(/\r\n?/g,'\n').split('\n');
+  var strict=scanText(lines,false);
+  var blocks=strict.filter(function(b){return b.t==='h';}).length>=3?strict:scanText(lines,true);
+  if(!blocks.some(function(b){return b.t==='h';}))blocks=synthesize(blocks);
+  var h1=blocks.find(function(b){return b.t==='h'&&b.l===1;});
+  return {blocks:blocks,title:h1?h1.x:''};
+}
+
+/* ---------- HTML parsing ---------- */
+function parseHtml(html){
+  var doc=new DOMParser().parseFromString(html,'text/html');
+  doc.querySelectorAll('script,style,noscript,nav,footer,aside,form,svg,iframe,button,template,[aria-hidden="true"],.skip-link').forEach(function(e){e.remove();});
+  var root=doc.querySelector('main')||doc.querySelector('article')||doc.body;
+  var title=clean((doc.querySelector('title')||{}).textContent||'');
+  var blocks=[];
+  var TEXT='p,li,pre,blockquote,dt,dd,figcaption,td,th,summary';
+  if(root){
+    root.querySelectorAll('h1,h2,h3,h4,'+TEXT).forEach(function(el){
+      var tag=el.tagName.toLowerCase();
+      var txt=clean(el.textContent||'');
+      if(!txt)return;
+      if(/^h[1-4]$/.test(tag)){blocks.push({t:'h',l:+tag[1],x:txt});return;}
+      if(el.parentElement&&el.parentElement.closest(TEXT))return;
+      var terms=[];
+      el.querySelectorAll('strong,b,dfn').forEach(function(t){var v=clean(t.textContent||'');if(v)terms.push(v);});
+      blocks.push({t:'p',x:txt,k:terms});
+    });
+  }
+  if(!blocks.some(function(b){return b.t==='h';}))blocks=synthesize(blocks);
+  var h1=blocks.find(function(b){return b.t==='h'&&b.l===1;});
+  return {blocks:blocks,title:(h1&&h1.x)||title};
+}
+
+/* ---------- PDF parsing ---------- */
+var pdfReady=null;
+function loadPdfJs(){
+  if(window.pdfjsLib)return Promise.resolve();
+  if(pdfReady)return pdfReady;
+  pdfReady=new Promise(function(res,rej){
+    var s=document.createElement('script');s.src=PDFJS;
+    s.addEventListener('load',function(){if(window.pdfjsLib){window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;res();}else{pdfReady=null;rej(new Error('pdfjs'));}});
+    s.addEventListener('error',function(){pdfReady=null;rej(new Error('pdfjs'));});
+    document.head.appendChild(s);
+  });
+  return pdfReady;
+}
+async function parsePdf(buf,onPage){
+  await loadPdfJs();
+  var pdf=await window.pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  var title='';
+  try{var md=await pdf.getMetadata();title=(md&&md.info&&md.info.Title)||'';}catch(e){}
+  var pages=[];
+  for(var p=1;p<=pdf.numPages;p++){
+    if(onPage)onPage(p,pdf.numPages);
+    var page=await pdf.getPage(p);var tc=await page.getTextContent();
+    var rows=[];
+    tc.items.forEach(function(it){
+      if(!it.str)return;var tr=it.transform;
+      var size=Math.round((Math.hypot(tr[2],tr[3])||it.height||0)*2)/2;var y=tr[5];
+      var row=rows.find(function(r){return Math.abs(r.y-y)<=2;});
+      if(!row){row={y:y,items:[]};rows.push(row);}
+      row.items.push({x:tr[4],w:it.width||0,s:it.str,size:size});
+    });
+    rows.sort(function(a,b){return b.y-a.y;});
+    var lines=rows.map(function(r){
+      r.items.sort(function(a,b){return a.x-b.x;});
+      var txt='',end=null,size=0;
+      r.items.forEach(function(i){
+        if(end!==null&&i.x-end>i.size*0.2&&!/\s$/.test(txt)&&!/^\s/.test(i.s))txt+=' ';
+        txt+=i.s;end=i.x+i.w;if(i.s.trim())size=Math.max(size,i.size);
+      });
+      return {text:txt.replace(/\s+/g,' ').trim(),size:size};
+    }).filter(function(l){return l.text;});
+    pages.push(lines);
+  }
+  // Drop running headers/footers and page numbers
+  function norm(t){return t.toLowerCase().replace(/\d+/g,'#').trim();}
+  var counts=new Map();
+  if(pages.length>=3){pages.forEach(function(lines){
+    new Set(lines.slice(0,2).concat(lines.slice(-2)).map(function(l){return norm(l.text);})).forEach(function(c){counts.set(c,(counts.get(c)||0)+1);});
+  });}
+  var repeated=new Set();counts.forEach(function(v,k){if(v>=Math.max(3,pages.length*0.4))repeated.add(k);});
+  var all=[];
+  pages.forEach(function(lines){lines.forEach(function(l,idx){
+    var edge=idx<2||idx>=lines.length-2;
+    if(edge&&repeated.has(norm(l.text)))return;
+    if(/^(page\s*)?\d+(\s*(of|\/)\s*\d+)?$/i.test(l.text))return;
+    all.push(l);
+  });});
+  // Body size = size with the most characters
+  var hist=new Map();all.forEach(function(l){hist.set(l.size,(hist.get(l.size)||0)+l.text.length);});
+  var body=0,best=-1;hist.forEach(function(v,k){if(v>best){best=v;body=k;}});
+  function isHead(l){return l.size>=body*1.15&&l.text.length<=120&&/[A-Za-z]{2}/.test(l.text)&&!/[.,;]$/.test(l.text);}
+  var headSizes=uniq(all.filter(isHead).map(function(l){return l.size;})).map(Number).sort(function(a,b){return b-a;});
+  var headCount=all.filter(isHead).length;
+  if(headCount<2||headCount>all.length*0.5){
+    var r=parseText(all.map(function(l){return l.text;}).join('\n'));return {blocks:r.blocks,title:title||r.title};
+  }
+  var blocks=[],buf2=[],lastHead=null;
+  function flush(){if(buf2.length){var x=buf2.reduce(function(acc,t){return /-$/.test(acc)?acc.slice(0,-1)+t:(acc?acc+' '+t:t);},'');if(x.trim())blocks.push({t:'p',x:x.trim(),k:[]});buf2=[];}}
+  all.forEach(function(l){
+    if(isHead(l)){
+      flush();
+      if(lastHead&&lastHead.size===l.size&&blocks[blocks.length-1]===lastHead.block){lastHead.block.x+=' '+l.text;}
+      else{var b={t:'h',l:Math.min(headSizes.indexOf(l.size)+1,4),x:l.text};blocks.push(b);lastHead={size:l.size,block:b};}
+    }else{buf2.push(l.text);lastHead=null;}
+  });
+  flush();
+  var h1=blocks.find(function(b){return b.t==='h';});
+  return {blocks:blocks,title:title||(h1?h1.x:'')};
+}
+
+/* ---------- Sections and episodes ---------- */
+var BAD_TERM=/^(note|tip|warning|caution|example|important|step\s*\d+|figure|table|answer|solution)\b/i;
+function cleanTerms(a){return uniq(a.map(clean).filter(function(t){return t.length>=2&&t.length<=60&&wc(t)<=6&&!/:$/.test(t)&&!BAD_TERM.test(t);})).slice(0,12);}
+function buildSections(blocks,level){
+  var secs=[],cur=null;
+  function start(id,title,l){cur={id:id,title:title,level:l,text:[],sub:[],terms:[],major:false};secs.push(cur);}
+  blocks.forEach(function(b,i){
+    if(b.t==='h'&&b.l<=level)start('s'+i,b.x,b.l);
+    else{
+      if(!cur)start('s-intro','Introduction',level);
+      if(b.t==='h')cur.sub.push(b.x);else{cur.text.push(b.x);if(b.k)cur.terms=cur.terms.concat(b.k);}
+    }
+  });
+  var out=[],pendingMajor=false;
+  secs.forEach(function(s){
+    s.words=wc(s.text.join(' '))+wc(s.sub.join(' '));s.terms=cleanTerms(s.terms);
+    if(s.words===0){pendingMajor=true;return;}
+    if(pendingMajor){s.major=true;pendingMajor=false;}
+    out.push(s);
+  });
+  if(!out.length)return secs;
+  var lv=out.map(function(s){return s.level;});var minL=Math.min.apply(null,lv),maxL=Math.max.apply(null,lv);
+  if(minL<maxL)out.forEach(function(s){if(s.level===minL)s.major=true;});
+  return out;
+}
+var secCache={key:null,val:[]};
+function getSecs(){
+  var key=state.blocks.length+':'+state.level+':'+state.sourceName;
+  if(secCache.key!==key){secCache={key:key,val:state.blocks.length?buildSections(state.blocks,state.level):[]};}
+  return secCache.val;
+}
+function headingLevels(){return uniq(state.blocks.filter(function(b){return b.t==='h';}).map(function(b){return b.l;})).map(Number).sort();}
+function pickLevel(blocks){
+  var levels=uniq(blocks.filter(function(b){return b.t==='h';}).map(function(b){return b.l;})).map(Number).sort();
+  if(!levels.length)return 2;
+  var bestL=levels[levels.length-1],bestScore=Infinity;
+  levels.forEach(function(L){
+    var n=buildSections(blocks,L).length;
+    var score=n<3?100+(3-n):(n>40?n-40:(n<5?5-n:0));
+    if(score<bestScore){bestScore=score;bestL=L;}
+  });
+  return bestL;
+}
+function totalWords(secs){return secs.reduce(function(a,s){return a+s.words;},0);}
+function defaultN(secs){var t=totalWords(secs);return clamp(Math.round(t/1500),Math.min(3,secs.length),Math.max(1,Math.min(15,secs.length)));}
+function autoSplit(secs,n){
+  n=clamp(n,1,secs.length);
+  var total=totalWords(secs),cum=[],c=0;
+  secs.forEach(function(s){cum.push(c);c+=s.words;});
+  var breaks=[],last=0;
+  for(var k=1;k<n;k++){
+    var target=total*k/n,best=-1,bestScore=Infinity;
+    for(var i=last+1;i<=secs.length-(n-k);i++){
+      var score=Math.abs(cum[i]-target);if(secs[i].major)score*=0.75;
+      if(score<bestScore){bestScore=score;best=i;}
+    }
+    if(best>0){breaks.push(secs[best].id);last=best;}
+  }
+  return breaks;
+}
+function defaultTitle(e){
+  var t=e.sections.map(function(s){return s.title;});
+  if(t.length===1)return t[0];
+  if(t.length===2)return t[0]+' & '+t[1];
+  return t[0]+' to '+t[t.length-1];
+}
+function getEpisodes(){
+  var secs=getSecs(),br=new Set(state.breaks),eps=[];
+  secs.forEach(function(s,i){if(i===0||br.has(s.id))eps.push({id:s.id,sections:[]});eps[eps.length-1].sections.push(s);});
+  eps.forEach(function(e,i){e.n=i+1;e.words=totalWords(e.sections);e.title=(state.titles[e.id]||'').trim()||defaultTitle(e);});
+  return eps;
+}
+
+/* ---------- Prompt building ---------- */
+function buildPrompt(ep,i,eps){
+  var S=state.settings,n=eps.length,L=[],m=state.meta[ep.id]||null;
+  var series=S.series.trim()||'this topic';
+  L.push('This is Episode '+(i+1)+' of '+n+' in a video series'+(S.course.trim()?' for '+S.course.trim():'')+' called "'+series+'". Audience: '+stripPunct(S.audience||'general learners')+'.');
+  if(n>1&&i===0&&S.firstIntro)L.push('Open by briefly introducing the series and what it will cover, then begin the lesson.');
+  if(i>0&&S.recap)L.push('Start with a one- or two-sentence bridge from Episode '+i+', "'+eps[i-1].title+'", without re-teaching it.');
+  var scope=ep.sections.map(function(s){return s.sub.length?s.title+' (including '+s.sub.slice(0,8).join('; ')+')':s.title;}).join('; ');
+  L.push('Cover only these parts of the sources: '+scope+'.');
+  if(m&&m.objectives&&m.objectives.length)L.push('By the end, viewers should be able to: '+m.objectives.map(stripPunct).join('; ')+'.');
+  if(S.terms){
+    var terms=(m&&m.concepts&&m.concepts.length)?m.concepts:cleanTerms([].concat.apply([],ep.sections.map(function(s){return s.terms;}))).slice(0,10);
+    if(terms.length)L.push('Clearly explain these key terms: '+terms.join(', ')+'.');
+  }
+  if(S.fence&&n>1){
+    var others=eps.filter(function(e,j){return j!==i;}).map(function(e){return 'Episode '+e.n+' ('+e.title+')';});
+    L.push('Other episodes cover '+others.join('; ')+'. Leave those topics out except for brief connections.');
+  }
+  if(n>1&&i<n-1&&S.tease)L.push('End with a one-sentence preview of Episode '+(i+2)+', "'+eps[i+1].title+'".');
+  else if(n>1&&i===n-1&&S.tease)L.push('This is the final episode, so close by briefly tying together the ideas from the whole series.');
+  if(m&&m.hook)L.push('Opening hook idea: '+stripPunct(m.hook)+'.');
+  if(S.tone.trim())L.push('Tone: '+stripPunct(S.tone)+'.');
+  if(S.extras.trim())L.push(S.extras.trim());
+  return L.join('\n');
+}
+function promptFor(ep,i,eps){
+  var gen=buildPrompt(ep,i,eps),o=state.overrides[ep.id];
+  if(o&&typeof o.text==='string')return {text:o.text,gen:gen,edited:true,stale:o.base!==gen};
+  return {text:gen,gen:gen,edited:false,stale:false};
+}
+
+/* ---------- Rendering ---------- */
+function renderPlan(focusSel){
+  var secs=getSecs(),has=secs.length>0;
+  $('#plan-empty').hidden=has;$('#plan-body').hidden=!has;
+  if(!has)return;
+  var sel=$('#level-select');
+  sel.innerHTML=headingLevels().map(function(L){
+    var n=buildSections(state.blocks,L).length;
+    return '<option value="'+L+'"'+(L===state.level?' selected':'')+'>Level '+L+' headings ('+plural(n,'section')+')</option>';
+  }).join('');
+  var eps=getEpisodes();
+  $('#n-videos').value=state.nVideos||eps.length;
+  $('#n-videos').max=secs.length;
+  var total=totalWords(secs);
+  $('#strip').innerHTML=eps.map(function(e,i){
+    return '<button class="seg c'+((i%6)+1)+'" data-goto="'+esc(e.id)+'" style="flex-grow:'+Math.max(e.words,1)+'" aria-label="Video '+e.n+': '+esc(e.title)+', '+fmt(e.words)+' words">'+e.n+'</button>';
+  }).join('');
+  var avg=Math.round(total/eps.length),longest=eps.reduce(function(a,e){return e.words>a.words?e:a;},eps[0]);
+  var note=plural(eps.length,'video')+' covering '+fmt(total)+' words of source, about '+fmt(avg)+' each.';
+  if(eps.length>1&&longest.words>avg*1.8)note+=' Video '+longest.n+' is much longer than the others; consider adding a break inside it.';
+  $('#strip-note').textContent=note;
+  var firstId=secs[0].id;
+  $('#episode-list').innerHTML=eps.map(function(e,i){
+    var c=(i%6)+1;
+    return '<li class="ep" id="ep-'+esc(e.id)+'">'+
+      '<div class="ep-head c'+c+'"><span class="ep-num" aria-hidden="true">'+e.n+'</span>'+
+      '<label class="sr-only" for="t-'+esc(e.id)+'">Title for video '+e.n+'</label>'+
+      '<input type="text" class="ep-title" id="t-'+esc(e.id)+'" data-ep="'+esc(e.id)+'" value="'+esc(e.title)+'">'+
+      '<span class="ep-meta">'+fmt(e.words)+' words in '+plural(e.sections.length,'section')+'</span></div>'+
+      '<ul class="secs">'+e.sections.map(function(s,j){
+        var btn='';
+        if(s.id!==firstId){
+          btn=j===0?'<button class="sec-btn" data-act="join" data-sec="'+esc(s.id)+'">Join with video '+(e.n-1)+'</button>'
+                   :'<button class="sec-btn" data-act="split" data-sec="'+esc(s.id)+'">Start a new video here</button>';
+        }
+        var sub=s.sub.length?'<span class="sec-sub">'+esc(s.sub.slice(0,6).join('; '))+(s.sub.length>6?'; and '+(s.sub.length-6)+' more':'')+'</span>':'';
+        return '<li class="sec"><div class="sec-main"><span class="sec-title">'+esc(s.title)+'</span>'+sub+'</div><span class="sec-words">'+plural(s.words,'word')+'</span>'+btn+'</li>';
+      }).join('')+'</ul></li>';
+  }).join('');
+  if(focusSel){var f=document.querySelector(focusSel);if(f)f.focus();}
+}
+function renderRun(){
+  var eps=getEpisodes(),S=state.settings,list=$('#run-list');
+  $('#run-empty').hidden=eps.length>0;
+  ['#btn-copy-all','#btn-download'].forEach(function(s){$(s).disabled=!eps.length;});
+  list.innerHTML=eps.map(function(e,i){
+    var p=promptFor(e,i,eps),done=!!state.done[e.id];
+    var rows=clamp(p.text.split('\n').length+Math.ceil(p.text.length/110),6,18);
+    return '<li class="run b'+((i%6)+1)+(done?' done':'')+'" id="run-'+esc(e.id)+'">'+
+      '<div class="run-head"><span class="ep-num c'+((i%6)+1)+'" aria-hidden="true">'+e.n+'</span><h3>Video '+e.n+': '+esc(e.title)+'</h3>'+
+      '<span class="run-settings">'+esc(S.format)+', '+esc(S.style)+' style</span></div>'+
+      '<label class="sr-only" for="p-'+esc(e.id)+'">Prompt for video '+e.n+'</label>'+
+      '<textarea class="prompt" id="p-'+esc(e.id)+'" data-ep="'+esc(e.id)+'" rows="'+rows+'">'+esc(p.text)+'</textarea>'+
+      '<div class="run-foot"><span class="chars" id="c-'+esc(e.id)+'">'+fmt(p.text.length)+' characters'+(p.edited?', edited':'')+'</span>'+
+      (p.stale?'<span class="stale">Your plan changed after you edited this prompt.</span>':'')+
+      (p.edited?'<button class="quiet" data-reset="'+esc(e.id)+'">Undo my edits</button>':'')+
+      '<button data-copy="'+esc(e.id)+'">Copy prompt</button>'+
+      '<label class="check"><input type="checkbox" data-done="'+esc(e.id)+'"'+(done?' checked':'')+'> Generated</label></div></li>';
+  }).join('');
+  updateProgress(eps);
+}
+function updateProgress(eps){
+  eps=eps||getEpisodes();
+  var d=eps.filter(function(e){return state.done[e.id];}).length;
+  $('#progress-text').textContent=eps.length?d+' of '+eps.length+' generated':'';
+}
+var runTimer=null;
+function renderRunSoon(){clearTimeout(runTimer);runTimer=setTimeout(renderRun,250);}
+function renderAll(){renderPlan();renderRun();}
+
+/* ---------- Ingest ---------- */
+function ingest(res,name,kind){
+  var blocks=res.blocks||[];
+  var words=blocks.reduce(function(a,b){return a+wc(b.x);},0);
+  var st=$('#source-status');
+  if(words<20){setStatus(st,'error','Found almost no readable text in '+name+'. If it\'s a scanned PDF, it has no text layer; copy the text another way and use Paste text.');return;}
+  state.blocks=blocks;state.sourceName=name;state.sourceKind=kind;
+  state.level=pickLevel(blocks);state.titles={};state.meta={};state.overrides={};state.done={};
+  secCache.key=null;
+  var secs=getSecs();
+  if(res.title&&(state.settings.seriesAuto||!state.settings.series.trim())){state.settings.series=res.title;state.settings.seriesAuto=true;$('#set-series').value=res.title;}
+  state.nVideos=defaultN(secs);state.breaks=autoSplit(secs,state.nVideos);
+  save();renderAll();
+  setStatus(st,'ok','Loaded '+name+': '+fmt(words)+' words in '+plural(secs.length,'section')+', proposed as '+plural(getEpisodes().length,'video')+'. Review the split in step 2.');
+}
+function errStatus(msg){setStatus($('#source-status'),'error',msg);}
+
+async function handleFile(f){
+  if(!f)return;
+  var name=f.name,ext=(name.split('.').pop()||'').toLowerCase(),st=$('#source-status');
+  try{
+    if(ext==='pdf'||f.type==='application/pdf'){
+      setStatus(st,'info','Reading '+name+'…');
+      var buf=await f.arrayBuffer();
+      var r=await parsePdf(buf,function(p,t){setStatus(st,'info','Reading page '+p+' of '+t+'…');});
+      ingest({blocks:r.blocks,title:r.title||name.replace(/\.[^.]+$/,'')},name,'pdf');
+    }else if(ext==='html'||ext==='htm'){
+      ingest(parseHtml(await f.text()),name,'html');
+    }else if(ext==='docx'||ext==='doc'||ext==='pptx'){
+      errStatus('Word and PowerPoint files can\'t be read here. Save the file as PDF, then upload that.');
+    }else{
+      var t=parseText(await f.text());if(!t.title)t.title=name.replace(/\.[^.]+$/,'');ingest(t,name,'text');
+    }
+  }catch(e){
+    if(e&&e.message==='pdfjs')errStatus('The PDF reader couldn\'t load. Check your internet connection, or copy the PDF\'s text and use Paste text.');
+    else errStatus('This file couldn\'t be read. If it\'s a PDF, it may be protected or scanned; try copying its text and using Paste text.');
+  }
+}
+async function fetchUrl(raw){
+  var url;try{url=new URL(raw.trim());}catch(e){errStatus('Enter a full address that starts with https://');return;}
+  var st=$('#source-status');setStatus(st,'info','Loading '+url.href+'…');
+  var r;
+  try{r=await fetch(url.href);}catch(e){errStatus('This site doesn\'t allow other pages to read it. Open the page, select all (Ctrl+A or Cmd+A), copy, and use Paste text instead.');return;}
+  if(!r.ok){errStatus('The page returned an error ('+r.status+'). Check the address and try again.');return;}
+  try{
+    var ct=r.headers.get('content-type')||'';
+    if(ct.indexOf('pdf')>-1||/\.pdf$/i.test(url.pathname)){
+      var pr=await parsePdf(await r.arrayBuffer(),function(p,t){setStatus(st,'info','Reading page '+p+' of '+t+'…');});
+      ingest(pr,url.href,'pdf');
+    }else{
+      var body=await r.text();
+      ingest(/html/i.test(ct)||/<(html|body|h1|p)[\s>]/i.test(body)?parseHtml(body):parseText(body),url.href,'url');
+    }
+  }catch(e){errStatus(e&&e.message==='pdfjs'?'The PDF reader couldn\'t load. Check your internet connection and try again.':'The page loaded but couldn\'t be read. Copy its text and use Paste text instead.');}
+}
+
+/* ---------- AI assist ---------- */
+function metaPrompt(){
+  var secs=getSecs(),S=state.settings,n=getEpisodes().length;
+  var lines=secs.map(function(s,i){
+    var ex=s.text.join(' ');ex=ex?firstWords(ex,25):'';
+    return 'S'+(i+1)+' | '+s.title+' | '+s.words+' words'+(s.sub.length?' | subtopics: '+s.sub.slice(0,10).join('; '):'')+(s.terms.length?' | bold terms: '+s.terms.join(', '):'')+(ex?' | starts: '+ex:'');
+  });
+  return [
+    'I am an instructor planning a series of NotebookLM Video Overviews ('+S.format+' format). Each video covers one part of the same source, and together they must cover all of it.',
+    'Series: '+(S.series||'(untitled)')+(S.course?'. Course: '+S.course:'')+'. Audience: '+S.audience+'.',
+    '',
+    'Here is the source outline as numbered sections, in order:',
+    lines.join('\n'),
+    '',
+    'Group these sections, in their original order, into about '+n+' videos. Each video should be a coherent lesson of similar size, and should start at a natural topic boundary. Every section belongs to exactly one video; a video runs from its start section until the next video\'s start section. The first video must start at S1.',
+    'For each video, write a clear student-facing title, 2 to 4 learning objectives that start with a verb, up to 8 key concepts to explain, and a one-sentence opening hook.',
+    '',
+    'Reply with only JSON in exactly this shape, with no commentary and no code fences:',
+    '{"episodes":[{"start":"S1","title":"...","objectives":["..."],"concepts":["..."],"hook":"..."}]}'
+  ].join('\n');
+}
+function applyAi(){
+  var st=$('#ai-status'),raw=$('#ai-reply').value.trim();
+  if(!raw){setStatus(st,'error','Paste the chatbot\'s reply first.');return;}
+  var a=raw.indexOf('{'),b=raw.lastIndexOf('}');
+  var data;
+  try{data=JSON.parse(raw.slice(a,b+1));}catch(e){setStatus(st,'error','The reply isn\'t valid JSON. Ask the chatbot to reply with only the JSON, then paste it again.');return;}
+  var secs=getSecs();
+  if(!data||!Array.isArray(data.episodes)||!data.episodes.length){setStatus(st,'error','The reply has no "episodes" list. Ask the chatbot to use the exact JSON shape from the prompt.');return;}
+  var items=data.episodes.map(function(e){var m=String(e.start||'').match(/(\d+)/);return {idx:m?+m[1]-1:-1,e:e};})
+    .filter(function(x){return x.idx>=0&&x.idx<secs.length;}).sort(function(x,y){return x.idx-y.idx;});
+  var seen=new Set();items=items.filter(function(x){if(seen.has(x.idx))return false;seen.add(x.idx);return true;});
+  if(!items.length){setStatus(st,'error','None of the start sections in the reply match this outline. Copy a fresh AI prompt and try again.');return;}
+  items[0].idx=0;
+  state.breaks=items.slice(1).map(function(x){return secs[x.idx].id;});
+  state.titles={};state.meta={};
+  items.forEach(function(x){
+    var id=secs[x.idx].id,e=x.e;
+    if(e.title)state.titles[id]=String(e.title);
+    state.meta[id]={objectives:(e.objectives||[]).map(String).slice(0,6),concepts:(e.concepts||[]).map(String).slice(0,10),hook:e.hook?String(e.hook):''};
+  });
+  state.nVideos=items.length;save();renderAll();
+  setStatus(st,'ok','Applied: '+plural(items.length,'video')+' with titles, objectives, and key concepts. You can still adjust breaks and titles.');
+}
+
+/* ---------- Clipboard and download ---------- */
+function copyText(text,label){
+  function fallback(){var t=document.createElement('textarea');t.value=text;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();
+    try{document.execCommand('copy');announce(label+' copied');}catch(e){announce('Copy failed. Select the text and copy it manually.');}document.body.removeChild(t);}
+  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).then(function(){announce(label+' copied');},fallback);}else fallback();
+}
+function allPromptsText(md){
+  var eps=getEpisodes(),S=state.settings;
+  var out=[];
+  if(md){out.push('# '+(S.series||'Video series'),'');
+    out.push((S.course?'Course: '+S.course+'  \n':'')+'Audience: '+S.audience+'  \nFormat: '+S.format+'  \nVisual style: '+S.style+'  \nSource: '+state.sourceName,'');}
+  eps.forEach(function(e,i){
+    var p=promptFor(e,i,eps).text;
+    if(md)out.push('## Video '+e.n+': '+e.title,'','```text',p,'```','');
+    else out.push('Video '+e.n+': '+e.title+'\n\n'+p);
+  });
+  return md?out.join('\n'):out.join('\n\n---\n\n');
+}
+function download(){
+  var blob=new Blob([allPromptsText(true)],{type:'text/markdown'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=(state.settings.series||'video-series').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-prompts.md';
+  document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
+  announce('Download started');
+}
+
+/* ---------- Events ---------- */
+// Tabs
+var tabs=[].slice.call(document.querySelectorAll('[role=tab]'));
+function selectTab(t){tabs.forEach(function(x){var on=x===t;x.setAttribute('aria-selected',on);x.tabIndex=on?0:-1;document.getElementById(x.getAttribute('aria-controls')).hidden=!on;});t.focus();}
+tabs.forEach(function(t,i){
+  t.addEventListener('click',function(){selectTab(t);});
+  t.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();selectTab(tabs[(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length]);}
+    if(e.key==='Home'){e.preventDefault();selectTab(tabs[0]);}if(e.key==='End'){e.preventDefault();selectTab(tabs[tabs.length-1]);}
+  });
+});
+$('#btn-use-text').addEventListener('click',function(){
+  var v=$('#paste-text').value;if(!v.trim()){errStatus('Paste some text first.');return;}
+  ingest(parseText(v),'pasted text','text');
+});
+$('#btn-sample').addEventListener('click',function(){$('#paste-text').value=SAMPLE;ingest(parseText(SAMPLE),'the sample','text');});
+$('#file-input').addEventListener('change',function(e){handleFile(e.target.files[0]);e.target.value='';});
+var drop=$('#drop');
+['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('over');});});
+['dragleave','drop'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.remove('over');});});
+drop.addEventListener('drop',function(e){if(e.dataTransfer&&e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+$('#btn-fetch').addEventListener('click',function(){fetchUrl($('#url-input').value);});
+$('#url-input').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();fetchUrl(e.target.value);}});
+
+// Plan
+$('#level-select').addEventListener('change',function(e){
+  state.level=+e.target.value;secCache.key=null;state.titles={};state.meta={};state.overrides={};state.done={};
+  var secs=getSecs();state.nVideos=clamp(state.nVideos||defaultN(secs),1,secs.length);state.breaks=autoSplit(secs,state.nVideos);
+  save();renderPlan('#level-select');renderRun();announce('Split into '+plural(getEpisodes().length,'video'));
+});
+function resplit(){
+  var secs=getSecs(),n=clamp(parseInt($('#n-videos').value,10)||1,1,secs.length);
+  state.nVideos=n;state.breaks=autoSplit(secs,n);state.meta={};save();renderPlan();renderRun();
+  announce('Re-split into '+plural(getEpisodes().length,'video'));
+}
+$('#btn-resplit').addEventListener('click',resplit);
+$('#n-videos').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();resplit();}});
+$('#episode-list').addEventListener('click',function(e){
+  var b=e.target.closest('[data-act]');if(!b)return;
+  var id=b.getAttribute('data-sec');
+  if(b.getAttribute('data-act')==='split'){if(state.breaks.indexOf(id)<0)state.breaks.push(id);}
+  else state.breaks=state.breaks.filter(function(x){return x!==id;});
+  state.nVideos=getEpisodes().length;save();
+  renderPlan('[data-sec="'+id+'"]');renderRun();
+  announce(plural(state.nVideos,'video')+' in the series');
+});
+$('#episode-list').addEventListener('input',function(e){
+  if(!e.target.classList.contains('ep-title'))return;
+  state.titles[e.target.getAttribute('data-ep')]=e.target.value;save();renderRunSoon();
+  clearTimeout(stripTimer);stripTimer=setTimeout(function(){var eps=getEpisodes();eps.forEach(function(ep){var s=document.querySelector('[data-goto="'+ep.id+'"]');if(s)s.setAttribute('aria-label','Video '+ep.n+': '+ep.title+', '+fmt(ep.words)+' words');});},300);
+});
+var stripTimer=null;
+$('#strip').addEventListener('click',function(e){
+  var b=e.target.closest('[data-goto]');if(!b)return;
+  var id=b.getAttribute('data-goto'),li=document.getElementById('ep-'+id);
+  if(li){li.scrollIntoView({block:'start'});var t=document.getElementById('t-'+id);if(t)t.focus({preventScroll:true});}
+});
+$('#btn-copy-meta').addEventListener('click',function(){copyText(metaPrompt(),'AI prompt');});
+$('#btn-apply-ai').addEventListener('click',applyAi);
+$('#btn-clear-ai').addEventListener('click',function(){state.meta={};save();renderRun();setStatus($('#ai-status'),'ok','Removed objectives, key concepts, and hooks from the prompts. Titles were kept.');});
+
+// Settings
+var fields={course:'#set-course',series:'#set-series',audience:'#set-audience',tone:'#set-tone',format:'#set-format',style:'#set-style',extras:'#set-extras'};
+var checks={firstIntro:'#opt-intro',recap:'#opt-recap',tease:'#opt-tease',fence:'#opt-fence',terms:'#opt-terms'};
+Object.keys(fields).forEach(function(k){
+  var el=$(fields[k]);el.value=state.settings[k];
+  el.addEventListener(el.tagName==='SELECT'?'change':'input',function(){state.settings[k]=el.value;if(k==='series')state.settings.seriesAuto=false;save();renderRunSoon();});
+});
+Object.keys(checks).forEach(function(k){
+  var el=$(checks[k]);el.checked=!!state.settings[k];
+  el.addEventListener('change',function(){state.settings[k]=el.checked;save();renderRun();});
+});
+
+// Run sheet
+var runList=$('#run-list');
+runList.addEventListener('input',function(e){
+  if(!e.target.classList.contains('prompt'))return;
+  var id=e.target.getAttribute('data-ep'),eps=getEpisodes(),i=eps.findIndex(function(x){return x.id===id;});
+  if(i<0)return;
+  var gen=buildPrompt(eps[i],i,eps);
+  if(e.target.value===gen)delete state.overrides[id];else state.overrides[id]={base:gen,text:e.target.value};
+  save();var c=document.getElementById('c-'+id);if(c)c.textContent=fmt(e.target.value.length)+' characters'+(state.overrides[id]?', edited':'');
+});
+runList.addEventListener('focusout',function(e){if(e.target.classList.contains('prompt')){var id=e.target.getAttribute('data-ep');var hadBtn=!!document.querySelector('[data-reset="'+id+'"]');if(hadBtn!==!!state.overrides[id])renderRun();}});
+runList.addEventListener('click',function(e){
+  var c=e.target.closest('[data-copy]');
+  if(c){var id=c.getAttribute('data-copy'),ta=document.getElementById('p-'+id);copyText(ta.value,'Prompt');return;}
+  var r=e.target.closest('[data-reset]');
+  if(r){var rid=r.getAttribute('data-reset');delete state.overrides[rid];save();renderRun();var t=document.getElementById('p-'+rid);if(t)t.focus();announce('Prompt reset');}
+});
+runList.addEventListener('change',function(e){
+  var d=e.target.getAttribute('data-done');if(!d)return;
+  if(e.target.checked)state.done[d]=true;else delete state.done[d];save();
+  var li=document.getElementById('run-'+d);if(li)li.classList.toggle('done',e.target.checked);updateProgress();
+});
+$('#btn-copy-all').addEventListener('click',function(){copyText(allPromptsText(false),'All prompts');});
+$('#btn-download').addEventListener('click',download);
+$('#btn-reset').addEventListener('click',function(){
+  if(!window.confirm('Clear the source, plan, and progress? Your voice settings are kept.'))return;
+  var keep=state.settings;state=defaults();state.settings=keep;secCache.key=null;save();
+  $('#paste-text').value='';$('#ai-reply').value='';$('#source-status').textContent='';$('#source-status').className='status';$('#ai-status').textContent='';
+  renderAll();announce('Cleared');
+});
+
+var SAMPLE=['# Subnetting Fundamentals','',
+'## Why We Subnet','A single flat network puts every device in one broadcast domain. As the network grows, broadcasts consume bandwidth, troubleshooting gets harder, and security boundaries disappear. **Subnetting** divides one large address block into smaller networks so traffic can be contained, policies can be applied per group, and addresses are used efficiently. Routers connect the subnets and forward traffic between them.','',
+'## Binary and the IPv4 Address','An IPv4 address is 32 bits, written as four **octets** in dotted decimal. Each octet holds values from 0 to 255 because it has eight bits with place values of 128, 64, 32, 16, 8, 4, 2, and 1. Converting between binary and decimal is the core skill behind every subnetting calculation, so practice it until it feels automatic.','',
+'## Subnet Masks and Prefix Length','A **subnet mask** marks which bits of an address belong to the network and which identify the host. Network bits are 1s and host bits are 0s. **CIDR notation** writes the same idea as a prefix length, so 255.255.255.0 becomes /24. Performing a bitwise AND between an address and its mask gives the **network address**.','',
+'## Calculating Subnets and Hosts','Borrowing n host bits creates 2 to the n subnets. With h host bits remaining, each subnet has 2 to the h minus 2 usable host addresses, because the first address identifies the network and the last is the **broadcast address**. The **block size**, 256 minus the interesting octet of the mask, tells you where each subnet begins.','',
+'## Variable Length Subnet Masking','**VLSM** lets one network use different mask lengths for different subnets. Start with the largest requirement, assign it the smallest block that fits, then carve the remaining space for smaller needs such as point-to-point links that only require a /30. VLSM reduces wasted addresses and is standard practice in enterprise design.','',
+'## Troubleshooting Addressing Problems','Most addressing faults come from a wrong mask, a wrong default gateway, or overlapping subnets. Check the host configuration with ipconfig or ip addr, confirm the host and gateway are in the same subnet, and verify that no two subnets share addresses. A quick subnet calculation usually reveals the mistake.'].join('\n');
+
+renderAll();
+if(state.sourceName){setStatus($('#source-status'),'ok','Restored your last session: '+state.sourceName+'.');}
+})();
+</script>
+</body>
+</html>
