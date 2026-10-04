@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Video Series Planner for NotebookLM</title>
-<meta name="description" content="Turn a document, web page, or PDF into a sequence of NotebookLM Video Overview prompts that together cover the whole source.">
+<title>Video Series Planner for Gemini Notebook</title>
+<meta name="description" content="Turn a document, web page, or PDF into a sequence of Gemini Notebook (formerly NotebookLM) Video Overview prompts that together cover the whole source.">
 <style>
 :root{
   --bg:#F2F4F7; --surface:#FFFFFF; --surface-2:#E9EDF3; --ink:#18202E; --muted:#525D70; --line:#CBD2DD;
@@ -75,6 +75,10 @@ textarea{resize:vertical;line-height:1.5}
 @media(min-width:720px){.controls{grid-template-columns:1.4fr 1fr}}
 .n-row{display:flex;gap:.5rem}
 .n-row input{max-width:6rem}
+.link-row{display:flex;flex-wrap:wrap;gap:.5rem}
+.link-row input{flex:1 1 18rem}
+a.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;white-space:nowrap;font-weight:600}
+a.btn:hover{border-color:var(--accent)}
 .strip{display:flex;gap:3px;margin:.25rem 0 .4rem;border-radius:var(--r-sm);overflow:hidden}
 .seg{flex-basis:0;min-width:44px;border:none;border-radius:0;padding:.5rem .25rem;font-weight:700;font-family:var(--serif);font-size:1.1rem;color:var(--ink);border-bottom:4px solid rgba(0,0,0,.18)}
 .c1{background:var(--seg1)}.c2{background:var(--seg2)}.c3{background:var(--seg3)}.c4{background:var(--seg4)}.c5{background:var(--seg5)}.c6{background:var(--seg6)}
@@ -132,8 +136,8 @@ html{scroll-behavior:smooth}
 
 <header class="site">
   <div class="wrap">
-    <h1>Video Series Planner for NotebookLM</h1>
-    <p>Give it the same source you load into NotebookLM. It splits the material into a sequence of videos and writes one Video Overview prompt for each, so the whole series covers everything without repeating itself.</p>
+    <h1>Video Series Planner for Gemini Notebook</h1>
+    <p>Give it the same source you load into Gemini Notebook (formerly NotebookLM). It splits the material into a sequence of videos and writes one Video Overview prompt for each, so the whole series covers everything without repeating itself.</p>
   </div>
 </header>
 
@@ -262,7 +266,7 @@ html{scroll-behavior:smooth}
         <select id="set-format">
           <option>Explainer</option><option>Brief</option><option>Cinematic</option>
         </select>
-        <p class="hint">Chosen in NotebookLM's customize panel. Shown on each card as a reminder.</p>
+        <p class="hint">Chosen in Gemini Notebook's customize panel. Shown on each card as a reminder.</p>
       </div>
       <div class="field">
         <label for="set-style">Visual style</label>
@@ -291,11 +295,19 @@ html{scroll-behavior:smooth}
     <h2 id="h-run"><span class="step-num" aria-hidden="true">4</span>Run the prompts</h2>
     <p class="step-intro">Generate one video at a time in the same notebook.</p>
     <ol class="howto">
-      <li>In NotebookLM, open the notebook that holds this source and make sure it's selected.</li>
+      <li>In Gemini Notebook, open the notebook that holds this source and make sure every source is selected.</li>
       <li>In the Studio panel, select the pencil icon on Video Overview.</li>
-      <li>Choose the format and visual style shown on the card, paste the prompt, and generate.</li>
+      <li>Choose the format and visual style shown on the card, paste the prompt, and generate. Videos generate in the background, so you can start the next one while the last one finishes.</li>
       <li>Check off each video here as you go. Your progress stays in this browser.</li>
     </ol>
+    <div class="field">
+      <label for="nb-link">Your notebook's link <span class="hint">(optional)</span></label>
+      <div class="link-row">
+        <input type="url" id="nb-link" placeholder="https://notebooklm.google.com/notebook/…" autocomplete="off">
+        <a class="btn" id="nb-open" href="https://notebooklm.google.com/" target="gemini-notebook">Open Gemini Notebook</a>
+      </div>
+      <p class="hint">Paste the address of the notebook that holds this source. Then "Copy and open notebook" on any card copies its prompt and takes you straight there, reusing the same tab.</p>
+    </div>
     <div class="run-tools">
       <button id="btn-copy-all">Copy all prompts</button>
       <button id="btn-download">Download prompts (.md)</button>
@@ -336,7 +348,7 @@ function plural(n,w){return fmt(n)+' '+w+(n===1?'':'s');}
 
 /* ---------- State ---------- */
 function defaults(){return {
-  sourceName:'',sourceKind:'',blocks:[],level:null,breaks:[],titles:{},meta:{},overrides:{},done:{},nVideos:null,
+  sourceName:'',sourceKind:'',blocks:[],level:null,breaks:[],titles:{},meta:{},overrides:{},done:{},nVideos:null,nbLink:'',
   settings:{course:'',series:'',seriesAuto:true,audience:'Community college students in an introductory course',
     tone:'Clear, friendly, and precise, like a good instructor',format:'Explainer',style:'Auto-select',extras:'',
     firstIntro:true,recap:true,tease:true,fence:true,terms:true}
@@ -664,6 +676,7 @@ function renderRun(){
       (p.stale?'<span class="stale">Your plan changed after you edited this prompt.</span>':'')+
       (p.edited?'<button class="quiet" data-reset="'+esc(e.id)+'">Undo my edits</button>':'')+
       '<button data-copy="'+esc(e.id)+'">Copy prompt</button>'+
+      '<button class="primary" data-copyopen="'+esc(e.id)+'">Copy and open notebook</button>'+
       '<label class="check"><input type="checkbox" data-done="'+esc(e.id)+'"'+(done?' checked':'')+'> Generated</label></div></li>';
   }).join('');
   updateProgress(eps);
@@ -741,7 +754,7 @@ function metaPrompt(){
     return 'S'+(i+1)+' | '+s.title+' | '+s.words+' words'+(s.sub.length?' | subtopics: '+s.sub.slice(0,10).join('; '):'')+(s.terms.length?' | bold terms: '+s.terms.join(', '):'')+(ex?' | starts: '+ex:'');
   });
   return [
-    'I am an instructor planning a series of NotebookLM Video Overviews ('+S.format+' format). Each video covers one part of the same source, and together they must cover all of it.',
+    'I am an instructor planning a series of Gemini Notebook (formerly NotebookLM) Video Overviews ('+S.format+' format). Each video covers one part of the same source, and together they must cover all of it.',
     'Series: '+(S.series||'(untitled)')+(S.course?'. Course: '+S.course:'')+'. Audience: '+S.audience+'.',
     '',
     'Here is the source outline as numbered sections, in order:',
@@ -889,6 +902,15 @@ runList.addEventListener('input',function(e){
 });
 runList.addEventListener('focusout',function(e){if(e.target.classList.contains('prompt')){var id=e.target.getAttribute('data-ep');var hadBtn=!!document.querySelector('[data-reset="'+id+'"]');if(hadBtn!==!!state.overrides[id])renderRun();}});
 runList.addEventListener('click',function(e){
+  var co=e.target.closest('[data-copyopen]');
+  if(co){
+    var ta2=document.getElementById('p-'+co.getAttribute('data-copyopen'));
+    var ok=syncCopy(ta2.value);
+    if(!ok&&navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(ta2.value).catch(function(){});
+    window.open(notebookUrl(),'gemini-notebook');
+    announce(ok?'Prompt copied. Paste it into the Video Overview prompt box.':'Notebook opened. If the prompt did not copy, use Copy prompt.');
+    return;
+  }
   var c=e.target.closest('[data-copy]');
   if(c){var id=c.getAttribute('data-copy'),ta=document.getElementById('p-'+id);copyText(ta.value,'Prompt');return;}
   var r=e.target.closest('[data-reset]');
@@ -903,10 +925,26 @@ $('#btn-copy-all').addEventListener('click',function(){copyText(allPromptsText(f
 $('#btn-download').addEventListener('click',download);
 $('#btn-reset').addEventListener('click',function(){
   if(!window.confirm('Clear the source, plan, and progress? Your voice settings are kept.'))return;
-  var keep=state.settings;state=defaults();state.settings=keep;secCache.key=null;save();
+  var keep=state.settings,keepLink=state.nbLink;state=defaults();state.settings=keep;state.nbLink=keepLink;secCache.key=null;save();
   $('#paste-text').value='';$('#ai-reply').value='';$('#source-status').textContent='';$('#source-status').className='status';$('#ai-status').textContent='';
   renderAll();announce('Cleared');
 });
+
+function notebookUrl(){
+  var v=(state.nbLink||'').trim();
+  try{var u=new URL(v);if(u.protocol==='https:')return u.href;}catch(e){}
+  return 'https://notebooklm.google.com/';
+}
+function syncCopy(text){
+  var t=document.createElement('textarea');t.value=text;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';
+  document.body.appendChild(t);t.select();var ok=false;
+  try{ok=document.execCommand('copy');}catch(e){ok=false;}
+  document.body.removeChild(t);return ok;
+}
+var nbInput=$('#nb-link'),nbOpen=$('#nb-open');
+function syncNbLink(){nbOpen.href=notebookUrl();nbOpen.textContent=state.nbLink&&notebookUrl()!=='https://notebooklm.google.com/'?'Open my notebook':'Open Gemini Notebook';}
+nbInput.value=state.nbLink||'';syncNbLink();
+nbInput.addEventListener('input',function(){state.nbLink=nbInput.value;save();syncNbLink();});
 
 var SAMPLE=['# Subnetting Fundamentals','',
 '## Why We Subnet','A single flat network puts every device in one broadcast domain. As the network grows, broadcasts consume bandwidth, troubleshooting gets harder, and security boundaries disappear. **Subnetting** divides one large address block into smaller networks so traffic can be contained, policies can be applied per group, and addresses are used efficiently. Routers connect the subnets and forward traffic between them.','',
