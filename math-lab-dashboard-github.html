@@ -84,6 +84,7 @@ legend{font-weight:700; margin-bottom:6px}
 table.data{width:100%; border-collapse:collapse; font-size:.9rem}
 table.data th,table.data td{padding:7px 9px; text-align:left; border-bottom:1px solid var(--rule); white-space:nowrap}
 table.data th{font-weight:700; cursor:pointer; user-select:none; position:relative}
+table.data.sortable th[aria-sort="none"]::after{content:" ↕"; font-size:.75em; opacity:.4}
 table.data th[aria-sort="ascending"]::after{content:" ▲"; font-size:.7em}
 table.data th[aria-sort="descending"]::after{content:" ▼"; font-size:.7em}
 table.data td.n,table.data th.n{text-align:right}
@@ -172,6 +173,9 @@ footer{margin-top:48px; font-size:.82rem; color:var(--muted); border-top:1px sol
         <input type="password" id="passphrase" placeholder="Passphrase" autocomplete="off" disabled style="margin-left:24px; width:calc(100% - 24px)">
       </fieldset>
       <fieldset>
+        <label class="opt" style="margin-top:10px"><input type="checkbox" id="hideStudents"><span>Leave student IDs out entirely<small>Removes the student column from the preview and the data download. Counts of different students still work.</small></span></label>
+      </fieldset>
+      <fieldset>
         <legend>Tutors</legend>
         <label class="opt"><input type="checkbox" id="maskTutors"><span>Hide tutor names too<small>Use when sharing outside the department. Leave off to report on individual tutors.</small></span></label>
       </fieldset>
@@ -187,6 +191,12 @@ footer{margin-top:48px; font-size:.82rem; color:var(--muted); border-top:1px sol
       <table class="maptable" id="mapTable"></table>
       <p class="small muted" id="unmapped"></p>
     </div>
+  </div>
+  <div class="panel" style="margin-top:20px" id="dupPanel">
+    <h3>Duplicate check</h3>
+    <p class="small muted" style="margin-top:2px">Runs on the loaded files before anything is anonymized or counted.</p>
+    <div id="dupSummary" class="qa" style="margin-top:10px"></div>
+    <label class="opt" style="margin-top:12px"><input type="checkbox" id="nearOn" checked><span>Also remove likely duplicates<small>Same tutor, student and course, logged within <select id="nearMin" aria-label="Minutes apart"><option>5</option><option selected>10</option><option>15</option><option>30</option></select> minutes of each other on the same day. The most complete entry is kept.</small></span></label>
   </div>
   <div class="row" style="margin-top:16px">
     <button id="runBtn" type="button">Anonymize and build dashboard</button>
@@ -239,7 +249,7 @@ footer{margin-top:48px; font-size:.82rem; color:var(--muted); border-top:1px sol
       <div><h3>Tutors</h3><p class="sub" style="margin:0">Click a row to spotlight that tutor. Click a header to sort.</p></div>
       <button class="ghost" id="exportTutors" type="button">Download tutor table (CSV)</button>
     </div>
-    <div class="scroll" style="margin-top:10px"><table class="data" id="tutorTable"></table></div>
+    <div class="scroll" style="margin-top:10px"><table class="data sortable" id="tutorTable"></table></div>
   </div>
 
   <div class="grid2">
@@ -276,8 +286,8 @@ footer{margin-top:48px; font-size:.82rem; color:var(--muted); border-top:1px sol
 
   <div class="card">
     <h3>Busiest course sections</h3>
-    <p class="sub">Top 15 sections by sessions. Useful for spotting classes that lean on the lab.</p>
-    <div class="scroll"><table class="data preview" id="sectionTable"></table></div>
+    <p class="sub">Top 15 sections by sessions. Useful for spotting classes that lean on the lab. Click a header to sort.</p>
+    <div class="scroll"><table class="data sortable" id="sectionTable"></table></div>
   </div>
 
   <div class="card">
@@ -492,13 +502,57 @@ function msg(id,text,err){ $(id).innerHTML=text?`<div class="notice${err?' err':
 function renderMapping(){
   const opts=h=>['<option value="">— not used —</option>',...S.headers.map(x=>`<option value="${esc(x)}"${x===h?' selected':''}>${esc(x)}</option>`)].join('');
   $('mapTable').innerHTML=FIELDS.map(f=>`<tr><td>${esc(f.label)}${f.req?' <span class="req" title="Required">*</span>':''}</td><td><select data-key="${f.key}" aria-label="Column for ${esc(f.label)}">${opts(S.mapping[f.key])}</select></td></tr>`).join('');
-  $('mapTable').querySelectorAll('select').forEach(s=>s.addEventListener('change',()=>{ S.mapping[s.dataset.key]=s.value||undefined; updateUnmapped(); }));
-  updateUnmapped();
+  $('mapTable').querySelectorAll('select').forEach(s=>s.addEventListener('change',()=>{ S.mapping[s.dataset.key]=s.value||undefined; updateUnmapped(); renderDupes(); }));
+  updateUnmapped(); renderDupes();
 }
 function updateUnmapped(){
   const used=new Set(Object.values(S.mapping).filter(Boolean));
   const un=S.headers.filter(h=>!used.has(h));
   $('unmapped').textContent=un.length?'Discarded: '+un.join(', '):'';
+}
+
+/* ---------- duplicate check (raw rows, before anonymizing) ---------- */
+function dedupe(){
+  const m=S.mapping; const get=(r,k)=>m[k]?r[m[k]]:undefined;
+  const filled=r=>Object.keys(r).filter(k=>k!=='__file'&&String(r[k]??'').trim()).length;
+  let skipDate=0, skipStudent=0; const byKey=new Map(); const fileHits=new Map();
+  for(const r of S.rows){
+    const pd=parseDate(get(r,'activity')); if(!pd){skipDate++; continue;}
+    const sRaw=normName(get(r,'studentId'))||normName(get(r,'student')); if(!sRaw){skipStudent++; continue;}
+    const tRaw=String(get(r,'tutor')||'').trim()||'Unassigned';
+    const c=parseCourse(get(r,'subject'),get(r,'section'));
+    const k=normName(tRaw)+'|'+sRaw+'|'+pd.d.getTime()+'|'+c.code;
+    const item={r,pd,sRaw,tRaw,c,score:filled(r)};
+    const prev=byKey.get(k);
+    if(!prev) byKey.set(k,item);
+    else { fileHits.set(r.__file,(fileHits.get(r.__file)||0)+1); if(item.score>prev.score) byKey.set(k,item); }
+  }
+  let kept=[...byKey.values()]; const exact=S.rows.length-skipDate-skipStudent-kept.length;
+  let near=0;
+  if(m.activity&&$('nearOn').checked){
+    const win=(+$('nearMin').value||10)*60000; const groups=new Map();
+    for(const it of kept){ const g=normName(it.tRaw)+'|'+it.sRaw+'|'+it.c.code+'|'+iso(it.pd.d); if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(it); }
+    const out=[];
+    for(const list of groups.values()){
+      list.sort((a,b)=>a.pd.d-b.pd.d); let cur=list[0];
+      for(let i=1;i<list.length;i++){ const it=list[i];
+        if(it.pd.time&&cur.pd.time&&it.pd.d-cur.pd.d<=win){ near++; if(it.score>cur.score) cur=it; }
+        else { out.push(cur); cur=it; } }
+      out.push(cur);
+    }
+    kept=out;
+  }
+  return {kept,exact,near,skipDate,skipStudent,fileHits};
+}
+function renderDupes(){
+  if(!S.rows.length) return;
+  const m=S.mapping;
+  if(!m.activity||!m.tutor||!(m.student||m.studentId)){ $('dupSummary').innerHTML='<span>Choose the date, tutor and student columns to run the check.</span>'; return; }
+  const D=dedupe();
+  const files=[...D.fileHits].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([f,n])=>`${esc(f)} (${fmt(n)})`).join(', ');
+  $('dupSummary').innerHTML=`<span><b>${fmt(S.rows.length)}</b> rows loaded</span><span><b>${fmt(D.exact)}</b> repeated entries</span><span><b>${fmt(D.near)}</b> likely duplicates</span><span><b>${fmt(D.kept.length)}</b> sessions will be kept</span>`+
+    (D.skipDate||D.skipStudent?`<span><b>${fmt(D.skipDate+D.skipStudent)}</b> rows missing a date or student</span>`:'')+
+    (files?`<span style="grid-column:1/-1">Repeats found in: ${files}</span>`:'');
 }
 
 /* ---------- anonymize ---------- */
@@ -514,17 +568,11 @@ async function run(){
     const key=await makeKey(mode,pass); const cache=new Map();
     const maskT=$('maskTutors').checked, notesMode=document.querySelector('input[name=notes]:checked').value;
     const get=(r,k)=>m[k]?r[m[k]]:undefined;
-    const seen=new Set(); const out=[]; let dupes=0, skipDate=0, skipStudent=0;
+    const D=dedupe(); const out=[]; const {skipDate,skipStudent}=D; const dupes=D.exact+D.near;
     const names=[];
     if(notesMode==='scrub'){ for(const r of S.rows){ names.push(get(r,'student')); if(maskT) names.push(get(r,'tutor')); const sec=String(get(r,'section')||''); const p=sec.split(/\s+-\s+/)[0]; if(/,/.test(p)) names.push(p); } }
     const scrub=notesMode==='scrub'?buildScrubber(names):null;
-    for(const r of S.rows){
-      const pd=parseDate(get(r,'activity')); if(!pd){skipDate++; continue;}
-      const sRaw=normName(get(r,'studentId'))||normName(get(r,'student')); if(!sRaw){skipStudent++; continue;}
-      const tRaw=String(get(r,'tutor')||'').trim()||'Unassigned';
-      const c=parseCourse(get(r,'subject'),get(r,'section'));
-      const dk=normName(tRaw)+'|'+sRaw+'|'+pd.d.getTime()+'|'+c.code;
-      if(seen.has(dk)){dupes++; continue;} seen.add(dk);
+    for(const {r,pd,sRaw,tRaw,c} of D.kept){
       const ws=weekStart(pd.d);
       const notesRaw=String(get(r,'notes')||'').trim();
       out.push({
@@ -539,18 +587,22 @@ async function run(){
       });
     }
     out.sort((a,b)=>a.date-b.date);
-    S.records=out; S.stats={rows:S.rows.length,dupes,skipDate,skipStudent,maskT,notesMode,mode};
+    S.records=out; S.stats={rows:S.rows.length,dupes,exact:D.exact,near:D.near,skipDate,skipStudent,maskT,notesMode,mode};
     $('runMsg').textContent=`${fmt(out.length)} sessions ready.`;
     renderPreview(); setupFilters(); $('step3').classList.remove('hidden'); render();
   }catch(e){ console.error(e); $('runMsg').textContent='Something went wrong while anonymizing: '+e.message; }
   finally{ $('runBtn').disabled=false; }
 }
 function renderPreview(){
+  if(!S.records.length||!S.stats) return;
+  const hideS=$('hideStudents').checked;
   const cols=['Date','Course','Section','Tutor','Student','Minutes','Location','Drop in','No show'];
   if(S.stats.notesMode==='scrub') cols.push('Notes (scrubbed)');
   const rows=S.records.slice(0,6).map(r=>{ const c=[usDate(r.date)+(r.hasTime?' '+r.date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):''),r.course,r.section,r.tutor,r.student,r.minutes??'',r.location,r.dropIn==null?'':(r.dropIn?'Yes':'No'),r.noShow?'Yes':'No'];
     if(S.stats.notesMode==='scrub') c.push(r.notes.length>80?r.notes.slice(0,80)+'…':r.notes);
+    if(hideS) c.splice(4,1);
     return '<tr>'+c.map(x=>`<td>${esc(x)}</td>`).join('')+'</tr>'; }).join('');
+  if(hideS) cols.splice(4,1);
   $('previewTable').innerHTML='<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>'+rows+'</tbody>';
   $('previewWrap').classList.remove('hidden');
 }
@@ -625,7 +677,7 @@ function render(){
     [fmt1(sum.avg),'average minutes'],[(sum.noShowRate*100).toFixed(1)+'%','no-show rate'],[fmt(ws.labels.length),'weeks in range']
   ].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
   const st=S.stats;
-  $('qa').innerHTML=`<span><b>${fmt(S.files.length)}</b> files, <b>${fmt(st.rows)}</b> rows read</span><span><b>${fmt(st.dupes)}</b> duplicate rows removed</span>`+
+  $('qa').innerHTML=`<span><b>${fmt(S.files.length)}</b> files, <b>${fmt(st.rows)}</b> rows read</span><span><b>${fmt(st.exact)}</b> repeated entries removed</span>${st.near?`<span><b>${fmt(st.near)}</b> likely duplicates removed</span>`:''}`+
     (st.skipDate?`<span><b>${fmt(st.skipDate)}</b> rows skipped (no date)</span>`:'')+(st.skipStudent?`<span><b>${fmt(st.skipStudent)}</b> rows skipped (no student)</span>`:'')+
     `<span>Data covers <b>${usDate(S.records[0].date)}</b> to <b>${usDate(S.records[S.records.length-1].date)}</b></span>`;
 
@@ -658,8 +710,18 @@ function render(){
   bars('locBars',[...lm].sort((a,b)=>b[1]-a[1]).map(([k,v])=>({k,v})));
 
   const sm=new Map(); for(const r of att){ if(!r.section) continue; const k=r.course+' · '+r.section; let s=sm.get(k); if(!s){s={course:r.course,section:r.section,s:0,st:new Set()}; sm.set(k,s);} s.s++; s.st.add(r.student); }
-  const sec=[...sm.values()].sort((a,b)=>b.s-a.s).slice(0,15);
-  $('sectionTable').innerHTML=sec.length?'<thead><tr><th>Course</th><th>Section</th><th class="n">Sessions</th><th class="n">Different students</th></tr></thead><tbody>'+sec.map(s=>`<tr><td>${esc(s.course)}</td><td>${esc(s.section)}</td><td class="n">${fmt(s.s)}</td><td class="n">${fmt(s.st.size)}</td></tr>`).join('')+'</tbody>':'<tbody><tr><td class="muted">No section codes were found in the export.</td></tr></tbody>';
+  S.sections=[...sm.values()].sort((a,b)=>b.s-a.s).slice(0,15).map(x=>({course:x.course,section:x.section,sessions:x.s,students:x.st.size}));
+  renderSectionTable();
+}
+const SCOLS=[['course','Course'],['section','Section'],['sessions','Sessions',1],['students','Different students',1]];
+function renderSectionTable(){
+  const el=$('sectionTable');
+  if(!S.sections||!S.sections.length){ el.innerHTML='<tbody><tr><td class="muted">No section codes were found in the export.</td></tr></tbody>'; return; }
+  S.secSort=S.secSort||{key:'sessions',dir:-1}; const {key,dir}=S.secSort;
+  const rows=[...S.sections].sort((a,b)=>{ const x=a[key],y=b[key]; return (typeof x==='string'?x.localeCompare(y):x-y)*dir; });
+  el.innerHTML='<thead><tr>'+SCOLS.map(([k,l,n])=>`<th tabindex="0" data-k="${k}" class="${n?'n':''}" aria-sort="${k===key?(dir>0?'ascending':'descending'):'none'}">${l}</th>`).join('')+'</tr></thead><tbody>'+
+    rows.map(r=>`<tr style="cursor:default"><td>${esc(r.course)}</td><td>${esc(r.section)}</td><td class="n">${fmt(r.sessions)}</td><td class="n">${fmt(r.students)}</td></tr>`).join('')+'</tbody>';
+  el.querySelectorAll('th').forEach(th=>{ const go=()=>{ const k=th.dataset.k; S.secSort={key:k,dir:S.secSort.key===k?-S.secSort.dir:(typeof S.sections[0][k]==='string'?1:-1)}; renderSectionTable(); }; th.onclick=go; th.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}}; });
 }
 const TCOLS=[['tutor','Tutor'],['sessions','Sessions',1],['students','Different students',1],['hours','Hours',1],['avg','Avg minutes',1],['weeksActive','Weeks active',1],['first','First session',1],['last','Last session',1]];
 function renderTutorTable(){
@@ -715,6 +777,7 @@ function exportCsv(){
   const recs=filtered(); const withNotes=S.stats.notesMode==='scrub';
   const head=['session','date','time','week_start','weekday','course','course_title','section','location','duration_min','drop_in','no_show','elevate','tutor','student'].concat(withNotes?['notes_scrubbed']:[]);
   const rows=recs.map((r,i)=>[i+1,iso(r.date),r.hasTime?String(r.date.getHours()).padStart(2,'0')+':'+String(r.date.getMinutes()).padStart(2,'0'):'',r.week,DOW[r.dow],r.course,r.courseTitle,r.section,r.location,r.minutes??'',r.dropIn==null?'':(r.dropIn?'Yes':'No'),r.noShow?'Yes':'No',r.elevate==null?'':(r.elevate?'Yes':'No'),r.tutor,r.student].concat(withNotes?[r.notes]:[]));
+  if($('hideStudents').checked){ const k=head.indexOf('student'); head.splice(k,1); rows.forEach(r=>r.splice(k,1)); }
   saveFile(`math-lab-sessions-anonymized-${stamp()}.csv`,'\uFEFF'+toCsv(head,rows),'text/csv');
 }
 function tutorRows(){ return [...S.tutors].sort((a,b)=>b.sessions-a.sessions).map(t=>[t.tutor,t.sessions,t.students,t.hours.toFixed(1),t.avg.toFixed(1),t.weeksActive,iso(t.first),iso(t.last)]); }
@@ -798,6 +861,8 @@ $('clearBtn').addEventListener('click',()=>{ S.files=[];S.rows=[];S.headers=[];S
   $('passphrase').value=''; setFilesUI(); $('step3').classList.add('hidden'); $('previewWrap').classList.add('hidden'); $('runMsg').textContent=''; msg('loadMsg','All data cleared from this tab.'); });
 document.querySelectorAll('input[name=keymode]').forEach(r=>r.addEventListener('change',()=>{ $('passphrase').disabled=document.querySelector('input[name=keymode]:checked').value!=='pass'; if(!$('passphrase').disabled) $('passphrase').focus(); }));
 $('runBtn').addEventListener('click',run);
+$('nearOn').addEventListener('change',renderDupes); $('nearMin').addEventListener('change',renderDupes);
+$('hideStudents').addEventListener('change',renderPreview);
 ['fFrom','fTo','fCourse','fTutor','fLoc','fNoShow'].forEach(id=>$(id).addEventListener('change',render));
 $('resetFilters').addEventListener('click',()=>{ setupFilters(); $('fNoShow').checked=false; render(); });
 $('spotSel').addEventListener('change',()=>{ S.spot=$('spotSel').value; renderTutorTable(); renderSpot(); });
