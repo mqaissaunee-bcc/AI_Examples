@@ -115,10 +115,29 @@ table.data tbody tr.sel{background:var(--marker-soft)}
 .bar .track{height:12px; background:var(--blue-soft); border-radius:2px; overflow:hidden}
 .bar .fill{height:100%; background:var(--blue)}
 .bar .v{text-align:right; white-space:nowrap; min-width:44px}
-.heat{border-collapse:collapse; font-size:.78rem}
-.heat td,.heat th{width:42px; height:30px; text-align:center; border:2px solid var(--surface)}
+.chartbox.big{height:380px}
+@media (max-width:600px){.chartbox.big{height:300px}}
+.heat{border-collapse:separate; border-spacing:3px; font-size:.88rem; width:100%; min-width:640px; table-layout:fixed}
+.heat td,.heat th{height:44px; text-align:center; border:none}
+.heat thead th{height:28px}
 .heat th{font-weight:600; color:var(--muted)}
-.heat td{border-radius:3px}
+.heat tbody th{width:52px; text-align:left}
+.heat td{border-radius:4px; font-weight:600}
+.seg{display:inline-flex; border:1.5px solid var(--blue); border-radius:4px; overflow:hidden}
+.seg button{border:none; border-radius:0; background:transparent; color:var(--blue); padding:6px 12px}
+.seg button.on{background:var(--blue); color:var(--surface)}
+.findings{margin:6px 0 0; padding-left:1.4em; display:grid; gap:10px; max-width:80ch}
+.findings li{padding-left:4px}
+.findings li::marker{font-family:var(--serif); font-weight:600; color:var(--blue)}
+.findings b{font-weight:700}
+.findings .tag{display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); margin-right:6px}
+.cover{border-collapse:separate; border-spacing:2px; font-size:.85rem}
+.cover th,.cover td{padding:6px 8px; text-align:center; white-space:nowrap}
+.cover thead th{font-weight:600; color:var(--muted); writing-mode:horizontal-tb}
+.cover tbody th{text-align:left; font-weight:600}
+.cover td{border-radius:3px; min-width:56px}
+.cover tfoot td,.cover tfoot th{border-top:2px solid var(--ink); font-weight:700}
+.cover .risk{background:var(--marker-soft); outline:2px solid var(--marker)}
 .legend{display:flex; gap:14px; font-size:.82rem; color:var(--muted); margin-top:8px; flex-wrap:wrap}
 .legend i{display:inline-block; width:12px; height:12px; border-radius:2px; vertical-align:-1px; margin-right:5px}
 .toast{position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:4px; font-size:.9rem; opacity:0; pointer-events:none; transition:opacity .2s; z-index:20}
@@ -226,6 +245,12 @@ footer{margin-top:48px; font-size:.82rem; color:var(--muted); border-top:1px sol
   <div class="ledger" id="ledger"></div>
   <div class="qa small muted" id="qa"></div>
 
+  <div class="card findings-card">
+    <h3>Key findings</h3>
+    <p class="sub">Written automatically from the sessions in the current view. They update with the filters.</p>
+    <ol class="findings" id="findings"></ol>
+  </div>
+
   <div class="spot" id="spot">
     <div class="row" style="justify-content:space-between">
       <h3>Tutor spotlight</h3>
@@ -233,15 +258,26 @@ footer{margin-top:48px; font-size:.82rem; color:var(--muted); border-top:1px sol
     </div>
     <p class="sentence" id="spotText"></p>
     <div class="grid2">
-      <div><div class="chartbox" style="height:200px"><canvas id="spotChart" aria-label="Weekly sessions for selected tutor"></canvas></div></div>
+      <div><div class="chartbox" style="height:260px"><canvas id="spotChart" aria-label="Weekly sessions for selected tutor"></canvas></div></div>
       <div><p class="small muted" style="margin-top:0">Courses this tutor covered</p><div class="bars" id="spotCourses"></div></div>
     </div>
   </div>
 
   <div class="card">
     <h3>Week by week</h3>
-    <p class="sub">Sessions and different students per week (weeks start Monday).</p>
-    <div class="chartbox"><canvas id="weekChart" aria-label="Weekly sessions and unique students"></canvas></div>
+    <p class="sub">Sessions, different students, and first-time students per week (weeks start Monday). A first-time student is someone with no earlier session in the loaded files.</p>
+    <div class="chartbox big"><canvas id="weekChart" aria-label="Weekly sessions, unique students and first-time students"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between; align-items:flex-start">
+      <div><h3>When students come in</h3><p class="sub" id="heatSub" style="margin:0">Sessions by weekday and start hour. Darker means busier.</p></div>
+      <div class="seg" role="group" aria-label="Heat map measure">
+        <button type="button" class="on" data-hm="sessions">Sessions</button><button type="button" data-hm="load">Per tutor working</button>
+      </div>
+    </div>
+    <div class="scroll" style="margin-top:12px"><table class="heat" id="heat"></table></div>
+    <p class="small muted" id="heatNote"></p>
   </div>
 
   <div class="card">
@@ -252,6 +288,12 @@ footer{margin-top:48px; font-size:.82rem; color:var(--muted); border-top:1px sol
     <div class="scroll" style="margin-top:10px"><table class="data sortable" id="tutorTable"></table></div>
   </div>
 
+  <div class="card">
+    <h3>Course coverage by tutor</h3>
+    <p class="sub">Sessions each tutor held in each course. The bottom row shows how much of a course depends on its busiest tutor; amber marks courses where one person handled 60% or more.</p>
+    <div class="scroll"><table class="cover" id="cover"></table></div>
+  </div>
+
   <div class="grid2">
     <div class="card">
       <h3>Courses</h3>
@@ -259,19 +301,16 @@ footer{margin-top:48px; font-size:.82rem; color:var(--muted); border-top:1px sol
       <div class="bars" id="courseBars"></div>
     </div>
     <div class="card">
-      <h3>When students come in</h3>
-      <p class="sub">Sessions by weekday and start hour. Darker means busier.</p>
-      <div class="scroll"><table class="heat" id="heat"></table></div>
-      <p class="small muted" id="heatNote"></p>
-    </div>
-  </div>
-
-  <div class="grid3">
-    <div class="card">
       <h3>Return visits</h3>
       <p class="sub">How many sessions each student had.</p>
       <div class="bars" id="returnBars"></div>
+      <h3 style="margin-top:22px">Session length</h3>
+      <p class="sub">How long sessions ran.</p>
+      <div class="bars" id="lenBars"></div>
     </div>
+  </div>
+
+  <div class="grid2">
     <div class="card">
       <h3>How sessions start</h3>
       <p class="sub">Drop-in vs. scheduled, and no-shows.</p>
@@ -582,11 +621,13 @@ async function run(){
         minutes:parseMinutes(get(r,'duration')),
         dropIn:m.dropin?yes(get(r,'dropin')):null, noShow:m.noshow?yes(get(r,'noshow')):false, elevate:m.elevate?yes(get(r,'elevate')):null,
         hasNotes:!!notesRaw, notes:scrub?scrub(notesRaw):'',
+        lag:(()=>{ const pc=parseDate(get(r,'created')); return pc&&pc.time&&pd.time?(pc.d-pd.d)/60000:null; })(),
         student:await pseudo(key,'S',sRaw,cache),
         tutor:maskT?await pseudo(key,'T',normName(tRaw),cache):tRaw
       });
     }
     out.sort((a,b)=>a.date-b.date);
+    { const seenS=new Set(); for(const x of out){ x.first=false; if(!x.noShow&&!seenS.has(x.student)){ x.first=true; seenS.add(x.student); } } }
     S.records=out; S.stats={rows:S.rows.length,dupes,exact:D.exact,near:D.near,skipDate,skipStudent,maskT,notesMode,mode};
     $('runMsg').textContent=`${fmt(out.length)} sessions ready.`;
     renderPreview(); setupFilters(); $('step3').classList.remove('hidden'); render();
@@ -638,10 +679,10 @@ function summarize(base){
     noShows:base.filter(r=>r.noShow).length, noShowRate:base.length?base.filter(r=>r.noShow).length/base.length:0};
 }
 function weekSeries(att, range){
-  const map=new Map(); for(const r of att){ let w=map.get(r.week); if(!w){w={s:0,st:new Set()}; map.set(r.week,w);} w.s++; w.st.add(r.student); }
+  const map=new Map(); for(const r of att){ let w=map.get(r.week); if(!w){w={s:0,st:new Set(),n:0}; map.set(r.week,w);} w.s++; w.st.add(r.student); if(r.first) w.n++; }
   const keys=[]; if(range&&range[0]){ let d=weekStart(range[0]); const end=weekStart(range[1]); while(d<=end){ keys.push(iso(d)); d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+7); } }
   else keys.push(...[...map.keys()].sort());
-  return {labels:keys, sessions:keys.map(k=>map.get(k)?.s||0), students:keys.map(k=>map.get(k)?.st.size||0)};
+  return {labels:keys, sessions:keys.map(k=>map.get(k)?.s||0), students:keys.map(k=>map.get(k)?.st.size||0), newcomers:keys.map(k=>map.get(k)?.n||0)};
 }
 function byTutor(att){
   const map=new Map();
@@ -683,7 +724,8 @@ function render(){
 
   chart('weekChart',{type:'line',data:{labels:ws.labels.map(l=>shortDate(new Date(l+'T00:00:00'))),datasets:[
     {label:'Sessions',data:ws.sessions,borderColor:css('--blue'),backgroundColor:css('--blue'),tension:.25,pointRadius:ws.labels.length>30?0:3,borderWidth:2},
-    {label:'Different students',data:ws.students,borderColor:css('--marker'),backgroundColor:css('--marker'),tension:.25,pointRadius:ws.labels.length>30?0:3,borderWidth:2,borderDash:[5,4]}]}});
+    {label:'Different students',data:ws.students,borderColor:css('--marker'),backgroundColor:css('--marker'),tension:.25,pointRadius:ws.labels.length>30?0:3,borderWidth:2,borderDash:[5,4]},
+    {label:'First-time students',data:ws.newcomers,borderColor:css('--ok'),backgroundColor:css('--ok'),tension:.25,pointRadius:ws.labels.length>30?0:3,borderWidth:2,borderDash:[2,3]}]}});
 
   const tut=byTutor(att); S.tutors=tut; renderTutorTable();
   const tutorNames=tut.map(t=>t.tutor).sort((a,b)=>a.localeCompare(b));
@@ -694,7 +736,9 @@ function render(){
   const cm=new Map(); for(const r of att){ let c=cm.get(r.course); if(!c){c={s:0,st:new Set(),title:r.courseTitle}; cm.set(r.course,c);} c.s++; c.st.add(r.student); if(!c.title&&r.courseTitle)c.title=r.courseTitle; }
   bars('courseBars',[...cm].sort((a,b)=>b[1].s-a[1].s).map(([k,c])=>({k,v:c.s,u:c.st.size,title:k+' '+c.title})),i=>`${fmt(i.v)} <span class="muted">(${fmt(i.u)})</span>`);
 
-  renderHeat(att);
+  renderHeat(att); renderCover(att); renderFindings(sum,att,base,ws);
+  const lb=[['15 min or less',0,15],['16–30',16,30],['31–45',31,45],['46–60',46,60],['Over 60',61,1e9]];
+  bars('lenBars',att.some(r=>r.minutes!=null)?lb.map(([k,a,b])=>({k,v:att.filter(r=>r.minutes!=null&&r.minutes>=a&&r.minutes<=b).length})):[],i=>fmt(i.v));
 
   const per=new Map(); for(const r of att) per.set(r.student,(per.get(r.student)||0)+1);
   const buckets=[['1 visit',1,1],['2 visits',2,2],['3–5',3,5],['6–10',6,10],['11 or more',11,1e9]];
@@ -749,16 +793,87 @@ function renderSpot(range){
 function renderHeat(att){
   const timed=att.filter(r=>r.hasTime);
   if(!timed.length){ $('heat').innerHTML=''; $('heatNote').textContent='The export has dates but no times, so this view is unavailable.'; return; }
+  const load=S.hm==='load';
   let lo=Math.min(...timed.map(r=>r.hour)), hi=Math.max(...timed.map(r=>r.hour)); lo=Math.min(lo,9); hi=Math.max(hi,17);
-  const g={}; let max=0; for(const r of timed){ const k=r.dow+'-'+r.hour; g[k]=(g[k]||0)+1; if(g[k]>max)max=g[k]; }
+  const cnt={}, crew={};
+  for(const r of timed){ const k=r.dow+'-'+r.hour; cnt[k]=(cnt[k]||0)+1; (crew[k]=crew[k]||new Set()).add(iso(r.date)+'|'+r.tutor); }
+  const val=k=>!cnt[k]?0:load?cnt[k]/crew[k].size:cnt[k];
+  let max=0, maxK=''; for(const k in cnt){ const v=val(k); if(v>max){max=v;maxK=k;} }
   const days=[...new Set(timed.map(r=>r.dow))].concat([0,1,2,3,4]).filter((v,i,a)=>a.indexOf(v)===i).sort();
   const hl=h=>(h%12||12)+(h<12?'a':'p');
   let html='<thead><tr><th></th>'; for(let h=lo;h<=hi;h++) html+=`<th scope="col">${hl(h)}</th>`; html+='</tr></thead><tbody>';
   const blue=css('--blue');
-  for(const d of days){ html+=`<tr><th scope="row">${DOW[d]}</th>`; for(let h=lo;h<=hi;h++){ const v=g[d+'-'+h]||0; const a=v?0.12+0.88*(v/max):0;
-    html+=`<td title="${DOW[d]} ${hl(h)}: ${v} sessions" style="background:${v?`color-mix(in srgb, ${blue} ${Math.round(a*100)}%, transparent)`:'var(--bg)'};color:${a>.55?'var(--surface)':'var(--ink)'}">${v||''}</td>`; } html+='</tr>'; }
+  for(const d of days){ html+=`<tr><th scope="row">${DOW[d]}</th>`; for(let h=lo;h<=hi;h++){ const k=d+'-'+h, v=val(k); const a=v?0.12+0.88*(v/max):0;
+    const shown=v?(load?v.toFixed(1):fmt(v)):'';
+    const tip=load?`${DOW[d]} ${hl(h)}: ${v?v.toFixed(1):0} sessions per tutor working (${cnt[k]||0} sessions)`:`${DOW[d]} ${hl(h)}: ${v} sessions`;
+    html+=`<td title="${tip}" style="background:${v?`color-mix(in srgb, ${blue} ${Math.round(a*100)}%, transparent)`:'var(--bg)'};color:${a>.55?'var(--surface)':'var(--ink)'}">${shown}</td>`; } html+='</tr>'; }
   $('heat').innerHTML=html+'</tbody>';
-  $('heatNote').textContent=`Based on session start times. Busiest slot has ${max} sessions.`;
+  const [md,mh]=maxK.split('-').map(Number);
+  $('heatSub').textContent=load?'Average sessions per tutor in each hour, counting the tutors who logged sessions then. High numbers mean each tutor was handling a lot.':'Sessions by weekday and start hour. Darker means busier.';
+  $('heatNote').textContent=load?`Heaviest load: ${DOW[md]} at ${hl(mh)}, ${max.toFixed(1)} sessions per tutor. Tutors who were on shift but logged nothing aren't in the data, so quiet hours may look busier per tutor than they were.`:`Based on session start times. Busiest slot: ${DOW[md]} at ${hl(mh)}, with ${fmt(max)} sessions.`;
+}
+function renderCover(att){
+  const el=$('cover');
+  const cm=new Map(); for(const r of att) cm.set(r.course,(cm.get(r.course)||0)+1);
+  const courses=[...cm].sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+  const tm=new Map(); for(const r of att){ let t=tm.get(r.tutor); if(!t){t={n:0,c:new Map()}; tm.set(r.tutor,t);} t.n++; t.c.set(r.course,(t.c.get(r.course)||0)+1); }
+  const tutors=[...tm].sort((a,b)=>b[1].n-a[1].n);
+  if(!courses.length){ el.innerHTML=''; return; }
+  let max=1; for(const [,t] of tutors) for(const v of t.c.values()) if(v>max) max=v;
+  const blue=css('--blue');
+  let h='<thead><tr><th></th>'+courses.map(c=>`<th scope="col">${esc(c)}</th>`).join('')+'<th scope="col">All</th></tr></thead><tbody>';
+  for(const [name,t] of tutors){ h+=`<tr><th scope="row">${esc(name)}</th>`+courses.map(c=>{ const v=t.c.get(c)||0; const a=v?0.1+0.8*(v/max):0;
+    return `<td style="background:${v?`color-mix(in srgb, ${blue} ${Math.round(a*100)}%, transparent)`:'transparent'};color:${a>.55?'var(--surface)':'var(--ink)'}">${v||'·'}</td>`; }).join('')+`<td><b>${fmt(t.n)}</b></td></tr>`; }
+  h+='</tbody><tfoot><tr><th scope="row">Busiest tutor\'s share</th>'+courses.map(c=>{ const tot=cm.get(c); let top=0, who=''; for(const [name,t] of tutors){ const v=t.c.get(c)||0; if(v>top){top=v;who=name;} }
+    const sh=top/tot; const risk=sh>=0.6&&tot>=10&&tutors.length>1; return `<td class="${risk?'risk':''}" title="${esc(who)}: ${top} of ${tot} sessions">${Math.round(sh*100)}%</td>`; }).join('')+'<td></td></tr></tfoot>';
+  el.innerHTML=h;
+}
+function renderFindings(sum,att,base,ws){
+  const F=findings(sum,att,base,ws);
+  $('findings').innerHTML=F.length?F.map(([t,x])=>`<li><span class="tag">${t}</span>${x}</li>`).join(''):'<li>No sessions in this view.</li>';
+  S.findings=F;
+}
+function findings(sum,att,base,ws){
+  const F=[]; const n=att.length; if(!n) return F;
+  const pct=x=>Math.round(x*100)+'%';
+  const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const hl=h=>`${h%12||12} ${h<12?'AM':'PM'}`;
+  const count=(arr,f)=>{ const m=new Map(); for(const r of arr){ const k=f(r); m.set(k,(m.get(k)||0)+1); } return [...m].sort((a,b)=>b[1]-a[1]); };
+  const wk=ws.labels.length, active=ws.sessions.filter(v=>v>0).length;
+  F.push(['Volume',`<b>${fmt(n)}</b> sessions for <b>${fmt(sum.students)}</b> different students${active>1?` over ${fmt(wk)} weeks, about <b>${fmt1(n/active)}</b> sessions in each week the lab was used`:' in a single week'}.`]);
+  if(active>1){ const mx=Math.max(...ws.sessions), i=ws.sessions.indexOf(mx); const nz=ws.sessions.filter(v=>v>0); const mn=Math.min(...nz);
+    F.push(['Peak week',`The busiest week began <b>${usDate(new Date(ws.labels[i]+'T00:00:00'))}</b>, with ${fmt(mx)} sessions. The quietest week that had any sessions had ${fmt(mn)}.`]); }
+  const timed=att.filter(r=>r.hasTime);
+  if(timed.length>=10){ const d=count(timed,r=>r.dow)[0], h=count(timed,r=>r.hour)[0]; const eve=timed.filter(r=>r.hour>=17).length/timed.length;
+    F.push(['Timing',`<b>${DAYS[d[0]]}</b> is the busiest day, with ${pct(d[1]/timed.length)} of sessions, and the most common start time is <b>${hl(h[0])}</b>. ${pct(eve)} of sessions start at 5 PM or later.`]); }
+  const cs=count(att,r=>r.course);
+  if(cs.length){ const top3=cs.slice(0,3); const s3=top3.reduce((a,x)=>a+x[1],0);
+    F.push(['Courses',`<b>${esc(cs[0][0])}</b> accounts for <b>${pct(cs[0][1]/n)}</b> of sessions.`+(cs.length>3?` The top three courses (${top3.map(x=>esc(x[0])).join(', ')}) account for ${pct(s3/n)}.`:'')]); }
+  const per=[...count(att,r=>r.student).map(x=>x[1])]; const st=per.length;
+  if(st>=5){ const once=per.filter(v=>v===1).length/st, heavy=per.filter(v=>v>=5).length/st; const k=Math.max(1,Math.ceil(st*0.1)); const topShare=per.slice(0,k).reduce((a,b)=>a+b,0)/n;
+    F.push(['Return visits',`${pct(once)} of students came once and ${pct(heavy)} came five or more times. The most frequent 10% of students account for <b>${pct(topShare)}</b> of all sessions.`]); }
+  const newIn=att.filter(r=>r.first).length;
+  if(active>1&&newIn){ const mx=Math.max(...ws.newcomers), i=ws.newcomers.indexOf(mx);
+    F.push(['New students',`<b>${fmt(newIn)}</b> students had their first session in this period. The most first-time visitors arrived the week of <b>${usDate(new Date(ws.labels[i]+'T00:00:00'))}</b> (${fmt(mx)}).`]); }
+  if(S.mapping.dropin){ const drop=att.filter(r=>r.dropIn).length/n; const sch=base.filter(r=>r.dropIn===false), dro=base.filter(r=>r.dropIn);
+    let t=`${pct(drop)} of sessions were drop-ins.`;
+    if(S.mapping.noshow&&sch.length>=5&&dro.length>=5) t+=` The no-show rate is <b>${pct(sch.filter(r=>r.noShow).length/sch.length)}</b> for scheduled sessions and ${pct(dro.filter(r=>r.noShow).length/dro.length)} for drop-ins.`;
+    F.push(['Drop-ins',t]); }
+  const wm=att.filter(r=>r.minutes!=null);
+  if(wm.length>=10){ const avg=wm.reduce((a,r)=>a+r.minutes,0)/wm.length; const mode=count(wm,r=>r.minutes)[0][0];
+    const lc=count(wm,r=>r.course).filter(x=>x[1]>=10).map(([c])=>{ const xs=wm.filter(r=>r.course===c); return [c,xs.reduce((a,r)=>a+r.minutes,0)/xs.length]; }).sort((a,b)=>b[1]-a[1]);
+    F.push(['Session length',`Sessions average <b>${fmt1(avg)} minutes</b>, and the most common length is ${fmt1(mode)} minutes.`+(lc.length>1?` ${esc(lc[0][0])} sessions run longest, at ${fmt1(lc[0][1])} minutes on average.`:'')]); }
+  const tutorsN=new Set(att.map(r=>r.tutor)).size;
+  if(tutorsN>1){ const risky=[]; for(const [c,tot] of cs){ if(tot<10) continue; const tc=count(att.filter(r=>r.course===c),r=>r.tutor)[0]; if(tc[1]/tot>=0.6) risky.push(`${esc(c)} (${pct(tc[1]/tot)} with ${esc(tc[0])})`); }
+    F.push(['Coverage',risky.length?`${risky.length} course${risky.length>1?'s rely':' relies'} on one tutor for most sessions: ${risky.slice(0,4).join('; ')}${risky.length>4?'; and others':''}. If that tutor is unavailable, those students have less support.`:`No course with 10 or more sessions depends on a single tutor for 60% or more of its sessions.`]); }
+  const ls=count(att,r=>r.location);
+  if(ls.length>1){ const on=att.filter(r=>/online|virtual|zoom|remote/i.test(r.location)).length;
+    F.push(['Location',`${pct(ls[0][1]/n)} of sessions were at <b>${esc(ls[0][0])}</b>.`+(on?` ${pct(on/n)} were online.`:'')]); }
+  const lags=att.map(r=>r.lag).filter(x=>x!=null&&x>-60).sort((a,b)=>a-b);
+  if(lags.length>=10){ const med=lags[Math.floor(lags.length/2)]; const late=lags.filter(x=>x>1440).length/lags.length;
+    const mt=med<90?`${Math.max(0,Math.round(med))} minutes`:`${fmt1(med/60)} hours`;
+    F.push(['Record keeping',`Half of sessions were logged within <b>${mt}</b> of starting. ${pct(late)} were logged more than a day later${late>0.1?', so recent weeks may be undercounted until those entries arrive':''}.`]); }
+  return F;
 }
 
 /* ---------- exports ---------- */
@@ -798,6 +913,7 @@ table{border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size
 <h1>Math Lab tutoring summary</h1><p class="m">${esc(filterLabel())}. Generated ${usDate(new Date())}. Students are identified only by pseudonym; ${S.stats.maskT?'tutor names are also hidden':'tutor names are shown'}.</p>
 <div class="k"><div><b>${fmt(sum.sessions)}</b><span class="m">sessions</span></div><div><b>${fmt(sum.students)}</b><span class="m">different students</span></div><div><b>${fmt1(sum.hours)}</b><span class="m">hours of tutoring</span></div>
 <div><b>${fmt1(sum.avg)}</b><span class="m">average minutes</span></div><div><b>${(sum.noShowRate*100).toFixed(1)}%</b><span class="m">no-show rate</span></div><div><b>${fmt(ws.labels.length)}</b><span class="m">weeks</span></div></div>
+${(S.findings||[]).length?`<h2>Key findings</h2><ol>${S.findings.map(([t,x])=>`<li><b>${t}.</b> ${x}</li>`).join('')}</ol>`:''}
 ${spot?`<h2>Tutor spotlight</h2><p class="s">${esc(spotSentence(spot,true,ws.labels.length))}</p>`:''}
 <h2>Sessions per week</h2>${svg}
 <h2>Tutors</h2>${table(['Tutor','Sessions','Different students','Hours','Avg min','Weeks active','First','Last'],tutorRows())}
@@ -867,6 +983,7 @@ $('hideStudents').addEventListener('change',renderPreview);
 $('resetFilters').addEventListener('click',()=>{ setupFilters(); $('fNoShow').checked=false; render(); });
 $('spotSel').addEventListener('change',()=>{ S.spot=$('spotSel').value; renderTutorTable(); renderSpot(); });
 $('copySpot').addEventListener('click',copySpot);
+document.querySelectorAll('[data-hm]').forEach(b=>b.addEventListener('click',()=>{ S.hm=b.dataset.hm; document.querySelectorAll('[data-hm]').forEach(x=>x.classList.toggle('on',x===b)); render(); }));
 $('exportCsv').addEventListener('click',exportCsv);
 $('exportTutors').addEventListener('click',exportTutors);
 $('exportReport').addEventListener('click',exportReport);
