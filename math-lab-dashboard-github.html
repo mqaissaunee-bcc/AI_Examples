@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Math Lab Tutoring Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#F5F7F9; --surface:#FFFFFF; --ink:#1C2B3A; --muted:#5B6B7A; --rule:#DDE4EA;
+  --grid:rgba(43,92,138,.07); --blue:#2B5C8A; --blue-soft:#DCE8F3; --marker:#F5C542;
+  --marker-soft:rgba(245,197,66,.38); --alert:#B9473A; --ok:#2F7A55;
+  --serif:"Newsreader", Georgia, "Times New Roman", serif;
+  --sans:"Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111921; --surface:#18232D; --ink:#E3EAF0; --muted:#97A6B4; --rule:#2B3846;
+    --grid:rgba(127,176,222,.06); --blue:#7FB0DE; --blue-soft:#22374A; --marker:#E8B93A;
+    --marker-soft:rgba(232,185,58,.28); --alert:#E2786B; --ok:#6CC59A; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111921; --surface:#18232D; --ink:#E3EAF0; --muted:#97A6B4; --rule:#2B3846;
+  --grid:rgba(127,176,222,.06); --blue:#7FB0DE; --blue-soft:#22374A; --marker:#E8B93A;
+  --marker-soft:rgba(232,185,58,.28); --alert:#E2786B; --ok:#6CC59A; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.5;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px; font-variant-numeric:tabular-nums;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:28px 20px 80px}
+h1,h2,h3{font-family:var(--serif); font-weight:600; line-height:1.15; margin:0}
+h1{font-size:clamp(1.9rem,4vw,2.7rem)}
+h2{font-size:1.5rem}
+h3{font-size:1.15rem}
+p{margin:.4rem 0}
+.muted{color:var(--muted)}
+.small{font-size:.875rem}
+a{color:var(--blue)}
+header.top{display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; padding-bottom:20px; border-bottom:2px solid var(--ink)}
+.lock{display:flex; gap:10px; align-items:flex-start; max-width:440px; font-size:.9rem; color:var(--muted)}
+.lock svg{flex:none; margin-top:2px; color:var(--ok)}
+.step{margin-top:36px}
+.step-head{display:flex; gap:14px; align-items:baseline; margin-bottom:14px}
+.num{font-family:var(--serif); font-size:1.5rem; color:var(--blue); min-width:1.2em}
+.panel{background:var(--surface); border:1px solid var(--rule); border-radius:6px; padding:20px}
+.drop{border:2px dashed var(--blue); border-radius:6px; background:var(--surface); padding:34px 20px; text-align:center; cursor:pointer; transition:background .15s}
+.drop.over{background:var(--blue-soft)}
+.drop strong{font-family:var(--serif); font-size:1.3rem; font-weight:600; display:block; margin-bottom:4px}
+.row{display:flex; flex-wrap:wrap; gap:12px; align-items:center}
+button,.btn{font:inherit; font-weight:600; font-size:.92rem; border-radius:4px; border:1.5px solid var(--blue); background:var(--blue); color:var(--surface); padding:8px 14px; cursor:pointer}
+button.ghost{background:transparent; color:var(--blue)}
+button.quiet{border-color:var(--rule); background:transparent; color:var(--ink); font-weight:500}
+button:disabled{opacity:.45; cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible,.drop:focus-visible,th:focus-visible,tr:focus-visible{outline:3px solid var(--marker); outline-offset:2px}
+select,input[type=text],input[type=password],input[type=date]{font:inherit; font-size:.92rem; color:var(--ink); background:var(--surface); border:1px solid var(--rule); border-radius:4px; padding:7px 9px; max-width:100%}
+label{font-size:.9rem}
+.files{margin-top:14px; font-size:.9rem}
+.files li{margin:2px 0}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+.grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+@media (max-width:860px){.grid2,.grid3{grid-template-columns:1fr}}
+fieldset{border:none; padding:0; margin:0 0 16px}
+legend{font-weight:700; margin-bottom:6px}
+.opt{display:flex; gap:8px; align-items:flex-start; margin:6px 0}
+.opt input{margin-top:4px}
+.opt span small{display:block; color:var(--muted)}
+.maptable{width:100%; border-collapse:collapse; font-size:.9rem}
+.maptable td{padding:5px 6px; border-bottom:1px solid var(--rule); vertical-align:middle}
+.maptable select{width:100%}
+.req{color:var(--alert)}
+.scroll{overflow-x:auto}
+table.data{width:100%; border-collapse:collapse; font-size:.9rem}
+table.data th,table.data td{padding:7px 9px; text-align:left; border-bottom:1px solid var(--rule); white-space:nowrap}
+table.data th{font-weight:700; cursor:pointer; user-select:none; position:relative}
+table.data th[aria-sort="ascending"]::after{content:" ▲"; font-size:.7em}
+table.data th[aria-sort="descending"]::after{content:" ▼"; font-size:.7em}
+table.data td.n,table.data th.n{text-align:right}
+table.data tbody tr{cursor:pointer}
+table.data tbody tr:hover{background:var(--blue-soft)}
+table.data tbody tr.sel{background:var(--marker-soft)}
+.preview td,.preview th{cursor:default!important}
+.notice{border-left:4px solid var(--marker); background:var(--surface); padding:10px 14px; font-size:.9rem; margin:12px 0}
+.notice.err{border-left-color:var(--alert)}
+.filters{position:sticky; top:env(safe-area-inset-top,0px); z-index:5; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--rule); display:flex; flex-wrap:wrap; gap:10px; align-items:end}
+.filters label{display:flex; flex-direction:column; gap:3px; font-size:.8rem; color:var(--muted)}
+.ledger{display:grid; grid-template-columns:repeat(6,1fr); border-top:2px solid var(--ink); border-bottom:1px solid var(--rule); margin:18px 0 8px}
+.ledger div{padding:12px 12px 14px; border-right:1px solid var(--rule)}
+.ledger div:last-child{border-right:none}
+.ledger b{display:block; font-family:var(--serif); font-size:2rem; font-weight:600; line-height:1.1}
+.ledger span{font-size:.85rem; color:var(--muted)}
+@media (max-width:860px){.ledger{grid-template-columns:repeat(3,1fr)} .ledger div:nth-child(3){border-right:none} .ledger div:nth-child(-n+3){border-bottom:1px solid var(--rule)}}
+@media (max-width:480px){.ledger{grid-template-columns:repeat(2,1fr)} .ledger div{border-right:none!important;border-bottom:1px solid var(--rule)}}
+.card{background:var(--surface); border:1px solid var(--rule); border-radius:6px; padding:16px 18px; margin-top:20px; min-width:0}
+.card h3{margin-bottom:4px}
+.card .sub{font-size:.85rem; color:var(--muted); margin-bottom:12px}
+.chartbox{position:relative; height:280px}
+.spot{background:var(--surface); border:1px solid var(--rule); border-left:6px solid var(--marker); border-radius:6px; padding:20px 22px; margin-top:20px}
+.spot .sentence{font-family:var(--serif); font-size:clamp(1.25rem,2.4vw,1.6rem); line-height:1.35; max-width:62ch; margin:8px 0 14px}
+.spot .sentence mark{background:linear-gradient(transparent 58%,var(--marker-soft) 58%); color:inherit; padding:0 2px}
+.bars{display:flex; flex-direction:column; gap:7px}
+.bar{display:grid; grid-template-columns:minmax(90px,34%) 1fr auto; gap:10px; align-items:center; font-size:.88rem}
+.bar .track{height:12px; background:var(--blue-soft); border-radius:2px; overflow:hidden}
+.bar .fill{height:100%; background:var(--blue)}
+.bar .v{text-align:right; white-space:nowrap; min-width:44px}
+.heat{border-collapse:collapse; font-size:.78rem}
+.heat td,.heat th{width:42px; height:30px; text-align:center; border:2px solid var(--surface)}
+.heat th{font-weight:600; color:var(--muted)}
+.heat td{border-radius:3px}
+.legend{display:flex; gap:14px; font-size:.82rem; color:var(--muted); margin-top:8px; flex-wrap:wrap}
+.legend i{display:inline-block; width:12px; height:12px; border-radius:2px; vertical-align:-1px; margin-right:5px}
+.toast{position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:4px; font-size:.9rem; opacity:0; pointer-events:none; transition:opacity .2s; z-index:20}
+.toast.show{opacity:1}
+.hidden{display:none!important}
+.qa{font-size:.88rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:6px 18px; margin-top:8px}
+.qa b{font-weight:700}
+footer{margin-top:48px; font-size:.82rem; color:var(--muted); border-top:1px solid var(--rule); padding-top:14px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <h1>Math Lab tutoring analysis</h1>
+    <p class="muted">Load the weekly tutoring exports, strip student identities, and see who was helped, when, and by whom.</p>
+  </div>
+  <div class="lock">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+    <span>Everything happens in this browser tab. Files are never uploaded, and this page makes no network requests with your data. Closing the tab erases it.</span>
+  </div>
+</header>
+
+<!-- STEP 1 -->
+<section class="step" aria-labelledby="s1">
+  <div class="step-head"><span class="num">1</span><h2 id="s1">Load the exports</h2></div>
+  <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose CSV files to load">
+    <strong>Drop report files here</strong>
+    <span class="muted">CSV exports or saved report emails (.html, .mht, .eml), or click to choose. Load all weeks at once; sessions that appear in more than one report are counted once.</span>
+    <input id="fileInput" type="file" accept=".csv,.txt,.html,.htm,.mht,.mhtml,.eml,text/csv,text/html" multiple hidden>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="ghost" id="weekBtn" type="button">Try it with a real week (names removed)</button>
+    <button class="quiet" id="sampleBtn" type="button">Try a made-up full year</button>
+    <button class="quiet hidden" id="clearBtn" type="button">Clear all data</button>
+  </div>
+  <ul id="fileList" class="files"></ul>
+  <div id="loadMsg"></div>
+</section>
+
+<!-- STEP 2 -->
+<section class="step hidden" id="step2" aria-labelledby="s2">
+  <div class="step-head"><span class="num">2</span><h2 id="s2">Choose privacy settings</h2></div>
+  <div class="grid2">
+    <div class="panel">
+      <fieldset>
+        <legend>Student pseudonyms</legend>
+        <label class="opt"><input type="radio" name="keymode" value="random" checked><span>Random key for this session<small>Strongest. IDs like S-4f1c09ab change every time the page is reloaded.</small></span></label>
+        <label class="opt"><input type="radio" name="keymode" value="pass"><span>Department passphrase<small>Same passphrase gives the same IDs next time, so reports can be compared across semesters. Keep it private.</small></span></label>
+        <input type="password" id="passphrase" placeholder="Passphrase" autocomplete="off" disabled style="margin-left:24px; width:calc(100% - 24px)">
+      </fieldset>
+      <fieldset>
+        <legend>Tutors</legend>
+        <label class="opt"><input type="checkbox" id="maskTutors"><span>Hide tutor names too<small>Use when sharing outside the department. Leave off to report on individual tutors.</small></span></label>
+      </fieldset>
+      <fieldset>
+        <legend>Session notes</legend>
+        <label class="opt"><input type="radio" name="notes" value="drop" checked><span>Remove notes entirely<small>Recommended. Notes often mention students by first name.</small></span></label>
+        <label class="opt"><input type="radio" name="notes" value="scrub"><span>Keep notes, with names, emails, phone and ID numbers replaced<small>Catches names in the data, not nicknames or misspellings. Review before sharing.</small></span></label>
+      </fieldset>
+    </div>
+    <div class="panel">
+      <h3>Columns</h3>
+      <p class="small muted">Matched automatically from the export's headers. Any column not listed here is discarded.</p>
+      <table class="maptable" id="mapTable"></table>
+      <p class="small muted" id="unmapped"></p>
+    </div>
+  </div>
+  <div class="row" style="margin-top:16px">
+    <button id="runBtn" type="button">Anonymize and build dashboard</button>
+    <span id="runMsg" class="small muted"></span>
+  </div>
+  <div id="previewWrap" class="hidden">
+    <h3 style="margin-top:22px">What the dashboard sees</h3>
+    <p class="small muted">First rows after anonymization. Real student names are gone from here on.</p>
+    <div class="scroll panel" style="padding:8px"><table class="data preview" id="previewTable"></table></div>
+  </div>
+</section>
+
+<!-- STEP 3 -->
+<section class="step hidden" id="step3" aria-labelledby="s3">
+  <div class="step-head"><span class="num">3</span><h2 id="s3">Dashboard</h2></div>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <label>From<input type="date" id="fFrom"></label>
+    <label>To<input type="date" id="fTo"></label>
+    <label>Course<select id="fCourse"></select></label>
+    <label>Tutor<select id="fTutor"></select></label>
+    <label>Location<select id="fLoc"></select></label>
+    <label class="opt" style="flex-direction:row; align-items:center; color:var(--ink)"><input type="checkbox" id="fNoShow" style="margin:0"> Count no-shows as sessions</label>
+    <button class="quiet" id="resetFilters" type="button">Reset</button>
+  </div>
+
+  <div class="ledger" id="ledger"></div>
+  <div class="qa small muted" id="qa"></div>
+
+  <div class="spot" id="spot">
+    <div class="row" style="justify-content:space-between">
+      <h3>Tutor spotlight</h3>
+      <div class="row"><select id="spotSel" aria-label="Choose a tutor"></select><button class="ghost" id="copySpot" type="button">Copy summary</button></div>
+    </div>
+    <p class="sentence" id="spotText"></p>
+    <div class="grid2">
+      <div><div class="chartbox" style="height:200px"><canvas id="spotChart" aria-label="Weekly sessions for selected tutor"></canvas></div></div>
+      <div><p class="small muted" style="margin-top:0">Courses this tutor covered</p><div class="bars" id="spotCourses"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Week by week</h3>
+    <p class="sub">Sessions and different students per week (weeks start Monday).</p>
+    <div class="chartbox"><canvas id="weekChart" aria-label="Weekly sessions and unique students"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div><h3>Tutors</h3><p class="sub" style="margin:0">Click a row to spotlight that tutor. Click a header to sort.</p></div>
+      <button class="ghost" id="exportTutors" type="button">Download tutor table (CSV)</button>
+    </div>
+    <div class="scroll" style="margin-top:10px"><table class="data" id="tutorTable"></table></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Courses</h3>
+      <p class="sub">Sessions per course, with different students in parentheses.</p>
+      <div class="bars" id="courseBars"></div>
+    </div>
+    <div class="card">
+      <h3>When students come in</h3>
+      <p class="sub">Sessions by weekday and start hour. Darker means busier.</p>
+      <div class="scroll"><table class="heat" id="heat"></table></div>
+      <p class="small muted" id="heatNote"></p>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card">
+      <h3>Return visits</h3>
+      <p class="sub">How many sessions each student had.</p>
+      <div class="bars" id="returnBars"></div>
+    </div>
+    <div class="card">
+      <h3>How sessions start</h3>
+      <p class="sub">Drop-in vs. scheduled, and no-shows.</p>
+      <div class="bars" id="mixBars"></div>
+    </div>
+    <div class="card">
+      <h3>Locations</h3>
+      <p class="sub">Sessions per location.</p>
+      <div class="bars" id="locBars"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Busiest course sections</h3>
+    <p class="sub">Top 15 sections by sessions. Useful for spotting classes that lean on the lab.</p>
+    <div class="scroll"><table class="data preview" id="sectionTable"></table></div>
+  </div>
+
+  <div class="card">
+    <h3>Share the results</h3>
+    <p class="sub">Both downloads respect the current filters and privacy settings. Neither contains real student names.</p>
+    <div class="row">
+      <button id="exportReport" type="button">Download summary report (HTML)</button>
+      <button class="ghost" id="exportCsv" type="button">Download anonymized data (CSV)</button>
+    </div>
+  </div>
+</section>
+
+<footer>Built for the Brookdale Math Lab. Student names and IDs are replaced with keyed pseudonyms (HMAC-SHA-256) before any analysis runs.</footer>
+</div>
+<script type="application/json" id="sampleWeek">{"headers": ["Tutoring Subject", "Date Created", "Tutoring Activity Date", "Duration", "Owner", "Regarding", "Section", "Tutoring Location", "Tutoring Notes", "Drop In", "No Show", "Elevate"], "rows": [{"Tutoring Subject": "MATH-011 Prealgebra I", "Date Created": "9/10/2026 10:00 PM", "Tutoring Activity Date": "9/10/2026 9:30 PM", "Duration": "45 minutes", "Owner": "Tutor 1", "Regarding": "Abbott, Aiden", "Section": "Abbott, Aiden - MATH-011 - 006RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "No", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-021 Introductory Algebra", "Date Created": "9/8/2026 10:02 PM", "Tutoring Activity Date": "9/8/2026 9:00 PM", "Duration": "15 minutes", "Owner": "Tutor 2", "Regarding": "Brooks, Bella", "Section": "Brooks, Bella - MATH-021 - 025RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-021 Introductory Algebra", "Date Created": "9/10/2026 12:02 PM", "Tutoring Activity Date": "9/9/2026 3:00 PM", "Duration": "30 minutes", "Owner": "Tutor 3", "Regarding": "Chen, Carlos", "Section": "Chen, Carlos - MATH-021 - 801RL", "Tutoring Location": "Bankier Library", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-021 Introductory Algebra", "Date Created": "9/10/2026 2:17 PM", "Tutoring Activity Date": "9/10/2026 1:30 PM", "Duration": "45 minutes", "Owner": "Tutor 4", "Regarding": "Diaz, Dana", "Section": "Diaz, Dana - MATH-021 - 006RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "Reviewed a few problems from lab 1.2. Dana was feeling a bit overwhelmed by her speed in which she picks up material, so we worked on math confidence and study plans for the semester.", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-021 Introductory Algebra", "Date Created": "9/10/2026 6:38 PM", "Tutoring Activity Date": "9/10/2026 6:15 PM", "Duration": "15 minutes", "Owner": "Tutor 5", "Regarding": "Brooks, Bella", "Section": "Brooks, Bella - MATH-021 - 025RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "lab/conceptual help - translating verbal expressions into algebraic expressions & distinguishing types of real numbers", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-021 Introductory Algebra", "Date Created": "9/11/2026 2:49 PM", "Tutoring Activity Date": "9/11/2026 2:00 PM", "Duration": "30 minutes", "Owner": "Tutor 2", "Regarding": "Evans, Eli", "Section": "Evans, Eli - MATH-021 - 016RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "discussed input and output", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-021 Introductory Algebra", "Date Created": "9/10/2026 8:48 PM", "Tutoring Activity Date": "9/10/2026 6:00 PM", "Duration": "15 minutes", "Owner": "Tutor 6", "Regarding": "Brooks, Bella", "Section": "Brooks, Bella - MATH-021 - 025RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "lab work, input and output tables, finding the rules, evaluaitons", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-021 Introductory Algebra", "Date Created": "9/11/2026 5:50 PM", "Tutoring Activity Date": "9/11/2026 5:30 PM", "Duration": "30 minutes", "Owner": "Tutor 7", "Regarding": "Flores, Fatima", "Section": "Flores, Fatima - MATH-021 - 004RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-021 Introductory Algebra", "Date Created": "9/9/2026 7:21 PM", "Tutoring Activity Date": "9/9/2026 5:00 PM", "Duration": "15 minutes", "Owner": "Tutor 6", "Regarding": "Gupta, Gabe", "Section": "Gupta, Gabe - MATH-021 - 022RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "online hw, finding input and output values, making the tables", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-021 Introductory Algebra", "Date Created": "9/10/2026 4:53 PM", "Tutoring Activity Date": "9/10/2026 4:00 PM", "Duration": "15 minutes", "Owner": "Tutor 2", "Regarding": "Brooks, Bella", "Section": "Brooks, Bella - MATH-021 - 025RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "writing equations from words", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-131 Statistics", "Date Created": "9/8/2026 4:05 PM", "Tutoring Activity Date": "9/8/2026 4:00 PM", "Duration": "15 minutes", "Owner": "Tutor 5", "Regarding": "Hart, Hana", "Section": "Hart, Hana - MATH-131 - 011RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "help with lab 1 - choosing population and qualitative/quantitative variables", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-131 Statistics", "Date Created": "9/10/2026 3:27 PM", "Tutoring Activity Date": "9/10/2026 3:30 PM", "Duration": "15 minutes", "Owner": "Tutor 4", "Regarding": "Ito, Ivan", "Section": "Ito, Ivan - MATH-131 - 011RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "Helped format/download/send excel file with sample", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-131 Statistics", "Date Created": "9/10/2026 4:47 PM", "Tutoring Activity Date": "9/10/2026 4:00 PM", "Duration": "45 minutes", "Owner": "Tutor 3", "Regarding": "James, Jada", "Section": "James, Jada - MATH-131 - 009RL", "Tutoring Location": "Bankier Library", "Tutoring Notes": "Section 1.1 HW", "Drop In": "No", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-131 Statistics", "Date Created": "9/11/2026 5:49 PM", "Tutoring Activity Date": "9/11/2026 5:30 PM", "Duration": "45 minutes", "Owner": "Tutor 2", "Regarding": "Kemp, Kai", "Section": "Kemp, Kai - MATH-131 - 015ML", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "No", "No Show": "Yes", "Elevate": "No"}, {"Tutoring Subject": "MATH-131 Statistics", "Date Created": "9/10/2026 2:21 PM", "Tutoring Activity Date": "9/10/2026 1:30 PM", "Duration": "45 minutes", "Owner": "Tutor 1", "Regarding": "Lowell, Lena", "Section": "Lowell, Lena - MATH-131 - 011RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-131 Statistics", "Date Created": "9/10/2026 2:24 PM", "Tutoring Activity Date": "9/10/2026 1:30 PM", "Duration": "45 minutes", "Owner": "Tutor 1", "Regarding": "Mills, Milo", "Section": "Mills, Milo - MATH-131 - 011RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-131 Statistics", "Date Created": "9/10/2026 2:37 PM", "Tutoring Activity Date": "9/10/2026 1:30 PM", "Duration": "45 minutes", "Owner": "Tutor 1", "Regarding": "Ito, Ivan", "Section": "Ito, Ivan - MATH-131 - 011RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-136 Math for Liberal Arts", "Date Created": "9/8/2026 3:56 PM", "Tutoring Activity Date": "9/8/2026 3:00 PM", "Duration": "60 minutes", "Owner": "Tutor 1", "Regarding": "Nguyen, Nora", "Section": "Nguyen, Nora - MATH-136 - 003RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-136 Math for Liberal Arts", "Date Created": "9/11/2026 5:17 PM", "Tutoring Activity Date": "9/11/2026 4:30 PM", "Duration": "45 minutes", "Owner": "Tutor 3", "Regarding": "Owens, Omar", "Section": "Owens, Omar - MATH-136 - 005RL", "Tutoring Location": "Bankier Library", "Tutoring Notes": "", "Drop In": "No", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-145 Algebraic Modeling", "Date Created": "9/11/2026 2:46 PM", "Tutoring Activity Date": "9/11/2026 12:45 PM", "Duration": "45 minutes", "Owner": "Tutor 2", "Regarding": "Patel, Pia", "Section": "Patel, Pia - MATH-145 - 011RW", "Tutoring Location": "Online", "Tutoring Notes": "discussed Function notation, independent and dependent variables", "Drop In": "No", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-145 Algebraic Modeling", "Date Created": "9/8/2026 6:00 PM", "Tutoring Activity Date": "9/8/2026 5:00 PM", "Duration": "45 minutes", "Owner": "Tutor 7", "Regarding": "Reyes, Quinn", "Section": "Reyes, Quinn - MATH-145 - 014XL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-145 Algebraic Modeling", "Date Created": "9/11/2026 3:17 PM", "Tutoring Activity Date": "9/11/2026 3:00 PM", "Duration": "15 minutes", "Owner": "Tutor 4", "Regarding": "Stroud, Rhea", "Section": "Stroud, Rhea - MATH-145 - 009ML", "Tutoring Location": "Lincroft", "Tutoring Notes": "Quick question on lab 1.2 regarding x intercepts, good understanding", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-145 Algebraic Modeling", "Date Created": "9/10/2026 7:50 PM", "Tutoring Activity Date": "9/10/2026 6:30 PM", "Duration": "60 minutes", "Owner": "Tutor 2", "Regarding": "Patel, Pia", "Section": "Patel, Pia - MATH-145 - 011RW", "Tutoring Location": "Online", "Tutoring Notes": "Interpreting graphs", "Drop In": "No", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-151 Intermediate Algebra", "Date Created": "9/10/2026 2:23 PM", "Tutoring Activity Date": "9/10/2026 2:00 PM", "Duration": "60 minutes", "Owner": "Tutor 5", "Regarding": "Torres, Sam", "Section": "Torres, Sam - MATH-151 - 001RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "lab/conceptual help - finding the equation of a line (using point-slope and slope-intercept form, given slopes, points, and in comparison to other equations)", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-151 Intermediate Algebra", "Date Created": "9/10/2026 6:05 PM", "Tutoring Activity Date": "9/10/2026 4:00 PM", "Duration": "45 minutes", "Owner": "Tutor 5", "Regarding": "Torres, Sam", "Section": "Torres, Sam - MATH-151 - 001RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "conceptual help - graphing absolute value functions (for the purpose of graphically solving) & algebraic word problems (defining variables and setting up systems of equations)", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-151 Intermediate Algebra", "Date Created": "9/11/2026 3:29 PM", "Tutoring Activity Date": "9/11/2026 7:30 PM", "Duration": "45 minutes", "Owner": "Tutor 2", "Regarding": "Vance, Tess", "Section": "Vance, Tess - MATH-151 - 013RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "discussed slope intercept form and point slope form of a line", "Drop In": "No", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-151 Intermediate Algebra", "Date Created": "9/8/2026 3:14 PM", "Tutoring Activity Date": "9/8/2026 2:30 PM", "Duration": "45 minutes", "Owner": "Tutor 4", "Regarding": "Torres, Sam", "Section": "Torres, Sam - MATH-151 - 001RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "Went through day 1 material/refreshed 025 material via test review", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-151 Intermediate Algebra", "Date Created": "9/10/2026 7:44 PM", "Tutoring Activity Date": "9/10/2026 6:51 AM", "Duration": "45 minutes", "Owner": "Tutor 7", "Regarding": "Walsh, Uma", "Section": "Walsh, Uma - MATH-151 - 004RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "No", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-151 Intermediate Algebra", "Date Created": "9/11/2026 5:34 PM", "Tutoring Activity Date": "9/11/2026 3:00 PM", "Duration": "45 minutes", "Owner": "Tutor 7", "Regarding": "Walsh, Uma", "Section": "Walsh, Uma - MATH-151 - 004RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-151 Intermediate Algebra", "Date Created": "9/11/2026 7:07 PM", "Tutoring Activity Date": "9/11/2026 12:00 PM", "Duration": "45 minutes", "Owner": "Tutor 7", "Regarding": "Young, Vic", "Section": "Young, Vic - MATH-151 - 003RL", "Tutoring Location": "Online", "Tutoring Notes": "", "Drop In": "No", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-152 Algebra and Trigonometry", "Date Created": "9/10/2026 8:47 PM", "Tutoring Activity Date": "9/10/2026 4:00 PM", "Duration": "45 minutes", "Owner": "Tutor 6", "Regarding": "Ames, Wes", "Section": "Ames, Wes - MATH-152 - 007RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "class activity, finding regression equations, scatter plots, using g.c for the work", "Drop In": "No", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-153 Pre-Calculus", "Date Created": "9/10/2026 8:50 PM", "Tutoring Activity Date": "9/10/2026 6:00 PM", "Duration": "30 minutes", "Owner": "Tutor 6", "Regarding": "Blake, Xena", "Section": "Blake, Xena - MATH-153 - 007RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "functions and graphs, inverse functions, domain and ranges", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-153 Pre-Calculus", "Date Created": "9/10/2026 10:30 PM", "Tutoring Activity Date": "9/10/2026 9:30 PM", "Duration": "45 minutes", "Owner": "Tutor 1", "Regarding": "Cruz, Yusuf", "Section": "Cruz, Yusuf - MATH-153 - 005RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-153 Pre-Calculus", "Date Created": "9/10/2026 2:43 PM", "Tutoring Activity Date": "9/10/2026 1:30 PM", "Duration": "60 minutes", "Owner": "Tutor 2", "Regarding": "Doyle, Zoe", "Section": "Doyle, Zoe - MATH-153 - 007RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "reviewed Unit circle, Inverse functions", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-153 Pre-Calculus", "Date Created": "9/10/2026 2:46 PM", "Tutoring Activity Date": "9/9/2026 9:30 PM", "Duration": "30 minutes", "Owner": "Tutor 2", "Regarding": "Ellis, Ari", "Section": "Ellis, Ari - MATH-153 - 007RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "reviewing class notes", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-153 Pre-Calculus", "Date Created": "9/11/2026 7:59 PM", "Tutoring Activity Date": "9/11/2026 4:00 PM", "Duration": "45 minutes", "Owner": "Tutor 6", "Regarding": "Ford, Bree", "Section": "Ford, Bree - MATH-153 - 005RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "online homework, graphing trig functions, periods, amplitude, horizontal shift, and middle lines", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-153 Pre-Calculus", "Date Created": "9/11/2026 8:01 PM", "Tutoring Activity Date": "9/11/2026 5:00 PM", "Duration": "30 minutes", "Owner": "Tutor 6", "Regarding": "Ford, Bree", "Section": "Ford, Bree - MATH-153 - 005RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "review of unit circles, evaluations of trig functions, finding reference angles", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-171 Calculus I", "Date Created": "9/10/2026 1:58 PM", "Tutoring Activity Date": "9/10/2026 1:30 PM", "Duration": "30 minutes", "Owner": "Tutor 5", "Regarding": "Grant, Cole", "Section": "Grant, Cole - MATH-171 - 003RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "homework/conceptual help - determining the existence of a limit graphically", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-171 Calculus I", "Date Created": "9/10/2026 7:24 PM", "Tutoring Activity Date": "9/10/2026 7:00 PM", "Duration": "60 minutes", "Owner": "Tutor 5", "Regarding": "Hayes, Dev", "Section": "", "Tutoring Location": "Lincroft", "Tutoring Notes": "conceptual review - simplifying complex fractions", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-171 Calculus I", "Date Created": "9/9/2026 8:26 PM", "Tutoring Activity Date": "9/9/2026 8:00 PM", "Duration": "15 minutes", "Owner": "Tutor 2", "Regarding": "Irwin, Enzo", "Section": "Irwin, Enzo - MATH-171 - 001RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}, {"Tutoring Subject": "MATH-172 Calculus II", "Date Created": "9/10/2026 8:14 PM", "Tutoring Activity Date": "9/10/2026 7:47 AM", "Duration": "45 minutes", "Owner": "Tutor 7", "Regarding": "Jory, Faye", "Section": "Jory, Faye - MATH-172 - 006RL", "Tutoring Location": "Lincroft", "Tutoring Notes": "", "Drop In": "Yes", "No Show": "No", "Elevate": "No"}]}</script>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Number(n).toLocaleString('en-US');
+const fmt1=n=>Number(n).toLocaleString('en-US',{maximumFractionDigits:1,minimumFractionDigits:0});
+const DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+/* ---------- state ---------- */
+const S={files:[], rows:[], headers:[], mapping:{}, records:[], stats:null, sort:{key:'sessions',dir:-1}, spot:null, charts:{}};
+
+/* ---------- field definitions ---------- */
+const FIELDS=[
+ {key:'activity', label:'Session date and time', req:true, exact:['tutoringactivitydate','activitydate','sessiondate','appointmentdate','date'], contains:['activitydate','sessiondate']},
+ {key:'tutor', label:'Tutor', req:true, exact:['owner','tutor','tutorname'], contains:['tutorname','owner']},
+ {key:'student', label:'Student name', req:true, exact:['regarding','student','studentname'], contains:['regarding','studentname']},
+ {key:'studentId', label:'Student ID (if present)', exact:['studentid','studentnumber','idnumber','bccid'], contains:['studentid','studentnumber']},
+ {key:'subject', label:'Course', exact:['tutoringsubject','subject','course'], contains:['subject','course']},
+ {key:'section', label:'Section', exact:['section'], contains:['section']},
+ {key:'duration', label:'Duration', exact:['duration','minutes','durationminutes'], contains:['duration']},
+ {key:'location', label:'Location', exact:['tutoringlocation','location','campus'], contains:['location']},
+ {key:'dropin', label:'Drop in', exact:['dropin','walkin'], contains:['dropin']},
+ {key:'noshow', label:'No show', exact:['noshow'], contains:['noshow']},
+ {key:'elevate', label:'Elevate', exact:['elevate'], contains:['elevate']},
+ {key:'notes', label:'Notes', exact:['tutoringnotes','notes','comments'], contains:['notes']},
+ {key:'created', label:'Date created', exact:['datecreated','createdon','created'], contains:['created']}
+];
+const norm=h=>String(h).toLowerCase().replace(/[^a-z0-9]/g,'');
+
+function autoMap(headers){
+  const m={}, used=new Set();
+  for(const f of FIELDS){ const h=headers.find(h=>!used.has(h)&&f.exact.includes(norm(h))); if(h){m[f.key]=h; used.add(h);} }
+  for(const f of FIELDS){ if(m[f.key]) continue; const h=headers.find(h=>!used.has(h)&&f.contains.some(c=>norm(h).includes(c))); if(h){m[f.key]=h; used.add(h);} }
+  return m;
+}
+
+/* ---------- parsing helpers ---------- */
+function parseDate(s){
+  if(s==null) return null; s=String(s).trim(); if(!s) return null;
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T,]+(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp]\.?[Mm]\.?)?)?/);
+  if(m){ let y=+m[3]; if(y<100) y+=2000; let h=+(m[4]||0); const mi=+(m[5]||0);
+    if(m[6]){ const pm=/p/i.test(m[6]); if(pm&&h<12)h+=12; if(!pm&&h===12)h=0; }
+    const d=new Date(y,+m[1]-1,+m[2],h,mi); return isNaN(d)?null:{d,time:!!m[4]}; }
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if(m){ if(m[4]&&/(Z|[+-]\d{2}:?\d{2})$/.test(s)){ const d=new Date(s); if(!isNaN(d)) return {d,time:true}; }
+    const d=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0)); return isNaN(d)?null:{d,time:!!m[4]}; }
+  const d=new Date(s); return isNaN(d)?null:{d,time:true};
+}
+function parseMinutes(s){
+  if(s==null) return null; s=String(s).toLowerCase().trim(); if(!s) return null;
+  let m=s.match(/^(\d+):(\d{2})$/); if(m) return +m[1]*60 + +m[2];
+  let t=0,found=false;
+  const h=s.match(/([\d.]+)\s*(h|hr|hrs|hour|hours)\b/); if(h){t+=parseFloat(h[1])*60; found=true;}
+  const mm=s.match(/([\d.]+)\s*(m|min|mins|minute|minutes)\b/); if(mm){t+=parseFloat(mm[1]); found=true;}
+  if(found) return t; const n=parseFloat(s); return isNaN(n)?null:n;
+}
+const yes=v=>/^(y|yes|true|1|x)$/i.test(String(v==null?'':v).trim());
+const COURSE_RE=/^([A-Z]{2,5})[-\s]?(\d{3}[A-Z]?)\b\s*(.*)$/i;
+function parseCourse(subject, section){
+  const s=String(subject||'').trim();
+  let m=s.match(COURSE_RE);
+  if(m) return {code:(m[1]+'-'+m[2]).toUpperCase(), title:m[3].trim()};
+  for(const p of String(section||'').split(/\s+-\s+/)){ m=p.trim().match(COURSE_RE); if(m) return {code:(m[1]+'-'+m[2]).toUpperCase(), title:''}; }
+  return {code:s||'Unspecified', title:''};
+}
+function parseSectionCode(section){
+  // Section strings look like "Last, First - MATH-011 - 006RL". Keep only the code; never the name.
+  const parts=String(section||'').split(/\s+-\s+/).map(p=>p.trim()).filter(Boolean);
+  if(!parts.length) return '';
+  const last=parts[parts.length-1];
+  if(/,/.test(last) || COURSE_RE.test(last)) return '';
+  return /^[A-Z0-9]{2,8}$/i.test(last)?last.toUpperCase():'';
+}
+const normName=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+function weekStart(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const dow=(x.getDay()+6)%7; x.setDate(x.getDate()-dow); return x; }
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const usDate=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+const shortDate=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+/* ---------- crypto ---------- */
+async function makeKey(mode, pass){
+  const enc=new TextEncoder();
+  if(mode==='pass'){
+    const base=await crypto.subtle.importKey('raw',enc.encode(pass),'PBKDF2',false,['deriveKey']);
+    return crypto.subtle.deriveKey({name:'PBKDF2',salt:enc.encode('brookdale-math-lab-v1'),iterations:150000,hash:'SHA-256'},base,{name:'HMAC',hash:'SHA-256',length:256},false,['sign']);
+  }
+  const raw=crypto.getRandomValues(new Uint8Array(32));
+  return crypto.subtle.importKey('raw',raw,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+}
+async function pseudo(key, prefix, value, cache){
+  const k=prefix+'|'+value; if(cache.has(k)) return cache.get(k);
+  const sig=new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(k)));
+  const id=prefix+'-'+Array.from(sig.slice(0,4)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  cache.set(k,id); return id;
+}
+const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function buildScrubber(names){
+  const toks=new Set();
+  for(const n of names){ const t=String(n||'').trim(); if(!t) continue; if(t.length>=2) toks.add(t);
+    for(const p of t.split(/[\s,.;/()]+/)){ if(p.length>=2) toks.add(p); for(const q of p.split('-')) if(q.length>=2) toks.add(q); } }
+  const list=[...toks].sort((a,b)=>b.length-a.length).map(reEsc);
+  let nameRe=null;
+  if(list.length){ try{ nameRe=new RegExp('(?<![\\p{L}\\p{N}])(?:'+list.join('|')+')(?![\\p{L}\\p{N}])','giu'); }catch(e){ nameRe=new RegExp('\\b(?:'+list.join('|')+')\\b','gi'); } }
+  return s=>{ if(!s) return ''; let o=String(s);
+    o=o.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g,'[email]').replace(/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g,'[phone]').replace(/\b\d{6,}\b/g,'[id]');
+    if(nameRe) o=o.replace(nameRe,'[name]'); return o; };
+}
+
+/* ---------- loading ---------- */
+function setFilesUI(){
+  $('fileList').innerHTML=S.files.map(f=>`<li>${esc(f.name)} <span class="muted">— ${fmt(f.rows)} rows</span></li>`).join('');
+  $('clearBtn').classList.toggle('hidden',!S.files.length);
+  $('step2').classList.toggle('hidden',!S.files.length);
+}
+function addRows(name, rows, headers){
+  rows.forEach(r=>r.__file=name);
+  S.rows.push(...rows); S.files.push({name,rows:rows.length});
+  for(const h of headers) if(h && !S.headers.includes(h)) S.headers.push(h);
+}
+/* ---------- saved report emails (.html / .htm / .mht / .eml) ---------- */
+const HEADER_WORDS=new Set(FIELDS.flatMap(f=>f.exact));
+function decodeQP(str, charset){
+  const s=str.replace(/=\r?\n/g,''); const bytes=[];
+  for(let i=0;i<s.length;i++){ if(s[i]==='='&&/^[0-9A-Fa-f]{2}$/.test(s.substr(i+1,2))){ bytes.push(parseInt(s.substr(i+1,2),16)); i+=2; } else bytes.push(s.charCodeAt(i)&255); }
+  try{ return new TextDecoder(charset||'utf-8').decode(new Uint8Array(bytes)); }catch(e){ return new TextDecoder('utf-8').decode(new Uint8Array(bytes)); }
+}
+function decodeB64(str, charset){
+  const bin=atob(str.replace(/\s+/g,'')); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+  try{ return new TextDecoder(charset||'utf-8').decode(u); }catch(e){ return new TextDecoder('utf-8').decode(u); }
+}
+function htmlFromMime(text){
+  // Pull every text/html part out of a MIME message (.eml or .mht/.mhtml).
+  const out=[]; const re=/Content-Type:\s*text\/html[^]*?(?:\r?\n\r?\n)/gi; let m;
+  while((m=re.exec(text))){
+    const head=m[0]; const start=m.index+head.length;
+    const bm=text.slice(0,m.index).match(/boundary="?([^"\r\n;]+)"?/gi);
+    let end=text.length;
+    if(bm){ const bd=bm[bm.length-1].replace(/boundary="?/i,'').replace(/"$/,''); const e=text.indexOf('--'+bd,start); if(e>-1) end=e; }
+    const body=text.slice(start,end); const cs=(head.match(/charset="?([\w-]+)/i)||[])[1];
+    const enc=((head.match(/Content-Transfer-Encoding:\s*([\w-]+)/i)||[])[1]||'').toLowerCase();
+    out.push(enc==='quoted-printable'?decodeQP(body,cs):enc==='base64'?decodeB64(body,cs):body);
+  }
+  return out.join('\n');
+}
+function tablesFromHtml(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const rows=[]; let header=null; const headers=[];
+  const cellText=c=>c.textContent.replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
+  for(const tr of doc.querySelectorAll('tr')){
+    const cells=[...tr.children].filter(c=>/^T[DH]$/.test(c.tagName)).map(cellText);
+    if(!cells.length) continue;
+    const hits=cells.filter(c=>c.length<40&&HEADER_WORDS.has(norm(c))).length;
+    if(hits>=3){ header=cells; for(const h of cells) if(h&&!headers.includes(h)) headers.push(h); continue; }
+    if(header&&cells.length===header.length&&cells.some(Boolean)){ const o={}; header.forEach((h,i)=>{ if(h) o[h]=cells[i]; }); rows.push(o); }
+    else if(header&&cells.length!==header.length&&cells.join('').length>400) header=null;
+  }
+  return {rows,headers};
+}
+const isCsv=f=>/\.(csv|txt)$/i.test(f.name)||f.type==='text/csv';
+const isHtml=f=>/\.(html?|mht|mhtml|eml)$/i.test(f.name)||/html|message\/rfc822|multipart/.test(f.type);
+function handleFiles(list){
+  const all=[...list]; const files=all.filter(f=>isCsv(f)||isHtml(f));
+  const warn=[]; const odd=all.filter(f=>!isCsv(f)&&!isHtml(f));
+  if(odd.some(f=>/\.msg$/i.test(f.name))) warn.push('Outlook .msg files can\'t be read. Open the email and save it as a web page (.html), or forward it and save from Outlook on the web.');
+  if(odd.some(f=>/\.xlsx?$/i.test(f.name))) warn.push('Excel files need to be saved as CSV first (File → Save As → CSV).');
+  if(odd.length&&!warn.length) warn.push(`${odd.length} file(s) weren't CSV or saved emails and were skipped.`);
+  if(!files.length){ msg('loadMsg', warn.join(' ')||'No files were chosen.', true); return; }
+  let done=0; const finish=()=>{ if(++done===files.length) afterLoad(warn); };
+  files.forEach(f=>{
+    if(isCsv(f)){
+      if(typeof Papa==='undefined'){ warn.push('The CSV reader didn\'t load. Check the network connection and reload the page.'); finish(); return; }
+      Papa.parse(f,{header:true,skipEmptyLines:'greedy',transformHeader:h=>h.replace(/^\uFEFF/,'').trim(),
+        complete:res=>{ addRows(f.name,res.data,res.meta.fields||[]); finish(); },
+        error:()=>{ warn.push(`Couldn't read ${f.name}.`); finish(); }});
+    } else {
+      f.text().then(text=>{
+        const html=/^(?:[\s\S]{0,4000}?)(MIME-Version:|Content-Type:\s*multipart)/i.test(text)?htmlFromMime(text)||text:text;
+        const t=tablesFromHtml(html);
+        if(t.rows.length) addRows(f.name,t.rows,t.headers); else warn.push(`No tutoring table was found in ${f.name}.`);
+      }).catch(()=>warn.push(`Couldn't read ${f.name}.`)).finally(finish);
+    }
+  });
+}
+function afterLoad(warn){
+  warn=Array.isArray(warn)?warn:[];
+  S.mapping=autoMap(S.headers); renderMapping(); setFilesUI();
+  msg('loadMsg', warn.join(' '), !!warn.length);
+  if(!S.files.length) return;
+  $('step3').classList.add('hidden'); $('previewWrap').classList.add('hidden');
+  $('step2').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+}
+function msg(id,text,err){ $(id).innerHTML=text?`<div class="notice${err?' err':''}">${esc(text)}</div>`:''; }
+
+function renderMapping(){
+  const opts=h=>['<option value="">— not used —</option>',...S.headers.map(x=>`<option value="${esc(x)}"${x===h?' selected':''}>${esc(x)}</option>`)].join('');
+  $('mapTable').innerHTML=FIELDS.map(f=>`<tr><td>${esc(f.label)}${f.req?' <span class="req" title="Required">*</span>':''}</td><td><select data-key="${f.key}" aria-label="Column for ${esc(f.label)}">${opts(S.mapping[f.key])}</select></td></tr>`).join('');
+  $('mapTable').querySelectorAll('select').forEach(s=>s.addEventListener('change',()=>{ S.mapping[s.dataset.key]=s.value||undefined; updateUnmapped(); }));
+  updateUnmapped();
+}
+function updateUnmapped(){
+  const used=new Set(Object.values(S.mapping).filter(Boolean));
+  const un=S.headers.filter(h=>!used.has(h));
+  $('unmapped').textContent=un.length?'Discarded: '+un.join(', '):'';
+}
+
+/* ---------- anonymize ---------- */
+async function run(){
+  const m=S.mapping;
+  if(!m.activity||!m.tutor||!(m.student||m.studentId)){ $('runMsg').textContent='Choose columns for session date, tutor, and student before continuing.'; return; }
+  const mode=document.querySelector('input[name=keymode]:checked').value;
+  const pass=$('passphrase').value;
+  if(mode==='pass'&&pass.length<8){ $('runMsg').textContent='Use a passphrase of at least 8 characters.'; return; }
+  if(!window.crypto||!crypto.subtle){ $('runMsg').textContent='This browser can\'t create secure pseudonyms here. Open the page over https in a current browser.'; return; }
+  $('runBtn').disabled=true; $('runMsg').textContent='Anonymizing…';
+  try{
+    const key=await makeKey(mode,pass); const cache=new Map();
+    const maskT=$('maskTutors').checked, notesMode=document.querySelector('input[name=notes]:checked').value;
+    const get=(r,k)=>m[k]?r[m[k]]:undefined;
+    const seen=new Set(); const out=[]; let dupes=0, skipDate=0, skipStudent=0;
+    const names=[];
+    if(notesMode==='scrub'){ for(const r of S.rows){ names.push(get(r,'student')); if(maskT) names.push(get(r,'tutor')); const sec=String(get(r,'section')||''); const p=sec.split(/\s+-\s+/)[0]; if(/,/.test(p)) names.push(p); } }
+    const scrub=notesMode==='scrub'?buildScrubber(names):null;
+    for(const r of S.rows){
+      const pd=parseDate(get(r,'activity')); if(!pd){skipDate++; continue;}
+      const sRaw=normName(get(r,'studentId'))||normName(get(r,'student')); if(!sRaw){skipStudent++; continue;}
+      const tRaw=String(get(r,'tutor')||'').trim()||'Unassigned';
+      const c=parseCourse(get(r,'subject'),get(r,'section'));
+      const dk=normName(tRaw)+'|'+sRaw+'|'+pd.d.getTime()+'|'+c.code;
+      if(seen.has(dk)){dupes++; continue;} seen.add(dk);
+      const ws=weekStart(pd.d);
+      const notesRaw=String(get(r,'notes')||'').trim();
+      out.push({
+        date:pd.d, hasTime:pd.time, week:iso(ws), dow:(pd.d.getDay()+6)%7, hour:pd.d.getHours(),
+        course:c.code, courseTitle:c.title, section:parseSectionCode(get(r,'section')),
+        location:String(get(r,'location')||'').trim()||'Not recorded',
+        minutes:parseMinutes(get(r,'duration')),
+        dropIn:m.dropin?yes(get(r,'dropin')):null, noShow:m.noshow?yes(get(r,'noshow')):false, elevate:m.elevate?yes(get(r,'elevate')):null,
+        hasNotes:!!notesRaw, notes:scrub?scrub(notesRaw):'',
+        student:await pseudo(key,'S',sRaw,cache),
+        tutor:maskT?await pseudo(key,'T',normName(tRaw),cache):tRaw
+      });
+    }
+    out.sort((a,b)=>a.date-b.date);
+    S.records=out; S.stats={rows:S.rows.length,dupes,skipDate,skipStudent,maskT,notesMode,mode};
+    $('runMsg').textContent=`${fmt(out.length)} sessions ready.`;
+    renderPreview(); setupFilters(); $('step3').classList.remove('hidden'); render();
+  }catch(e){ console.error(e); $('runMsg').textContent='Something went wrong while anonymizing: '+e.message; }
+  finally{ $('runBtn').disabled=false; }
+}
+function renderPreview(){
+  const cols=['Date','Course','Section','Tutor','Student','Minutes','Location','Drop in','No show'];
+  if(S.stats.notesMode==='scrub') cols.push('Notes (scrubbed)');
+  const rows=S.records.slice(0,6).map(r=>{ const c=[usDate(r.date)+(r.hasTime?' '+r.date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):''),r.course,r.section,r.tutor,r.student,r.minutes??'',r.location,r.dropIn==null?'':(r.dropIn?'Yes':'No'),r.noShow?'Yes':'No'];
+    if(S.stats.notesMode==='scrub') c.push(r.notes.length>80?r.notes.slice(0,80)+'…':r.notes);
+    return '<tr>'+c.map(x=>`<td>${esc(x)}</td>`).join('')+'</tr>'; }).join('');
+  $('previewTable').innerHTML='<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>'+rows+'</tbody>';
+  $('previewWrap').classList.remove('hidden');
+}
+
+/* ---------- filters ---------- */
+function uniq(a){return [...new Set(a)].sort((x,y)=>String(x).localeCompare(String(y)));}
+function setupFilters(){
+  const R=S.records; if(!R.length) return;
+  $('fFrom').value=iso(R[0].date); $('fTo').value=iso(R[R.length-1].date);
+  $('fCourse').innerHTML='<option value="">All courses</option>'+uniq(R.map(r=>r.course)).map(c=>`<option>${esc(c)}</option>`).join('');
+  $('fTutor').innerHTML='<option value="">All tutors</option>'+uniq(R.map(r=>r.tutor)).map(c=>`<option>${esc(c)}</option>`).join('');
+  $('fLoc').innerHTML='<option value="">All locations</option>'+uniq(R.map(r=>r.location)).map(c=>`<option>${esc(c)}</option>`).join('');
+  S.spot=null;
+}
+function filtered(){
+  const from=$('fFrom').value?new Date($('fFrom').value+'T00:00:00'):null, to=$('fTo').value?new Date($('fTo').value+'T23:59:59'):null;
+  const c=$('fCourse').value, t=$('fTutor').value, l=$('fLoc').value;
+  return S.records.filter(r=>(!from||r.date>=from)&&(!to||r.date<=to)&&(!c||r.course===c)&&(!t||r.tutor===t)&&(!l||r.location===l));
+}
+function filterLabel(){
+  const p=[]; if($('fFrom').value||$('fTo').value) p.push(`${$('fFrom').value||'start'} to ${$('fTo').value||'end'}`);
+  if($('fCourse').value) p.push($('fCourse').value); if($('fTutor').value) p.push('tutor: '+$('fTutor').value); if($('fLoc').value) p.push($('fLoc').value);
+  p.push($('fNoShow').checked?'no-shows counted':'no-shows excluded'); return p.join('; ');
+}
+
+/* ---------- aggregation ---------- */
+function summarize(base){
+  const countNS=$('fNoShow').checked;
+  const att=countNS?base:base.filter(r=>!r.noShow);
+  const mins=att.reduce((a,r)=>a+(r.minutes||0),0);
+  const withMin=att.filter(r=>r.minutes!=null).length;
+  return {base, att, sessions:att.length, students:new Set(att.map(r=>r.student)).size, hours:mins/60, avg:withMin?mins/withMin:0,
+    noShows:base.filter(r=>r.noShow).length, noShowRate:base.length?base.filter(r=>r.noShow).length/base.length:0};
+}
+function weekSeries(att, range){
+  const map=new Map(); for(const r of att){ let w=map.get(r.week); if(!w){w={s:0,st:new Set()}; map.set(r.week,w);} w.s++; w.st.add(r.student); }
+  const keys=[]; if(range&&range[0]){ let d=weekStart(range[0]); const end=weekStart(range[1]); while(d<=end){ keys.push(iso(d)); d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+7); } }
+  else keys.push(...[...map.keys()].sort());
+  return {labels:keys, sessions:keys.map(k=>map.get(k)?.s||0), students:keys.map(k=>map.get(k)?.st.size||0)};
+}
+function byTutor(att){
+  const map=new Map();
+  for(const r of att){ let t=map.get(r.tutor); if(!t){t={tutor:r.tutor,sessions:0,st:new Set(),mins:0,minN:0,first:r.date,last:r.date,weeks:new Set(),courses:new Map()}; map.set(r.tutor,t);}
+    t.sessions++; t.st.add(r.student); if(r.minutes!=null){t.mins+=r.minutes;t.minN++;} if(r.date<t.first)t.first=r.date; if(r.date>t.last)t.last=r.date; t.weeks.add(r.week); t.courses.set(r.course,(t.courses.get(r.course)||0)+1); }
+  return [...map.values()].map(t=>({...t,students:t.st.size,hours:t.mins/60,avg:t.minN?t.mins/t.minN:0,weeksActive:t.weeks.size}));
+}
+
+/* ---------- rendering ---------- */
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function bars(el, items, fmtV){
+  const max=Math.max(1,...items.map(i=>i.v));
+  $(el).innerHTML=items.length?items.map(i=>`<div class="bar"><span title="${esc(i.title||i.k)}">${esc(i.k)}</span><div class="track"><div class="fill" style="width:${(i.v/max*100).toFixed(1)}%;${i.color?'background:'+i.color:''}"></div></div><span class="v">${fmtV?fmtV(i):fmt(i.v)}</span></div>`).join(''):'<p class="small muted">No data in this view.</p>';
+}
+function chart(id, cfg){
+  if(typeof Chart==='undefined') return;
+  if(S.charts[id]) S.charts[id].destroy();
+  const ink=css('--muted'), rule=css('--rule');
+  Chart.defaults.font.family=css('--sans'); Chart.defaults.color=ink;
+  cfg.options=Object.assign({responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{boxWidth:12}}},
+    scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkipPadding:14}},y:{beginAtZero:true,grid:{color:rule},ticks:{precision:0}}}},cfg.options||{});
+  S.charts[id]=new Chart($(id),cfg);
+}
+function render(){
+  if(!S.records.length){ $('ledger').innerHTML=''; $('qa').innerHTML='<div class="notice err">No usable sessions were found. Check the column choices in step 2.</div>'; return; }
+  const base=filtered(); const sum=summarize(base); const att=sum.att;
+  const from=$('fFrom').value?new Date($('fFrom').value+'T00:00:00'):S.records[0].date;
+  const to=$('fTo').value?new Date($('fTo').value+'T00:00:00'):S.records[S.records.length-1].date;
+  const ws=weekSeries(att,[from,to]); S.weekCount=ws.labels.length;
+  $('ledger').innerHTML=[
+    [fmt(sum.sessions),'sessions'],[fmt(sum.students),'different students'],[fmt1(sum.hours),'hours of tutoring'],
+    [fmt1(sum.avg),'average minutes'],[(sum.noShowRate*100).toFixed(1)+'%','no-show rate'],[fmt(ws.labels.length),'weeks in range']
+  ].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
+  const st=S.stats;
+  $('qa').innerHTML=`<span><b>${fmt(S.files.length)}</b> files, <b>${fmt(st.rows)}</b> rows read</span><span><b>${fmt(st.dupes)}</b> duplicate rows removed</span>`+
+    (st.skipDate?`<span><b>${fmt(st.skipDate)}</b> rows skipped (no date)</span>`:'')+(st.skipStudent?`<span><b>${fmt(st.skipStudent)}</b> rows skipped (no student)</span>`:'')+
+    `<span>Data covers <b>${usDate(S.records[0].date)}</b> to <b>${usDate(S.records[S.records.length-1].date)}</b></span>`;
+
+  chart('weekChart',{type:'line',data:{labels:ws.labels.map(l=>shortDate(new Date(l+'T00:00:00'))),datasets:[
+    {label:'Sessions',data:ws.sessions,borderColor:css('--blue'),backgroundColor:css('--blue'),tension:.25,pointRadius:ws.labels.length>30?0:3,borderWidth:2},
+    {label:'Different students',data:ws.students,borderColor:css('--marker'),backgroundColor:css('--marker'),tension:.25,pointRadius:ws.labels.length>30?0:3,borderWidth:2,borderDash:[5,4]}]}});
+
+  const tut=byTutor(att); S.tutors=tut; renderTutorTable();
+  const tutorNames=tut.map(t=>t.tutor).sort((a,b)=>a.localeCompare(b));
+  if(!S.spot||!tutorNames.includes(S.spot)) S.spot=[...tut].sort((a,b)=>b.sessions-a.sessions)[0]?.tutor||null;
+  $('spotSel').innerHTML=tutorNames.map(n=>`<option${n===S.spot?' selected':''}>${esc(n)}</option>`).join('');
+  renderSpot([from,to]);
+
+  const cm=new Map(); for(const r of att){ let c=cm.get(r.course); if(!c){c={s:0,st:new Set(),title:r.courseTitle}; cm.set(r.course,c);} c.s++; c.st.add(r.student); if(!c.title&&r.courseTitle)c.title=r.courseTitle; }
+  bars('courseBars',[...cm].sort((a,b)=>b[1].s-a[1].s).map(([k,c])=>({k,v:c.s,u:c.st.size,title:k+' '+c.title})),i=>`${fmt(i.v)} <span class="muted">(${fmt(i.u)})</span>`);
+
+  renderHeat(att);
+
+  const per=new Map(); for(const r of att) per.set(r.student,(per.get(r.student)||0)+1);
+  const buckets=[['1 visit',1,1],['2 visits',2,2],['3–5',3,5],['6–10',6,10],['11 or more',11,1e9]];
+  bars('returnBars',buckets.map(([k,a,b])=>({k,v:[...per.values()].filter(n=>n>=a&&n<=b).length})),i=>fmt(i.v));
+
+  const hasDrop=S.mapping.dropin; const mix=[];
+  if(hasDrop){ mix.push({k:'Drop in',v:base.filter(r=>r.dropIn&&!r.noShow).length}); mix.push({k:'Scheduled',v:base.filter(r=>r.dropIn===false&&!r.noShow).length}); }
+  mix.push({k:'No show',v:base.filter(r=>r.noShow).length,color:css('--alert')});
+  if(S.mapping.elevate) mix.push({k:'Elevate',v:base.filter(r=>r.elevate).length});
+  bars('mixBars',mix,i=>fmt(i.v));
+
+  const lm=new Map(); for(const r of att) lm.set(r.location,(lm.get(r.location)||0)+1);
+  bars('locBars',[...lm].sort((a,b)=>b[1]-a[1]).map(([k,v])=>({k,v})));
+
+  const sm=new Map(); for(const r of att){ if(!r.section) continue; const k=r.course+' · '+r.section; let s=sm.get(k); if(!s){s={course:r.course,section:r.section,s:0,st:new Set()}; sm.set(k,s);} s.s++; s.st.add(r.student); }
+  const sec=[...sm.values()].sort((a,b)=>b.s-a.s).slice(0,15);
+  $('sectionTable').innerHTML=sec.length?'<thead><tr><th>Course</th><th>Section</th><th class="n">Sessions</th><th class="n">Different students</th></tr></thead><tbody>'+sec.map(s=>`<tr><td>${esc(s.course)}</td><td>${esc(s.section)}</td><td class="n">${fmt(s.s)}</td><td class="n">${fmt(s.st.size)}</td></tr>`).join('')+'</tbody>':'<tbody><tr><td class="muted">No section codes were found in the export.</td></tr></tbody>';
+}
+const TCOLS=[['tutor','Tutor'],['sessions','Sessions',1],['students','Different students',1],['hours','Hours',1],['avg','Avg minutes',1],['weeksActive','Weeks active',1],['first','First session',1],['last','Last session',1]];
+function renderTutorTable(){
+  const {key,dir}=S.sort;
+  const rows=[...S.tutors].sort((a,b)=>{ const x=a[key],y=b[key]; return (typeof x==='string'?x.localeCompare(y):x-y)*dir; });
+  $('tutorTable').innerHTML='<thead><tr>'+TCOLS.map(([k,l,n])=>`<th tabindex="0" data-k="${k}" class="${n?'n':''}" aria-sort="${k===key?(dir>0?'ascending':'descending'):'none'}">${l}</th>`).join('')+'</tr></thead><tbody>'+
+    rows.map(t=>`<tr tabindex="0" data-t="${esc(t.tutor)}" class="${t.tutor===S.spot?'sel':''}"><td>${esc(t.tutor)}</td><td class="n">${fmt(t.sessions)}</td><td class="n">${fmt(t.students)}</td><td class="n">${fmt1(t.hours)}</td><td class="n">${fmt1(t.avg)}</td><td class="n">${fmt(t.weeksActive)}</td><td class="n">${usDate(t.first)}</td><td class="n">${usDate(t.last)}</td></tr>`).join('')+'</tbody>';
+  $('tutorTable').querySelectorAll('th').forEach(th=>{ const go=()=>{ const k=th.dataset.k; S.sort={key:k,dir:S.sort.key===k?-S.sort.dir:(k==='tutor'?1:-1)}; renderTutorTable(); }; th.onclick=go; th.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}}; });
+  $('tutorTable').querySelectorAll('tbody tr').forEach(tr=>{ const go=()=>{ S.spot=tr.dataset.t; $('spotSel').value=S.spot; renderTutorTable(); renderSpot(); $('spot').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'}); }; tr.onclick=go; tr.onkeydown=e=>{if(e.key==='Enter'){go();}}; });
+}
+function spotSentence(t, plain, weeks){
+  const mk=s=>plain?s:`<mark>${s}</mark>`;
+  return `${plain?t.tutor:esc(t.tutor)} held ${mk(fmt(t.sessions)+' sessions')} with ${mk(fmt(t.students)+' different students')}, ${fmt1(t.hours)} hours of tutoring, between ${usDate(t.first)} and ${usDate(t.last)}. ${weeks===1?'All of it fell in a single week.':'They tutored in '+fmt(t.weeksActive)+(weeks?' of the '+fmt(weeks)+' weeks in this range':' weeks')+'.'}`;
+}
+function renderSpot(range){
+  const t=(S.tutors||[]).find(x=>x.tutor===S.spot);
+  if(!t){ $('spotText').textContent='No tutor sessions in this view.'; $('spotCourses').innerHTML=''; return; }
+  $('spotText').innerHTML=spotSentence(t,false,S.weekCount);
+  bars('spotCourses',[...t.courses].sort((a,b)=>b[1]-a[1]).map(([k,v])=>({k,v})));
+  const att=summarize(filtered()).att.filter(r=>r.tutor===t.tutor);
+  const r=range||[$('fFrom').value?new Date($('fFrom').value+'T00:00:00'):S.records[0].date,$('fTo').value?new Date($('fTo').value+'T00:00:00'):S.records[S.records.length-1].date];
+  const ws=weekSeries(att,r);
+  chart('spotChart',{type:'bar',data:{labels:ws.labels.map(l=>shortDate(new Date(l+'T00:00:00'))),datasets:[{label:'Sessions',data:ws.sessions,backgroundColor:css('--marker'),borderRadius:2}]},options:{plugins:{legend:{display:false}}}});
+}
+function renderHeat(att){
+  const timed=att.filter(r=>r.hasTime);
+  if(!timed.length){ $('heat').innerHTML=''; $('heatNote').textContent='The export has dates but no times, so this view is unavailable.'; return; }
+  let lo=Math.min(...timed.map(r=>r.hour)), hi=Math.max(...timed.map(r=>r.hour)); lo=Math.min(lo,9); hi=Math.max(hi,17);
+  const g={}; let max=0; for(const r of timed){ const k=r.dow+'-'+r.hour; g[k]=(g[k]||0)+1; if(g[k]>max)max=g[k]; }
+  const days=[...new Set(timed.map(r=>r.dow))].concat([0,1,2,3,4]).filter((v,i,a)=>a.indexOf(v)===i).sort();
+  const hl=h=>(h%12||12)+(h<12?'a':'p');
+  let html='<thead><tr><th></th>'; for(let h=lo;h<=hi;h++) html+=`<th scope="col">${hl(h)}</th>`; html+='</tr></thead><tbody>';
+  const blue=css('--blue');
+  for(const d of days){ html+=`<tr><th scope="row">${DOW[d]}</th>`; for(let h=lo;h<=hi;h++){ const v=g[d+'-'+h]||0; const a=v?0.12+0.88*(v/max):0;
+    html+=`<td title="${DOW[d]} ${hl(h)}: ${v} sessions" style="background:${v?`color-mix(in srgb, ${blue} ${Math.round(a*100)}%, transparent)`:'var(--bg)'};color:${a>.55?'var(--surface)':'var(--ink)'}">${v||''}</td>`; } html+='</tr>'; }
+  $('heat').innerHTML=html+'</tbody>';
+  $('heatNote').textContent=`Based on session start times. Busiest slot has ${max} sessions.`;
+}
+
+/* ---------- exports ---------- */
+const capDownloads=(window.claude&&typeof window.claude.use==='function')?window.claude.use('downloads').catch(()=>null):Promise.resolve(null);
+const framed=(()=>{try{return window.top!==window.self;}catch(e){return true;}})();
+async function saveFile(filename, data, mime){
+  const dl=await capDownloads;
+  if(dl){ try{ await dl.save({filename,data}); toast('Saved '+filename); }catch(e){ const c=e&&e.code; toast(c==='declined'?'Download cancelled.':c==='rate_limited'?'A save prompt is already open.':'Couldn\'t save the file here.'); } return; }
+  if(framed&&window.claude){ toast('Downloads aren\'t available in this view. Open the page in its own tab.'); return; }
+  const url=URL.createObjectURL(new Blob([data],{type:mime})); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000); toast('Saved '+filename);
+}
+const csvCell=v=>{ const s=String(v==null?'':v); return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+const toCsv=(head,rows)=>[head,...rows].map(r=>r.map(csvCell).join(',')).join('\r\n');
+const stamp=()=>iso(new Date());
+function exportCsv(){
+  const recs=filtered(); const withNotes=S.stats.notesMode==='scrub';
+  const head=['session','date','time','week_start','weekday','course','course_title','section','location','duration_min','drop_in','no_show','elevate','tutor','student'].concat(withNotes?['notes_scrubbed']:[]);
+  const rows=recs.map((r,i)=>[i+1,iso(r.date),r.hasTime?String(r.date.getHours()).padStart(2,'0')+':'+String(r.date.getMinutes()).padStart(2,'0'):'',r.week,DOW[r.dow],r.course,r.courseTitle,r.section,r.location,r.minutes??'',r.dropIn==null?'':(r.dropIn?'Yes':'No'),r.noShow?'Yes':'No',r.elevate==null?'':(r.elevate?'Yes':'No'),r.tutor,r.student].concat(withNotes?[r.notes]:[]));
+  saveFile(`math-lab-sessions-anonymized-${stamp()}.csv`,'\uFEFF'+toCsv(head,rows),'text/csv');
+}
+function tutorRows(){ return [...S.tutors].sort((a,b)=>b.sessions-a.sessions).map(t=>[t.tutor,t.sessions,t.students,t.hours.toFixed(1),t.avg.toFixed(1),t.weeksActive,iso(t.first),iso(t.last)]); }
+function exportTutors(){ saveFile(`math-lab-tutors-${stamp()}.csv`,'\uFEFF'+toCsv(['tutor','sessions','different_students','hours','avg_minutes','weeks_active','first_session','last_session'],tutorRows()),'text/csv'); }
+function exportReport(){
+  const sum=summarize(filtered()); const att=sum.att;
+  const from=$('fFrom').value?new Date($('fFrom').value+'T00:00:00'):S.records[0].date, to=$('fTo').value?new Date($('fTo').value+'T00:00:00'):S.records[S.records.length-1].date;
+  const ws=weekSeries(att,[from,to]); const W=640,H=140,max=Math.max(1,...ws.sessions), bw=W/Math.max(1,ws.labels.length);
+  const svg=`<svg viewBox="0 0 ${W} ${H+18}" width="100%" role="img" aria-label="Sessions per week">${ws.sessions.map((v,i)=>`<rect x="${(i*bw+1).toFixed(1)}" y="${(H-v/max*H).toFixed(1)}" width="${Math.max(1,bw-2).toFixed(1)}" height="${(v/max*H).toFixed(1)}" fill="#2B5C8A"><title>${ws.labels[i]}: ${v}</title></rect>`).join('')}<text x="0" y="${H+14}" font-size="11" fill="#5B6B7A">${shortDate(from)}</text><text x="${W}" y="${H+14}" font-size="11" fill="#5B6B7A" text-anchor="end">${shortDate(to)}</text></svg>`;
+  const cm=new Map(); for(const r of att){ let c=cm.get(r.course); if(!c){c={s:0,st:new Set()}; cm.set(r.course,c);} c.s++; c.st.add(r.student); }
+  const table=(h,rows)=>`<table><thead><tr>${h.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(x=>`<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const spot=(S.tutors||[]).find(x=>x.tutor===S.spot);
+  const doc=`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Math Lab tutoring summary</title><style>
+body{font-family:Georgia,serif;color:#1C2B3A;max-width:820px;margin:32px auto;padding:0 20px;line-height:1.5}h1{font-size:28px;margin:0 0 4px}h2{font-size:19px;margin:28px 0 8px;border-bottom:1px solid #DDE4EA;padding-bottom:4px}
+.m{color:#5B6B7A;font-family:Arial,sans-serif;font-size:13px}.k{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}.k div{border-top:2px solid #1C2B3A;padding-top:6px}.k b{font-size:26px;display:block}
+table{border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px}th,td{text-align:left;padding:5px 8px;border-bottom:1px solid #DDE4EA}th{background:#F5F7F9}.s{font-size:18px;background:#FFF7DA;border-left:5px solid #F5C542;padding:10px 14px}
+@media print{body{margin:0}}</style></head><body>
+<h1>Math Lab tutoring summary</h1><p class="m">${esc(filterLabel())}. Generated ${usDate(new Date())}. Students are identified only by pseudonym; ${S.stats.maskT?'tutor names are also hidden':'tutor names are shown'}.</p>
+<div class="k"><div><b>${fmt(sum.sessions)}</b><span class="m">sessions</span></div><div><b>${fmt(sum.students)}</b><span class="m">different students</span></div><div><b>${fmt1(sum.hours)}</b><span class="m">hours of tutoring</span></div>
+<div><b>${fmt1(sum.avg)}</b><span class="m">average minutes</span></div><div><b>${(sum.noShowRate*100).toFixed(1)}%</b><span class="m">no-show rate</span></div><div><b>${fmt(ws.labels.length)}</b><span class="m">weeks</span></div></div>
+${spot?`<h2>Tutor spotlight</h2><p class="s">${esc(spotSentence(spot,true,ws.labels.length))}</p>`:''}
+<h2>Sessions per week</h2>${svg}
+<h2>Tutors</h2>${table(['Tutor','Sessions','Different students','Hours','Avg min','Weeks active','First','Last'],tutorRows())}
+<h2>Courses</h2>${table(['Course','Sessions','Different students'],[...cm].sort((a,b)=>b[1].s-a[1].s).map(([k,c])=>[k,c.s,c.st.size]))}
+<p class="m" style="margin-top:28px">Duplicate rows across weekly exports were removed (${fmt(S.stats.dupes)}). ${$('fNoShow').checked?'No-shows are counted as sessions.':'No-shows are excluded from session and student counts.'} A "different student" is counted once no matter how many sessions they attended.</p>
+</body></html>`;
+  saveFile(`math-lab-summary-${stamp()}.html`,doc,'text/html');
+}
+function copySpot(){
+  const t=(S.tutors||[]).find(x=>x.tutor===S.spot); if(!t) return;
+  const text=spotSentence(t,true,S.weekCount)+` (${filterLabel()})`;
+  const fallback=()=>{ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); let ok=false; try{ok=document.execCommand('copy');}catch(e){} ta.remove(); toast(ok?'Summary copied.':'Copy isn\'t available here. Select the sentence and copy it.'); };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(()=>toast('Summary copied.'),fallback); else fallback();
+}
+let toastT; function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),2600); }
+
+/* ---------- sample data (entirely fictional) ---------- */
+function sampleData(){
+  let seed=20260904; const rnd=()=>{ seed=(seed*1664525+1013904223)%4294967296; return seed/4294967296; }; const pick=a=>a[Math.floor(rnd()*a.length)];
+  const tutors=['Alvarez, Marco','Bennett, Priya','Castillo, Rosa','Dunn, Theo','Erikson, Maya','Fontaine, Luc','Greer, Avery','Hollis, June'];
+  const firsts=['Aiden','Bella','Carlos','Dana','Eli','Fatima','Gabe','Hana','Ivan','Jada','Kai','Lena','Mason','Nora','Omar','Pia','Quinn','Rhea','Sam','Tess','Uma','Vic','Wes','Xena','Yusuf','Zoe'];
+  const lasts=['Abbott','Brooks','Chen','Diaz','Evans','Flores','Gupta','Hart','Ito','James','Khan','Lopez','Mills','Nguyen','Owens','Patel','Reyes','Shaw','Torres','Vance','Walsh','Young'];
+  const students=Array.from({length:340},()=>pick(lasts)+', '+pick(firsts));
+  const courses=['MATH-011 Prealgebra I','MATH-021 Introductory Algebra','MATH-131 Statistics','MATH-145 Algebraic Modeling','MATH-151 Intermediate Algebra','MATH-153 Pre-Calculus','MATH-171 Calculus I','MATH-172 Calculus II'];
+  const cw=[3,8,7,4,7,5,3,2]; const cpick=()=>{ let t=rnd()*cw.reduce((a,b)=>a+b); for(let i=0;i<cw.length;i++){ t-=cw[i]; if(t<=0) return i; } return 0; };
+  const locs=['Lincroft','Lincroft','Lincroft','Lincroft','Bankier Library','Online'];
+  const topics=['factoring trinomials','slope and intercepts','normal distribution','limits','word problems','exponent rules','solving systems','z-scores','related rates'];
+  const fmtD=d=>`${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()} ${(d.getHours()%12)||12}:${String(d.getMinutes()).padStart(2,'0')} ${d.getHours()<12?'AM':'PM'}`;
+  const start=new Date(2025,8,8);
+  const files=[]; let carry=[];
+  for(let w=0; w<52; w++){
+    const ws=new Date(start); ws.setDate(ws.getDate()+w*7); const mo=ws.getMonth();
+    const load=(mo===5||mo===6||mo===7)?0.25:(mo===11&&ws.getDate()>20)||mo===0&&ws.getDate()<20?0.15:1;
+    const n=Math.round((45+rnd()*35)*load); const rows=[...carry]; carry=[];
+    for(let i=0;i<n;i++){
+      const d=new Date(ws); d.setDate(d.getDate()+Math.floor(rnd()*5)); d.setHours(9+Math.floor(rnd()*12),pick([0,15,30,45]));
+      let tutor=pick(tutors); if(tutor==='Greer, Avery'&&w>40) tutor=pick(tutors.slice(0,6));
+      const stu=students[Math.floor(Math.pow(rnd(),1.6)*students.length)]; const ci=cpick(); const code=courses[ci].slice(0,8);
+      const first=stu.split(', ')[1]; const cr=new Date(d.getTime()+(20+rnd()*120)*60000);
+      const noShow=rnd()<0.04;
+      const note=rnd()<0.5?`${pick(topics)}; ${first} ${pick(['made good progress','needs more practice','will return Thursday'])}`:'';
+      const row={'Tutoring Subject':courses[ci],'Date Created':fmtD(cr),'Tutoring Activity Date':fmtD(d),'Duration':pick(['15 minutes','30 minutes','45 minutes','45 minutes','60 minutes']),'Owner':tutor,'Regarding':stu,'Section':`${stu} - ${code} - ${String(1+Math.floor(rnd()*30)).padStart(3,'0')}RL`,'Tutoring Location':pick(locs),'Tutoring Notes':noShow?'':note,'Drop In':rnd()<0.75?'Yes':'No','No Show':noShow?'Yes':'No','Elevate':rnd()<0.05?'Yes':'No'};
+      rows.push(row); if(rnd()<0.04) carry.push({...row});
+    }
+    files.push({name:`sample-week-${String(w+1).padStart(2,'0')}.csv`,rows});
+  }
+  return files;
+}
+
+/* ---------- wiring ---------- */
+const drop=$('drop'), fi=$('fileInput');
+drop.addEventListener('click',()=>fi.click());
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fi.click();}});
+fi.addEventListener('change',()=>{ handleFiles(fi.files); fi.value=''; });
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>handleFiles(e.dataTransfer.files));
+$('sampleBtn').addEventListener('click',()=>{ for(const f of sampleData()) addRows(f.name,f.rows,Object.keys(f.rows[0]||{})); afterLoad([]); msg('loadMsg','Loaded 52 weeks of made-up sessions. No real students or tutors are in this sample.'); });
+$('weekBtn').addEventListener('click',()=>{ try{ const d=JSON.parse($('sampleWeek').textContent); addRows('math-lab-week-of-sep-8-2026.csv',d.rows.map(r=>({...r})),d.headers); afterLoad([]); msg('loadMsg','Loaded the Math Lab report for the week of Sep 8, 2026. Courses, times, durations, sections and notes are real; students have made-up names and tutors are numbered. Your own files will show real tutor names.'); }catch(e){ msg('loadMsg','The sample week couldn\'t be loaded.',true); } });
+$('clearBtn').addEventListener('click',()=>{ S.files=[];S.rows=[];S.headers=[];S.mapping={};S.records=[];S.tutors=[];S.spot=null; Object.values(S.charts).forEach(c=>c.destroy()); S.charts={};
+  $('passphrase').value=''; setFilesUI(); $('step3').classList.add('hidden'); $('previewWrap').classList.add('hidden'); $('runMsg').textContent=''; msg('loadMsg','All data cleared from this tab.'); });
+document.querySelectorAll('input[name=keymode]').forEach(r=>r.addEventListener('change',()=>{ $('passphrase').disabled=document.querySelector('input[name=keymode]:checked').value!=='pass'; if(!$('passphrase').disabled) $('passphrase').focus(); }));
+$('runBtn').addEventListener('click',run);
+['fFrom','fTo','fCourse','fTutor','fLoc','fNoShow'].forEach(id=>$(id).addEventListener('change',render));
+$('resetFilters').addEventListener('click',()=>{ setupFilters(); $('fNoShow').checked=false; render(); });
+$('spotSel').addEventListener('change',()=>{ S.spot=$('spotSel').value; renderTutorTable(); renderSpot(); });
+$('copySpot').addEventListener('click',copySpot);
+$('exportCsv').addEventListener('click',exportCsv);
+$('exportTutors').addEventListener('click',exportTutors);
+$('exportReport').addEventListener('click',exportReport);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(S.records.length) render(); });
+new MutationObserver(()=>{ if(S.records.length) render(); }).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+})();
+</script>
+</body>
+</html>
