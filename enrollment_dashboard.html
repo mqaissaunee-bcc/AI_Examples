@@ -2,27 +2,51 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.30
+  Version:  v5.32
   Date:     October 8, 2026
-  Features: 10th-day census banner & chart marker.
+  Features: Census surfaces as a bar beneath the KPI strip.
+            - The census information no longer renders as a free-floating
+              banner above the KPI strip. It's now a secondary KPI row
+              that sits flush beneath the live strip, with matching column
+              structure so each census number aligns under its live
+              counterpart (Sections, Enrollment, SCH, FTE).
+            - The "Overall Fill" column (which has no census equivalent)
+              carries the identifier label: "● 10TH-DAY CENSUS · Sep 21,
+              2026". Self-labeling without stealing a value column.
+            - 5-column variant activates when the fall FTE goal is set
+              (matching the .has-fte modifier on the KPI strip).
+            - Trends view no longer shows a census bar — the chart marker
+              already provides the census number inline on the chart;
+              a bar there with no KPIs to anchor to would float awkwardly.
+            Built on v5.31.
+
+  v5.31 (previous):
+            Census snapshot source rule — prefer day-after.
+            - Banner and chart marker now pull their numbers from the
+              snapshot captured on (census date + 1 day), which reflects
+              end-of-census-day processing more accurately than the
+              census-day pull itself. Fall back to the census-date
+              snapshot if no day-after snapshot exists.
+            - Silent — the banner always labels itself with the census
+              date, never discloses which snapshot is the data source.
+            - Applies to every POT.
+
+  v5.30 (previous):
+            10th-day census banner & chart marker.
             - New manifest field: `census` — maps POT codes to census
               dates, e.g. { "15W": "2026-09-21" }. Dates are per-POT
               because each sub-term has its own census day.
             - When the active POT has a census date set AND that date
-              has passed AND a snapshot exists for that exact date,
-              the dashboard pins a blue banner above the KPI strip
-              showing the official state-reportable number: enrolled,
-              sections, SCH, and FTE from the census-day snapshot.
+              has passed AND a snapshot exists for the census-day or
+              day-after, the dashboard pins a blue banner above the
+              KPI strip showing the official state-reportable number:
+              enrolled, sections, SCH, and FTE.
             - The Trends view also marks the census date on the
               Enrollment Over Time chart with a vertical info-blue
               line and a pill label showing the enrollment count.
             - 15W-only for this release. Manifest.json carries
               { "census": { "15W": "2026-09-21" } }. Other POT
               census dates to be added as Laura confirms them.
-            - Snapshot lookup is exact-date-match; a near-miss would
-              be misleading since this is the official number. When
-              no snapshot exists on the census date, the banner is
-              suppressed and a console warning fires.
             - Pipeline unaffected — generate_manifest.py already
               preserves custom top-level fields (goals, census, etc.)
               across regenerations.
@@ -910,77 +934,81 @@
   }
   .goal-badge .ribbon { font-size: 10px; line-height: 1; }
 
-  /* 10th-day census banner. Appears above the KPI strip when a census
-     date has been set for the active POT AND that date has passed.
-     Pins the snapshot captured on the census date as the official
-     state-reportable enrollment number. */
-  .census-banner {
-    background: var(--surface);
-    border: 2px solid var(--info);
-    border-radius: 4px;
-    padding: 14px 20px;
-    margin-bottom: 14px;
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 20px;
-    align-items: center;
-  }
-  .census-banner .cb-left {
-    border-right: 1px solid var(--rule);
-    padding-right: 20px;
-  }
-  .census-banner .cb-tag {
-    display: inline-block;
-    font-family: 'Helvetica Neue', sans-serif;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--info);
-    background: color-mix(in srgb, var(--info) 12%, var(--surface));
-    padding: 3px 8px;
-    border-radius: 3px;
-    margin-bottom: 4px;
-  }
-  .census-banner .cb-title {
-    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
-    font-size: 16px;
-    line-height: 1.2;
-    color: var(--ink);
-  }
-  .census-banner .cb-date {
-    font-size: 11px;
-    color: var(--ink-mute);
-    font-family: 'Helvetica Neue', sans-serif;
-    margin-top: 2px;
-    letter-spacing: 0.02em;
-  }
-  .census-banner .cb-nums {
+  /* 10th-day census bar. Sits directly beneath the KPI strip with the
+     same column structure so each census number aligns under its live
+     counterpart. The one column with no census equivalent (Overall Fill)
+     holds the identifier label — "CENSUS · <date>" — so the bar is
+     self-labeling without stealing a value column.
+
+     Visually: info-blue left border signals this is a different data
+     layer (locked historical census, not the live snapshot). Soft blue
+     tint on the fill background echoes the goal-met treatment pattern
+     already in the dashboard. Smaller type than the main KPI cards so
+     it reads as secondary context. */
+  .census-bar {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
+    background: color-mix(in srgb, var(--info) 6%, var(--surface));
+    border-top: 1px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule-strong);
+    border-left: 3px solid var(--info);
+    margin-top: -24px;       /* pull up to sit flush against KPI strip */
+    margin-bottom: 24px;
   }
-  .census-banner .cb-num {
-    text-align: center;
+  .census-bar.has-fte {
+    grid-template-columns: repeat(5, 1fr);
   }
-  .census-banner .cb-num-val {
+  .census-cell {
+    padding: 10px 22px;
+    border-right: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .census-cell:last-child { border-right: none; }
+  .census-cell .cb-val {
     font-family: 'Iowan Old Style', Palatino, Georgia, serif;
-    font-size: 22px;
+    font-size: 18px;
     line-height: 1;
     color: var(--ink);
   }
-  .census-banner .cb-num-label {
-    font-size: 10px;
-    color: var(--ink-mute);
+  .census-cell .cb-sub {
     font-family: 'Helvetica Neue', sans-serif;
-    letter-spacing: 0.04em;
+    font-size: 10px;
+    color: var(--info);
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     margin-top: 4px;
+    font-weight: 600;
+  }
+  /* The label cell — occupies the "Overall Fill" column since census has
+     no fill-rate equivalent. Tag + date stacked. */
+  .census-cell.is-label .cb-tag {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--info);
+    line-height: 1;
+  }
+  .census-cell.is-label .cb-date {
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-size: 15px;
+    line-height: 1.1;
+    color: var(--ink);
+    margin-top: 4px;
+  }
+  .census-cell.is-empty {
+    background: color-mix(in srgb, var(--info) 3%, transparent);
   }
   @media (max-width: 720px) {
-    .census-banner { grid-template-columns: 1fr; }
-    .census-banner .cb-left { border-right: none; border-bottom: 1px solid var(--rule); padding-right: 0; padding-bottom: 10px; }
-    .census-banner .cb-nums { grid-template-columns: repeat(2, 1fr); }
+    .census-bar,
+    .census-bar.has-fte {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .census-cell { border-right: none; border-bottom: 1px solid var(--rule); }
   }
 
   /* Vertical census marker rendered inside the trend chart SVG. */
@@ -2356,7 +2384,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.30</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.32</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -3425,14 +3453,16 @@
 
     let body = renderTabs();
     if (state.activeTab === 'snapshot') {
-      body += renderCensusBanner();
       body += renderKPIs();
+      body += renderCensusBar();
       body += renderFilters();
       body += renderDisciplineSummaries();
       body += renderCourseGrid();
       body += renderTable();
     } else if (state.activeTab === 'trends') {
-      body += renderCensusBanner();
+      // Census information surfaces in the trends view as the chart
+      // marker (vertical line + pill label), not as a bar — the bar
+      // only makes sense anchored to a KPI strip.
       body += renderTrendsView();
     } else if (state.activeTab === 'snapshots') {
       body += renderSnapshotManager();
@@ -3640,44 +3670,69 @@
   }
 
   /* =========================================================================
-   * 10TH-DAY CENSUS BANNER
+   * 10TH-DAY CENSUS BAR
    * ========================================================================= *
    * The college's state-reportable enrollment number is the snapshot captured
    * on the 10th day of each sub-term. Manifest sets these dates per POT:
    *   "census": { "15W": "2026-09-21", "11W": "2026-10-19", ... }
    * When the active POT has a census date set AND the date has passed, we
-   * surface the snapshot captured on that date as a pinned banner — it stays
-   * visible for the rest of the term, independent of whichever snapshot the
-   * user is currently viewing. The number also appears as a vertical marker
-   * on the trend chart (handled inside renderMultiSeriesChart).
+   * surface the official number as a secondary KPI row directly beneath the
+   * live KPI strip. Each census number aligns under its live counterpart
+   * (Sections, Enrollment, SCH, FTE) so comparison is at-a-glance. The bar
+   * stays visible for the rest of the term, independent of whichever
+   * snapshot the user is currently viewing. The number also appears as a
+   * vertical marker on the trend chart (handled inside
+   * renderMultiSeriesChart) — the bar makes sense anchored to the KPI
+   * strip; the chart marker provides the same information in the Trends
+   * view, so the bar is not duplicated there.
    */
 
   // Returns { date, snapshot, aggregates } for the active POT when the
-  // census date is set and has passed AND we have a snapshot on that date.
-  // Returns null otherwise. The snapshot lookup requires an EXACT date
-  // match — the census number is the official number, so a near-miss
-  // substitute would be misleading.
+  // census date is set and has passed AND we have a usable snapshot.
+  //
+  // Snapshot source rule (silent — the banner always labels itself with
+  // the census date, never the data date):
+  //   1. Prefer the snapshot captured on (census date + 1 day). This
+  //      reflects the state after end-of-census-day processing — late
+  //      registrations finalized, add-drops closed overnight — so it's
+  //      a more representative read of what the census day actually
+  //      locked in.
+  //   2. Fall back to the snapshot captured on the census date itself
+  //      if no day-after snapshot exists.
+  //   3. Null (suppress banner) if neither exists.
+  //
+  // Returns null otherwise.
   function activeCensusInfo() {
     if (!state.census) return null;
     const pot = state.activePartOfTerm || '15W';
     const censusDate = state.census[pot];
     if (!censusDate) return null;
 
-    // Only show once the date has passed (compare to today in local time)
+    // Only consider showing once the census date has passed (compare in
+    // local time)
     const todayIso = new Date().toISOString().slice(0, 10);
     if (censusDate > todayIso) return null;
 
-    // Find the snapshot captured on the census date for this POT. Exact
-    // match only. If multiple snapshots exist for that date (shouldn't,
-    // but defensive), prefer the latest-added.
-    const matches = state.snapshots.filter(s =>
-      s.date === censusDate && (s.part_of_term || '15W') === pot
+    // Compute census date + 1 calendar day
+    const d = new Date(censusDate + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    const dayAfter = d.toISOString().slice(0, 10);
+
+    const snapsForPot = state.snapshots.filter(s =>
+      (s.part_of_term || '15W') === pot
     );
-    if (matches.length === 0) {
-      console.warn(`[census] No snapshot found for ${pot} on census date ${censusDate}. Banner will not display.`);
+
+    // Prefer day-after snapshot (latest-added if several share the date)
+    let candidates = snapsForPot.filter(s => s.date === dayAfter);
+    if (candidates.length === 0) {
+      // Fall back to census-date snapshot
+      candidates = snapsForPot.filter(s => s.date === censusDate);
+    }
+    if (candidates.length === 0) {
+      console.warn(`[census] No snapshot found for ${pot} on ${dayAfter} or ${censusDate}. Banner suppressed.`);
       return null;
     }
-    const snap = matches[matches.length - 1];
+    const snap = candidates[candidates.length - 1];
 
     // Aggregate the official numbers from the snapshot. The census number
     // is unfiltered — it's the whole-college number, not scoped to the
@@ -3695,38 +3750,62 @@
     };
   }
 
-  function renderCensusBanner() {
+  // Renders the census bar — a secondary KPI row that sits directly
+  // beneath the live KPI strip with matching column structure. Each
+  // census number aligns under its live counterpart so a chair can
+  // compare "where we are now" vs. "what the state locked in" at a
+  // glance. The Overall Fill column (which has no census equivalent)
+  // holds the identifier label ("CENSUS · Sep 21, 2026"), making the
+  // bar self-labeling without stealing a value column. The FTE column
+  // only renders when a fall FTE goal is set (matching .has-fte on
+  // the KPI strip above).
+  function renderCensusBar() {
     const info = activeCensusInfo();
     if (!info) return '';
 
-    const potLabel = partOfTermLabel(state.activePartOfTerm);
-    const termLabel = 'Fall 2026'; // Could be derived from manifest.term later
+    const hasFte = !!fteGoal();
+    const barClass = hasFte ? 'census-bar has-fte' : 'census-bar';
+
+    // Columns, in order, must match the KPI strip exactly:
+    //   1. Sections   2. Enrollment   3. Overall Fill (label slot)
+    //   4. SCH        5. FTE (if goal set)
+    const sectionsCell = `
+      <div class="census-cell">
+        <div class="cb-val">${fmtInt(info.sections)}</div>
+        <div class="cb-sub">Census Sections</div>
+      </div>`;
+
+    const enrolledCell = `
+      <div class="census-cell">
+        <div class="cb-val">${fmtInt(info.enrolled)}</div>
+        <div class="cb-sub">Census Enrolled</div>
+      </div>`;
+
+    const labelCell = `
+      <div class="census-cell is-label" aria-label="10th-day census">
+        <div class="cb-tag">● 10th-Day Census</div>
+        <div class="cb-date">${escapeHtml(fmtDate(info.date))}</div>
+      </div>`;
+
+    const schCell = `
+      <div class="census-cell">
+        <div class="cb-val">${fmtInt(info.sch)}</div>
+        <div class="cb-sub">Census SCH</div>
+      </div>`;
+
+    const fteCell = hasFte ? `
+      <div class="census-cell">
+        <div class="cb-val">${info.fte.toFixed(1)}</div>
+        <div class="cb-sub">Census FTE</div>
+      </div>` : '';
 
     return `
-      <div class="census-banner" role="region" aria-label="10th-day census">
-        <div class="cb-left">
-          <div class="cb-tag">● 10th-Day Census</div>
-          <div class="cb-title">${escapeHtml(termLabel)} · ${escapeHtml(potLabel)}</div>
-          <div class="cb-date">Captured ${fmtDate(info.date)}</div>
-        </div>
-        <div class="cb-nums">
-          <div class="cb-num">
-            <div class="cb-num-val">${fmtInt(info.enrolled)}</div>
-            <div class="cb-num-label">Enrolled</div>
-          </div>
-          <div class="cb-num">
-            <div class="cb-num-val">${fmtInt(info.sections)}</div>
-            <div class="cb-num-label">Sections</div>
-          </div>
-          <div class="cb-num">
-            <div class="cb-num-val">${fmtInt(info.sch)}</div>
-            <div class="cb-num-label">SCH</div>
-          </div>
-          <div class="cb-num">
-            <div class="cb-num-val">${info.fte.toFixed(1)}</div>
-            <div class="cb-num-label">FTE</div>
-          </div>
-        </div>
+      <div class="${barClass}" role="region" aria-label="10th-day census numbers">
+        ${sectionsCell}
+        ${enrolledCell}
+        ${labelCell}
+        ${schCell}
+        ${fteCell}
       </div>
     `;
   }
@@ -5454,9 +5533,12 @@
 
     const dates = snaps.map(s => fmtDateShort(s.date));
 
-    // Census marker — find the index of the snapshot captured on the
-    // active POT's 10th-day census date. Null if no census set, census
-    // date in the future, or no snapshot on that exact date.
+    // Census marker — the vertical line sits at the census date on the
+    // chart's x-axis, but the enrollment count labeled on the pill comes
+    // from the day-after snapshot (silent — same rule as the banner, see
+    // activeCensusInfo). Falls back to the census-date snapshot if no
+    // day-after snapshot exists. Null if no census set, census date in
+    // the future, or neither snapshot exists.
     let censusIndex = -1;
     let censusEnrolled = null;
     if (state.census) {
@@ -5465,9 +5547,28 @@
       if (censusDate) {
         const todayIso = new Date().toISOString().slice(0, 10);
         if (censusDate <= todayIso) {
+          // The vertical line lands at the census-date snapshot's x
+          // position. If there's no snapshot on the census date itself,
+          // fall back to the day-after snapshot (so the line still
+          // appears, just one tick to the right).
           censusIndex = snaps.findIndex(s => s.date === censusDate);
-          if (censusIndex >= 0) {
-            censusEnrolled = sum(snaps[censusIndex].rows, 'Enrolled Students');
+          if (censusIndex < 0) {
+            const d = new Date(censusDate + 'T00:00:00');
+            d.setDate(d.getDate() + 1);
+            const dayAfter = d.toISOString().slice(0, 10);
+            censusIndex = snaps.findIndex(s => s.date === dayAfter);
+          }
+          // Separately, pull the enrollment number from the day-after
+          // snapshot (preferred) or the census-date snapshot (fallback).
+          // This is independent of where the line is drawn — the number
+          // the pill shows is the census-of-record value.
+          const d2 = new Date(censusDate + 'T00:00:00');
+          d2.setDate(d2.getDate() + 1);
+          const dayAfterIso = d2.toISOString().slice(0, 10);
+          let valueSnap = snaps.find(s => s.date === dayAfterIso);
+          if (!valueSnap) valueSnap = snaps.find(s => s.date === censusDate);
+          if (valueSnap) {
+            censusEnrolled = sum(valueSnap.rows, 'Enrolled Students');
           }
         }
       }
