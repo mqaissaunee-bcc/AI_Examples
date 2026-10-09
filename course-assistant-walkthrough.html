@@ -354,7 +354,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     </div>
     <details class="fix"><summary>Advanced settings (the defaults are fine)</summary><div>
       <div class="form">
-        <div class="field"><label for="c-model">Gemini model name</label><span class="hint">The default always points to Google’s current fast model. Change it only if Google retires that name. See Step 9.</span><input type="text" id="c-model" data-k="model" placeholder="gemini-flash-latest"></div>
+        <div class="field"><label for="c-model">Gemini model name</label><span class="hint">The default always points to Google’s current Flash-Lite model, which answers quickly. If the first model is busy, the Worker retries once with <code>gemini-flash-latest</code>. See Step 9.</span><input type="text" id="c-model" data-k="model" placeholder="gemini-flash-lite-latest"></div>
         <div class="field"><label for="c-rate">Questions allowed per student per minute</label><input type="text" id="c-rate" data-k="rate" placeholder="10" inputmode="numeric"></div>
         <div class="field"><label for="c-sel">Part of the page to read</label><span class="hint">A CSS selector. <code>main</code> works for most pages; use <code>body</code> if your pages have no &lt;main&gt; element.</span><input type="text" id="c-sel" data-k="sel" placeholder="main"></div>
         <div class="field"><label for="c-extraorigins">More sites that may use this Worker (optional)</label><span class="hint">Separate with commas, for example a second course site.</span><input type="text" id="c-extraorigins" data-k="moreOrigins" placeholder="https://othername.github.io"></div>
@@ -389,6 +389,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     <li>Name it <code class="fill" data-f="worker">your-worker-name</code> and select <span class="ui">Deploy</span>.</li>
     <li>Select <span class="ui">Edit code</span>. Delete everything in the editor, then paste the code below. Use the <span class="ui">Copy</span> button so nothing gets missed.</li>
     <li>Select <span class="ui">Deploy</span> in the top right of the editor.</li>
+    <li>Leave the editor (select the Worker’s name in the top left), open the <span class="ui">Domains</span> tab, and make sure the switch next to the <strong>Production</strong> address <code><span class="fill" data-f="worker">name</span>.<i>your-account</i>.workers.dev</code> is turned <strong>on</strong>. Cloudflare sometimes leaves it off for new Workers, and then the address shows “error code: 1042”. The <strong>Preview</strong> switch can stay off.</li>
     <li>Copy your Worker’s address. It appears near the top and looks like <code>https://<span class="fill" data-f="worker">name</span>.<i>your-account</i>.workers.dev</code>. Paste it into the box under the code.</li>
   </ol>
   <div class="code" id="code-worker"><div class="code-bar"><span class="fname">worker.js</span><button type="button" class="cbtn" data-copy="worker">Copy</button><button type="button" class="cbtn" data-dl="worker">Download</button></div><pre tabindex="0" aria-label="Worker code"><code></code></pre></div>
@@ -430,6 +431,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     <li>Text that starts with <code>"status": "ok"</code>: this guide’s code is running.</li>
     <li><code>Hello World!</code>: the template is still there. Redo Step 4.</li>
     <li><code>{"error":"Method not allowed"}</code> or other short text: the Worker runs different, older code. Paste this guide’s code over it, or leave it alone if it already works.</li>
+    <li><code>error code: 1042</code>: the Worker’s public address is switched off, or no Worker has that name. Turn on the <strong>Production</strong> switch on the Worker’s <span class="ui">Domains</span> tab, and check the name.</li>
     <li>A Cloudflare error page, or “site can’t be reached”: the address is wrong, or the Worker isn’t deployed.</li>
   </ul>
   <p>You’ll test a real question in Step 7, from your own course page. The Worker deliberately refuses chat requests from any other site, including this guide.</p></div>
@@ -631,7 +633,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     <h3>Watching usage</h3>
     <p>Cloudflare shows request counts and errors on your Worker’s <span class="ui">Metrics</span> tab, and live error messages under <span class="ui">Logs</span>. Google AI Studio shows how much of your Gemini allowance you’ve used. If you move to Gemini’s paid tier, set a budget alert in Google Cloud Billing so a busy week can’t surprise you.</p>
     <h3>When Google renames models</h3>
-    <p>Google releases new Gemini models often and eventually retires old names. The default <code>gemini-flash-latest</code> is an alias that follows Google’s current fast model, so it rarely needs changing. If the assistant suddenly stops answering and the Worker logs show a “not found” error for the model, open Google’s <a href="https://ai.google.dev/gemini-api/docs/models">models page</a>. Copy a current model name into the <code>MODEL</code> variable in Cloudflare, then deploy.</p>
+    <p>Google releases new Gemini models often and eventually retires old names. The default <code>gemini-flash-lite-latest</code> is an alias that follows Google’s current Flash-Lite model, so it rarely needs changing. Flash-Lite answers in a few seconds, while the larger Flash model can take a minute or more on long pages. If the first model is busy or takes longer than 45 seconds, the Worker retries once with <code>FALLBACK_MODEL</code>. If the assistant suddenly stops answering and the Worker logs show a “not found” error for the model, open Google’s <a href="https://ai.google.dev/gemini-api/docs/models">models page</a>. Copy a current model name into the <code>MODEL</code> variable in Cloudflare, then deploy.</p>
     <h3>Turning it off</h3>
     <p>To pause the assistant, delete the <code>GEMINI_API_KEY</code> secret, or delete the Worker. The button stays on your pages and shows a “couldn’t reach the assistant” message. To remove it completely, delete the <code>&lt;script&gt;</code> line from your pages.</p>
   </div>
@@ -650,11 +652,18 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     <p>Usually the Worker doesn’t recognize your site. The <code>ALLOWED_ORIGINS</code> variable must be just the scheme and host, such as <code class="fill" data-f="origin">https://yourname.github.io</code>. It has no folder and no trailing slash. Fix it in Cloudflare and deploy.</p>
     <p>Also check that the Worker address in <code>assistant.js</code> matches the one Cloudflare shows. If you change it, download the file again from Step 7.</p>
   </div></details>
+  <details class="fix"><summary>The Worker’s address shows “error code: 1042”</summary><div>
+    <p>Cloudflare can’t find a live Worker at that address. Most often the Worker is deployed but its public address is switched off. Open the Worker, go to the <span class="ui">Domains</span> tab, and turn on the switch next to the <strong>Production</strong> <code>workers.dev</code> address. Wait a minute, then try the address again.</p>
+    <p>If the switch is already on, check that the name in the address matches the Worker’s name exactly. A grayed-out <span class="ui">Deploy</span> button in the editor is normal: it means the current code is already deployed.</p>
+  </div></details>
   <details class="fix"><summary>Step 6 says the key wasn’t found</summary><div>
     <p>The secret must be named exactly <code>GEMINI_API_KEY</code> and its type must be <span class="ui">Secret</span>. After adding it, select <span class="ui">Deploy</span>.</p>
   </div></details>
   <details class="fix"><summary>The assistant answers, but ignores the page</summary><div>
     <p>Your pages may not use a <code>&lt;main&gt;</code> element. In Advanced settings, change “Part of the page to read” to <code>body</code>, or to the selector that wraps your content, then download <code>assistant.js</code> again.</p>
+  </div></details>
+  <details class="fix"><summary>“The AI service didn’t answer this time” or slow answers</summary><div>
+    <p>Gemini was overloaded or too slow. Larger models think before answering, and with a long module page that can take over a minute. Set the <code>MODEL</code> variable to <code>gemini-flash-lite-latest</code>, the guide’s default, and deploy. Answers usually come back in seconds. The Worker’s <span class="ui">Logs</span> tab shows the exact error from Google.</p>
   </div></details>
   <details class="fix"><summary>“The assistant is busy right now”</summary><div>
     <p>Either one student hit the per-minute limit, or your Gemini free-tier allowance ran out for now. AI Studio shows which. Free-tier limits reset over time. For a large class, consider the paid tier.</p>
@@ -698,7 +707,8 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
 // Settings live in Cloudflare (Settings, then Variables and Secrets):
 //   GEMINI_API_KEY   secret: your Gemini API key (required)
 //   ALLOWED_ORIGINS  text: sites allowed to use this assistant, comma-separated
-//   MODEL            text: Gemini model name (optional, default gemini-flash-latest)
+//   MODEL            text: Gemini model name (optional, default gemini-flash-lite-latest)
+//   FALLBACK_MODEL   text: model to retry with if the first one fails (optional, default gemini-flash-latest)
 //   PER_MINUTE       text: questions per visitor per minute (optional, default 10)
 %%ENV_DOC%%
 const SYSTEM_PROMPT = `%%SYSTEM%%`;
@@ -748,7 +758,8 @@ export default {
         assistant: "%%COURSE%%",
         keyFound: Boolean(env.GEMINI_API_KEY),
         allowedSites: allowed,
-        model: env.MODEL || "gemini-flash-latest",
+        model: env.MODEL || "gemini-flash-lite-latest",
+        fallbackModel: env.FALLBACK_MODEL || "gemini-flash-latest",
         resources: "%%MODE_LABEL%%",%%HEALTH_EXTRA%%
       }, 200, { "Access-Control-Allow-Origin": "*" });
     }
@@ -780,23 +791,29 @@ export default {
       contents,
     };
 %%RES_TOOLS%%
-    const model = env.MODEL || "gemini-flash-latest";
-    let res;
-    try {
-      res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify(payload),
-      });
-    } catch (e) {
-      console.log("Could not reach Gemini:", e);
-      return reply({ error: "upstream" }, 502, cors);
+    // Ask Gemini. If the first model is overloaded or too slow, try the fallback model once.
+    async function askGemini(model) {
+      try {
+        const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(45000),
+        });
+        if (!r.ok) console.log("Gemini error", model, r.status, (await r.clone().text()).slice(0, 500));
+        return r;
+      } catch (e) {
+        console.log("Gemini did not answer in time or could not be reached:", model, String(e));
+        return null;
+      }
     }
+    const primary = env.MODEL || "gemini-flash-lite-latest";
+    const fallback = env.FALLBACK_MODEL || "gemini-flash-latest";
+    let res = await askGemini(primary);
+    if ((!res || res.status >= 500) && fallback && fallback !== primary) res = await askGemini(fallback);
+    if (!res) return reply({ error: "upstream" }, 502, cors);
     if (res.status === 429) return reply({ error: "rate" }, 429, cors);
-    if (!res.ok) {
-      console.log("Gemini error", res.status, await res.text());
-      return reply({ error: "upstream" }, 502, cors);
-    }
+    if (!res.ok) return reply({ error: "upstream" }, 502, cors);
 
     const data = await res.json();
     const cand = (data.candidates || [])[0] || {};
@@ -1117,6 +1134,7 @@ for name in uploaded:
       body: JSON.stringify({ messages: history.slice(-12), context: readPage() })
     }).then(function (r) {
       if (r.status === 429) throw new Error("rate");
+      if (r.status === 502) throw new Error("upstream");
       if (!r.ok) throw new Error("http");
       return r.json();
     }).then(function (data) {
@@ -1128,6 +1146,8 @@ for name in uploaded:
       dots.remove();
       add("assistant", e.message === "rate"
         ? "The assistant is busy right now. Please try again in a minute."
+        : e.message === "upstream"
+        ? "The AI service didn't answer this time. It may be busy. Please try again in a moment."
         : "Sorry, I couldn't reach the assistant. Check your connection and try again.");
     }).then(function () { setBusy(false); input.focus(); });
   }
@@ -1207,7 +1227,7 @@ for name in uploaded:
   function course() { return cfg.course.trim() || "your course"; }
   function slug() { return (cfg.worker.trim() || (cfg.course.trim() ? cfg.course.trim() + "-assistant" : "course-assistant")).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "course-assistant"; }
   function rate() { var n = parseInt(cfg.rate, 10); return n > 0 && n < 1000 ? n : 10; }
-  function model() { return cfg.model.trim() || "gemini-flash-latest"; }
+  function model() { return cfg.model.trim() || "gemini-flash-lite-latest"; }
   function color() { return cfg.color.trim() || "#14324a"; }
   function sel() { return cfg.sel.trim() || "main"; }
   function cfname() { return cfg.cfname.trim() || "course-resources"; }
@@ -1338,6 +1358,7 @@ for name in uploaded:
       ["GEMINI_API_KEY", "Secret", "Your key from Step 3", "Lets the Worker talk to Gemini. Required."],
       ["ALLOWED_ORIGINS", "Text", o.length ? o.join(",") : "(fill in your site address in Step 2)", "Only these sites may use the assistant. Required."],
       ["MODEL", "Text", model(), "Which Gemini model answers. Optional."],
+      ["FALLBACK_MODEL", "Text", "gemini-flash-latest", "Model to retry with if the first one is busy or slow. Optional."],
       ["PER_MINUTE", "Text", String(rate()), "Questions per visitor per minute. Optional."]
     ];
     if (cfg.mode === "gfs") rows.push(["FILE_SEARCH_STORE", "Text", cfg.store.trim() || "(from the Colab notebook, Step 8B)", "Which File Search store to search. Path B."]);
@@ -1750,7 +1771,8 @@ for name in uploaded:
           "  • Text that starts with \"status\": \"ok\" means this guide's code is running, and this page just can't read it.\n" +
           "  • “Hello World!” means the template is still there. Redo Step 4.\n" +
           "  • {\"error\":\"Method not allowed\"} or other short text means different code. Paste this guide's code over it in Step 4 and deploy, or leave it alone if it already works on your pages.\n" +
-          "  • A Cloudflare error page (for example, error 1042 or “There is nothing here yet”) means the address is wrong or the Worker isn't deployed. Copy the address again from your Worker's page in Cloudflare.";
+          "  • “error code: 1042” means the Worker's public address is switched off. Turn on the Production switch on the Worker's Domains tab. It can also mean no Worker has that name.\n" +
+          "  • Another Cloudflare error page means the address is wrong or the Worker isn't deployed. Copy the address again from your Worker's page in Cloudflare.";
       }, function () {
         out.textContent = "Couldn't reach anything at " + url + ".\n\n✗ Check the address against the one shown on your Worker's page in Cloudflare. It should look like https://name.your-account.workers.dev. If it matches, the Worker may not be deployed: open it in Cloudflare and select Deploy." +
           (location.protocol === "file:" ? "" : "\n\nIf your network blocks workers.dev addresses (some campus networks do), try again on another network.");
