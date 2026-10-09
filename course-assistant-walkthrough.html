@@ -422,10 +422,16 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
   <div class="prose"><p>Check that the Worker is running and can see your key before you touch your pages. This sends no question to Gemini.</p></div>
   <div class="btns">
     <button type="button" class="btn" id="t-health">Check my Worker</button>
-    <a class="btn ghost" id="t-open" href="#test">Open it in a new tab instead</a>
+    <a class="btn ghost" id="t-open" href="#test">Open my Worker in a new tab</a>
   </div>
   <div class="tester-out" id="t-out" role="status" aria-live="polite">Results appear here.</div>
-  <div class="note"><p><span class="lab">What you want to see:</span> <code>"status": "ok"</code>, <code>"keyFound": true</code>, and your site listed under <code>allowedSites</code>. If the button above can’t connect, open the Worker in a new tab instead. You should see the same text in the browser.</p>
+  <div class="note"><p><span class="lab">What you want to see:</span> <code>"status": "ok"</code>, <code>"keyFound": true</code>, and your site listed under <code>allowedSites</code>. If the check can’t tell, open the Worker in a new tab and compare what you see:</p>
+  <ul style="margin:0 0 var(--s2);padding-left:1.2rem">
+    <li>Text that starts with <code>"status": "ok"</code>: this guide’s code is running.</li>
+    <li><code>Hello World!</code>: the template is still there. Redo Step 4.</li>
+    <li><code>{"error":"Method not allowed"}</code> or other short text: the Worker runs different, older code. Paste this guide’s code over it, or leave it alone if it already works.</li>
+    <li>A Cloudflare error page, or “site can’t be reached”: the address is wrong, or the Worker isn’t deployed.</li>
+  </ul>
   <p>You’ll test a real question in Step 7, from your own course page. The Worker deliberately refuses chat requests from any other site, including this guide.</p></div>
   <div class="done-row"><button type="button" class="btn ghost done-btn" data-step="test" aria-pressed="false">Mark step complete</button></div>
 </section>
@@ -1367,8 +1373,8 @@ for name in uploaded:
     else { st.appendChild(el("span", { class: "pill ok" }, "Ready")); st.appendChild(document.createTextNode(" Your code is fully filled in.")); }
 
     var open = $("t-open");
-    if (originOf(cfg.url)) { open.setAttribute("href", cfg.url.trim()); open.setAttribute("target", "_blank"); open.setAttribute("rel", "noopener"); open.textContent = "Open it in a new tab instead (opens a new tab)"; }
-    else { open.setAttribute("href", "#worker"); open.removeAttribute("target"); open.textContent = "Open it in a new tab instead"; }
+    if (originOf(cfg.url)) { open.setAttribute("href", cfg.url.trim()); open.setAttribute("target", "_blank"); open.setAttribute("rel", "noopener"); open.textContent = "Open my Worker in a new tab"; open.setAttribute("aria-label", "Open my Worker in a new tab (opens a new tab)"); }
+    else { open.setAttribute("href", "#worker"); open.removeAttribute("target"); open.textContent = "Open my Worker in a new tab"; open.removeAttribute("aria-label"); }
     renderPack();
   }
 
@@ -1714,10 +1720,16 @@ for name in uploaded:
     var out = $("t-out"), url = cfg.url.trim();
     if (!originOf(url)) { out.textContent = "Paste your Worker’s address into the box in Step 4 first."; return; }
     out.textContent = "Contacting " + url + " …";
-    fetch(url, { method: "GET" }).then(function (r) { return r.json(); }).then(function (d) {
+    var DIFFERENT = "\n\n✗ The Worker at this address is running different code from this guide's (an older or hand-written Worker). It may still work for your pages, but it has no status check. To use this guide's code, go back to Step 4, paste the code over it, and select Deploy. Check that its variable names match Step 5.";
+    fetch(url, { method: "GET" }).then(function (r) { return r.text().then(function (t) { return { status: r.status, text: t }; }); }).then(function (res) {
+      var d = null; try { d = JSON.parse(res.text); } catch (e) {}
+      if (!d) {
+        if (/hello world/i.test(res.text)) { out.textContent = "The Worker answered “" + res.text.trim().slice(0, 60) + "”.\n\n✗ It's still running Cloudflare's Hello World template. Go back to Step 4: select Edit code, replace everything with the code from this guide, and select Deploy."; return; }
+        out.textContent = "The Worker answered (status " + res.status + "):\n" + res.text.trim().slice(0, 300) + DIFFERENT; return;
+      }
+      if (d.status !== "ok") { out.textContent = "The Worker answered (status " + res.status + "):\n" + JSON.stringify(d, null, 2) + DIFFERENT; return; }
       var lines = [JSON.stringify(d, null, 2), ""];
-      if (d.status !== "ok") lines.push("✗ This doesn’t look like the assistant Worker. Did you paste the code and select Deploy?");
-      else {
+      {
         lines.push(d.keyFound ? "✓ API key found." : "✗ No API key. Add the GEMINI_API_KEY secret (Step 5) and deploy.");
         var mine = origins(), list = d.allowedSites || [];
         if (!list.length) lines.push("✗ No allowed sites. Add the ALLOWED_ORIGINS variable (Step 5).");
@@ -1729,7 +1741,20 @@ for name in uploaded:
       }
       out.textContent = lines.join("\n");
     }).catch(function () {
-      out.textContent = "Couldn’t connect. Check the address, or use “Open it in a new tab instead”. If that shows the Worker’s status text, the Worker is fine. If it shows an error page, re-check Step 4.";
+      // The normal check was blocked. Probe again without reading the reply, to tell "nothing there" from "something there that won't talk to this page".
+      fetch(url, { method: "GET", mode: "no-cors" }).then(function () {
+        out.textContent = "Something answered at this address, but not with this guide's status check. Either:\n" +
+          "  • no Worker is deployed at this exact address, so Cloudflare sent an error page, or\n" +
+          "  • the Worker is running different code: Cloudflare's template, or an older Worker you wrote before.\n\n" +
+          "Select “Open my Worker in a new tab” to see which:\n" +
+          "  • Text that starts with \"status\": \"ok\" means this guide's code is running, and this page just can't read it.\n" +
+          "  • “Hello World!” means the template is still there. Redo Step 4.\n" +
+          "  • {\"error\":\"Method not allowed\"} or other short text means different code. Paste this guide's code over it in Step 4 and deploy, or leave it alone if it already works on your pages.\n" +
+          "  • A Cloudflare error page (for example, error 1042 or “There is nothing here yet”) means the address is wrong or the Worker isn't deployed. Copy the address again from your Worker's page in Cloudflare.";
+      }, function () {
+        out.textContent = "Couldn't reach anything at " + url + ".\n\n✗ Check the address against the one shown on your Worker's page in Cloudflare. It should look like https://name.your-account.workers.dev. If it matches, the Worker may not be deployed: open it in Cloudflare and select Deploy." +
+          (location.protocol === "file:" ? "" : "\n\nIf your network blocks workers.dev addresses (some campus networks do), try again on another network.");
+      });
     });
   });
 
