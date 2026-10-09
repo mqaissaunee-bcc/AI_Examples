@@ -29,6 +29,7 @@
   }
 }
 *,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
 html{scroll-behavior:smooth}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
 body{margin:0;background:var(--paper);color:var(--text);font-family:var(--sans);font-size:1.0625rem;line-height:1.6}
@@ -193,6 +194,13 @@ td.pick{background:var(--you-bg)}
 .gauge i{display:block;height:100%;width:0;background:var(--ok);transition:width .2s}
 .gauge.mid i{background:var(--you-line)}.gauge.high i{background:var(--bad)}
 
+/* url importer */
+.importer{border:1.5px solid var(--ink-2);border-radius:var(--radius-m);padding:var(--s4) var(--s5);margin:0 0 var(--s4);background:var(--panel)}
+.docs li label{display:flex;gap:var(--s3);align-items:flex-start;flex:1;min-height:44px;padding-top:.35rem;min-width:0}
+.docs li label input{width:1.1rem;height:1.1rem;margin-top:.2rem;flex:0 0 auto;accent-color:var(--ink-2)}
+.docs li .url{display:block;font-size:.82rem;color:var(--muted);font-family:var(--mono);overflow-wrap:anywhere}
+.docs li.fail{border-color:var(--bad)}
+.docs li.fail small{color:var(--bad);white-space:normal}
 /* tester */
 .tester-out{font-family:var(--mono);font-size:.85rem;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-s);padding:var(--s3);white-space:pre-wrap;overflow-wrap:anywhere;min-height:3rem;margin:0 0 var(--s4)}
 
@@ -464,7 +472,8 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
       <tr><th scope="row">Your files live</th><td data-p="pack">Inside your Worker’s code</td><td data-p="gfs">In Google’s File Search storage, under your API key</td><td data-p="cfs">In a Cloudflare R2 storage bucket</td></tr>
       <tr><th scope="row">Updating</th><td data-p="pack">Rebuild the pack here and paste the Worker code again</td><td data-p="gfs">Run the notebook again with new files</td><td data-p="cfs">Upload or delete files; Cloudflare re-indexes them</td></tr>
       <tr><th scope="row">Cost</th><td data-p="pack">Free tier. Each question uses more of your allowance, because all of the text is sent every time.</td><td data-p="gfs">Indexing is billed per amount of text. Check Google’s current pricing. Storage and searches have generally been free.</td><td data-p="cfs">Free allowance for small courses. R2 may ask for a card on file even when you stay within the free allowance.</td></tr>
-      <tr><th scope="row">Shows sources</th><td data-p="pack">No</td><td data-p="gfs">Yes: file names under each answer</td><td data-p="cfs">Yes: file names under each answer</td></tr>
+      <tr><th scope="row">Web pages (URLs)</th><td data-p="pack">Fetched on this page and added to the pack. Best for a few pages.</td><td data-p="gfs">The notebook fetches them for you. Works with any public site, and suits whole OER courses.</td><td data-p="cfs">Fetched on this page and downloaded as text files, which you upload to Cloudflare. Suits whole OER courses.</td></tr>
+      <tr><th scope="row">Shows sources</th><td data-p="pack">Can link students to the source page when you import by URL</td><td data-p="gfs">Yes: document names under each answer, and links to source pages imported by URL</td><td data-p="cfs">Yes: file names under each answer, and links to source pages imported by URL</td></tr>
     </tbody>
   </table></div>
 
@@ -484,6 +493,31 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
   </div>
 
   <div class="note warn"><p><span class="lab">Only add material you have the right to use this way.</span> Your own notes, syllabi and open (OER) materials are fine. Don’t upload publisher textbooks or vendor courseware unless the license allows it, and never upload student records or grades.</p></div>
+
+  <div class="importer" id="importer">
+    <h3 style="margin-top:0">Have course pages on the web? Import them by address</h3>
+    <div class="prose"><p>If your OER course or notes are published as web pages, list their addresses here. Give the course’s home page and turn on <strong>Follow links</strong>, and the guide finds the other pages in that course for you. It reads each page’s text (scripts, menus and buttons are left out), and you choose what to do with the result for the path you pick below.</p></div>
+    <div class="form">
+      <div class="field"><label for="u-list">Web addresses, one per line</label><span class="hint">For example, your course hub or individual module pages.</span><textarea id="u-list" rows="4" spellcheck="false" placeholder="https://yourname.github.io/biol101/&#10;https://yourname.github.io/biol101/module01.html"></textarea></div>
+      <div class="checks"><label><input type="checkbox" id="u-follow" checked> Follow links to other pages in the same course: same site and same folder or below</label></div>
+      <div class="row two">
+        <div class="field"><label for="u-max">Most pages to fetch</label><input type="text" id="u-max" inputmode="numeric" value="60"></div>
+        <div class="field"><label for="u-skip">Skip pages whose address contains (optional)</label><span class="hint">Comma-separated, for example <code>quiz, answers</code>.</span><input type="text" id="u-skip" spellcheck="false"></div>
+      </div>
+    </div>
+    <div class="btns"><button type="button" class="btn" id="u-go">Fetch pages</button><button type="button" class="btn ghost" id="u-stop" hidden>Stop</button></div>
+    <p class="derived" id="u-status" aria-live="polite"></p>
+    <div id="u-results" hidden>
+      <div class="btns" style="margin-top:0"><button type="button" class="btn ghost" id="u-all">Select all</button><button type="button" class="btn ghost" id="u-none">Select none</button></div>
+      <ul class="docs" id="u-pages"></ul>
+      <p class="derived" id="u-total"></p>
+      <div class="btns">
+        <button type="button" class="btn" id="u-topack">Add selected to the knowledge pack (path A)</button>
+        <button type="button" class="btn ghost" id="u-zip">Download selected as text files (.zip, for path C)</button>
+      </div>
+    </div>
+    <div class="note"><p><span class="lab">If a page won’t fetch,</span> its site doesn’t let other web pages read it. GitHub Pages allows it, but many college and LMS sites don’t. Path B’s notebook fetches pages from Google’s servers instead, so it works with any public site. Pages behind a login (Canvas, Blackboard, Moodle) can’t be fetched by any path; copy their text into the knowledge pack instead.</p></div>
+  </div>
 
   <p class="status-line"><strong>Your Worker currently uses:</strong> <span id="mode-now" class="pill mid">Page text only</span></p>
 
@@ -507,6 +541,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
       <div class="field"><label for="kb-text">Text</label><textarea id="kb-text" rows="6" placeholder="Paste the text of a document here"></textarea></div>
       <div class="btns" style="margin:0"><button type="button" class="btn ghost" id="kb-add">Add to pack</button></div>
     </div>
+    <p class="derived">To add web pages, use <a href="#importer">Import them by address</a> above, then select <span class="ui">Add selected to the knowledge pack</span>. Each page keeps its address, so the assistant can link students to it.</p>
     <h4>In your pack</h4>
     <ul class="docs" id="kb-list"></ul>
     <p id="kb-empty" class="derived">Nothing yet.</p>
@@ -535,6 +570,9 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
       <li>In Cloudflare, add one more <span class="ui">Text</span> variable: <code>FILE_SEARCH_STORE</code>, with your store name as the value.</li>
       <li>Return to <a href="#worker">Step 4</a>, copy the updated Worker code, paste it in, and select <span class="ui">Deploy</span>.</li>
     </ol>
+    <h4>Loading web pages instead of (or as well as) files</h4>
+    <div class="prose"><p>This cell fetches the web addresses you entered in <a href="#importer">Import them by address</a>, using the same <strong>Follow links</strong> and page-limit settings. Each page goes into the store with its address, so answers can link back to it. Run it in a new cell. If you’ve already filled in your store name, it adds to that store. Otherwise it creates a new store and prints its name at the end.</p></div>
+    <div class="code"><div class="code-bar"><span class="fname">Colab cell: fetch web pages into File Search</span><button type="button" class="cbtn" data-copy="colabUrls">Copy</button></div><pre tabindex="0" aria-label="Colab code to fetch web pages"><code id="code-colab-urls"></code></pre></div>
     <h4>Adding more files later</h4>
     <div class="prose"><p>Paste this into a new Colab cell and run it. It adds files to the store you already have, so the Worker needs no changes.</p></div>
     <div class="code"><div class="code-bar"><span class="fname">Colab cell: add files to your existing store</span><button type="button" class="cbtn" data-copy="colab2">Copy</button></div><pre tabindex="0" aria-label="Colab code to add files"><code id="code-colab2"></code></pre></div>
@@ -547,7 +585,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     <ol class="do">
       <li>In the Cloudflare dashboard, open <span class="ui">R2 Object Storage</span>. The first time, Cloudflare asks you to activate R2, which may require a payment method even on the free allowance.</li>
       <li>Select <span class="ui">Create bucket</span> and name it <code class="fill" data-f="bucket">course-resources</code>.</li>
-      <li>Open the bucket, select <span class="ui">Upload</span>, and drag in your PDFs, Word, HTML, Markdown or text files.</li>
+      <li>Open the bucket, select <span class="ui">Upload</span>, and drag in your PDFs, Word, HTML, Markdown or text files. For web pages, use <a href="#importer">Import them by address</a> above, select <span class="ui">Download selected as text files</span>, unzip the download (double-click it), and drag in the .txt files.</li>
     </ol>
     <h4>Part 2: Create the AI Search instance</h4>
     <ol class="do">
@@ -567,7 +605,8 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
       <li>Under <span class="ui">Variables and Secrets</span>, add a <span class="ui">Text</span> variable <code>AI_SEARCH_NAME</code> whose value is <code class="fill" data-f="cfname">course-resources</code>.</li>
       <li>Return to <a href="#worker">Step 4</a>, copy the updated Worker code, paste it in, and select <span class="ui">Deploy</span>.</li>
     </ol>
-    <div class="note"><p><span class="lab">To update your resources,</span> upload or delete files in the bucket. AI Search picks up changes on its next sync, and the instance page has a button to sync now.</p></div>
+    <div class="note"><p><span class="lab">To update your resources,</span> upload or delete files in the bucket. AI Search picks up changes on its next sync, and the instance page has a button to sync now. When your course pages change, fetch them again here and upload the new text files over the old ones.</p></div>
+    <div class="note"><p><span class="lab">Course on your own domain?</span> If your site uses a custom domain that you’ve added to this Cloudflare account, AI Search can crawl it directly. Choose <span class="ui">Website</span> instead of R2 as the data source, and it will re-crawl when the pages change. This doesn’t work for <code>github.io</code> addresses, because Cloudflare only crawls domains in your own account.</p></div>
   </div>
   <div class="done-row"><button type="button" class="btn ghost done-btn" data-step="resources" aria-pressed="false">Mark step complete (or skipped)</button></div>
 </section>
@@ -771,14 +810,16 @@ export default {
 const KNOWLEDGE = `%%KNOWLEDGE%%`;
 </script>
 <script type="text/plain" id="tpl-pack-system">    system += "\n\n=== COURSE REFERENCE MATERIAL (from the instructor) ===\n" + KNOWLEDGE +
-      "\n\nUse this reference material together with the page. If they disagree, say so and suggest checking with the instructor.";
+      "\n\nUse this reference material together with the page. If they disagree, say so and suggest checking with the instructor." +
+      " Some documents start with a line \"Source: <web address>\". When you draw on one of those, give the student that link so they can read more.";
 </script>
 
 <script type="text/plain" id="tpl-gfs-tools">    // Path B: Gemini File Search. Gemini searches your uploaded files while answering.
     if (env.FILE_SEARCH_STORE) {
       payload.tools = [{ fileSearch: { fileSearchStoreNames: [env.FILE_SEARCH_STORE] } }];
       payload.systemInstruction.parts[0].text +=
-        "\n\nYou can search the instructor's course documents. Use them when they help answer the question.";
+        "\n\nYou can search the instructor's course documents. Use them when they help answer the question." +
+        " Some documents start with a line \"Source: <web address>\". When you draw on one of those, give the student that link so they can read more.";
     }
 </script>
 <script type="text/plain" id="tpl-gfs-reply">    // List the documents File Search drew on.
@@ -800,7 +841,8 @@ const KNOWLEDGE = `%%KNOWLEDGE%%`;
         }).join("\n\n");
         if (passages) {
           system += "\n\n=== PASSAGES FROM THE INSTRUCTOR'S COURSE DOCUMENTS ===\n" + passages.slice(0, 20000) +
-            "\n\nUse these passages when they are relevant. Ignore them when they are not.";
+            "\n\nUse these passages when they are relevant. Ignore them when they are not." +
+            " Some passages include a line \"Source: <web address>\". When you draw on one of those, give the student that link so they can read more.";
         }
       } catch (e) {
         console.log("AI Search lookup failed; answering from the page only:", e);
@@ -838,6 +880,88 @@ for name in uploaded:
 
 print("\nAll done. Copy this line into the walkthrough and into Cloudflare as FILE_SEARCH_STORE:")
 print(store.name)
+</script>
+
+<script type="text/plain" id="tpl-colab-urls"># Fetch web pages for %%COURSE%% into Gemini File Search.
+# Select the Run button. Paste your Gemini API key when asked.
+!pip install -q -U google-genai beautifulsoup4
+import os, re, time
+from collections import deque
+from getpass import getpass
+from urllib.parse import urljoin, urldefrag, urlparse
+import requests
+from bs4 import BeautifulSoup
+from google import genai
+
+START_URLS = %%URLS%%
+FOLLOW_LINKS = %%FOLLOW%%   # also fetch linked pages in the same folder or below
+MAX_PAGES = %%MAX%%
+SKIP = %%SKIP%%   # skip addresses containing any of these
+STORE = "%%STORE%%"   # leave empty ("") to create a new store
+
+client = genai.Client(api_key=getpass("Paste your Gemini API key, then press Enter: "))
+if not STORE:
+    STORE = client.file_search_stores.create(config={"display_name": "%%STORE_LABEL%%"}).name
+
+def folder(u):
+    p = urlparse(u)
+    path = p.path if p.path.endswith("/") else p.path.rsplit("/", 1)[0] + "/"
+    return p.scheme + "://" + p.netloc + path
+
+def looks_like_page(u):
+    last = urlparse(u).path.rsplit("/", 1)[-1].lower()
+    return last == "" or "." not in last or last.endswith((".html", ".htm"))
+
+scopes = [folder(u) for u in START_URLS]
+seen, queue, pages = set(), deque(START_URLS), []
+os.makedirs("pages", exist_ok=True)
+
+while queue and len(pages) < MAX_PAGES:
+    url = re.sub(r"/index\.html?$", "/", urldefrag(queue.popleft())[0].split("?")[0], flags=re.I)
+    if url in seen or any(s in url for s in SKIP):
+        continue
+    seen.add(url)
+    try:
+        r = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0 (course assistant indexer)"})
+    except Exception as e:
+        print("Could not fetch:", url, e)
+        continue
+    if r.status_code != 200 or "html" not in r.headers.get("content-type", ""):
+        print("Skipped:", url, "(status", r.status_code, ")")
+        continue
+    r.encoding = r.encoding or "utf-8"
+    soup = BeautifulSoup(r.text, "html.parser")
+    if FOLLOW_LINKS:
+        for a in soup.find_all("a", href=True):
+            link = re.sub(r"/index\.html?$", "/", urldefrag(urljoin(url, a["href"]))[0].split("?")[0], flags=re.I)
+            if link not in seen and looks_like_page(link) and any(link.startswith(s) for s in scopes):
+                queue.append(link)
+    title = (soup.title.get_text(strip=True) if soup.title else "") or url
+    for tag in soup(["script", "style", "noscript", "nav", "footer", "button", "form", "svg", "template"]):
+        tag.decompose()
+    root = soup.find("main") or soup.find("article") or soup.body or soup
+    text = re.sub(r"\n{3,}", "\n\n", root.get_text("\n", strip=True))
+    if len(text) < 200:
+        print("Too little text, skipped:", url)
+        continue
+    name = re.sub(r"[^A-Za-z0-9]+", "-", urlparse(url).netloc + urlparse(url).path).strip("-")[:120] or "page"
+    path = "pages/" + name + ".txt"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(title + "\nSource: " + url + "\n\n" + text)
+    pages.append((path, title))
+    print("Fetched:", title)
+
+print("\nIndexing", len(pages), "pages. This can take a few minutes.")
+for path, title in pages:
+    op = client.file_search_stores.upload_to_file_search_store(
+        file=path, file_search_store_name=STORE, config={"display_name": title})
+    while not op.done:
+        time.sleep(5)
+        op = client.operations.get(op)
+    print("Ready:", title)
+
+print("\nAll done. Your store name (use it for FILE_SEARCH_STORE in Cloudflare):")
+print(STORE)
 </script>
 
 <script type="text/plain" id="tpl-colab2"># Add more files to your existing File Search store.
@@ -1149,7 +1273,32 @@ for name in uploaded:
   function colabCode() { return fill(tpl("tpl-colab"), { COURSE: course().replace(/\n/g, " "), STORE_LABEL: py(course() + " resources") }); }
   function colab2Code() { return fill(tpl("tpl-colab2"), { STORE: py(cfg.store.trim() || "fileSearchStores/PASTE-YOUR-STORE-NAME") }); }
 
-  var GEN = { worker: workerCode, widget: widgetCode, tag: tagCode, colab: colabCode, colab2: colab2Code };
+  /* importer settings (saved separately from cfg) */
+  var imp = Object.assign({ list: "", follow: true, max: "60", skip: "" }, load("imp", {}));
+  function impUrls() {
+    var out = [];
+    String(imp.list || "").split(/[\s,]+/).forEach(function (u) {
+      u = u.trim(); if (!u) return;
+      if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+      try { var h = normUrl(u); if (out.indexOf(h) < 0) out.push(h); } catch (e) {}
+    });
+    return out;
+  }
+  function normUrl(u, base) { var x = new URL(u, base); x.hash = ""; x.search = ""; x.pathname = x.pathname.replace(/\/index\.html?$/i, "/"); return x.href; }
+  function impMax() { var n = parseInt(imp.max, 10); return n > 0 ? Math.min(n, 500) : 60; }
+  function impSkip() { return String(imp.skip || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean); }
+  function pyList(a) { return "[\n" + a.map(function (x) { return '    "' + py(x) + '",'; }).join("\n") + (a.length ? "\n" : "") + "]"; }
+  function colabUrlsCode() {
+    var urls = impUrls();
+    return fill(tpl("tpl-colab-urls"), {
+      COURSE: course().replace(/\n/g, " "), STORE_LABEL: py(course() + " resources"), STORE: py(cfg.store.trim()),
+      URLS: urls.length ? pyList(urls) : '[\n    "https://yourname.github.io/your-course/",   # replace with your course address\n]',
+      FOLLOW: imp.follow ? "True" : "False", MAX: String(impMax()),
+      SKIP: impSkip().length ? "[" + impSkip().map(function (x) { return '"' + py(x) + '"'; }).join(", ") + "]" : "[]"
+    });
+  }
+
+  var GEN = { worker: workerCode, widget: widgetCode, tag: tagCode, colab: colabCode, colab2: colab2Code, colabUrls: colabUrlsCode };
   var FILES = { worker: "worker.js", widget: "assistant.js" };
 
   /* ---------- rendering ---------- */
@@ -1169,6 +1318,7 @@ for name in uploaded:
     $("code-tag").textContent = tagCode();
     $("code-colab").textContent = colabCode();
     $("code-colab2").textContent = colab2Code();
+    $("code-colab-urls").textContent = colabUrlsCode();
 
     var o = origins();
     var od = $("d-origin"); od.textContent = "The Worker will only answer pages from: ";
@@ -1350,6 +1500,7 @@ for name in uploaded:
     pack.forEach(function (d, i) {
       total += d.text.length;
       var li = el("li"), name = el("span", null, d.title);
+      if (d.url) { name = el("span"); name.appendChild(document.createTextNode(d.title)); name.appendChild(el("span", { class: "url" }, d.url)); }
       li.appendChild(name); li.appendChild(el("small", null, d.text.length.toLocaleString() + " characters"));
       var rm = el("button", { type: "button", class: "btn ghost", "aria-label": "Remove " + d.title }, "Remove");
       rm.addEventListener("click", function () { pack.splice(i, 1); savePack(); render(); say(d.title + " removed."); });
@@ -1366,10 +1517,16 @@ for name in uploaded:
     else msg = total.toLocaleString() + " characters, about " + tokens.toLocaleString() + " tokens. Too large for a pack. Use path B or C instead.";
     $("kb-size").textContent = msg;
   }
-  function addDoc(title, text) {
+  function addDoc(title, text, url) {
+    if (url) {
+      text = "Source: " + url + "\n\n" + String(text || "").trim();
+      pack = pack.filter(function (d) { return d.url !== url; });   // re-importing a page replaces it
+    }
     text = String(text || "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
     if (!text) return false;
-    pack.push({ title: (title || "Untitled").trim().slice(0, 120), text: text });
+    var doc = { title: (title || "Untitled").trim().slice(0, 120), text: text };
+    if (url) doc.url = url;
+    pack.push(doc);
     return true;
   }
   function htmlToText(html) {
@@ -1396,6 +1553,160 @@ for name in uploaded:
       r.onerror = function () { if (--left === 0) { savePack(); render(); say("Some files couldn't be read."); } };
       r.readAsText(f);
     });
+  });
+
+  /* ---------- web page importer ---------- */
+  var fetched = [], running = false, stopped = false;
+  ["u-list", "u-max", "u-skip"].forEach(function (id) {
+    var k = { "u-list": "list", "u-max": "max", "u-skip": "skip" }[id];
+    $(id).value = imp[k] || "";
+    $(id).addEventListener("input", function () { imp[k] = $(id).value; store("imp", imp); clearTimeout(timer); timer = setTimeout(render, 200); });
+  });
+  $("u-follow").checked = !!imp.follow;
+  $("u-follow").addEventListener("change", function () { imp.follow = $("u-follow").checked; store("imp", imp); render(); });
+
+  function folderOf(u) { var x = new URL(u); return x.origin + (x.pathname.slice(-1) === "/" ? x.pathname : x.pathname.replace(/[^\/]*$/, "")); }
+  function pageLike(u) {
+    var last = new URL(u).pathname.split("/").pop().toLowerCase();
+    return last === "" || last.indexOf(".") < 0 || /\.html?$/.test(last);
+  }
+  var BLOCKS = "h1,h2,h3,h4,h5,h6,p,li,div,section,article,header,aside,tr,pre,br,dt,dd,blockquote,figcaption,table,ul,ol,details,summary,caption";
+  function extract(html, url) {
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var links = [];
+    doc.querySelectorAll("a[href]").forEach(function (a) {
+      try { var h = normUrl(a.getAttribute("href"), url); if (/^https?:/.test(h)) links.push(h); } catch (e) {}
+    });
+    var title = (doc.querySelector("title") && doc.querySelector("title").textContent.trim()) ||
+      (doc.querySelector("h1") && doc.querySelector("h1").textContent.trim()) || url;
+    doc.querySelectorAll("script,style,noscript,template,nav,footer,button,form,select,input,textarea,svg,canvas,iframe,[hidden],[aria-hidden=\"true\"],.ca-panel,.ca-launch,.skip-link").forEach(function (n) { n.remove(); });
+    var root = doc.querySelector("main") || doc.querySelector("article") || doc.body;
+    if (!root) return { title: title, text: "", links: links };
+    root.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach(function (h) { h.insertBefore(doc.createTextNode("\n## "), h.firstChild); });
+    root.querySelectorAll("li").forEach(function (li) { li.insertBefore(doc.createTextNode("- "), li.firstChild); });
+    root.querySelectorAll("td,th").forEach(function (c) { c.appendChild(doc.createTextNode(" | ")); });
+    root.querySelectorAll(BLOCKS).forEach(function (b) { b.appendChild(doc.createTextNode("\n")); });
+    var text = (root.textContent || "").split("\n").map(function (l) { return l.replace(/[ \t\u00a0]+/g, " ").trim(); })
+      .filter(function (l, i, a) { return l !== "## " && l !== "-" && !(l === "" && a[i - 1] === ""); }).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    return { title: title.replace(/\s+/g, " ").slice(0, 120), text: text, links: links };
+  }
+
+  function paintResults() {
+    var list = $("u-pages"); list.textContent = "";
+    var okCount = 0, sel = 0, chars = 0;
+    fetched.forEach(function (p, i) {
+      var li = el("li", p.ok ? null : { class: "fail" });
+      if (p.ok) {
+        okCount++; if (p.sel) { sel++; chars += p.text.length; }
+        var lab = el("label"), cb = el("input", { type: "checkbox" }); cb.checked = p.sel;
+        cb.addEventListener("change", function () { p.sel = cb.checked; paintResults(); });
+        var t = el("span"); t.appendChild(document.createTextNode(p.title)); t.appendChild(el("span", { class: "url" }, p.url));
+        lab.appendChild(cb); lab.appendChild(t); li.appendChild(lab);
+        li.appendChild(el("small", null, p.text.length.toLocaleString() + " characters"));
+      } else {
+        var t2 = el("span"); t2.appendChild(el("span", { class: "url" }, p.url)); li.appendChild(t2);
+        li.appendChild(el("small", null, p.err));
+      }
+      list.appendChild(li);
+    });
+    $("u-results").hidden = !fetched.length;
+    $("u-total").textContent = sel + " of " + okCount + " fetched pages selected, " + chars.toLocaleString() + " characters (about " + Math.round(chars / 4).toLocaleString() + " tokens)." +
+      (chars > 250000 ? " That’s too much for a knowledge pack. Use path B or C." : chars > 100000 ? " That’s large for a knowledge pack. Path B or C will handle it better." : "");
+    $("u-topack").disabled = !sel; $("u-zip").disabled = !sel;
+  }
+
+  $("u-go").addEventListener("click", function () {
+    var starts = impUrls();
+    if (!starts.length) { $("u-status").textContent = "Enter at least one web address."; $("u-list").focus(); return; }
+    var max = impMax(), skip = impSkip(), follow = imp.follow;
+    var scopes = starts.map(folderOf), seen = {}, queue = starts.slice(), active = 0, okN = 0;
+    fetched = []; running = true; stopped = false;
+    $("u-go").disabled = true; $("u-stop").hidden = false; paintResults();
+    function status(msg) { $("u-status").textContent = msg; }
+    function finish() {
+      running = false; $("u-go").disabled = false; $("u-stop").hidden = true; paintResults();
+      var bad = fetched.filter(function (p) { return !p.ok; }).length;
+      var msg = (stopped ? "Stopped. " : "Done. ") + okN + " page" + (okN === 1 ? "" : "s") + " fetched" + (bad ? ", " + bad + " couldn’t be read" : "") + ".";
+      if (okN >= max && queue.length) msg += " Reached the limit of " + max + " pages; raise “Most pages to fetch” to get more.";
+      status(msg); say(msg);
+    }
+    function next() {
+      if (stopped) { if (!active) finish(); return; }
+      while (active < 3 && queue.length && okN + active < max) {
+        var url = queue.shift();
+        if (seen[url] || skip.some(function (s) { return url.indexOf(s) >= 0; })) continue;
+        seen[url] = true; active++;
+        (function (url) {
+          fetch(url, { credentials: "omit" }).then(function (r) {
+            if (!r.ok) throw new Error("Error " + r.status);
+            var type = r.headers.get("content-type") || "";
+            if (type && type.indexOf("html") < 0) throw new Error("Not a web page");
+            return r.text();
+          }).then(function (html) {
+            var x = extract(html, url);
+            if (follow) x.links.forEach(function (l) {
+              if (!seen[l] && pageLike(l) && scopes.some(function (s) { return l.indexOf(s) === 0; }) && queue.indexOf(l) < 0) queue.push(l);
+            });
+            if (x.text.length < 200) fetched.push({ url: url, ok: false, err: "Too little text to use" });
+            else if (fetched.some(function (p) { return p.ok && p.text === x.text; })) fetched.push({ url: url, ok: false, err: "Same text as another page, skipped" });
+            else { okN++; fetched.push({ url: url, ok: true, title: x.title, text: x.text, sel: true }); }
+          }).catch(function (e) {
+            fetched.push({ url: url, ok: false, err: e && /^Error \d|^Not a/.test(e.message) ? e.message : "Blocked: this site doesn’t allow other pages to read it" });
+          }).then(function () {
+            active--; status("Fetching… " + okN + " page" + (okN === 1 ? "" : "s") + " so far, " + queue.length + " waiting.");
+            if (fetched.length % 5 === 0) paintResults();
+            if (!active && (stopped || !queue.length || okN >= max)) finish(); else next();
+          });
+        })(url);
+      }
+      if (!active) finish();
+    }
+    status("Fetching…"); next();
+  });
+  $("u-stop").addEventListener("click", function () { stopped = true; $("u-status").textContent = "Stopping after the current pages…"; });
+  $("u-all").addEventListener("click", function () { fetched.forEach(function (p) { if (p.ok) p.sel = true; }); paintResults(); });
+  $("u-none").addEventListener("click", function () { fetched.forEach(function (p) { p.sel = false; }); paintResults(); });
+  $("u-topack").addEventListener("click", function () {
+    var n = 0;
+    fetched.forEach(function (p) { if (p.ok && p.sel && addDoc(p.title, p.text, p.url)) n++; });
+    savePack(); render(); selectTab(tabFor("pack"));
+    say(n + " page" + (n === 1 ? "" : "s") + " added to the knowledge pack.");
+    $("u-status").textContent = n + " page" + (n === 1 ? "" : "s") + " added to the knowledge pack. Re-importing a page replaces its old copy. Switch the Worker to the pack in path A if you haven’t yet.";
+  });
+
+  /* minimal .zip writer (stored, no compression) */
+  var CRC = (function () { var t = [], c; for (var n = 0; n < 256; n++) { c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function makeZip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], offset = 0;
+    function u16(v) { return [v & 255, (v >>> 8) & 255]; }
+    function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+    var d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+      var common = [].concat(u16(20), u16(0x0800), u16(0), u16(time), u16(date), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0));
+      var local = new Uint8Array([].concat(u32(0x04034b50), common));
+      parts.push(local, name, data);
+      central.push(new Uint8Array([].concat(u32(0x02014b50), u16(20), common, u16(0), u16(0), u16(0), u32(0), u32(offset))), name);
+      offset += local.length + name.length + data.length;
+    });
+    var cdSize = central.reduce(function (n, p) { return n + p.length; }, 0);
+    var end = new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(cdSize), u32(offset), u16(0)));
+    return new Blob(parts.concat(central, [end]), { type: "application/zip" });
+  }
+  $("u-zip").addEventListener("click", function () {
+    var used = {}, files = [];
+    fetched.forEach(function (p) {
+      if (!p.ok || !p.sel) return;
+      var x = new URL(p.url), base = (x.hostname + x.pathname).replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100) || "page", name = base, i = 2;
+      while (used[name]) name = base + "-" + i++;
+      used[name] = true;
+      files.push({ name: name + ".txt", text: p.title + "\nSource: " + p.url + "\n\n" + p.text + "\n" });
+    });
+    var a = el("a", { href: URL.createObjectURL(makeZip(files)), download: slug() + "-pages.zip" });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+    say(files.length + " text files downloaded as a .zip.");
   });
 
   /* ---------- tester ---------- */
