@@ -251,6 +251,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
         <li><a href="#test">Test the Worker</a></li>
         <li><a href="#widget">Add the button to your pages</a></li>
         <li><a href="#resources">Add your own resources</a></li>
+        <li><a href="#update">Update an assistant you’ve built</a></li>
         <li><a href="#safe">Keep it safe and running</a></li>
         <li><a href="#trouble">Fix common problems</a></li>
         <li><a href="#finish">Final checklist</a></li>
@@ -354,7 +355,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     </div>
     <details class="fix"><summary>Advanced settings (the defaults are fine)</summary><div>
       <div class="form">
-        <div class="field"><label for="c-model">Gemini model name</label><span class="hint">The default always points to Google’s current Flash-Lite model, which answers quickly. If the first model is busy, the Worker retries once with <code>gemini-flash-latest</code>. See Step 9.</span><input type="text" id="c-model" data-k="model" placeholder="gemini-flash-lite-latest"></div>
+        <div class="field"><label for="c-model">Gemini model name</label><span class="hint">The default always points to Google’s current Flash-Lite model, which answers quickly. If the first model is busy, the Worker retries once with <code>gemini-flash-latest</code>. See Step 10.</span><input type="text" id="c-model" data-k="model" placeholder="gemini-flash-lite-latest"></div>
         <div class="field"><label for="c-rate">Questions allowed per student per minute</label><input type="text" id="c-rate" data-k="rate" placeholder="10" inputmode="numeric"></div>
         <div class="field"><label for="c-sel">Part of the page to read</label><span class="hint">A CSS selector. <code>main</code> works for most pages; use <code>body</code> if your pages have no &lt;main&gt; element.</span><input type="text" id="c-sel" data-k="sel" placeholder="main"></div>
         <div class="field"><label for="c-extraorigins">More sites that may use this Worker (optional)</label><span class="hint">Separate with commas, for example a second course site.</span><input type="text" id="c-extraorigins" data-k="moreOrigins" placeholder="https://othername.github.io"></div>
@@ -362,7 +363,12 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     </div></details>
   </div>
   <p class="status-line" id="cfg-status" aria-live="polite"></p>
-  <div class="btns"><button type="button" class="btn ghost" id="cfg-reset">Clear my settings</button></div>
+  <div class="btns">
+    <button type="button" class="btn ghost" id="cfg-save">Save settings to a file</button>
+    <button type="button" class="btn ghost" id="cfg-load-btn">Load settings from a file</button><input type="file" id="cfg-load" accept=".json,application/json" hidden>
+    <button type="button" class="btn ghost" id="cfg-reset">Clear my settings</button>
+  </div>
+  <p class="derived">This page keeps one course at a time. If you run assistants for several courses, or work from more than one computer, save a settings file for each course. It includes your knowledge pack and web addresses, but never your API key. Load it whenever you come back to update that course’s assistant.</p>
   </div>
   <div class="done-row"><button type="button" class="btn ghost done-btn" data-step="settings" aria-pressed="false">Mark step complete</button></div>
 </section>
@@ -619,9 +625,75 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
   <div class="done-row"><button type="button" class="btn ghost done-btn" data-step="resources" aria-pressed="false">Mark step complete (or skipped)</button></div>
 </section>
 
+<!-- ============ UPDATE ============ -->
+<section class="step" id="update">
+  <div class="step-head"><span class="step-no" aria-hidden="true">9</span><h2>Update an assistant you’ve already built<span class="time">5–20 minutes, whenever you add material</span></h2></div>
+  <div class="prose">
+    <p>You can add documents, web pages or facts to a working assistant at any time. Your course pages and <code>assistant.js</code> never change for this. Depending on the path, you either update the Worker’s code or add files to its search index.</p>
+  </div>
+
+  <h3>First: find out what your assistant uses now</h3>
+  <ol class="do">
+    <li>Open your Worker’s address in a browser tab, for example <code>https://<span class="fill" data-f="worker">name</span>.<i>your-account</i>.workers.dev</code>.</li>
+    <li>Find the line that starts with <code>"resources"</code>, then use the matching row below.</li>
+  </ol>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">It says</th><th scope="col">To add knowledge</th><th scope="col">Worker code changes?</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><code>page text only</code></th><td>Pick a path in <a href="#resources">Step 8</a> and follow it. Small facts can go in your ground rules instead (see below).</td><td>Yes, once</td></tr>
+      <tr><th scope="row"><code>knowledge pack (…)</code></th><td>Add documents to the pack, then redeploy. See <strong>Path A</strong> below.</td><td>Yes, every time</td></tr>
+      <tr><th scope="row"><code>Gemini File Search</code></th><td>Run a Colab cell that adds files or pages to your store. See <strong>Path B</strong> below.</td><td>No</td></tr>
+      <tr><th scope="row"><code>Cloudflare AI Search</code></th><td>Upload files to your R2 bucket. See <strong>Path C</strong> below.</td><td>No</td></tr>
+      <tr><th scope="row">No <code>"resources"</code> line, or an error</th><td>Your Worker runs older or hand-written code. See the last part of this step.</td><td>Yes, once</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Before you change the Worker’s code: load that course’s settings</h3>
+  <div class="prose"><p>The Worker code this guide writes includes your course name, ground rules and (for path A) your knowledge pack. Before you copy new code, make sure the settings in <a href="#settings">Step 2</a> are for this course: open this guide in the same browser you used before, or select <span class="ui">Load settings from a file</span>. Otherwise you could overwrite one course’s assistant with another course’s rules.</p></div>
+
+  <h3>Quick facts and policies</h3>
+  <div class="prose"><p>For a few lines, such as office hours, a late-work policy or where assignments are posted, you don’t need documents. Add them to <strong>Anything else it should know or do</strong> in <a href="#settings">Step 2</a>, then copy the Worker code from <a href="#worker">Step 4</a> and deploy.</p></div>
+
+  <h3>Path A: add to the knowledge pack</h3>
+  <ol class="do">
+    <li>Load this course’s settings (above). Your current pack appears in the <a href="#resources">path A tab</a>.</li>
+    <li>Add files or pasted text there, or import web pages with <a href="#importer">Import them by address</a>. Importing a page you already have replaces the old copy. To drop a document, select <span class="ui">Remove</span> next to it.</li>
+    <li>Watch the size meter. If it turns amber or red, switch to path B or C instead.</li>
+    <li>Copy the Worker code from <a href="#worker">Step 4</a>, paste it over the old code, and deploy. Then save a fresh settings file.</li>
+  </ol>
+
+  <h3>Path B: add to Gemini File Search</h3>
+  <ol class="do">
+    <li>Make sure your store name is in the <strong>Your store name</strong> box in the <a href="#resources">path B tab</a>. It’s also the <code>FILE_SEARCH_STORE</code> value in Cloudflare.</li>
+    <li>For files: run the <strong>Add files to your existing store</strong> cell in Colab. For web pages: enter the addresses in <a href="#importer">Import them by address</a> and run the <strong>Fetch web pages into File Search</strong> cell.</li>
+    <li>Both cells replace a document of the same name, so running them again after you edit a file or page refreshes it rather than adding a duplicate. New material is searchable as soon as each item shows “Ready”. You don’t need to change the Worker.</li>
+  </ol>
+  <div class="prose"><p>To see what’s in the store or remove something, run this cell. Put part of a document’s name in <code>REMOVE</code> to delete it, or leave the list empty just to see the list.</p></div>
+  <div class="code"><div class="code-bar"><span class="fname">Colab cell: list or remove documents in your store</span><button type="button" class="cbtn" data-copy="colabManage">Copy</button></div><pre tabindex="0" aria-label="Colab code to manage documents"><code id="code-colab-manage"></code></pre></div>
+
+  <h3>Path C: add to Cloudflare AI Search</h3>
+  <ol class="do">
+    <li>Open your bucket in <span class="ui">R2 Object Storage</span> and upload the new files. For web pages, use <a href="#importer">Import them by address</a>, download the .zip, unzip it, and upload the .txt files. A file with the same name replaces the old one.</li>
+    <li>To remove something, delete its file from the bucket.</li>
+    <li>Open your AI Search instance and select <span class="ui">Sync</span>, or wait for the next automatic sync. You don’t need to change the Worker.</li>
+  </ol>
+
+  <h3>Switching paths</h3>
+  <div class="prose"><p>To move from page-only or a knowledge pack to File Search or AI Search, for example because your material has grown, follow that path in <a href="#resources">Step 8</a> from the start. Then select its <span class="ui">Use … in my Worker</span> button, add its variables in Cloudflare, copy the Worker code, and deploy. Your pages don’t change.</p></div>
+
+  <h3>If your Worker runs older or hand-written code</h3>
+  <ol class="do">
+    <li>In the Worker’s editor, copy the current code into a text file on your computer, so you can go back if needed.</li>
+    <li>Open <span class="ui">Settings</span>, then <span class="ui">Variables and Secrets</span>, and note the variable names. This guide’s code expects <code>GEMINI_API_KEY</code> and <code>ALLOWED_ORIGINS</code>. Add or rename them to match <a href="#secrets">Step 5</a>.</li>
+    <li>Fill in <a href="#settings">Step 2</a> for this course, choose a path in Step 8, then paste the Worker code from <a href="#worker">Step 4</a> and deploy.</li>
+    <li>Check that your pages’ chat button still answers. The guide’s Worker accepts the same requests as earlier versions of the chat button, but re-downloading <code>assistant.js</code> from <a href="#widget">Step 7</a> gets you the latest messages and page-length limit.</li>
+  </ol>
+  <div class="done-row"><button type="button" class="btn ghost done-btn" data-step="update" aria-pressed="false">Mark as read</button></div>
+</section>
+
 <!-- ============ SAFE ============ -->
 <section class="step" id="safe">
-  <div class="step-head"><span class="step-no" aria-hidden="true">9</span><h2>Keep it safe and running<span class="time">5-minute read</span></h2></div>
+  <div class="step-head"><span class="step-no" aria-hidden="true">10</span><h2>Keep it safe and running<span class="time">5-minute read</span></h2></div>
   <div class="prose">
     <p>The Worker you pasted already has these protections built in:</p>
     <ul>
@@ -642,7 +714,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
 
 <!-- ============ TROUBLE ============ -->
 <section class="step" id="trouble">
-  <div class="step-head"><span class="step-no" aria-hidden="true">10</span><h2>Fix common problems</h2></div>
+  <div class="step-head"><span class="step-no" aria-hidden="true">11</span><h2>Fix common problems</h2></div>
   <div class="prose"><p>Most problems show up in two places: the Worker’s <span class="ui">Logs</span> tab in Cloudflare, and the browser’s console on your course page. To open the console, press <kbd>F12</kbd> (on a Mac, <kbd>⌥ Option</kbd>+<kbd>⌘</kbd>+<kbd>J</kbd>) and select <span class="ui">Console</span>.</p></div>
   <details class="fix"><summary>The chat button doesn’t appear</summary><div>
     <p>Check that <code>assistant.js</code> is in the same folder as the page, or that the path has the right number of <code>../</code>. Open <code>https://your-site/assistant.js</code> in a tab: you should see code, not a 404 page.</p>
@@ -669,7 +741,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     <p>Either one student hit the per-minute limit, or your Gemini free-tier allowance ran out for now. AI Studio shows which. Free-tier limits reset over time. For a large class, consider the paid tier.</p>
   </div></details>
   <details class="fix"><summary>The logs show a Gemini error 400 or 404</summary><div>
-    <p>A 404 that mentions the model means the model name has been retired. See “When Google renames models” in Step 9. A 400 that mentions a tool or file search means the model doesn’t support that feature yet; use a model listed on the File Search page.</p>
+    <p>A 404 that mentions the model means the model name has been retired. See “When Google renames models” in Step 10. A 400 that mentions a tool or file search means the model doesn’t support that feature yet; use a model listed on the File Search page.</p>
     <p>A 400 or 403 that mentions the API key means the key is wrong or was deleted. Create a new key and replace the secret.</p>
   </div></details>
   <details class="fix"><summary>AI Search (path C) returns nothing</summary><div>
@@ -680,7 +752,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
 
 <!-- ============ FINISH ============ -->
 <section class="step" id="finish">
-  <div class="step-head"><span class="step-no" aria-hidden="true">11</span><h2>Final checklist</h2></div>
+  <div class="step-head"><span class="step-no" aria-hidden="true">12</span><h2>Final checklist</h2></div>
   <ul class="checklist">
     <li><label><input type="checkbox" data-chk="c1"> The Worker test shows <code>"keyFound": true</code> and my site under <code>allowedSites</code>.</label></li>
     <li><label><input type="checkbox" data-chk="c2"> The button appears on my live pages and answers a page-specific question.</label></li>
@@ -974,8 +1046,17 @@ while queue and len(pages) < MAX_PAGES:
     pages.append((path, title))
     print("Fetched:", title)
 
+try:
+    old = {d.display_name: d.name for d in client.file_search_stores.documents.list(parent=STORE)}
+except Exception as e:
+    print("(Couldn't check for older copies:", e, ")")
+    old = {}
+
 print("\nIndexing", len(pages), "pages. This can take a few minutes.")
 for path, title in pages:
+    if title in old:
+        client.file_search_stores.documents.delete(name=old[title], config={"force": True})
+        print("Replacing older copy of:", title)
     op = client.file_search_stores.upload_to_file_search_store(
         file=path, file_search_store_name=STORE, config={"display_name": title})
     while not op.done:
@@ -985,6 +1066,26 @@ for path, title in pages:
 
 print("\nAll done. Your store name (use it for FILE_SEARCH_STORE in Cloudflare):")
 print(STORE)
+</script>
+
+<script type="text/plain" id="tpl-colab-manage"># List or remove documents in your Gemini File Search store.
+!pip install -q -U google-genai
+from getpass import getpass
+from google import genai
+
+client = genai.Client(api_key=getpass("Paste your Gemini API key, then press Enter: "))
+STORE = "%%STORE%%"
+REMOVE = []   # for example ["Module 03", "old syllabus"]: documents whose name contains any of these are deleted
+
+docs = list(client.file_search_stores.documents.list(parent=STORE))
+print(len(docs), "documents in", STORE)
+for d in sorted(docs, key=lambda d: (d.display_name or "").lower()):
+    print("  -", d.display_name)
+
+for d in docs:
+    if any(r.lower() in (d.display_name or "").lower() for r in REMOVE):
+        client.file_search_stores.documents.delete(name=d.name, config={"force": True})
+        print("Removed:", d.display_name)
 </script>
 
 <script type="text/plain" id="tpl-colab2"># Add more files to your existing File Search store.
@@ -997,8 +1098,19 @@ from google.colab import files
 client = genai.Client(api_key=getpass("Paste your Gemini API key, then press Enter: "))
 STORE = "%%STORE%%"
 
+def existing_docs():
+    try:
+        return {d.display_name: d.name for d in client.file_search_stores.documents.list(parent=STORE)}
+    except Exception as e:
+        print("(Couldn't check for older copies:", e, ")")
+        return {}
+old = existing_docs()
+
 uploaded = files.upload()
 for name in uploaded:
+    if name in old:
+        client.file_search_stores.documents.delete(name=old[name], config={"force": True})
+        print("Replacing older copy of", name)
     op = client.file_search_stores.upload_to_file_search_store(
         file=name, file_search_store_name=STORE, config={"display_name": name})
     while not op.done:
@@ -1324,7 +1436,8 @@ for name in uploaded:
     });
   }
 
-  var GEN = { worker: workerCode, widget: widgetCode, tag: tagCode, colab: colabCode, colab2: colab2Code, colabUrls: colabUrlsCode };
+  function colabManageCode() { return fill(tpl("tpl-colab-manage"), { STORE: py(cfg.store.trim() || "fileSearchStores/PASTE-YOUR-STORE-NAME") }); }
+  var GEN = { worker: workerCode, widget: widgetCode, tag: tagCode, colab: colabCode, colab2: colab2Code, colabUrls: colabUrlsCode, colabManage: colabManageCode };
   var FILES = { worker: "worker.js", widget: "assistant.js" };
 
   /* ---------- rendering ---------- */
@@ -1345,6 +1458,7 @@ for name in uploaded:
     $("code-colab").textContent = colabCode();
     $("code-colab2").textContent = colab2Code();
     $("code-colab-urls").textContent = colabUrlsCode();
+    $("code-colab-manage").textContent = colabManageCode();
 
     var o = origins();
     var od = $("d-origin"); od.textContent = "The Worker will only answer pages from: ";
@@ -1409,6 +1523,32 @@ for name in uploaded:
       store("cfg", cfg);
       clearTimeout(timer); timer = setTimeout(render, 150);
     });
+  });
+  function syncForm() {
+    document.querySelectorAll("[data-k]").forEach(function (inp) { var k = inp.getAttribute("data-k"); if (inp.type === "checkbox") inp.checked = !!cfg[k]; else inp.value = cfg[k] || ""; });
+    $("u-list").value = imp.list || ""; $("u-max").value = imp.max || ""; $("u-skip").value = imp.skip || ""; $("u-follow").checked = !!imp.follow;
+  }
+  $("cfg-save").addEventListener("click", function () {
+    var data = { kind: "course-assistant-settings", version: 1, saved: new Date().toISOString(), settings: cfg, pack: pack, importer: imp };
+    var a = el("a", { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })), download: slug() + "-settings.json" });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+    say("Settings saved as " + slug() + "-settings.json.");
+  });
+  $("cfg-load-btn").addEventListener("click", function () { $("cfg-load").click(); });
+  $("cfg-load").addEventListener("change", function (e) {
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      var d; try { d = JSON.parse(r.result); } catch (x) { d = null; }
+      if (!d || d.kind !== "course-assistant-settings" || !d.settings) { say("That file isn't a settings file from this guide."); $("cfg-status").textContent = "That file isn't a settings file from this guide."; e.target.value = ""; return; }
+      cfg = Object.assign({}, DEF, d.settings); pack = Array.isArray(d.pack) ? d.pack : []; imp = Object.assign({ list: "", follow: true, max: "60", skip: "" }, d.importer || {});
+      store("cfg", cfg); savePack(); store("imp", imp);
+      syncForm(); selectTab(tabFor(cfg.mode) || tabs[0]); render();
+      var msg = "Loaded settings for " + course() + (pack.length ? ", with " + pack.length + " document" + (pack.length === 1 ? "" : "s") + " in the knowledge pack." : ".");
+      say(msg); $("cfg-status").textContent = msg; e.target.value = "";
+    };
+    r.readAsText(f);
   });
   $("cfg-reset").addEventListener("click", function () {
     if (!window.confirm("Clear all of your settings on this page? Your knowledge pack is kept.")) return;
