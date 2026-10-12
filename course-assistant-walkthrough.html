@@ -471,7 +471,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
   <div class="note warn"><p><span class="lab">The button only appears on pages that have the line.</span> If it shows on your home page but nowhere else, the other pages are missing it. Use Part 3 to add it to all of them at once.</p></div>
 
   <h3 id="every-page">Part 3: Add the button to every page at once</h3>
-  <div class="prose"><p>There are two ways, depending on how your site is built. Use one or the other, not both.</p></div>
+  <div class="prose"><p>There are three ways, depending on how your site is built. Use one of A or B, or C on its own. Option C keeps doing it for pages you add later.</p></div>
   <h4>Option A: your pages share a script file</h4>
   <div class="prose"><p>Many course sites load a common file on every page, such as <code>assets/js/site.js</code> or <code>main.js</code>. To check, open a page’s HTML and look near the bottom for a <code>&lt;script src="…"&gt;</code> line that every page has. If you find one, add the code below to the very end of that file. Every page, including ones you add later, then gets the button. It works out where <code>assistant.js</code> is from the shared file’s own location, so it works for pages in subfolders too. If the shared file is in your top folder rather than two folders down, change <code>../../assistant.js</code> to <code>assistant.js</code>.</p></div>
   <div class="code"><div class="code-bar"><span class="fname">add to the end of your shared .js file</span><button type="button" class="cbtn" data-copy="loader">Copy</button></div><pre class="short" tabindex="0" aria-label="Loader code for a shared script"><code id="code-loader"></code></pre></div>
@@ -490,6 +490,18 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     <li>Unzip the download.</li>
     <li>On GitHub, open your repository, select <span class="ui">Add file</span>, then <span class="ui">Upload files</span>. Drag in the contents of the unzipped folder, keeping its folders, and select <span class="ui">Commit changes</span>. Same-named files are replaced.</li>
   </ol>
+  <h4>Option C: let GitHub add it automatically</h4>
+  <div class="prose"><p>If your site is on GitHub, a small <em>GitHub Action</em> can add the line for you. It checks every page each time you add or change an HTML file, and adds the line to any page that doesn’t have it, with the right <code>../</code> for subfolders. New pages get the button without you doing anything. It uses the skip words from Option B, if you set any.</p></div>
+  <ol class="do">
+    <li>In your repository on GitHub, select <span class="ui">Add file</span>, then <span class="ui">Create new file</span>.</li>
+    <li>For the file name, type <code>.github/workflows/add-assistant.yml</code> exactly. GitHub turns each <code>/</code> into a folder as you type.</li>
+    <li>Copy the code below, paste it into the file, and select <span class="ui">Commit changes</span>.</li>
+    <li>To update the pages you already have, open the <span class="ui">Actions</span> tab, select <span class="ui">Add course assistant to pages</span> on the left, then <span class="ui">Run workflow</span>. If GitHub asks you to enable Actions first, allow it.</li>
+    <li>After a minute, the run shows a green check, and a new commit called “Add course assistant to new pages” lists the pages it changed. GitHub Pages then updates the site as usual.</li>
+  </ol>
+  <div class="code"><div class="code-bar"><span class="fname">.github/workflows/add-assistant.yml</span><button type="button" class="cbtn" data-copy="ghaction">Copy</button></div><pre tabindex="0" aria-label="GitHub Action code"><code id="code-ghaction"></code></pre></div>
+  <div class="note"><p><span class="lab">After the action makes a commit,</span> your copy of the files on your computer is one step behind. If you edit pages locally, use <span class="ui">Fetch origin</span> and <span class="ui">Pull</span> in GitHub Desktop before you start, or download the files again. Otherwise your next upload could remove the line, which the action would simply add back.</p>
+  <p>If <code>assistant.js</code> isn’t in your top folder, change the <code>ASSISTANT</code> line near the top of the code, for example to <code>"assets/js/assistant.js"</code>. If the run fails with a permissions error, open <span class="ui">Settings</span>, then <span class="ui">Actions</span>, then <span class="ui">General</span>, and under <span class="ui">Workflow permissions</span> choose <span class="ui">Read and write permissions</span>.</p></div>
   <div class="note warn"><p><span class="lab">Use your latest copies.</span> If your pages on GitHub are newer than the ones on your computer, uploading these would undo those changes. Download your repository first if you’re unsure: on GitHub, select <span class="ui">Code</span>, then <span class="ui">Download ZIP</span>.</p>
   <p><span class="lab">The assistant reads the whole page,</span> including answers hidden behind “Show answer” buttons. On practice pages with built-in solutions, it could repeat them if a student asks. Leave the line off those pages if that matters to you.</p></div>
   <div class="done-row"><button type="button" class="btn ghost done-btn" data-step="widget" aria-pressed="false">Mark step complete</button></div>
@@ -1153,6 +1165,79 @@ for d in docs:
         print("Removed:", d.display_name)
 </script>
 
+<script type="text/plain" id="tpl-ghaction"># Adds the course assistant's chat button to every page in this site.
+# Runs whenever HTML files change, and can be run by hand from the Actions tab.
+name: Add course assistant to pages
+
+on:
+  push:
+    paths: ["**.html", "**.htm"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  add-assistant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add the chat button line to pages that don't have it
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          ASSISTANT = "assistant.js"   # where assistant.js is, from the top of the repository
+          SKIP = %%SKIP%%   # pages whose file name contains any of these are left alone
+          END = "</" + "script>"
+          changed = []
+          for p in sorted(pathlib.Path(".").rglob("*")):
+              if p.suffix.lower() not in (".html", ".htm") or not p.is_file():
+                  continue
+              if any(part.startswith(".") for part in p.parts):
+                  continue
+              if any(w.lower() in p.name.lower() for w in SKIP):
+                  continue
+              with open(p, encoding="utf-8", errors="surrogateescape", newline="") as f:
+                  s = f.read()
+              if "assistant.js" in s:
+                  continue
+              tag = '<script src="' + "../" * (len(p.parts) - 1) + ASSISTANT + '" defer>' + END
+              low = s.lower()
+              i = low.rfind("</body>")
+              if i >= 0:
+                  tail = low[i:]
+                  close = tail.find(END)
+                  if close >= 0 and "<script" not in tail[:close]:
+                      i = -1   # that </body> is inside a script's text
+              if i >= 0:
+                  s = s[:i] + tag + "\n" + s[i:]
+              else:
+                  j = low.rfind("</html>")
+                  if j >= 0 and END not in low[j:]:
+                      s = s[:j] + tag + "\n" + s[j:]
+                  else:
+                      s = s.rstrip("\n") + "\n" + tag + "\n"
+              with open(p, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
+                  f.write(s)
+              changed.append(str(p))
+          if changed:
+              print("Added the chat button line to:")
+              for c in changed:
+                  print("  " + c)
+          else:
+              print("Every page already has the chat button line.")
+          PY
+
+      - name: Save the changes
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Add course assistant to new pages"
+          git push
+</script>
+
 <script type="text/plain" id="tpl-colab2"># Add more files to your existing File Search store.
 !pip install -q -U google-genai
 import time
@@ -1585,7 +1670,11 @@ for name in uploaded:
   function loaderCode() {
     return "/* Course assistant: add the chat button to every page that loads this file */\n(function () {\n  var s = document.createElement(\"script\");\n  s.src = new URL(\"../../assistant.js\", document.currentScript.src).href;\n  s.defer = true;\n  document.body.appendChild(s);\n})();";
   }
-  var GEN = { loader: loaderCode, worker: workerCode, widget: widgetCode, tag: tagCode, colab: colabCode, colab2: colab2Code, colabUrls: colabUrlsCode, colabManage: colabManageCode };
+  function ghActionCode() {
+    var w = ($("b-skip-inclass") && $("b-skip-inclass").checked) ? $("b-skip-words").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean) : [];
+    return fill(tpl("tpl-ghaction"), { SKIP: "[" + w.map(function (x) { return '"' + py(x) + '"'; }).join(", ") + "]" });
+  }
+  var GEN = { ghaction: ghActionCode, loader: loaderCode, worker: workerCode, widget: widgetCode, tag: tagCode, colab: colabCode, colab2: colab2Code, colabUrls: colabUrlsCode, colabManage: colabManageCode };
   var FILES = { worker: "worker.js", widget: "assistant.js" };
 
   /* ---------- rendering ---------- */
@@ -1608,6 +1697,7 @@ for name in uploaded:
     $("code-colab-urls").textContent = colabUrlsCode();
     $("code-colab-manage").textContent = colabManageCode();
     $("code-loader").textContent = loaderCode();
+    $("code-ghaction").textContent = ghActionCode();
 
     var o = origins();
     var od = $("d-origin"); od.textContent = "The Worker will only answer pages from: ";
@@ -2045,6 +2135,7 @@ for name in uploaded:
     return { out: src.replace(/\s*$/, "\n") + tag + "\n", how: "added at the end (the page has no </body>)" };
   }
   function paintBulk() {
+    $("code-ghaction").textContent = ghActionCode();
     var list = $("b-list"); list.textContent = "";
     var words = skipWords(), changed = 0;
     bulk.forEach(function (b) {
