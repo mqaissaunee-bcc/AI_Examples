@@ -467,6 +467,30 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
     <li>Open the live page. Select <span class="ui">Ask the assistant</span> in the bottom-right corner and ask something about the page.</li>
   </ol>
   <div class="note good"><p><span class="lab">It works when</span> the answer mentions details from the page you’re on. Try a page-specific question, such as “Summarize this page in three points.”</p></div>
+  <div class="note warn"><p><span class="lab">The button only appears on pages that have the line.</span> If it shows on your home page but nowhere else, the other pages are missing it. Use Part 3 to add it to all of them at once.</p></div>
+
+  <h3 id="every-page">Part 3: Add the button to every page at once</h3>
+  <div class="prose"><p>There are two ways, depending on how your site is built. Use one or the other, not both.</p></div>
+  <h4>Option A: your pages share a script file</h4>
+  <div class="prose"><p>Many course sites load a common file on every page, such as <code>assets/js/site.js</code> or <code>main.js</code>. To check, open a page’s HTML and look near the bottom for a <code>&lt;script src="…"&gt;</code> line that every page has. If you find one, add the code below to the very end of that file. Every page, including ones you add later, then gets the button. It works out where <code>assistant.js</code> is from the shared file’s own location, so it works for pages in subfolders too. If the shared file is in your top folder rather than two folders down, change <code>../../assistant.js</code> to <code>assistant.js</code>.</p></div>
+  <div class="code"><div class="code-bar"><span class="fname">add to the end of your shared .js file</span><button type="button" class="cbtn" data-copy="loader">Copy</button></div><pre class="short" tabindex="0" aria-label="Loader code for a shared script"><code id="code-loader"></code></pre></div>
+  <h4>Option B: your pages are self-contained</h4>
+  <div class="prose"><p>If each page stands on its own, every page needs the one line. This tool adds it for you. Choose your site’s folder on your computer, the one with <code>index.html</code> and <code>assistant.js</code> in it. The tool adds the line to each page, with the right <code>../</code> for pages in subfolders, and gives you a .zip of the changed pages. Your files are read on this page only; nothing is uploaded.</p></div>
+  <div class="form">
+    <div class="field"><label for="b-folder">Your site’s folder</label><span class="hint">Your browser may ask you to confirm. It reads the HTML files in the folder.</span><input type="file" id="b-folder" webkitdirectory multiple></div>
+    <div class="field"><label for="b-files">Or choose HTML files (pages in the top folder only)</label><input type="file" id="b-files" multiple accept=".html,.htm,text/html"></div>
+    <div class="checks"><label><input type="checkbox" id="b-skip-inclass"> Skip pages whose file name contains a word (for example, pages whose hidden answers you don’t want the assistant to see)</label></div>
+    <div class="field" id="b-skip-wrap" hidden><label for="b-skip-words">Words to skip, comma-separated</label><input type="text" id="b-skip-words" value="inclass" spellcheck="false"></div>
+  </div>
+  <p class="derived" id="b-status" aria-live="polite"></p>
+  <ul class="docs" id="b-list"></ul>
+  <div class="btns"><button type="button" class="btn" id="b-zip" disabled>Download the updated pages (.zip)</button></div>
+  <ol class="do">
+    <li>Unzip the download.</li>
+    <li>On GitHub, open your repository, select <span class="ui">Add file</span>, then <span class="ui">Upload files</span>. Drag in the contents of the unzipped folder, keeping its folders, and select <span class="ui">Commit changes</span>. Same-named files are replaced.</li>
+  </ol>
+  <div class="note warn"><p><span class="lab">Use your latest copies.</span> If your pages on GitHub are newer than the ones on your computer, uploading these would undo those changes. Download your repository first if you’re unsure: on GitHub, select <span class="ui">Code</span>, then <span class="ui">Download ZIP</span>.</p>
+  <p><span class="lab">The assistant reads the whole page,</span> including answers hidden behind “Show answer” buttons. On practice pages with built-in solutions, it could repeat them if a student asks. Leave the line off those pages if that matters to you.</p></div>
   <div class="done-row"><button type="button" class="btn ghost done-btn" data-step="widget" aria-pressed="false">Mark step complete</button></div>
 </section>
 <!-- ============ RESOURCES ============ -->
@@ -719,6 +743,7 @@ footer.foot p{margin:0 0 var(--s2);max-width:80ch}
   <details class="fix"><summary>The chat button doesn’t appear</summary><div>
     <p>Check that <code>assistant.js</code> is in the same folder as the page, or that the path has the right number of <code>../</code>. Open <code>https://your-site/assistant.js</code> in a tab: you should see code, not a 404 page.</p>
     <p>Check that the <code>&lt;script&gt;</code> line is above <code>&lt;/body&gt;</code>, not inside a comment, and that GitHub Pages has finished updating.</p>
+    <p>If it appears on your home page but not on other pages, those pages don’t have the line. See <a href="#every-page">Step 7, Part 3</a> to add it to every page at once.</p>
   </div></details>
   <details class="fix"><summary>“Sorry, I couldn’t reach the assistant”</summary><div>
     <p>Usually the Worker doesn’t recognize your site. The <code>ALLOWED_ORIGINS</code> variable must be just the scheme and host, such as <code class="fill" data-f="origin">https://yourname.github.io</code>. It has no folder and no trailing slash. Fix it in Cloudflare and deploy.</p>
@@ -1264,11 +1289,39 @@ for name in uploaded:
     }).then(function () { setBusy(false); input.focus(); });
   }
 
+  // Keep the button clear of other fixed buttons in the bottom-right corner,
+  // such as a page's own Notes or Help button. The panel opens above the button.
+  function place() {
+    var bottom = 18;
+    launch.style.bottom = bottom + "px";
+    for (var tries = 0; tries < 4; tries++) {
+      var r = launch.getBoundingClientRect(), hit = null;
+      var pts = [[r.left + 4, r.top + 4], [r.right - 4, r.top + 4], [r.left + 4, r.bottom - 4], [r.right - 4, r.bottom - 4], [(r.left + r.right) / 2, (r.top + r.bottom) / 2]];
+      for (var i = 0; i < pts.length && !hit; i++) {
+        var stack = document.elementsFromPoint(pts[i][0], pts[i][1]);
+        for (var j = 0; j < stack.length && !hit; j++) {
+          var n = stack[j];
+          if (n === launch || launch.contains(n) || panel.contains(n)) continue;
+          for (var a = n; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
+            if (getComputedStyle(a).position === "fixed") { hit = a; break; }
+          }
+        }
+      }
+      if (!hit) break;
+      var hr = hit.getBoundingClientRect();
+      if (hr.height > window.innerHeight * 0.5) break;   // ignore full-screen layers
+      bottom = Math.round(window.innerHeight - hr.top + 10);
+      launch.style.bottom = bottom + "px";
+    }
+    panel.style.bottom = (bottom + 60) + "px";
+    panel.style.height = "min(560px, calc(100vh - " + (bottom + 92) + "px))";
+  }
+
   function toggle(state) {
     open = state == null ? !open : state;
     panel.hidden = !open;
     launch.setAttribute("aria-expanded", String(open));
-    if (open) { if (!log.childNodes.length) paint(); setTimeout(function () { input.focus(); }, 30); }
+    if (open) { place(); if (!log.childNodes.length) paint(); setTimeout(function () { input.focus(); }, 30); }
     else launch.focus();
   }
 
@@ -1291,6 +1344,9 @@ for name in uploaded:
     panel.appendChild(head); panel.appendChild(log); panel.appendChild(foot);
     panel.appendChild(el("p", { class: "ca-note" }, CONFIG.note));
     document.body.appendChild(launch); document.body.appendChild(panel);
+    place();
+    setTimeout(place, 1500);   // pages that add their own buttons a moment after loading
+    var rt; window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(place, 200); });
 
     launch.addEventListener("click", function () { toggle(); });
     close.addEventListener("click", function () { toggle(false); });
@@ -1437,7 +1493,10 @@ for name in uploaded:
   }
 
   function colabManageCode() { return fill(tpl("tpl-colab-manage"), { STORE: py(cfg.store.trim() || "fileSearchStores/PASTE-YOUR-STORE-NAME") }); }
-  var GEN = { worker: workerCode, widget: widgetCode, tag: tagCode, colab: colabCode, colab2: colab2Code, colabUrls: colabUrlsCode, colabManage: colabManageCode };
+  function loaderCode() {
+    return "/* Course assistant: add the chat button to every page that loads this file */\n(function () {\n  var s = document.createElement(\"script\");\n  s.src = new URL(\"../../assistant.js\", document.currentScript.src).href;\n  s.defer = true;\n  document.body.appendChild(s);\n})();";
+  }
+  var GEN = { loader: loaderCode, worker: workerCode, widget: widgetCode, tag: tagCode, colab: colabCode, colab2: colab2Code, colabUrls: colabUrlsCode, colabManage: colabManageCode };
   var FILES = { worker: "worker.js", widget: "assistant.js" };
 
   /* ---------- rendering ---------- */
@@ -1459,6 +1518,7 @@ for name in uploaded:
     $("code-colab2").textContent = colab2Code();
     $("code-colab-urls").textContent = colabUrlsCode();
     $("code-colab-manage").textContent = colabManageCode();
+    $("code-loader").textContent = loaderCode();
 
     var o = origins();
     var od = $("d-origin"); od.textContent = "The Worker will only answer pages from: ";
@@ -1874,6 +1934,68 @@ for name in uploaded:
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
     say(files.length + " text files downloaded as a .zip.");
+  });
+
+  /* ---------- add the line to many pages ---------- */
+  var bulk = [];
+  $("b-skip-inclass").addEventListener("change", function () { $("b-skip-wrap").hidden = !this.checked; paintBulk(); });
+  $("b-skip-words").addEventListener("input", function () { paintBulk(); });
+  function skipWords() { return $("b-skip-inclass").checked ? $("b-skip-words").value.split(",").map(function (w) { return w.trim().toLowerCase(); }).filter(Boolean) : []; }
+  function addTag(src, depth) {
+    var tag = '<script src="' + "../".repeat(depth) + 'assistant.js" defer><\/script>';
+    if (/assistant\.js/.test(src)) return { out: null, how: "already has the line" };
+    var low = src.toLowerCase(), i = low.lastIndexOf("</body>");
+    if (i >= 0) {
+      // make sure that </body> isn't inside a script's text
+      var tail = low.slice(i), close = tail.indexOf("<\/script>");
+      if (close >= 0 && tail.slice(0, close).indexOf("<script") < 0) i = -1;
+    }
+    if (i >= 0) return { out: src.slice(0, i) + tag + "\n" + src.slice(i), how: "added above </body>" };
+    var j = low.lastIndexOf("</html>");
+    if (j >= 0 && low.slice(j).indexOf("<\/script>") < 0) return { out: src.slice(0, j) + tag + "\n" + src.slice(j), how: "added above </html>" };
+    return { out: src.replace(/\s*$/, "\n") + tag + "\n", how: "added at the end (the page has no </body>)" };
+  }
+  function paintBulk() {
+    var list = $("b-list"); list.textContent = "";
+    var words = skipWords(), changed = 0;
+    bulk.forEach(function (b) {
+      var name = b.path.split("/").pop().toLowerCase();
+      b.skip = words.some(function (w) { return name.indexOf(w) >= 0; });
+      var li = el("li");
+      var t = el("span"); t.appendChild(document.createTextNode(b.path));
+      li.appendChild(t);
+      li.appendChild(el("small", null, b.skip ? "skipped" : b.res.how));
+      if (b.res.out && !b.skip) changed++;
+      list.appendChild(li);
+    });
+    $("b-zip").disabled = !changed;
+    if (bulk.length) $("b-status").textContent = bulk.length + " page" + (bulk.length === 1 ? "" : "s") + " found. " + changed + " will get the line.";
+  }
+  function readBulk(files, useFolders) {
+    var html = Array.prototype.slice.call(files).filter(function (f) { return /\.html?$/i.test(f.name); });
+    if (!html.length) { $("b-status").textContent = "No .html files found there."; bulk = []; paintBulk(); return; }
+    var left = html.length; bulk = [];
+    $("b-status").textContent = "Reading " + left + " pages…";
+    html.forEach(function (f) {
+      var rel = useFolders && f.webkitRelativePath ? f.webkitRelativePath.split("/").slice(1).join("/") : f.name;
+      var r = new FileReader();
+      r.onload = function () {
+        var depth = rel.split("/").length - 1;
+        bulk.push({ path: rel, res: addTag(String(r.result), depth) });
+        if (--left === 0) { bulk.sort(function (a, b) { return a.path.localeCompare(b.path); }); paintBulk(); say($("b-status").textContent); }
+      };
+      r.onerror = function () { if (--left === 0) paintBulk(); };
+      r.readAsText(f);
+    });
+  }
+  $("b-folder").addEventListener("change", function (e) { readBulk(e.target.files, true); });
+  $("b-files").addEventListener("change", function (e) { readBulk(e.target.files, false); });
+  $("b-zip").addEventListener("click", function () {
+    var files = bulk.filter(function (b) { return b.res.out && !b.skip; }).map(function (b) { return { name: b.path, text: b.res.out }; });
+    var a = el("a", { href: URL.createObjectURL(makeZip(files)), download: slug() + "-pages-with-assistant.zip" });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+    say(files.length + " updated pages downloaded.");
   });
 
   /* ---------- tester ---------- */
