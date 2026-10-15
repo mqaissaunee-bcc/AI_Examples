@@ -96,6 +96,10 @@ a.btn:hover{border-color:var(--accent)}
 .sec-sub{display:block;font-size:.86rem;color:var(--muted);overflow-wrap:anywhere}
 .sec-words{font-size:.86rem;color:var(--muted);white-space:nowrap}
 .sec-btn{font-size:.88rem;padding:.4rem .75rem}
+.removed{border:1px dashed var(--line);border-radius:var(--r-md);padding:.8rem .9rem;margin:0 0 .9rem}
+.removed h3{margin-bottom:.2rem}
+.removed .secs{background:transparent;margin-top:.5rem}
+.removed .sec-title{text-decoration:line-through;color:var(--muted)}
 details.ai{margin-top:1.5rem;border:1px solid var(--line);border-radius:var(--r-md);padding:.4rem 1rem 1rem;background:var(--surface-2)}
 details.ai summary{cursor:pointer;font-weight:600;padding:.6rem 0;min-height:44px;display:flex;align-items:center}
 details.ai p{max-width:68ch}
@@ -215,6 +219,7 @@ html{scroll-behavior:smooth}
       <p class="strip-note" id="strip-note"></p>
 
       <ol class="episodes" id="episode-list"></ol>
+      <div class="removed" id="removed" hidden></div>
 
       <details class="ai" id="ai-box">
         <summary>Refine the plan with an AI chatbot (optional)</summary>
@@ -352,7 +357,7 @@ function plural(n,w){return fmt(n)+' '+w+(n===1?'':'s');}
 
 /* ---------- State ---------- */
 function defaults(){return {
-  sourceName:'',sourceKind:'',blocks:[],level:null,breaks:[],titles:{},meta:{},overrides:{},done:{},nVideos:null,nbLink:'',
+  sourceName:'',sourceKind:'',blocks:[],level:null,breaks:[],titles:{},meta:{},overrides:{},done:{},nVideos:null,nbLink:'',excluded:[],
   settings:{course:'',series:'',seriesAuto:true,audience:'Community college students in an introductory course',
     tone:'Clear, friendly, and precise, like a good instructor',format:'Explainer',style:'Auto-select',extras:'',
     firstIntro:true,recap:true,tease:true,fence:true,terms:true,number:true}
@@ -545,11 +550,12 @@ function buildSections(blocks,level){
   return out;
 }
 var secCache={key:null,val:[]};
-function getSecs(){
+function getAllSecs(){
   var key=state.blocks.length+':'+state.level+':'+state.sourceName;
   if(secCache.key!==key){secCache={key:key,val:state.blocks.length?buildSections(state.blocks,state.level):[]};}
   return secCache.val;
 }
+function getSecs(){var ex=new Set(state.excluded||[]);return getAllSecs().filter(function(s){return !ex.has(s.id);});}
 function headingLevels(){return uniq(state.blocks.filter(function(b){return b.t==='h';}).map(function(b){return b.l;})).map(Number).sort();}
 function pickLevel(blocks){
   var levels=uniq(blocks.filter(function(b){return b.t==='h';}).map(function(b){return b.l;})).map(Number).sort();
@@ -586,8 +592,13 @@ function defaultTitle(e){
   return t[0]+' to '+t[t.length-1];
 }
 function getEpisodes(){
-  var secs=getSecs(),br=new Set(state.breaks),eps=[];
-  secs.forEach(function(s,i){if(i===0||br.has(s.id))eps.push({id:s.id,sections:[]});eps[eps.length-1].sections.push(s);});
+  var br=new Set(state.breaks),ex=new Set(state.excluded||[]),eps=[],pending=false;
+  getAllSecs().forEach(function(s){
+    if(br.has(s.id))pending=true;
+    if(ex.has(s.id))return;
+    if(!eps.length||pending){eps.push({id:s.id,sections:[]});pending=false;}
+    eps[eps.length-1].sections.push(s);
+  });
   eps.forEach(function(e,i){e.n=i+1;e.words=totalWords(e.sections);e.title=(state.titles[e.id]||'').trim()||defaultTitle(e);});
   return eps;
 }
@@ -598,8 +609,9 @@ function videoName(ep,eps){return pad(ep.n,eps.length)+' '+ep.title;}
 function buildPrompt(ep,i,eps){
   var S=state.settings,n=eps.length,L=[],m=state.meta[ep.id]||null;
   var series=S.series.trim()||'this topic';
+  if(S.number)L.push('Video title: "'+videoName(ep,eps)+'". Use this exact title, including the number '+pad(ep.n,n)+' at the start, as the title of this video and on its opening slide.');
   L.push('This is Episode '+(i+1)+' of '+n+' in a video series'+(S.course.trim()?' for '+S.course.trim():'')+' called "'+series+'". Audience: '+stripPunct(S.audience||'general learners')+'.');
-  if(S.number)L.push('Title this video "'+videoName(ep,eps)+'", and show that exact title on the opening slide.');
+
   if(n>1&&i===0&&S.firstIntro)L.push('Open by briefly introducing the series and what it will cover, then begin the lesson.');
   if(i>0&&S.recap)L.push('Start with a one- or two-sentence bridge from Episode '+i+', "'+eps[i-1].title+'", without re-teaching it.');
   var scope=ep.sections.map(function(s){return s.sub.length?s.title+' (including '+s.sub.slice(0,8).join('; ')+')':s.title;}).join('; ');
@@ -651,7 +663,7 @@ function renderPlan(focusSel){
   $('#episode-list').innerHTML=eps.map(function(e,i){
     var c=(i%6)+1;
     return '<li class="ep" id="ep-'+esc(e.id)+'">'+
-      '<div class="ep-head c'+c+'"><span class="ep-num" aria-hidden="true">'+e.n+'</span>'+
+      '<div class="ep-head c'+c+'"><span class="ep-num" aria-hidden="true">'+(state.settings.number?pad(e.n,eps.length):e.n)+'</span>'+
       '<label class="sr-only" for="t-'+esc(e.id)+'">Title for video '+e.n+'</label>'+
       '<input type="text" class="ep-title" id="t-'+esc(e.id)+'" data-ep="'+esc(e.id)+'" value="'+esc(e.title)+'">'+
       '<span class="ep-meta">'+fmt(e.words)+' words in '+plural(e.sections.length,'section')+'</span></div>'+
@@ -662,9 +674,14 @@ function renderPlan(focusSel){
                    :'<button class="sec-btn" data-act="split" data-sec="'+esc(s.id)+'">Start a new video here</button>';
         }
         var sub=s.sub.length?'<span class="sec-sub">'+esc(s.sub.slice(0,6).join('; '))+(s.sub.length>6?'; and '+(s.sub.length-6)+' more':'')+'</span>':'';
-        return '<li class="sec"><div class="sec-main"><span class="sec-title">'+esc(s.title)+'</span>'+sub+'</div><span class="sec-words">'+plural(s.words,'word')+'</span>'+btn+'</li>';
+        var rm=secs.length>1?'<button class="sec-btn quiet" data-act="remove" data-sec="'+esc(s.id)+'" aria-label="Remove section: '+esc(s.title)+'">Remove</button>':'';
+        return '<li class="sec" id="sec-'+esc(s.id)+'"><div class="sec-main"><span class="sec-title">'+esc(s.title)+'</span>'+sub+'</div><span class="sec-words">'+plural(s.words,'word')+'</span>'+btn+rm+'</li>';
       }).join('')+'</ul></li>';
   }).join('');
+  var ex=new Set(state.excluded||[]),removed=getAllSecs().filter(function(s){return ex.has(s.id);});
+  $('#removed').hidden=!removed.length;
+  $('#removed').innerHTML=removed.length?'<h3>Removed sections ('+removed.length+')</h3><p class="hint">These are left out of every video. Restore one to put it back in its original place.</p><ul class="secs">'+
+    removed.map(function(s){return '<li class="sec"><div class="sec-main"><span class="sec-title">'+esc(s.title)+'</span></div><span class="sec-words">'+plural(s.words,'word')+'</span><button class="sec-btn" data-act="restore" data-sec="'+esc(s.id)+'">Restore</button></li>';}).join('')+'</ul>':'';
   if(focusSel){var f=document.querySelector(focusSel);if(f)f.focus();}
 }
 function renderRun(){
@@ -675,7 +692,7 @@ function renderRun(){
     var p=promptFor(e,i,eps),done=!!state.done[e.id];
     var rows=clamp(p.text.split('\n').length+Math.ceil(p.text.length/110),6,18);
     return '<li class="run b'+((i%6)+1)+(done?' done':'')+'" id="run-'+esc(e.id)+'">'+
-      '<div class="run-head"><span class="ep-num c'+((i%6)+1)+'" aria-hidden="true">'+e.n+'</span><h3>Video '+e.n+': '+esc(e.title)+'</h3>'+
+      '<div class="run-head"><span class="ep-num c'+((i%6)+1)+'" aria-hidden="true">'+(S.number?pad(e.n,eps.length):e.n)+'</span><h3>'+(S.number?esc(videoName(e,eps)):'Video '+e.n+': '+esc(e.title))+'</h3>'+
       '<span class="run-settings">'+esc(S.format)+', '+esc(S.style)+' style</span></div>'+
       (S.number?'<p class="vname">Name: <strong>'+esc(videoName(e,eps))+'</strong> <button class="quiet small" data-copyname="'+esc(e.id)+'">Copy name</button></p>':'')+
       '<label class="sr-only" for="p-'+esc(e.id)+'">Prompt for video '+e.n+'</label>'+
@@ -705,7 +722,7 @@ function ingest(res,name,kind){
   var st=$('#source-status');
   if(words<20){setStatus(st,'error','Found almost no readable text in '+name+'. If it\'s a scanned PDF, it has no text layer; copy the text another way and use Paste text.');return;}
   state.blocks=blocks;state.sourceName=name;state.sourceKind=kind;
-  state.level=pickLevel(blocks);state.titles={};state.meta={};state.overrides={};state.done={};
+  state.level=pickLevel(blocks);state.excluded=[];state.titles={};state.meta={};state.overrides={};state.done={};
   secCache.key=null;
   var secs=getSecs();
   if(res.title&&(state.settings.seriesAuto||!state.settings.series.trim())){state.settings.series=res.title;state.settings.seriesAuto=true;$('#set-series').value=res.title;}
@@ -851,7 +868,7 @@ $('#url-input').addEventListener('keydown',function(e){if(e.key==='Enter'){e.pre
 
 // Plan
 $('#level-select').addEventListener('change',function(e){
-  state.level=+e.target.value;secCache.key=null;state.titles={};state.meta={};state.overrides={};state.done={};
+  state.level=+e.target.value;secCache.key=null;state.excluded=[];state.titles={};state.meta={};state.overrides={};state.done={};
   var secs=getSecs();state.nVideos=clamp(state.nVideos||defaultN(secs),1,secs.length);state.breaks=autoSplit(secs,state.nVideos);
   save();renderPlan('#level-select');renderRun();announce('Split into '+plural(getEpisodes().length,'video'));
 });
@@ -862,15 +879,28 @@ function resplit(){
 }
 $('#btn-resplit').addEventListener('click',resplit);
 $('#n-videos').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();resplit();}});
-$('#episode-list').addEventListener('click',function(e){
+function onPlanClick(e){
   var b=e.target.closest('[data-act]');if(!b)return;
-  var id=b.getAttribute('data-sec');
+  var id=b.getAttribute('data-sec'),act=b.getAttribute('data-act');
+  if(act==='remove'||act==='restore'){
+    var vis=getSecs(),idx=vis.findIndex(function(s){return s.id===id;});
+    if(act==='remove'){if(vis.length<2)return;state.excluded=(state.excluded||[]).concat([id]);}
+    else state.excluded=(state.excluded||[]).filter(function(x){return x!==id;});
+    state.nVideos=getEpisodes().length;save();
+    var target='#sec-'+id+' [data-act="remove"]';
+    if(act==='remove'){var nv=getSecs(),nx=nv[Math.min(idx,nv.length-1)];target=nx?'#sec-'+nx.id+' [data-act="remove"]':'#level-select';}
+    renderPlan(target);renderRun();
+    announce(act==='remove'?'Section removed. It is listed under Removed sections.':'Section restored');
+    return;
+  }
   if(b.getAttribute('data-act')==='split'){if(state.breaks.indexOf(id)<0)state.breaks.push(id);}
   else state.breaks=state.breaks.filter(function(x){return x!==id;});
   state.nVideos=getEpisodes().length;save();
   renderPlan('[data-sec="'+id+'"]');renderRun();
   announce(plural(state.nVideos,'video')+' in the series');
-});
+}
+$('#episode-list').addEventListener('click',onPlanClick);
+$('#removed').addEventListener('click',onPlanClick);
 $('#episode-list').addEventListener('input',function(e){
   if(!e.target.classList.contains('ep-title'))return;
   state.titles[e.target.getAttribute('data-ep')]=e.target.value;save();renderRunSoon();
@@ -895,7 +925,7 @@ Object.keys(fields).forEach(function(k){
 });
 Object.keys(checks).forEach(function(k){
   var el=$(checks[k]);el.checked=!!state.settings[k];
-  el.addEventListener('change',function(){state.settings[k]=el.checked;save();renderRun();});
+  el.addEventListener('change',function(){state.settings[k]=el.checked;save();if(k==='number')renderPlan();renderRun();});
 });
 
 // Run sheet
