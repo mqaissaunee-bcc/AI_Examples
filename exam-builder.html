@@ -416,9 +416,11 @@ footer .program{color:var(--cyan);font-weight:600;}
 
   <div class="card">
     <h3>&#9889; Quick Build &mdash; Blueprint</h3>
-    <p class="hint" style="margin-bottom:12px;">Describe the exam by chapter and build every slot at once. Add a chapter per reading, set how many questions and (optionally) which topics, then generate. Fine-tune any slot below afterward.</p>
+    <p class="hint" style="margin-bottom:12px;">Describe the assignment by its sections and build every slot at once. Add a row per reading, set how many questions and (optionally) which topics, then generate. Fine-tune any slot below afterward.</p>
+    <div class="field" style="max-width:260px;margin-bottom:12px;"><label class="lab" for="bpUnitTerm">Group problems by</label>
+      <select id="bpUnitTerm"><option value="Chapter">Chapter</option><option value="Module">Module</option><option value="Unit">Unit</option><option value="Lesson">Lesson</option><option value="Week">Week</option><option value="Section">Section</option><option value="Topic">Topic</option></select></div>
     <div id="bpChapters"></div>
-    <button class="btn btn-ghost" id="bpAddChapter" style="margin:2px 0 14px;">+ Add chapter</button>
+    <button class="btn btn-ghost" id="bpAddChapter" style="margin:2px 0 14px;">+ Add row</button>
 
     <div class="qb-grid">
       <div class="field"><label class="lab" for="bpSubject">Subject</label><select id="bpSubject"></select></div>
@@ -622,8 +624,10 @@ footer .program{color:var(--cyan);font-weight:600;}
 <section class="panel" id="tab-guide" role="tabpanel" aria-labelledby="t-guide">
 <div class="wrap">
   <div class="head"><h2>How This Tool Works</h2><p>A workflow for turning chapter coverage into a verified, traditional exam. <b>Version <span class="app-ver"></span></b> &mdash; the version number also shows in the header and footer, so you can tell when your copy is out of date.</p></div>
-  <div class="card"><h3>&#128221; What&rsquo;s new in v1.0</h3>
+  <div class="card"><h3>&#128221; What&rsquo;s new</h3>
     <ul class="glist">
+      <li><b>v1.1</b> &mdash; choose how problems are grouped (Chapter, Module, Unit, Lesson, Week, Section, or Topic) in the Blueprint; labels and generated question names follow your choice. Added a general Astronomy subject.</li>
+      <li><b>v1.0</b> &mdash; first full release:</li>
       <li><b>Blueprint builder</b> &mdash; describe an exam by chapter (count, difficulty spread, optional topics) and generate every question at once; one-click in-class companion.</li>
       <li><b>Three modes</b> &mdash; Exam, Weekly Homework, and In-class Examples (browser presenter + Canvas-native copy, step-by-step reveal).</li>
       <li><b>A/B versions</b>, <b>CLO outcome tagging</b> with coverage tables, <b>Bloom levels</b>, <b>formula sheet &amp; calculator policy</b>, <b>target audience</b>, and <b>per-figure image styles</b>.</li>
@@ -753,9 +757,11 @@ function typeset(el){
 })();
 
 /* ════════════════ tabs ════════════════ */
-const APP_VERSION='1.0';
+const APP_VERSION='1.1';
 document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.app-ver').forEach(e=>{e.textContent='v'+APP_VERSION;});document.title='Quantitative Exam Builder v'+APP_VERSION+' [Alpha]';});
 const TABS=['config','prompt','review','figures','export','guide'];
+let unitTerm='Chapter';
+function unitPrefix(){return unitTerm==='Chapter'?'Ch.':unitTerm;}
 function switchTab(name){
   TABS.forEach(n=>{
     const tab=$('t-'+n), panel=$('tab-'+n), on=(n===name);
@@ -855,33 +861,37 @@ $('slotList').addEventListener('drop',e=>{
 $('addSlot').addEventListener('click',()=>{slots.push(newSlot());renderSlots();});
 $('addFourEng').addEventListener('click',()=>{
   slots=[
-    newSlot({label:'Ch. 1',subject:'engtech-kinematics',figure:'auto'}),
-    newSlot({label:'Ch. 2',subject:'engtech-kinematics',figure:'image'}),
-    newSlot({label:'Ch. 3',subject:'engtech-kinematics',figure:'image'}),
-    newSlot({label:'Ch. 4',subject:'engtech-kinematics',figure:'auto'}),
+    newSlot({label:unitPrefix()+' 1',subject:'engtech-kinematics',figure:'auto'}),
+    newSlot({label:unitPrefix()+' 2',subject:'engtech-kinematics',figure:'image'}),
+    newSlot({label:unitPrefix()+' 3',subject:'engtech-kinematics',figure:'image'}),
+    newSlot({label:unitPrefix()+' 4',subject:'engtech-kinematics',figure:'auto'}),
   ];
   renderSlots(); toast('Added 4 engineering slots.','success');
 });
 /* Quick Build — Blueprint (bulk, by chapter) */
-let resetBlueprint=null;
+let resetBlueprint=null, syncUnitTerm=null;
 (function(){
   const g=id=>document.getElementById(id);
-  let bp=[{label:'Ch. 1',url:'',count:7,topics:''},{label:'Ch. 2',url:'',count:7,topics:''}];
+  let bp=[{label:unitPrefix()+' 1',url:'',count:7,topics:''},{label:unitPrefix()+' 2',url:'',count:7,topics:''}];
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const DEFPAT=/^(Ch\.|Chapter|Module|Unit|Lesson|Week|Section|Topic)\s*\d+$/i;
   function syncTotal(){g('bpTotal').value=bp.reduce((a,c)=>a+Math.max(0,+c.count||0),0);}
+  function updateTermUI(){if(g('bpAddChapter'))g('bpAddChapter').textContent='+ Add '+unitTerm.toLowerCase();}
   function render(){
     const host=g('bpChapters'); if(!host)return; host.innerHTML='';
     bp.forEach((c,i)=>{
       const row=document.createElement('div'); row.className='bp-row'; row.dataset.idx=i;
-      row.innerHTML='<input class="bp-label" placeholder="Ch. 12" value="'+esc(c.label)+'">'+
+      row.innerHTML='<input class="bp-label" placeholder="'+esc(unitPrefix()+' 12')+'" value="'+esc(c.label)+'">'+
         '<input class="bp-url" placeholder="Reference URL (optional)" value="'+esc(c.url)+'">'+
         '<input class="bp-count" type="number" min="1" max="30" value="'+(c.count||1)+'" title="# questions">'+
         '<input class="bp-topics" placeholder="Topics (optional, comma-separated) — blank = auto-spread" value="'+esc(c.topics)+'">'+
-        '<button class="bp-del" title="Remove chapter" data-del="'+i+'">&times;</button>';
+        '<button class="bp-del" title="Remove row" data-del="'+i+'">&times;</button>';
       host.appendChild(row);
     });
     syncTotal();
   }
+  syncUnitTerm=function(){ if(g('bpUnitTerm'))g('bpUnitTerm').value=unitTerm; bp.forEach((c,i)=>{ if(!c.label||DEFPAT.test(c.label.trim()))c.label=unitPrefix()+' '+(i+1); }); updateTermUI(); render(); };
+  if(g('bpUnitTerm'))g('bpUnitTerm').addEventListener('change',()=>{ unitTerm=g('bpUnitTerm').value; syncUnitTerm(); });
   g('bpChapters').addEventListener('input',e=>{
     const row=e.target.closest('.bp-row'); if(!row)return; const i=+row.dataset.idx; if(!bp[i])return;
     if(e.target.classList.contains('bp-label'))bp[i].label=e.target.value;
@@ -891,10 +901,10 @@ let resetBlueprint=null;
   });
   g('bpChapters').addEventListener('click',e=>{
     const b=e.target.closest('[data-del]'); if(!b)return;
-    if(bp.length<=1){toast('Keep at least one chapter.','error');return;}
+    if(bp.length<=1){toast('Keep at least one row.','error');return;}
     bp.splice(+b.dataset.del,1); render();
   });
-  g('bpAddChapter').addEventListener('click',()=>{bp.push({label:'Ch. '+(bp.length+1),url:'',count:5,topics:''});render();});
+  g('bpAddChapter').addEventListener('click',()=>{bp.push({label:unitPrefix()+' '+(bp.length+1),url:'',count:5,topics:''});render();});
   if(g('bpSubject'))g('bpSubject').innerHTML=subjectOptions('engtech-kinematics');
 
   function spreadDifficulty(total,e,m,h){
@@ -932,7 +942,7 @@ let resetBlueprint=null;
     chapters.forEach((c,ci)=>{
       for(let k=0;k<c.count;k++){
         const topic=c.topics.length?c.topics[k%c.topics.length]:'';
-        out.push(newSlot({label:(c.label||('Ch. '+(ci+1)))+' \u00b7 Q'+(k+1),subject:subj,topic:topic,difficulty:diffs[idx],points:pts[idx],parts:parts,figure:fig,sourceUrl:c.url}));
+        out.push(newSlot({label:(c.label||(unitPrefix()+' '+(ci+1)))+' \u00b7 Q'+(k+1),subject:subj,topic:topic,difficulty:diffs[idx],points:pts[idx],parts:parts,figure:fig,sourceUrl:c.url}));
         idx++;
       }
     });
@@ -949,8 +959,8 @@ let resetBlueprint=null;
     assignMode='inclass';applyMode();switchTab('prompt');
     toast('Switched to In-class — copy the prompt to generate fresh examples on these chapters.','success');
   });
-  render();
-  resetBlueprint=function(){bp=[{label:'Ch. 1',url:'',count:7,topics:''},{label:'Ch. 2',url:'',count:7,topics:''}];render();};
+  render(); updateTermUI();
+  resetBlueprint=function(){bp=[{label:unitPrefix()+' 1',url:'',count:7,topics:''},{label:unitPrefix()+' 2',url:'',count:7,topics:''}];render();};
   document.querySelectorAll('.qb-set').forEach(btn=>btn.addEventListener('click',()=>{
     if(!slots.length){toast('No slots yet — generate or add some first.','error');return;}
     const f=btn.dataset.qbset; let val;
@@ -1152,7 +1162,7 @@ function clearContentOnly(){
   if($('jsonPaste'))$('jsonPaste').value='';
   if($('urlHint'))$('urlHint').style.display='none';
   problems=[]; verified={};
-  slots=[newSlot({label:'Ch. 1'}),newSlot({label:'Ch. 2'})];
+  slots=[newSlot({label:unitPrefix()+' 1'}),newSlot({label:unitPrefix()+' 2'})];
   renderSlots();
   if(resetBlueprint)resetBlueprint();
   renderReview(); refreshExport(); if(typeof renderFigures==='function')renderFigures();
@@ -1175,7 +1185,7 @@ $('resetAll').addEventListener('click',()=>{
   if($('targetLLM'))$('targetLLM').value='claude';
   if($('imgStyle'))$('imgStyle').value=DEFAULT_IMG_STYLE;
   if($('imgStylePreset'))$('imgStylePreset').value='technical';
-  assignMode='exam'; instrTouched=false; applyMode();
+  assignMode='exam'; instrTouched=false; applyMode(); unitTerm='Chapter'; if(syncUnitTerm)syncUnitTerm();
   clearContentOnly();
   toast('Everything reset.','success');
 });
@@ -1912,13 +1922,13 @@ $('expInclassCanvas').addEventListener('click',()=>{
   );
 });
 function buildExamData(){
-  return {assignMode,meta:examMeta(),defaults:{unitSystem:$('unitSystem').value,sigFigs:$('sigFigs').value,defaultTol:$('defaultTol').value,audience:($('audience')?$('audience').value:''),courseOutcomes:($('courseOutcomes')?$('courseOutcomes').value:'')},imgStyle:($('imgStyle')?$('imgStyle').value:''),imgStylePreset:($('imgStylePreset')?$('imgStylePreset').value:''),lessonUrl:$('lessonUrl').value.trim(),slots:slots.map(s=>({label:s.label,subject:s.subject,topic:s.topic,difficulty:s.difficulty,points:s.points,parts:s.parts,figure:s.figure,sourceUrl:s.sourceUrl})),generated:new Date().toISOString(),problems};
+  return {assignMode,meta:examMeta(),defaults:{unitSystem:$('unitSystem').value,sigFigs:$('sigFigs').value,defaultTol:$('defaultTol').value,audience:($('audience')?$('audience').value:''),courseOutcomes:($('courseOutcomes')?$('courseOutcomes').value:''),unitTerm:unitTerm},imgStyle:($('imgStyle')?$('imgStyle').value:''),imgStylePreset:($('imgStylePreset')?$('imgStylePreset').value:''),lessonUrl:$('lessonUrl').value.trim(),slots:slots.map(s=>({label:s.label,subject:s.subject,topic:s.topic,difficulty:s.difficulty,points:s.points,parts:s.parts,figure:s.figure,sourceUrl:s.sourceUrl})),generated:new Date().toISOString(),problems};
 }
 function applyExamData(d,opts){
   opts=opts||{};
   if(d.assignMode){assignMode=(d.assignMode==='hw'||d.assignMode==='inclass')?d.assignMode:'exam';applyMode();}
   if(d.meta){$('courseTitle').value=d.meta.courseTitle||'';$('examTitle').value=d.meta.examTitle||'';$('instructor').value=d.meta.instructor||'';$('timeLimit').value=d.meta.timeLimit||'';$('dueDate').value=d.meta.dueDate||'';$('instructions').value=d.meta.instructions||'';$('honorPledge').value=d.meta.honorPledge||'';if(d.meta.version!=null&&$('versionLabel'))$('versionLabel').value=d.meta.version;if(d.meta.formulaSheet!=null&&$('formulaSheet'))$('formulaSheet').value=d.meta.formulaSheet;if(d.meta.calcPolicy!=null&&$('calcPolicy'))$('calcPolicy').value=d.meta.calcPolicy;instrTouched=true;}
-  if(d.defaults){$('unitSystem').value=d.defaults.unitSystem||'SI';$('sigFigs').value=d.defaults.sigFigs||'3';$('defaultTol').value=d.defaults.defaultTol||'2';if(d.defaults.audience!=null&&$('audience'))$('audience').value=d.defaults.audience;if(d.defaults.courseOutcomes!=null&&$('courseOutcomes'))$('courseOutcomes').value=d.defaults.courseOutcomes;}
+  if(d.defaults){$('unitSystem').value=d.defaults.unitSystem||'SI';$('sigFigs').value=d.defaults.sigFigs||'3';$('defaultTol').value=d.defaults.defaultTol||'2';if(d.defaults.audience!=null&&$('audience'))$('audience').value=d.defaults.audience;if(d.defaults.courseOutcomes!=null&&$('courseOutcomes'))$('courseOutcomes').value=d.defaults.courseOutcomes;if(d.defaults.unitTerm){unitTerm=d.defaults.unitTerm;if(syncUnitTerm)syncUnitTerm();}}
   if(d.lessonUrl!=null)$('lessonUrl').value=d.lessonUrl;
   if(d.imgStyle!=null&&$('imgStyle'))$('imgStyle').value=d.imgStyle;
   if(d.imgStylePreset&&$('imgStylePreset'))$('imgStylePreset').value=d.imgStylePreset;
@@ -1941,13 +1951,13 @@ $('loadExamInput').addEventListener('change',()=>{
 /* ════════════════ course-setup templates ════════════════ */
 const COURSE_FIELDS=['courseTitle','instructor','audience','calcPolicy','formulaSheet','courseOutcomes','honorPledge','instructions'];
 function buildCourseSetup(){
-  const o={type:'exam-builder-course-setup',fields:{},defaults:{unitSystem:$('unitSystem').value,sigFigs:$('sigFigs').value,defaultTol:$('defaultTol').value,targetLLM:$('targetLLM').value},imgStyle:($('imgStyle')?$('imgStyle').value:''),imgStylePreset:($('imgStylePreset')?$('imgStylePreset').value:''),generated:new Date().toISOString()};
+  const o={type:'exam-builder-course-setup',fields:{},defaults:{unitSystem:$('unitSystem').value,sigFigs:$('sigFigs').value,defaultTol:$('defaultTol').value,targetLLM:$('targetLLM').value,unitTerm:unitTerm},imgStyle:($('imgStyle')?$('imgStyle').value:''),imgStylePreset:($('imgStylePreset')?$('imgStylePreset').value:''),generated:new Date().toISOString()};
   COURSE_FIELDS.forEach(id=>{if($(id))o.fields[id]=$(id).value;});
   return o;
 }
 function applyCourseSetup(d){
   if(d.fields)Object.keys(d.fields).forEach(id=>{if($(id))$(id).value=d.fields[id];});
-  if(d.defaults){if(d.defaults.unitSystem)$('unitSystem').value=d.defaults.unitSystem;if(d.defaults.sigFigs)$('sigFigs').value=d.defaults.sigFigs;if(d.defaults.defaultTol)$('defaultTol').value=d.defaults.defaultTol;if(d.defaults.targetLLM&&$('targetLLM'))$('targetLLM').value=d.defaults.targetLLM;}
+  if(d.defaults){if(d.defaults.unitSystem)$('unitSystem').value=d.defaults.unitSystem;if(d.defaults.sigFigs)$('sigFigs').value=d.defaults.sigFigs;if(d.defaults.defaultTol)$('defaultTol').value=d.defaults.defaultTol;if(d.defaults.targetLLM&&$('targetLLM'))$('targetLLM').value=d.defaults.targetLLM;if(d.defaults.unitTerm){unitTerm=d.defaults.unitTerm;if(syncUnitTerm)syncUnitTerm();}}
   if(d.imgStyle!=null&&$('imgStyle'))$('imgStyle').value=d.imgStyle;
   if(d.imgStylePreset&&$('imgStylePreset'))$('imgStylePreset').value=d.imgStylePreset;
   instrTouched=true;
