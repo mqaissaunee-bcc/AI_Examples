@@ -444,6 +444,7 @@ footer .program{color:var(--cyan);font-weight:600;}
         <span><label style="display:inline-flex;gap:6px;align-items:center;"><input type="radio" name="bpPtMode" value="per" checked style="width:auto;min-height:auto;accent-color:var(--cyan);"> Per question</label> <input type="number" id="bpPerPts" value="20" min="1" max="100" style="max-width:80px;"></span>
         <span><label style="display:inline-flex;gap:6px;align-items:center;"><input type="radio" name="bpPtMode" value="total" style="width:auto;min-height:auto;accent-color:var(--cyan);"> Total</label> <input type="number" id="bpTotPts" value="100" min="1" max="1000" style="max-width:90px;"> <select id="bpPtWeight" style="max-width:150px;"><option value="equal">split equally</option><option value="difficulty">weight by difficulty</option></select></span>
       </div>
+      <div class="hint" id="bpPointsNote" style="display:none;margin-top:8px;color:var(--amber);">In-class examples hide points by default. Turn on &ldquo;Show points&rdquo; in Export &rarr; Options if you want them shown.</div>
     </div>
 
     <div class="btnrow" style="margin-top:14px;">
@@ -626,6 +627,8 @@ footer .program{color:var(--cyan);font-weight:600;}
   <div class="head"><h2>How This Tool Works</h2><p>A workflow for turning chapter coverage into a verified, traditional exam. <b>Version <span class="app-ver"></span></b> &mdash; the version number also shows in the header and footer, so you can tell when your copy is out of date.</p></div>
   <div class="card"><h3>&#128221; What&rsquo;s new</h3>
     <ul class="glist">
+      <li><b>v1.1.2</b> &mdash; in In-class Examples mode, a note now explains that points are hidden by default (enable &ldquo;Show points&rdquo; in Export options to include them).</li>
+      <li><b>v1.1.1</b> &mdash; fixed math rendering: \cdotp and a few other non-KaTeX commands now normalize to supported LaTeX so units like N&middot;m&sup2;/kg&sup2; render correctly.</li>
       <li><b>v1.1</b> &mdash; choose how problems are grouped (Chapter, Module, Unit, Lesson, Week, Section, or Topic) in the Blueprint; labels and generated question names follow your choice. Added a general Astronomy subject.</li>
       <li><b>v1.0</b> &mdash; first full release:</li>
       <li><b>Blueprint builder</b> &mdash; describe an exam by chapter (count, difficulty spread, optional topics) and generate every question at once; one-click in-class companion.</li>
@@ -699,8 +702,17 @@ let toastTimer;
 function toast(msg,type){const t=$('toast');t.textContent=msg;t.className='show '+(type==='success'?'ok':type==='error'?'err':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.className='',3200);}
 
 /* render text that may contain $LaTeX$ / $$..$$; escape the prose, keep delimiters for KaTeX */
+/* Normalize LaTeX commands that common LLMs emit but KaTeX/Canvas don't support. */
+function fixMath(s){
+  if(s==null) return s;
+  return String(s)
+    .replace(/\\cdotp(?![a-zA-Z])/g,'\\cdot')   // \cdotp -> \cdot (KaTeX doesn't know \cdotp)
+    .replace(/\\dotsc(?![a-zA-Z])/g,'\\dots')
+    .replace(/\\degree(?![a-zA-Z])/g,'^{\\circ}');
+}
 function renderLatex(s){
   if(!s) return '';
+  s=fixMath(s);
   const plainDollar=/^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|[\d.,]+%?)\$$/;
   return String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g).map(p=>{
     if(p && p[0]==='$' && !p.startsWith('$$') && plainDollar.test(p)) p=p.slice(1,-1);
@@ -719,6 +731,7 @@ function eqImgCanvas(latex,display){
 }
 function renderLatexCanvas(s){
   if(!s) return '';
+  s=fixMath(s);
   const plainDollar=/^\$(\d{1,3}(?:\.\d{1,3}){0,3}(?:\/\d+)?|\/\d+|[\d.,]+%?)\$$/;
   return String(s).split(/(\$\$[\s\S]*?\$\$|\$[^$\n]+?\$)/g).map(p=>{
     if(!p) return '';
@@ -757,7 +770,7 @@ function typeset(el){
 })();
 
 /* ════════════════ tabs ════════════════ */
-const APP_VERSION='1.1';
+const APP_VERSION='1.1.2';
 document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.app-ver').forEach(e=>{e.textContent='v'+APP_VERSION;});document.title='Quantitative Exam Builder v'+APP_VERSION+' [Alpha]';});
 const TABS=['config','prompt','review','figures','export','guide'];
 let unitTerm='Chapter';
@@ -1010,6 +1023,7 @@ function applyMode(){
     : 'One slot per chapter/topic. In <b>exam</b> mode each slot has its own reference URL.';
   $('addFourEng').style.display=hw?'none':'';
   document.querySelectorAll('.slot-url-field').forEach(el=>el.style.display=hw?'none':'');
+  if($('bpPointsNote'))$('bpPointsNote').style.display=ic?'':'none';
   if(!instrTouched){ $('instructions').value = ic ? INCLASS_INSTR : GRADING_INSTR; }
 }
 $('modeExam').addEventListener('click',()=>{assignMode='exam';applyMode();});
@@ -1077,6 +1091,7 @@ function buildPrompt(){
 (calcPolicy?'- Calculator policy: '+calcPolicy+'. Keep the arithmetic and expected tools consistent with this policy.\n':'')+
 (outcomes?'- Align each problem to the course outcomes below and TAG it: set each problem\u2019s "outcome" field to the label/code of the single outcome it best assesses. Spread the problems to cover as many outcomes as the specifications allow. COURSE OUTCOMES:\n'+outcomes+'\n':'')+
 '- TAG each problem with a "bloom" field: one of "Remember", "Understand", "Apply", "Analyze", "Evaluate", or "Create" — the primary cognitive level it demands (most calculation problems are "Apply" or "Analyze").\n'+
+'- Use only standard KaTeX-supported LaTeX: write multiplication dots as \\cdot (NOT \\cdotp), units with \\mathrm{...} or \\text{...}, and degrees as ^{\\circ}. Avoid non-KaTeX commands.\n'+
 (autoTopic?'- For any problem whose type is left for you to choose, read the provided source(s) and select distinct, representative quantitative skills from that material so the problem set spans the lesson/chapter without overlapping — do not repeat the same problem type, and make each problem clearly different from the others.\n':'')+
 '- Unit system: '+(unit==='SI'?'SI':unit==='US'?'US Customary':'specify clearly per problem')+'. Report numeric answers to '+(sig==='any'?'an appropriate number of':sig)+' significant figures.\n'+
 '- Every problem is self-contained: all values needed appear in the stem. State any standard constants used.\n'+
@@ -1251,7 +1266,7 @@ function normFigure(fig){
 }
 function normParts(p){
   if(!Array.isArray(p)||!p.length) return [{letter:'',prompt:'',points:0,answer:'',units:'',verification_expression:''}];
-  return p.map(x=>({letter:(x.letter||'').toString(),prompt:x.prompt||'',points:+x.points||0,answer:x.answer!=null?String(x.answer):'',units:x.units||'',verification_expression:x.verification_expression||x.verificationExpression||''}));
+  return p.map(x=>({letter:(x.letter||'').toString(),prompt:fixMath(x.prompt||''),points:+x.points||0,answer:fixMath(x.answer!=null?String(x.answer):''),units:fixMath(x.units||''),verification_expression:x.verification_expression||x.verificationExpression||''}));
 }
 $('validateBtn').addEventListener('click',()=>{
   const raw=$('jsonPaste').value.trim(); const vm=$('validateMsg');
@@ -1267,11 +1282,11 @@ $('validateBtn').addEventListener('click',()=>{
       subject:q.subject||(slots[i]?slots[i].subject:''),
       difficulty:(q.difficulty||'medium').toLowerCase(),
       points:+q.points||0,
-      stem:q.stem||'',
+      stem:fixMath(q.stem||''),
       figure:normFigure(q.figure),
       parts:normParts(q.parts),
-      worked_solution:q.worked_solution||q.workedSolution||'',
-      steps:Array.isArray(q.steps)?q.steps.map(x=>String(x==null?'':x)).filter(x=>x.trim()):[],
+      worked_solution:fixMath(q.worked_solution||q.workedSolution||''),
+      steps:Array.isArray(q.steps)?q.steps.map(x=>fixMath(String(x==null?'':x))).filter(x=>x.trim()):[],
       outcome:(q.outcome||q.clo||'').toString().trim(),
       bloom:(q.bloom||'').toString().trim(),
       rationale:q.rationale||''
