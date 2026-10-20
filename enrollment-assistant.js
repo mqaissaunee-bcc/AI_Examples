@@ -138,17 +138,29 @@
     });
   }
 
-  // The text of the page the student is reading, sent with each question.
-  function readPage() {
-    if (pageText !== null) return pageText;
+// What the assistant sees with each question. If the page offers its own
+  // summary (window.getAssistantContext), use that; otherwise read the page.
+  // Read fresh every time, because the dashboard changes as the user works.
+  function readPage(question) {
+    if (typeof window.getAssistantContext === "function") {
+      try {
+        var c = window.getAssistantContext(question);
+        if (c) return String(c).slice(0, CONFIG.maxPageChars);
+      } catch (e) { console.warn("Assistant context failed; using page text instead.", e); }
+    }
     var root = document.querySelector(CONFIG.pageSelector) || document.body;
     var copy = root.cloneNode(true);
     copy.querySelectorAll("script,style,noscript,nav,button,.ca-panel,.ca-launch").forEach(function (n) { n.remove(); });
     var heading = document.querySelector("h1");
     var text = (document.title + (heading ? "\n" + heading.textContent : "") + "\n\n" + (copy.innerText || copy.textContent || ""))
       .replace(/\n{3,}/g, "\n\n").trim();
-    pageText = text.slice(0, CONFIG.maxPageChars);
-    return pageText;
+    return text.slice(0, CONFIG.maxPageChars);
+  }
+
+  // The last few questions, so a follow-up like "what about 7B?" keeps its subject.
+  function recentQuestions() {
+    return history.filter(function (m) { return m.role === "user"; }).slice(-3)
+      .map(function (m) { return m.content; }).join("\n");
   }
 
   function save() { try { sessionStorage.setItem(KEY, JSON.stringify(history.slice(-24))); } catch (e) {} }
@@ -185,7 +197,7 @@
     fetch(CONFIG.workerUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: history.slice(-12), context: readPage() })
+      body: JSON.stringify({ messages: history.slice(-12), context: readPage(recentQuestions()) })
     }).then(function (r) {
       if (r.status === 429) throw new Error("rate");
       if (r.status === 502) return r.json().catch(function () { return {}; }).then(function (d) { throw new Error(d && d.error === "setup" ? "setup" : "upstream"); });
