@@ -6877,6 +6877,130 @@
   state.snapshots = [];
   state.currentSnapshotId = null;
   loadFromManifest();
+/* =========================================================================
+   * ASSISTANT CONTEXT
+   * Gives the chat assistant a compact summary of the loaded data for every
+   * part of term, whatever the screen shows. enrollment-assistant.js calls
+   * window.getAssistantContext(recentQuestions) before each question.
+   * ========================================================================= */
+  window.getAssistantContext = function (question) {
+    const q = String(question || '');
+    const BUDGET = 22000;
+    if (state.loadStatus !== 'loaded' || !state.snapshots.length) {
+      return 'ENROLLMENT DATA: not loaded yet. Tell the user to wait for the dashboard to finish loading, or to select Refresh.';
+    }
+
+    // Term label from the data folder, e.g. data/26FA/ -> Fall 2026
+    const tm = DATA_PATH.match(/(\d{2})(FA|SP|SU|WI)/i);
+    const season = tm ? { FA: 'Fall', SP: 'Spring', SU: 'Summer', WI: 'Winter' }[tm[2].toUpperCase()] : '';
+    const termLabel = tm ? `${season} 20${tm[1]} (${tm[0].toUpperCase()})` : 'the current term';
+
+    const pct = (a, b) => (b ? Math.round((1000 * a) / b) / 10 + '%' : 'n/a');
+    const open = r => Math.max(0, r['Avail Seats'] || 0);
+    function totals(rows) {
+      const t = { sections: rows.length, cap: 0, enr: 0, open: 0, wl: 0, sch: 0 };
+      rows.forEach(r => {
+        t.cap += r.Capacity; t.enr += r['Enrolled Students']; t.open += open(r);
+        t.wl += r['Wait List']; t.sch += r['Total Student Credit Hours'];
+      });
+      return t;
+    }
+
+    // Newest snapshot for each part of term
+    const latest = {};
+    state.snapshots.forEach(s => {
+      const pot = s.part_of_term || '15W';
+      if (!latest[pot] || s.date >= latest[pot].date) latest[pot] = s;
+    });
+    const pots = POT_ORDER.filter(p => latest[p]);
+
+    // Header: term, what's on screen, and a summary of every part of term
+    const lines = [
+      'ENROLLMENT DATA (from the dashboard\'s loaded data for all disciplines, not just what is on screen)',
+      `Term: ${termLabel}. Data updated: ${state.manifestUpdatedAt || 'unknown'}.`,
+      `The user is viewing: ${partOfTermLabel(state.activePartOfTerm)}. Disciplines selected on screen: ${state.selectedDisciplines.size ? [...state.selectedDisciplines].join(', ') : 'none'}.`,
+      'Open seats = Avail Seats from the college report. Fill = enrolled / capacity. FTE = student credit hours / 30. Special projects (-295) and internships (-299) are excluded.',
+      '',
+      'SUMMARY BY PART OF TERM (newest snapshot of each):',
+    ];
+    let collegeSch = 0;
+    pots.forEach(p => {
+      const t = totals(latest[p].rows);
+      collegeSch += t.sch;
+      const census = state.census && state.census[p] ? `, census date ${state.census[p]}` : '';
+      lines.push(`- ${partOfTermLabel(p)} (snapshot ${latest[p].date}${census}): ${t.sections} sections, ${t.enr}/${t.cap} enrolled (${pct(t.enr, t.cap)} fill), ${t.open} open seats, waitlist ${t.wl}, SCH ${t.sch}, FTE ${(t.sch / 30).toFixed(1)}`);
+    });
+    const goal = state.goals && state.goals.fte;
+    lines.push(`College FTE (all parts of term): ${(collegeSch / 30).toFixed(1)}${goal ? ` against a goal of ${goal}` : ''}.`);
+    const header = lines.join('\n');
+
+    // Which parts of term the question is about (else the one on screen)
+    const potPatterns = [
+      ['15W', /\b15[\s-]?(w|wk|week)\b|full[\s-]semester/i],
+      ['11W', /\b11[\s-]?(w|wk|week)\b|late[\s-]start/i],
+      ['7A', /\b7[\s-]?a\b|first\s+(half|7)/i],
+      ['7B', /\b7[\s-]?b\b|second\s+(half|7)/i],
+      ['SU1', /\bsu[\s-]?1\b|summer\s+(1|i)\b/i],
+      ['SU2', /\bsu[\s-]?2\b|summer\s+(2|ii)\b/i],
+      ['SU3', /\bsu[\s-]?3\b|summer\s+(3|iii)\b/i],
+    ];
+    let focus = /\b(all|every|each)\b.*\b(parts? of term|sessions?)\b/i.test(q)
+      ? pots.slice()
+      : potPatterns.filter(([p, re]) => latest[p] && re.test(q)).map(([p]) => p);
+    if (!focus.length) focus = [latest[state.activePartOfTerm] ? state.activePartOfTerm : pots[0]];
+
+    // Courses (NETW 110, NETW-110) and discipline prefixes (NETW) named in the question
+    const prefixes = new Set();
+    Object.values(state.instituteIndex).forEach(list => list.forEach(p => prefixes.add(p)));
+    const courseHits = new Set(), prefixHits = new Set();
+    (q.match(/\b[A-Za-z]{2,5}[\s-]?\d{3}[A-Za-z]*\b/g) || []).forEach(tok => {
+      const mm = tok.match(/^([A-Za-z]{2,5})[\s-]?(\d{3}[A-Za-z]*)$/);
+      if (mm && prefixes.has(mm[1].toUpperCase())) courseHits.add(mm[1].toUpperCase() + '-' + mm[2].toUpperCase());
+    });
+    prefixes.forEach(p => { if (new RegExp('\\b' + p + '\\b').test(q)) prefixHits.add(p); });
+    const filtered = courseHits.size > 0 || prefixHits.size > 0;
+    const matches = r => prefixHits.has(r._prefix) ||
+      [...courseHits].some(c => String(r.Course).toUpperCase().startsWith(c));
+
+    const secLine = r => `${r.Section} | ${r['Course Title'] || ''} | ${r['Enrolled Students']}/${r.Capacity} enrolled | ${open(r)} open | waitlist ${r['Wait List']} | ${r['Meeting Days'] || '-'} ${r['Section Start Time'] || ''} | ${r.Location || '-'} | ${r.Instructor || 'TBA'}`;
+
+    function block(pot, level) {
+      let rows = latest[pot].rows;
+      if (filtered) rows = rows.filter(matches);
+      const head = `\n${partOfTermLabel(pot).toUpperCase()} (snapshot ${latest[pot].date})` +
+        (filtered ? ', only the courses or disciplines asked about' : ', all disciplines') +
+        `: ${rows.length} sections, listed by ${level}`;
+      if (!rows.length) return head + '\n(no matching sections)';
+      if (level === 'section') {
+        return head + '\n' + rows.slice().sort((a, b) => String(a.Section).localeCompare(String(b.Section))).map(secLine).join('\n');
+      }
+      const key = level === 'course' ? r => r.Course : r => r._prefix;
+      const groups = new Map();
+      rows.forEach(r => { const k = key(r); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
+      return head + '\n' + [...groups.keys()].sort().map(k => {
+        const g = groups.get(k), t = totals(g);
+        const name = level === 'course' ? `${k} ${g[0]['Course Title'] || ''}` : k;
+        return `${name}: ${t.sections} sections (${g.filter(r => open(r) > 0).length} with open seats), ${t.enr}/${t.cap} enrolled (${pct(t.enr, t.cap)}), ${t.open} open seats, waitlist ${t.wl}`;
+      }).join('\n');
+    }
+
+    // Finest level of detail that fits: sections, then courses, then disciplines
+    const levels = filtered ? ['section'] : ['section', 'course', 'discipline'];
+    let detail = '', used = '';
+    for (const lv of levels) {
+      detail = focus.map(p => block(p, lv)).join('\n');
+      used = lv;
+      if (header.length + detail.length <= BUDGET) break;
+    }
+    let note = '';
+    if (header.length + detail.length > BUDGET) {
+      detail = detail.slice(0, BUDGET - header.length - 300);
+      note = '\n[List cut off for length. Ask the user to name a discipline prefix or course, such as NETW or NETW-110.]';
+    } else if (used !== 'section') {
+      note = `\n[Listed by ${used} because the full section list is too long. For specific sections, ask the user to name a discipline prefix or course, such as NETW or NETW-110.]`;
+    }
+    return header + '\n' + detail + note;
+  };
 })();
 </script>
   <script src="enrollment-assistant.js" defer></script>
