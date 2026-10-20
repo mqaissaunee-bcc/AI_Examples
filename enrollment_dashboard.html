@@ -6984,17 +6984,64 @@
       }).join('\n');
     }
 
+    // History: questions about earlier snapshots, trends or peaks get a
+    // snapshot-by-snapshot series plus the sections with the largest waitlists.
+    const historyMode = /\b(snapshots?|histor(y|ical)|trends?|over time|over the (term|semester)|earlier|previous|past|peak|week[\s-]by[\s-]week|week[\s-]to[\s-]week|since|grew|growth|changed?)\b/i.test(q);
+    let history = '';
+    if (historyMode) {
+      const HIST_BUDGET = 12000;
+      history = focus.map(pot => {
+        const snaps = state.snapshots.filter(s => (s.part_of_term || '15W') === pot)
+          .slice().sort((a, b) => a.date.localeCompare(b.date));
+        const series = snaps.map(s => {
+          const rows = filtered ? s.rows.filter(matches) : s.rows;
+          const t = totals(rows);
+          return {
+            date: s.date, t,
+            withWl: rows.filter(r => r['Wait List'] > 0).length,
+            full: rows.filter(r => r.Capacity > 0 && open(r) === 0).length,
+          };
+        });
+        const fmt = x => `${x.date}: ${x.t.sections} sec, ${x.t.enr}/${x.t.cap} enrolled (${pct(x.t.enr, x.t.cap)}), ${x.t.open} open, waitlist ${x.t.wl} in ${x.withWl} sec, ${x.full} full`;
+        let list = series, thinned = false;
+        if (series.map(fmt).join('\n').length > HIST_BUDGET / focus.length - 2500) {
+          // Too many snapshots: keep about 40 evenly spaced, plus the 10 with the largest waitlists
+          const step = Math.ceil(series.length / 40);
+          const top = new Set(series.slice().sort((a, b) => b.t.wl - a.t.wl).slice(0, 10));
+          list = series.filter((x, i) => i % step === 0 || i === series.length - 1 || top.has(x));
+          thinned = true;
+        }
+        // Each section's largest waitlist in any snapshot
+        const peak = new Map();
+        snaps.forEach(s => (filtered ? s.rows.filter(matches) : s.rows).forEach(r => {
+          const cur = peak.get(r.Section);
+          if (r['Wait List'] > 0 && (!cur || r['Wait List'] > cur.wl)) {
+            peak.set(r.Section, { wl: r['Wait List'], date: s.date, title: r['Course Title'] || '' });
+          }
+        }));
+        const latestWl = new Map(latest[pot].rows.map(r => [r.Section, r['Wait List']]));
+        const peaks = [...peak.entries()].sort((a, b) => b[1].wl - a[1].wl).slice(0, 15)
+          .map(([sec, v]) => `${sec} | ${v.title} | peak waitlist ${v.wl} on ${v.date} | waitlist now ${latestWl.has(sec) ? latestWl.get(sec) : 'section not in newest snapshot'}`);
+        return `\n${partOfTermLabel(pot).toUpperCase()} HISTORY` +
+          (filtered ? ', only the courses or disciplines asked about' : ', all disciplines') +
+          ` (${snaps.length} snapshots, oldest first${thinned ? '; showing evenly spaced snapshots plus the 10 with the largest total waitlist' : ''}):\n` +
+          list.map(fmt).join('\n') +
+          '\nSections with the largest waitlist in any snapshot:\n' + (peaks.length ? peaks.join('\n') : '(no waitlists recorded)');
+      }).join('\n') +
+        '\n[Columns: date, sections (sec), enrolled/capacity, open seats, total waitlist and how many sections have one, full sections. A waitlist count is a point-in-time figure for that snapshot date; adding waitlists across snapshots counts the same students more than once.]';
+    }
+
     // Finest level of detail that fits: sections, then courses, then disciplines
     const levels = filtered ? ['section'] : ['section', 'course', 'discipline'];
     let detail = '', used = '';
     for (const lv of levels) {
       detail = focus.map(p => block(p, lv)).join('\n');
       used = lv;
-      if (header.length + detail.length <= BUDGET) break;
+      if (header.length + history.length + detail.length <= BUDGET) break;
     }
     let note = '';
-    if (header.length + detail.length > BUDGET) {
-      detail = detail.slice(0, BUDGET - header.length - 300);
+    if (header.length + history.length + detail.length > BUDGET) {
+      detail = detail.slice(0, Math.max(0, BUDGET - header.length - history.length - 300));
       note = '\n[List cut off for length. Ask the user to name a discipline prefix or course, such as NETW or NETW-110.]';
     } else if (used !== 'section') {
       note = `\n[Listed by ${used} because the full section list is too long. For specific sections, ask the user to name a discipline prefix or course, such as NETW or NETW-110.]`;
@@ -7003,7 +7050,7 @@
     if (others.length) {
       note += `\n[Detailed lists above cover only ${focus.map(partOfTermLabel).join(' and ')}. The summary covers every part of term. For detail on ${others.join(', ')}, ask the user to name that part of term in their question, for example "7B" or "11-week". The data is not limited by the menu on screen.]`;
     }
-    return header + '\n' + detail + note;
+    return header + '\n' + history + '\n' + detail + note;
   };
 })();
 </script>
