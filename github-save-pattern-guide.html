@@ -142,6 +142,7 @@ footer .inner{max-width:1140px;margin:0 auto;padding:20px var(--space) 40px}
       <li><a href="#token">Create the access token</a></li>
       <li><a href="#setup">Run setup and set passwords</a></li>
       <li><a href="#share">Share with others</a></li>
+      <li><a href="#people">Add viewers and other people</a></li>
       <li><a href="#maintain">Renew, change, or revoke</a></li>
       <li><a href="#trouble">Troubleshooting</a></li>
       <li><a href="#reuse">Reusing it in other tools</a></li>
@@ -156,7 +157,7 @@ footer .inner{max-width:1140px;margin:0 auto;padding:20px var(--space) 40px}
       <div class="cards">
         <div class="card"><h3>Loads the latest version</h3><p>Every time the page opens, it reads the data file straight from the repository, so everyone sees the same thing.</p></div>
         <div class="card"><h3>Saves automatically</h3><p>A moment after any change, the page commits the data file back to GitHub. Each save is a commit, so the history doubles as a version log.</p></div>
-        <div class="card"><h3>One password per person</h3><p>Each person signs in with their own password. The page knows who made each change and records it in the commit message.</p></div>
+        <div class="card"><h3>One password per person</h3><p>Each person signs in with their own password, as an editor or a read-only viewer. The page knows who made each change and records it in the commit message.</p></div>
         <div class="card"><h3>Handles simultaneous edits</h3><p>If two people save at once, the page fetches the other person’s version and reapplies its own change on top, so no edit is lost.</p></div>
       </div>
       <p class="muted small">It is meant for small groups and modest amounts of data — a handful of people and a data file well under a megabyte. For dozens of editors or private data, use a real backend.</p>
@@ -219,7 +220,7 @@ footer .inner{max-width:1140px;margin:0 auto;padding:20px var(--space) 40px}
           <tr><td><code>data.json</code></td><td>Anyone, in a public repo</td><td>Readable in the repository and at the Pages address. Don’t store anything private.</td></tr>
           <tr><td><code>access.json</code></td><td>Anyone, in a public repo</td><td>Contains only encrypted tokens. Strong passwords keep it safe.</td></tr>
           <tr><td>The token</td><td>Only signed-in browsers</td><td>Kept in memory, or in that browser’s storage if “Stay signed in” is chosen.</td></tr>
-          <tr><td>Saving changes</td><td>Only people with a password</td><td>This is what the passwords protect.</td></tr>
+          <tr><td>Saving changes</td><td>Only editors</td><td>Editors’ passwords unlock the read-and-write token. Viewers’ passwords unlock a read-only token that GitHub won’t let save.</td></tr>
         </tbody>
       </table></div>
       <div class="callout caution">
@@ -316,12 +317,59 @@ footer .inner{max-width:1140px;margin:0 auto;padding:20px var(--space) 40px}
       <p>When signing in, each person can tick <strong>Stay signed in on this device</strong>. That keeps the token in that browser’s storage so they skip the password next time. It should only be used on their own computer or phone, never a shared lab machine.</p>
     </section>
 
+    <section id="people" aria-labelledby="h-people">
+      <h2 id="h-people">Add viewers and other people</h2>
+      <p>Setup creates two editors. After that, the advisor account can add more people from <span class="path">Settings → People</span> inside the tool, without rerunning setup. Each person gets their own password and one of two kinds of access:</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Access</th><th>Can</th><th>Can’t</th></tr></thead>
+        <tbody>
+          <tr><td>Editor</td><td style="font-weight:400;white-space:normal">Change anything in the tool</td><td style="font-weight:400;white-space:normal">Manage people (only the advisor account can)</td></tr>
+          <tr><td>Viewer</td><td style="font-weight:400;white-space:normal">See every tab, present the slides, print or save them as a PDF, download a backup</td><td style="font-weight:400;white-space:normal">Change anything. Edit controls are hidden and switched off, and GitHub itself rejects any save</td></tr>
+        </tbody>
+      </table></div>
+      <p>A viewer works well for someone who needs to follow the project without touching it, such as a grant’s project lead, a department chair or an outside mentor.</p>
+
+      <h3>Why viewers need their own token</h3>
+      <p>Hiding the edit buttons alone wouldn’t make anyone read-only: if a viewer’s password unlocked the main token, someone comfortable with browser tools could still save changes. So viewers get a <strong>second fine-grained token</strong> with <strong>Contents: Read-only</strong>. Their passwords unlock only that token, and GitHub refuses any write made with it. The read-only token is also stored once more in <code>access.json</code>, encrypted with the main token, so the advisor can add further viewers without pasting it again.</p>
+
+      <h3>Create the read-only token</h3>
+      <ol class="steps">
+        <li>Open <span class="path">Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token</span>, the same place as the main token.</li>
+        <li>Name it so it’s easy to tell apart, for example “EVA tracker – viewers.”</li>
+        <li>Choose the same resource owner and <strong>Only select repositories</strong> → the tool’s repository.</li>
+        <li>Under Repository permissions, set <strong>Contents</strong> to <strong>Read-only</strong>. Leave everything else at “No access.”</li>
+        <li>Set an expiration, generate the token, and copy it.</li>
+      </ol>
+
+      <h3>Add a viewer</h3>
+      <ol class="steps">
+        <li>Sign in to the tool with the advisor password and open <span class="path">Settings</span> (top right). Scroll to <strong>People</strong>.</li>
+        <li>Under <em>Add a person</em>, enter the person’s name, choose <strong>Viewer (read only)</strong>, and set a password of 12 or more characters.</li>
+        <li>For the first viewer only, paste the read-only token. Later viewers just need a name and password.</li>
+        <li>Click <span class="path">Add person</span>. The tool encrypts the right token with the new password and commits the updated <code>access.json</code>.</li>
+        <li>Wait a minute or two for GitHub Pages to publish, then send the address and password separately, the same way as for editors.</li>
+      </ol>
+      <p>Adding an editor works the same way: choose <strong>Editor</strong>, and no extra token is needed. Two people can’t share a password, because the password is what tells the tool who is signing in.</p>
+
+      <h3>Change, reset or remove</h3>
+      <ul>
+        <li><strong>Set new password</strong> next to anyone’s name gives them a new password; use it when someone forgets theirs. <strong>Change my password</strong> appears on the advisor’s own row.</li>
+        <li><strong>Remove</strong> takes a person’s password off the list. The advisor account can’t remove itself.</li>
+      </ul>
+      <div class="callout caution">
+        <strong>Removing someone doesn’t sign them out everywhere.</strong>
+        <p>If they chose “Stay signed in,” that browser keeps its copy of the token. For a clean cut-off, also delete and replace the token on GitHub: the read-only token for a viewer (use <span class="path">People → Viewer token and removing access → Replace the read-only token</span>, then set a new password for each remaining viewer), or the main token through setup for an editor.</p>
+      </div>
+    </section>
+
     <section id="maintain" aria-labelledby="h-maintain">
       <h2 id="h-maintain">Renew, change, or revoke</h2>
       <h3>Token expired, or you want new passwords</h3>
-      <p>Create a new token (or reuse the current one if it’s still valid), open the site with <code>?setup</code> again, and run setup. This replaces <code>access.json</code> and leaves <code>data.json</code> untouched. Everyone signs in again with the new passwords.</p>
+      <p>Create a new token (or reuse the current one if it’s still valid), open the site with <code>?setup</code> again, and run setup. This replaces <code>access.json</code> and leaves <code>data.json</code> untouched. Viewers are kept, because their passwords unlock the separate read-only token. The editor list is reset to the two people entered in setup, so re-add any other editors in <span class="path">Settings → People</span>. To change a single password without rerunning setup, use <strong>Set new password</strong> in People instead.</p>
+      <h3>Read-only token expired</h3>
+      <p>Viewers see a message that GitHub didn’t accept the access key. Create a new read-only token, replace it in <span class="path">Settings → People → Viewer token and removing access</span>, then set a new password for each viewer.</p>
       <h3>Cutting off access right away</h3>
-      <p>Go to <span class="path">Settings → Developer settings → Personal access tokens → Fine-grained tokens</span>, open the token, and delete it. Saving stops immediately for everyone, even people who chose “Stay signed in.” Then run setup with a new token and new passwords for the people who should keep access.</p>
+      <p>Go to <span class="path">Settings → Developer settings → Personal access tokens → Fine-grained tokens</span>, open the token, and delete it. Saving stops immediately for everyone, even people who chose “Stay signed in.” Then run setup with a new token and new passwords for the people who should keep access. Deleting the read-only token cuts off every viewer the same way.</p>
       <h3>Going back to an earlier version</h3>
       <p>Every save is a commit. In the repository, open <code>data.json</code>, click <span class="path">History</span>, and copy the contents of an older version back if needed. The tool’s <strong>Download backup</strong> button also saves a copy to your computer at any time.</p>
     </section>
@@ -331,6 +379,10 @@ footer .inner{max-width:1140px;margin:0 auto;padding:20px var(--space) 40px}
       <dl class="trouble">
         <dt>“Not set up yet” right after running setup</dt>
         <dd>GitHub Pages hasn’t published <code>access.json</code> yet. Wait a couple of minutes and reload. You can watch progress in the repository’s <span class="path">Actions</span> tab.</dd>
+        <dt>A new viewer’s password doesn’t work yet</dt>
+        <dd>GitHub Pages hasn’t published the updated <code>access.json</code>. Wait a couple of minutes and try again.</dd>
+        <dt>“Paste a read-only token to add the first viewer”</dt>
+        <dd>The tool doesn’t have a viewer token yet, or setup was rerun with a new main token. Paste the read-only token in the <em>Add a person</em> form.</dd>
         <dt>“That password doesn’t match”</dt>
         <dd>Passwords are case-sensitive. If someone forgot theirs, rerun setup with new passwords for everyone — there is no way to recover an old one.</dd>
         <dt>“GitHub didn’t accept the access key”</dt>
@@ -351,7 +403,7 @@ footer .inner{max-width:1140px;margin:0 auto;padding:20px var(--space) 40px}
       <p>The EVA glove tracker’s <code>index.html</code> is the reference version; its storage, sign-in and setup code can be lifted into any tool. These are the building blocks.</p>
 
       <h3>The access file</h3>
-      <p>What setup commits to the repository. Each person gets their own salt, nonce (<code>iv</code>) and encrypted token.</p>
+      <p>What setup and the People section commit to the repository. Each person gets their own salt, nonce (<code>iv</code>) and encrypted token: editors’ entries hold the main token, viewers’ entries hold the read-only token. <code>viewerKey</code> is the read-only token encrypted with the main token, so any editor’s browser can recover it when the advisor adds another viewer.</p>
       <div class="code"><button class="copy" type="button">Copy</button><pre><code>{
   "version": 1,
   "owner": "your-username",
@@ -361,8 +413,10 @@ footer .inner{max-width:1140px;margin:0 auto;padding:20px var(--space) 40px}
   "iterations": 600000,
   "users": [
     { "name": "Prof. Qaissaunee", "role": "advisor", "salt": "…", "iv": "…", "ct": "…" },
-    { "name": "Cristian", "role": "student", "salt": "…", "iv": "…", "ct": "…" }
-  ]
+    { "name": "Cristian", "role": "student", "salt": "…", "iv": "…", "ct": "…" },
+    { "name": "Grant Lead", "role": "viewer", "salt": "…", "iv": "…", "ct": "…" }
+  ],
+  "viewerKey": { "iterations": 100000, "salt": "…", "iv": "…", "ct": "…" }
 }</code></pre></div>
 
       <h3>Encrypting and decrypting the token</h3>
@@ -468,7 +522,7 @@ async function save() {
         <li>Replace the tracker’s content (phases, materials, views) with the new tool’s, and keep the storage, sign-in and setup sections as they are.</li>
         <li>Route every edit through <code>mutate(fn)</code> so it is saved and replayable.</li>
         <li>Change the <code>defaults()</code> function to describe the new tool’s empty data.</li>
-        <li>Keep role names (<code>advisor</code>, <code>student</code>, or your own) if the tool should show or hide things per person. Remember that this is a convenience, not security — anyone with a password has the same token.</li>
+        <li>Keep the role names: <code>advisor</code> manages people, <code>student</code> or <code>editor</code> can change everything, and <code>viewer</code> is read-only. Hiding things for editors is a convenience, not security, since all editors share one token; the viewer role is enforced by GitHub through the read-only token.</li>
       </ul>
     </section>
 
@@ -485,10 +539,11 @@ async function save() {
         <label><input type="checkbox" data-k="c7"><span>Waited for Pages to publish, then signed in from another device</span></label>
         <label><input type="checkbox" data-k="c8"><span>Sent the address and each password separately</span></label>
         <label><input type="checkbox" data-k="c9"><span>Put the token’s expiration date on the calendar</span></label>
+        <label><input type="checkbox" data-k="c10"><span>Optional: created a read-only token and added viewers in Settings → People</span></label>
       </div>
       <div class="progress-row">
-        <progress id="prog" max="9" value="0" aria-label="Checklist progress"></progress>
-        <span id="progtext" aria-live="polite">0 of 9 done</span>
+        <progress id="prog" max="10" value="0" aria-label="Checklist progress"></progress>
+        <span id="progtext" aria-live="polite">0 of 10 done</span>
         <button class="reset" type="button" id="resetChecks">Clear ticks</button>
       </div>
     </section>
