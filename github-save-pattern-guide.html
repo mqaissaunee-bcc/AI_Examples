@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saving a Static Web App to GitHub with Passwords — Setup Guide</title>
+<meta name="description" content="How to host a single-file HTML tool on GitHub Pages, protect saving with per-person passwords, and have it commit its data back to the repository automatically using a fine-grained access token.">
+<style>
+:root{
+  --paper:#F7F8FA; --surface:#FFFFFF; --sunk:#EDF0F4; --ink:#1D2433; --muted:#566074; --rule:#D8DDE5;
+  --accent:#0B6E4F; --accent-soft:#E1F1EA; --caution:#8A4B00; --caution-soft:#FBEEDC;
+  --code-bg:#EEF1F5; --code-ink:#1D2433;
+  --serif:"Charter","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:"Segoe UI Variable","Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+  --space:clamp(16px,3vw,28px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#11151C; --surface:#181E27; --sunk:#1F2732; --ink:#E5E9EF; --muted:#A3ADBD; --rule:#2D3643;
+    --accent:#4CC79B; --accent-soft:#163329; --caution:#F2B05E; --caution-soft:#3A2A15;
+    --code-bg:#1C232E; --code-ink:#DCE3EC;
+    color-scheme:dark;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*{transition:none!important}}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.6}
+a{color:var(--accent);text-underline-offset:2px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.skip-link{position:absolute;left:-9999px;top:8px;background:var(--surface);color:var(--ink);padding:10px 14px;border:2px solid var(--accent);z-index:10}
+.skip-link:focus{left:8px}
+
+header.hero{border-bottom:1px solid var(--rule);background:var(--surface)}
+.hero-inner{max-width:1140px;margin:0 auto;padding:calc(var(--space)*1.6) var(--space) var(--space)}
+.kicker{color:var(--muted);font-size:.95rem;margin:0 0 10px}
+h1{font-family:var(--serif);font-weight:700;font-size:clamp(2rem,4.6vw,3rem);line-height:1.08;margin:0;max-width:20ch}
+.hero p.sum{font-size:1.1rem;color:var(--muted);max-width:62ch;margin:16px 0 0}
+
+.layout{max-width:1140px;margin:0 auto;padding:0 var(--space);display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px}
+nav.toc{position:sticky;top:0;align-self:start;padding:28px 0;max-height:100vh;overflow:auto}
+nav.toc p{font-weight:600;margin:0 0 8px;font-size:.9rem;color:var(--muted)}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+nav.toc li{counter-increment:toc}
+nav.toc a{display:flex;gap:8px;align-items:baseline;color:var(--ink);text-decoration:none;padding:7px 0;min-height:44px;font-size:.95rem;border-left:2px solid transparent;padding-left:10px}
+nav.toc a:hover{color:var(--accent)}
+nav.toc a.active{border-left-color:var(--accent);color:var(--accent)}
+@media (max-width:860px){.layout{grid-template-columns:1fr;gap:0}nav.toc{position:static;max-height:none;padding:20px 0 0;border-bottom:1px solid var(--rule)}}
+
+main{padding:28px 0 60px;min-width:0}
+section{padding:10px 0 34px;border-bottom:1px solid var(--rule);scroll-margin-top:12px}
+section:last-of-type{border-bottom:0}
+h2{font-family:var(--serif);font-size:clamp(1.5rem,2.6vw,1.9rem);line-height:1.15;margin:20px 0 12px}
+h3{font-family:var(--serif);font-size:1.2rem;margin:24px 0 8px}
+p,li{max-width:70ch}
+ul,ol{padding-left:22px}
+li{margin-bottom:6px}
+.muted{color:var(--muted)}
+.small{font-size:.92rem}
+
+/* Steps — a real sequence, so numbered */
+ol.steps{list-style:none;padding:0;counter-reset:step;margin:16px 0}
+ol.steps>li{counter-increment:step;position:relative;padding:4px 0 18px 52px;max-width:none}
+ol.steps>li::before{content:counter(step);position:absolute;left:0;top:2px;width:34px;height:34px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;display:flex;align-items:center;justify-content:center;font-family:var(--serif)}
+ol.steps>li::after{content:"";position:absolute;left:16px;top:42px;bottom:4px;width:2px;background:var(--rule)}
+ol.steps>li:last-child::after{display:none}
+.path{font-family:var(--sans);background:var(--sunk);border-radius:4px;padding:1px 6px;white-space:nowrap}
+
+/* Field table */
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:6px;background:var(--surface);margin:14px 0}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{background:var(--sunk);font-weight:600;color:var(--muted);font-size:.85rem}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600;white-space:nowrap}
+
+.callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 6px 6px 0;margin:16px 0}
+.callout.caution{border-left-color:var(--caution);background:var(--caution-soft)}
+.callout strong{display:block;margin-bottom:2px}
+.callout p{margin:0}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:16px 0}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px 18px}
+.card h3{margin-top:0;font-size:1.05rem}
+.card p{margin:0;font-size:.95rem}
+
+/* Diagram */
+figure{margin:18px 0;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:18px}
+figure svg{width:100%;height:auto;display:block}
+figure svg text{font-family:var(--sans);font-size:14px;fill:var(--ink)}
+figure svg .sub{fill:var(--muted);font-size:12.5px}
+figcaption{color:var(--muted);font-size:.9rem;margin-top:10px}
+
+/* Code */
+.code{position:relative;margin:14px 0}
+pre{background:var(--code-bg);color:var(--code-ink);border:1px solid var(--rule);border-radius:6px;padding:16px;overflow-x:auto;font-family:var(--mono);font-size:.85rem;line-height:1.55;margin:0;tab-size:2}
+code{font-family:var(--mono);font-size:.9em}
+p code,li code,td code{background:var(--sunk);padding:1px 5px;border-radius:3px}
+.copy{position:absolute;top:8px;right:8px;min-height:44px;min-width:44px;padding:6px 12px;background:var(--surface);color:var(--ink);border:1px solid var(--rule);border-radius:4px;cursor:pointer;font:inherit;font-size:.85rem}
+.copy:hover{border-color:var(--accent)}
+
+/* Checklist */
+.checklist{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:8px 18px;margin:16px 0}
+.checklist label{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--rule);cursor:pointer;min-height:44px}
+.checklist label:first-of-type{border-top:0}
+.checklist input{width:20px;height:20px;margin-top:3px;accent-color:var(--accent);flex:none}
+.checklist input:checked + span{color:var(--muted);text-decoration:line-through}
+.progress-row{display:flex;align-items:center;gap:12px;margin:8px 0 0}
+progress{flex:1;height:10px;accent-color:var(--accent)}
+.reset{background:none;border:1px solid var(--rule);color:var(--ink);border-radius:4px;padding:6px 12px;min-height:44px;cursor:pointer;font:inherit;font-size:.9rem}
+
+dl.trouble{margin:14px 0}
+dl.trouble dt{font-weight:600;margin-top:14px}
+dl.trouble dd{margin:4px 0 0;max-width:70ch;color:var(--ink)}
+
+footer{border-top:1px solid var(--rule);color:var(--muted);font-size:.9rem}
+footer .inner{max-width:1140px;margin:0 auto;padding:20px var(--space) 40px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="kicker">AI Projects · Setup guide</p>
+    <h1>Saving a static web app to GitHub, with a password for each person</h1>
+    <p class="sum">A single HTML file hosted on GitHub Pages can load its data from the repository, save changes back as commits, and let only people with a password make changes — no server, no database, no monthly bill. This guide walks through setting it up and explains how it works so you can reuse it in other tools.</p>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" aria-label="On this page">
+    <p>On this page</p>
+    <ol>
+      <li><a href="#overview">What this does</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#public">What’s public, what’s protected</a></li>
+      <li><a href="#repo">Create the repository</a></li>
+      <li><a href="#token">Create the access token</a></li>
+      <li><a href="#setup">Run setup and set passwords</a></li>
+      <li><a href="#share">Share with others</a></li>
+      <li><a href="#maintain">Renew, change, or revoke</a></li>
+      <li><a href="#trouble">Troubleshooting</a></li>
+      <li><a href="#reuse">Reusing it in other tools</a></li>
+      <li><a href="#checklist">Setup checklist</a></li>
+    </ol>
+  </nav>
+
+  <main id="main">
+    <section id="overview" aria-labelledby="h-overview">
+      <h2 id="h-overview">What this does</h2>
+      <p>The pattern was first built for a student project tracker, where an advisor and a student both needed to check off tasks, log test results and leave notes in one shared page. It works for any small tool where a few named people need to edit shared data:</p>
+      <div class="cards">
+        <div class="card"><h3>Loads the latest version</h3><p>Every time the page opens, it reads the data file straight from the repository, so everyone sees the same thing.</p></div>
+        <div class="card"><h3>Saves automatically</h3><p>A moment after any change, the page commits the data file back to GitHub. Each save is a commit, so the history doubles as a version log.</p></div>
+        <div class="card"><h3>One password per person</h3><p>Each person signs in with their own password. The page knows who made each change and records it in the commit message.</p></div>
+        <div class="card"><h3>Handles simultaneous edits</h3><p>If two people save at once, the page fetches the other person’s version and reapplies its own change on top, so no edit is lost.</p></div>
+      </div>
+      <p class="muted small">It is meant for small groups and modest amounts of data — a handful of people and a data file well under a megabyte. For dozens of editors or private data, use a real backend.</p>
+    </section>
+
+    <section id="how" aria-labelledby="h-how">
+      <h2 id="h-how">How it works</h2>
+      <p>A static page has no server to check passwords, and anything written in its HTML can be read by anyone who views the source. So the password doesn’t unlock the page itself. It unlocks a <strong>GitHub access token</strong> — the key that allows saving — which is stored only in encrypted form.</p>
+      <figure>
+        <svg viewBox="0 0 860 250" role="img" aria-labelledby="dg-t dg-d">
+          <title id="dg-t">Sign-in and save flow</title>
+          <desc id="dg-d">A person types their password in the browser. The browser downloads access.json, uses the password to decrypt the GitHub token, then reads and writes data.json in the repository through the GitHub API.</desc>
+          <rect x="10" y="40" width="190" height="150" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="2"/>
+          <text x="105" y="72" text-anchor="middle" font-weight="600">Browser</text>
+          <text x="105" y="104" text-anchor="middle" class="sub">Person types</text>
+          <text x="105" y="122" text-anchor="middle" class="sub">their password</text>
+          <rect x="40" y="140" width="130" height="32" rx="4" fill="var(--accent-soft)"/>
+          <text x="105" y="161" text-anchor="middle" class="sub">token decrypted here</text>
+
+          <rect x="330" y="20" width="220" height="80" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="2"/>
+          <text x="440" y="52" text-anchor="middle" font-weight="600">access.json</text>
+          <text x="440" y="76" text-anchor="middle" class="sub">token, encrypted once per password</text>
+
+          <rect x="330" y="140" width="220" height="80" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="2"/>
+          <text x="440" y="172" text-anchor="middle" font-weight="600">GitHub API</text>
+          <text x="440" y="196" text-anchor="middle" class="sub">reads and commits with the token</text>
+
+          <rect x="660" y="140" width="190" height="80" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="755" y="172" text-anchor="middle" font-weight="600">data.json</text>
+          <text x="755" y="196" text-anchor="middle" class="sub">in the repository</text>
+
+          <path d="M330 60 L 210 90" stroke="var(--muted)" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+          <text x="226" y="58" class="sub">1. download</text>
+          <path d="M210 160 L 320 180" stroke="var(--accent)" stroke-width="2.5" fill="none" marker-end="url(#ar2)"/>
+          <text x="214" y="200" class="sub">2. request with token</text>
+          <path d="M550 180 L 650 180" stroke="var(--accent)" stroke-width="2.5" fill="none" marker-end="url(#ar2)"/>
+          <text x="560" y="168" class="sub">3. read / commit</text>
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--muted)"/></marker>
+            <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker>
+          </defs>
+        </svg>
+        <figcaption>The token never travels or sits anywhere in readable form except inside the signed-in person’s browser.</figcaption>
+      </figure>
+      <h3>The pieces</h3>
+      <ul>
+        <li><strong>A fine-grained personal access token</strong> that can only read and write files in one repository. You create it on GitHub.</li>
+        <li><strong>A one-time setup screen</strong> (open the page with <code>?setup</code> on the end of the address). You paste the token and choose a password for each person. The browser encrypts the token separately with each password — PBKDF2 with 600,000 rounds to turn the password into a key, then AES-GCM encryption — and commits the result to the repo as <code>access.json</code>.</li>
+        <li><strong>Sign-in.</strong> The page downloads <code>access.json</code> and tries the typed password against each encrypted copy. Whichever one opens tells the page who you are and gives it the token.</li>
+        <li><strong>Saving.</strong> The page uses GitHub’s Contents API to read and commit <code>data.json</code>. Every write includes the file’s current version ID (its <em>SHA</em>); if someone else saved in the meantime, GitHub refuses the write, the page fetches the newer file, reapplies its change and tries again.</li>
+      </ul>
+    </section>
+
+    <section id="public" aria-labelledby="h-public">
+      <h2 id="h-public">What’s public, what’s protected</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Item</th><th>Who can see it</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>The page</td><td>Anyone with the address</td><td>Visitors see only the sign-in box until they enter a password.</td></tr>
+          <tr><td><code>data.json</code></td><td>Anyone, in a public repo</td><td>Readable in the repository and at the Pages address. Don’t store anything private.</td></tr>
+          <tr><td><code>access.json</code></td><td>Anyone, in a public repo</td><td>Contains only encrypted tokens. Strong passwords keep it safe.</td></tr>
+          <tr><td>The token</td><td>Only signed-in browsers</td><td>Kept in memory, or in that browser’s storage if “Stay signed in” is chosen.</td></tr>
+          <tr><td>Saving changes</td><td>Only people with a password</td><td>This is what the passwords protect.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout caution">
+        <strong>Passwords protect saving, not reading.</strong>
+        <p>Anyone can download <code>access.json</code> and guess passwords against it on their own computer, as fast as their hardware allows. Use long passwords — three or four unrelated random words is plenty — and a different one for each person.</p>
+      </div>
+      <h3>Public or private repository?</h3>
+      <p>On a free GitHub account, Pages only works from a <strong>public</strong> repository. Paid plans (GitHub Pro and up) can publish from a private repository, but the published site is still public, and Pages serves every file in the published folder — including the data file. For data that isn’t sensitive, a public repository is the simplest choice.</p>
+    </section>
+
+    <section id="repo" aria-labelledby="h-repo">
+      <h2 id="h-repo">Create the repository</h2>
+      <p>Give each tool its own repository. The token will be limited to that one repository, so if a password is ever guessed, nothing else you host is at risk.</p>
+      <ol class="steps">
+        <li>On GitHub, create a new <strong>public</strong> repository, for example <code>eva-glove-tracker</code>. Adding a README is fine.</li>
+        <li>Upload the tool’s HTML file and name it <code>index.html</code>. (<span class="path">Add file → Upload files</span>, then commit.)</li>
+        <li>Turn on Pages: <span class="path">Settings</span> tab of the repository → <span class="path">Pages</span> → under <em>Build and deployment</em>, Source: <strong>Deploy from a branch</strong>, Branch: <strong>main</strong>, folder <strong>/ (root)</strong> → <span class="path">Save</span>.</li>
+        <li>After a minute or two, the site appears at <code>https://&lt;your-username&gt;.github.io/&lt;repository-name&gt;/</code>. Opening it now shows “Not set up yet” — that’s expected.</li>
+      </ol>
+    </section>
+
+    <section id="token" aria-labelledby="h-token">
+      <h2 id="h-token">Create the fine-grained access token</h2>
+      <h3>Why a token at all</h3>
+      <p>GitHub won’t accept a commit from a web page unless the request carries proof that someone is allowed to make it. Your GitHub password can’t be used for that, and it shouldn’t be: it opens your entire account. A <strong>personal access token</strong> is a separate, revocable key made for a single purpose. The tool sends it with each request, and GitHub treats the request as coming from you, within whatever limits the token has.</p>
+
+      <h3>Why fine-grained instead of classic</h3>
+      <p>GitHub offers two kinds of token. A <strong>classic</strong> token is broad: give it the <code>repo</code> scope and it can read and write <em>every</em> repository you have access to, including private ones and ones in organizations. A <strong>fine-grained</strong> token is built around least privilege — it gets only the specific repositories and the specific permissions you pick, and nothing more.</p>
+      <p>That matters here because the token is shared. Everyone with a tracker password unlocks the same token, and a copy of it, encrypted, sits in a public file. The question to plan around is “if this token ever leaked, what could someone do with it?” A fine-grained token keeps the answer small.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>With this setup, the token can</th><th>It cannot</th></tr></thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:400;white-space:normal">Read files in the one repository you chose<br>Create, change and delete files in that repository<br>Read the repository’s basic details (name, branches)</td>
+            <td style="font-weight:400;white-space:normal">Touch any of your other repositories, such as your course sites or textbooks<br>Change repository settings, Pages, collaborators or webhooks<br>Delete or rename the repository<br>Run Actions workflows, open issues or pull requests<br>Change your account, email, password or other tokens</td>
+          </tr>
+        </tbody>
+      </table></div>
+
+      <h3>The other safeguards that come with it</h3>
+      <ul>
+        <li><strong>Expiration.</strong> Fine-grained tokens are meant to expire. Set the date to the end of the project, and the key stops working on its own once the tool is no longer needed, even if everyone forgets about it.</li>
+        <li><strong>Independent revocation.</strong> Each token can be deleted on its own. Cutting off one tool doesn’t affect any other tool or your own GitHub access.</li>
+        <li><strong>A clear record.</strong> Each token is listed by name with its repository, permissions and last-used date, so it’s easy to see what exists and what it can reach.</li>
+        <li><strong>Visible history.</strong> Everything the token does shows up as a normal commit in the repository, so any change, accidental or not, can be seen and undone.</li>
+      </ul>
+
+      <div class="callout caution">
+        <strong>Know the one remaining risk.</strong>
+        <p>Within its repository, the token can change <em>any</em> file, not just <code>data.json</code> — including <code>index.html</code>. That’s why each tool gets its own repository: the worst case is a messed-up project page that can be restored from the commit history, not damage to your other sites. GitHub permissions can’t be narrowed to a single file, so this is as tight as it gets.</p>
+      </div>
+
+      <h3>Creating it</h3>
+      <div class="callout">
+        <strong>Look in your account settings, not the repository’s.</strong>
+        <p>Developer settings live under your profile picture, not the <em>Settings</em> tab of a repository.</p>
+      </div>
+      <ol class="steps">
+        <li>Click your profile picture in the top-right corner of GitHub and choose <span class="path">Settings</span>.</li>
+        <li>Scroll to the very bottom of the left sidebar and click <span class="path">Developer settings</span>.</li>
+        <li>Choose <span class="path">Personal access tokens → Fine-grained tokens → Generate new token</span>. You can also go straight to <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new<span class="sr-only"> (opens in a new tab)</span></a> ↗.</li>
+        <li>Fill in the form as shown in the table below, then click <span class="path">Generate token</span>.</li>
+        <li>Copy the token right away. GitHub shows it only once. Keep it somewhere safe until setup is done; you won’t need it after that.</li>
+      </ol>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Field</th><th>Set it to</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Token name</td><td>The tool’s name, e.g. “EVA glove tracker”</td><td>So you can find and revoke it later.</td></tr>
+          <tr><td>Expiration</td><td>A custom date near the end of the project</td><td>An expired token stops saving; renewing takes two minutes.</td></tr>
+          <tr><td>Resource owner</td><td>Your account (or the organization that owns the repo)</td><td>Must match who owns the repository.</td></tr>
+          <tr><td>Repository access</td><td><strong>Only select repositories</strong> → the tool’s repository</td><td>The token can’t touch anything else.</td></tr>
+          <tr><td>Repository permissions</td><td><strong>Contents: Read and write</strong></td><td>Lets the page read and commit files. <em>Metadata: Read-only</em> is added automatically.</td></tr>
+          <tr><td>Everything else</td><td>Leave at “No access”</td><td>No other permissions are needed.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="setup" aria-labelledby="h-setup">
+      <h2 id="h-setup">Run setup and set passwords</h2>
+      <ol class="steps">
+        <li>Open the site with <code>?setup</code> added to the end, for example <code>https://&lt;your-username&gt;.github.io/eva-glove-tracker/?setup</code>.</li>
+        <li>Check the repository fields. The owner, repository and folder fill in from the address; the branch is usually <code>main</code>. Leave the folder blank if <code>index.html</code> is at the top level of the repo.</li>
+        <li>Paste the token.</li>
+        <li>Enter a name and password for each person. Passwords need at least 12 characters and must be different from each other.</li>
+        <li>Click <span class="path">Save access file to GitHub</span>. The page checks the token, encrypts it with each password, commits <code>access.json</code>, creates an empty <code>data.json</code> if there isn’t one, and signs you in.</li>
+        <li>Wait a minute or two for Pages to publish <code>access.json</code> before signing in from another device.</li>
+      </ol>
+      <p class="muted small">Setup runs entirely in your browser. The token and passwords are sent nowhere except to GitHub — the token as the login for its API, and the passwords never at all.</p>
+    </section>
+
+    <section id="share" aria-labelledby="h-share">
+      <h2 id="h-share">Share with others</h2>
+      <p>Send the plain site address — without <code>?setup</code> — and each person’s password separately, for example the address by email and the password in person or by text.</p>
+      <p>When signing in, each person can tick <strong>Stay signed in on this device</strong>. That keeps the token in that browser’s storage so they skip the password next time. It should only be used on their own computer or phone, never a shared lab machine.</p>
+    </section>
+
+    <section id="maintain" aria-labelledby="h-maintain">
+      <h2 id="h-maintain">Renew, change, or revoke</h2>
+      <h3>Token expired, or you want new passwords</h3>
+      <p>Create a new token (or reuse the current one if it’s still valid), open the site with <code>?setup</code> again, and run setup. This replaces <code>access.json</code> and leaves <code>data.json</code> untouched. Everyone signs in again with the new passwords.</p>
+      <h3>Cutting off access right away</h3>
+      <p>Go to <span class="path">Settings → Developer settings → Personal access tokens → Fine-grained tokens</span>, open the token, and delete it. Saving stops immediately for everyone, even people who chose “Stay signed in.” Then run setup with a new token and new passwords for the people who should keep access.</p>
+      <h3>Going back to an earlier version</h3>
+      <p>Every save is a commit. In the repository, open <code>data.json</code>, click <span class="path">History</span>, and copy the contents of an older version back if needed. The tool’s <strong>Download backup</strong> button also saves a copy to your computer at any time.</p>
+    </section>
+
+    <section id="trouble" aria-labelledby="h-trouble">
+      <h2 id="h-trouble">Troubleshooting</h2>
+      <dl class="trouble">
+        <dt>“Not set up yet” right after running setup</dt>
+        <dd>GitHub Pages hasn’t published <code>access.json</code> yet. Wait a couple of minutes and reload. You can watch progress in the repository’s <span class="path">Actions</span> tab.</dd>
+        <dt>“That password doesn’t match”</dt>
+        <dd>Passwords are case-sensitive. If someone forgot theirs, rerun setup with new passwords for everyone — there is no way to recover an old one.</dd>
+        <dt>“GitHub didn’t accept the access key”</dt>
+        <dd>The token expired or was deleted. Create a new one and rerun setup.</dd>
+        <dt>“Repository not found, or the token doesn’t include it” during setup</dt>
+        <dd>The token’s <em>Repository access</em> doesn’t include this repository, the resource owner is wrong, or the owner/repository name has a typo.</dd>
+        <dt>“Not saved” with a message about GitHub refusing the save</dt>
+        <dd>Usually a permissions problem (the token needs <em>Contents: Read and write</em>) or too many requests in a short time. The page retries on its own.</dd>
+        <dt>“Couldn’t reach GitHub”</dt>
+        <dd>No internet connection. Changes stay on the page and save when the connection returns — but don’t close the tab until the status reads “Saved to GitHub.”</dd>
+        <dt>Lots of Pages deployments in the Actions tab</dt>
+        <dd>Each save is a commit, and each commit republishes the site. That’s harmless: the tool reads its data through the API, not through the published site. If GitHub ever delays a deployment, saving still works.</dd>
+      </dl>
+    </section>
+
+    <section id="reuse" aria-labelledby="h-reuse">
+      <h2 id="h-reuse">Reusing it in other tools</h2>
+      <p>The EVA glove tracker’s <code>index.html</code> is the reference version; its storage, sign-in and setup code can be lifted into any tool. These are the building blocks.</p>
+
+      <h3>The access file</h3>
+      <p>What setup commits to the repository. Each person gets their own salt, nonce (<code>iv</code>) and encrypted token.</p>
+      <div class="code"><button class="copy" type="button">Copy</button><pre><code>{
+  "version": 1,
+  "owner": "your-username",
+  "repo": "eva-glove-tracker",
+  "branch": "main",
+  "dataPath": "data.json",
+  "iterations": 600000,
+  "users": [
+    { "name": "Prof. Qaissaunee", "role": "advisor", "salt": "…", "iv": "…", "ct": "…" },
+    { "name": "Cristian", "role": "student", "salt": "…", "iv": "…", "ct": "…" }
+  ]
+}</code></pre></div>
+
+      <h3>Encrypting and decrypting the token</h3>
+      <p>Built on the browser’s Web Crypto API, so no libraries are needed. It requires HTTPS, which GitHub Pages provides.</p>
+      <div class="code"><button class="copy" type="button">Copy</button><pre><code>const te = new TextEncoder(), td = new TextDecoder();
+const toB64 = b =&gt; btoa(String.fromCharCode(...b));
+const fromB64 = s =&gt; Uint8Array.from(atob(s), c =&gt; c.charCodeAt(0));
+
+async function deriveKey(password, salt, iterations) {
+  const base = await crypto.subtle.importKey("raw", te.encode(password), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+
+async function encryptFor(password, token, iterations = 600000) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(password, salt, iterations);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, te.encode(token));
+  return { salt: toB64(salt), iv: toB64(iv), ct: toB64(new Uint8Array(ct)) };
+}
+
+async function tryDecrypt(password, user, iterations = 600000) {
+  try {
+    const key = await deriveKey(password, fromB64(user.salt), iterations);
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(user.iv) }, key, fromB64(user.ct));
+    return td.decode(pt);            // the token
+  } catch { return null; }           // wrong password
+}</code></pre></div>
+
+      <h3>Reading and committing a file</h3>
+      <p>GitHub’s Contents API returns the file Base64-encoded along with its <code>sha</code>. Writing back requires that same <code>sha</code>, which is what catches simultaneous edits. The helpers below handle UTF-8 safely, so names with accents and typographic quotes survive.</p>
+      <div class="code"><button class="copy" type="button">Copy</button><pre><code>const utf8ToB64 = s =&gt; { const b = te.encode(s); let bin = "";
+  for (let i = 0; i &lt; b.length; i += 0x8000) bin += String.fromCharCode(...b.subarray(i, i + 0x8000));
+  return btoa(bin); };
+const b64ToUtf8 = s =&gt; td.decode(fromB64(s.replace(/\s/g, "")));
+
+function gh(cfg, path, token, opts = {}) {
+  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}`;
+  return fetch(opts.method ? url : url + "?ref=" + cfg.branch, {
+    method: opts.method || "GET", body: opts.body, cache: "no-store",
+    headers: { "Accept": "application/vnd.github+json", "Authorization": "Bearer " + token }
+  });
+}
+
+async function readFile(cfg, path, token) {
+  const r = await gh(cfg, path, token);
+  if (r.status === 404) return null;
+  if (!r.ok) throw Object.assign(new Error("GitHub " + r.status), { status: r.status });
+  const j = await r.json();
+  return { sha: j.sha, text: b64ToUtf8(j.content) };
+}
+
+async function writeFile(cfg, path, text, sha, message, token) {
+  const body = { message, content: utf8ToB64(text), branch: cfg.branch };
+  if (sha) body.sha = sha;            // omit only when creating the file
+  const r = await gh(cfg, path, token, { method: "PUT", body: JSON.stringify(body) });
+  if (!r.ok) throw Object.assign(new Error("GitHub " + r.status), { status: r.status });
+  return (await r.json()).content.sha;  // keep for the next write
+}</code></pre></div>
+
+      <h3>Saving without losing anyone’s edits</h3>
+      <p>Instead of saving the page’s current state, record each change as a small function and replay the unsaved ones on top of the latest copy from GitHub. A conflict then costs one extra read, not a lost edit.</p>
+      <div class="code"><button class="copy" type="button">Copy</button><pre><code>let remote = {}, remoteSha = null, pending = [], saving = false, timer;
+
+function change(fn) {           // call for every edit, e.g. change(s =&gt; s.tasks[id] = true)
+  fn(state);                    // update the screen right away
+  pending.push(fn);
+  clearTimeout(timer);
+  timer = setTimeout(save, 1500);   // batch quick edits into one commit
+}
+
+async function save() {
+  if (saving || !pending.length) return;
+  saving = true;
+  const batch = pending.slice();
+  try {
+    for (let attempt = 0; ; attempt++) {
+      const next = structuredClone(remote);
+      batch.forEach(fn =&gt; fn(next));
+      try {
+        remoteSha = await writeFile(cfg, "data.json", JSON.stringify(next), remoteSha,
+                                    "Update by " + who.name, token);
+        remote = next;
+        break;
+      } catch (e) {
+        if ((e.status === 409 || e.status === 422) &amp;&amp; attempt &lt; 3) {
+          const f = await readFile(cfg, "data.json", token);   // someone else saved first
+          remote = f ? JSON.parse(f.text) : {}; remoteSha = f ? f.sha : null;
+          continue;
+        }
+        throw e;
+      }
+    }
+    pending = pending.slice(batch.length);
+  } finally { saving = false; if (pending.length) save(); }
+}</code></pre></div>
+      <p class="small muted">The full version in the tracker also shows a save status, retries after network failures, warns before closing a tab with unsaved changes, and checks for other people’s changes every 45 seconds.</p>
+
+      <h3>Adapting the tracker for a new tool</h3>
+      <ul>
+        <li>Replace the tracker’s content (phases, materials, views) with the new tool’s, and keep the storage, sign-in and setup sections as they are.</li>
+        <li>Route every edit through <code>mutate(fn)</code> so it is saved and replayable.</li>
+        <li>Change the <code>defaults()</code> function to describe the new tool’s empty data.</li>
+        <li>Keep role names (<code>advisor</code>, <code>student</code>, or your own) if the tool should show or hide things per person. Remember that this is a convenience, not security — anyone with a password has the same token.</li>
+      </ul>
+    </section>
+
+    <section id="checklist" aria-labelledby="h-check">
+      <h2 id="h-check">Setup checklist</h2>
+      <p class="muted">Your ticks are saved in this browser.</p>
+      <div class="checklist" id="checklist">
+        <label><input type="checkbox" data-k="c1"><span>Created a dedicated public repository for the tool</span></label>
+        <label><input type="checkbox" data-k="c2"><span>Uploaded the tool as <code>index.html</code></span></label>
+        <label><input type="checkbox" data-k="c3"><span>Turned on GitHub Pages from <code>main</code>, root folder</span></label>
+        <label><input type="checkbox" data-k="c4"><span>Created a fine-grained token: one repository, Contents read and write, expiration set</span></label>
+        <label><input type="checkbox" data-k="c5"><span>Copied the token somewhere safe</span></label>
+        <label><input type="checkbox" data-k="c6"><span>Ran <code>?setup</code> with a strong, different password for each person</span></label>
+        <label><input type="checkbox" data-k="c7"><span>Waited for Pages to publish, then signed in from another device</span></label>
+        <label><input type="checkbox" data-k="c8"><span>Sent the address and each password separately</span></label>
+        <label><input type="checkbox" data-k="c9"><span>Put the token’s expiration date on the calendar</span></label>
+      </div>
+      <div class="progress-row">
+        <progress id="prog" max="9" value="0" aria-label="Checklist progress"></progress>
+        <span id="progtext" aria-live="polite">0 of 9 done</span>
+        <button class="reset" type="button" id="resetChecks">Clear ticks</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="inner">
+    <p>Built for <span class="program">AI Projects</span> · Brookdale Community College · <span class="year">2026</span></p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  // Copy buttons
+  document.querySelectorAll(".copy").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var text = btn.parentElement.querySelector("code").textContent;
+      var done = function(){ btn.textContent = "Copied"; setTimeout(function(){ btn.textContent = "Copy"; }, 1600); };
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done, function(){ fallback(text); done(); });
+      } else { fallback(text); done(); }
+    });
+  });
+  function fallback(text){
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "absolute"; ta.style.left = "-9999px";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch(e){}
+    ta.remove();
+  }
+
+  // Checklist
+  var KEY = "github-save-guide-checklist-v1";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll("#checklist input"));
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ saved = {}; }
+  function update(){
+    var n = boxes.filter(function(b){ return b.checked; }).length;
+    document.getElementById("prog").value = n;
+    document.getElementById("progtext").textContent = n + " of " + boxes.length + " done";
+  }
+  boxes.forEach(function(b){
+    b.checked = !!saved[b.dataset.k];
+    b.addEventListener("change", function(){
+      saved[b.dataset.k] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch(e){}
+      update();
+    });
+  });
+  document.getElementById("resetChecks").addEventListener("click", function(){
+    boxes.forEach(function(b){ b.checked = false; });
+    saved = {};
+    try { localStorage.removeItem(KEY); } catch(e){}
+    update();
+  });
+  update();
+
+  // Highlight current section in the table of contents
+  var links = Array.prototype.slice.call(document.querySelectorAll("nav.toc a"));
+  if ("IntersectionObserver" in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting){
+          links.forEach(function(l){ l.classList.toggle("active", l.getAttribute("href") === "#" + en.target.id); });
+        }
+      });
+    }, {rootMargin:"-20% 0px -70% 0px"});
+    document.querySelectorAll("main section").forEach(function(s){ obs.observe(s); });
+  }
+})();
+</script>
+</body>
+</html>
