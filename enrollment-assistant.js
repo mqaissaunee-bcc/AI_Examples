@@ -17,7 +17,8 @@
     // Suggested questions. A question with [square brackets] goes into the box
     // for the user to finish; the bracketed part is selected so they can type over it.
     // Any other question is asked straight away when clicked.
-    // A page can supply its own list with window.assistantSuggestions = [ ... ].
+    // A page can supply its own list or function as window.assistantSuggestions
+    // (see suggestionList below) and its own greeting as window.assistantGreeting.
     suggestions: [
       "Which courses still have open seats in the 11-week session?",
       "Give me a summary of 7B enrollment.",
@@ -26,9 +27,9 @@
       "Which 15-week sections have the largest waitlists right now?",
       "Which 15-week snapshots had the greatest unmet demand?",
       "How did 15-week fill change week by week since May?",
-      "Which [NETW] sections still have open seats in the 15-week term?",
-      "How have [NETW] waitlists changed over the 15-week term?",
-      "Which [NETW] 15-week sections are below 50% fill?"
+      "Which 15-week sections still have open seats in [your discipline]?",
+      "How has 15-week enrollment changed over the term in [your discipline]?",
+      "Which 15-week sections are below 50% fill in [your discipline]?"
     ],
     suggestionsShown: 4
   };
@@ -203,10 +204,19 @@
     return wrap;
   }
 
-  // Suggested questions: a few picked at random from the list each time.
+  // Suggested questions. A page can supply window.assistantSuggestions as a list
+  // (a few are picked at random) or as a function that returns a list in order
+  // of priority (the first few are shown). If the function returns nothing,
+  // CONFIG.suggestions is used.
   function suggestionList() {
-    var list = Array.isArray(window.assistantSuggestions) ? window.assistantSuggestions : CONFIG.suggestions;
-    return (list || []).filter(function (s) { return typeof s === "string" && s.trim(); });
+    var src = window.assistantSuggestions, list = null, ordered = false;
+    if (typeof src === "function") {
+      try { list = src(); ordered = Array.isArray(list) && list.length > 0; } catch (e) { list = null; }
+    } else if (Array.isArray(src)) list = src;
+    if (!Array.isArray(list) || !list.length) list = CONFIG.suggestions;
+    list = (list || []).filter(function (s) { return typeof s === "string" && s.trim(); });
+    list.ordered = ordered;
+    return list;
   }
   function removeSuggestions() {
     var old = log.querySelectorAll(".ca-sugs");
@@ -230,7 +240,9 @@
     removeSuggestions();
     if (!list.length) return;
     var pick = list.slice();
-    for (var i = pick.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = pick[i]; pick[i] = pick[j]; pick[j] = t; }
+    if (!list.ordered) {
+      for (var i = pick.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = pick[i]; pick[i] = pick[j]; pick[j] = t; }
+    }
     pick = pick.slice(0, CONFIG.suggestionsShown || 4);
     var box = el("div", { class: "ca-sugs", role: "group", "aria-label": "Suggested questions" });
     box.appendChild(el("p", { class: "ca-sugs-label" }, "Try asking:"));
@@ -246,7 +258,7 @@
 
   function paint() {
     log.textContent = "";
-    add("assistant", CONFIG.greeting);
+    add("assistant", typeof window.assistantGreeting === "string" && window.assistantGreeting.trim() ? window.assistantGreeting : CONFIG.greeting);
     history.forEach(function (m) { add(m.role, m.content); });
     if (!history.length) showSuggestions();
   }
@@ -339,7 +351,7 @@
     var ideas = el("button", { type: "button", class: "ca-icon", "aria-label": "Show suggested questions", title: "Suggested questions" }, "\uD83D\uDCA1");
     var fresh = el("button", { type: "button", class: "ca-icon", "aria-label": "Start a new conversation", title: "New conversation" }, "\u21BB");
     var close = el("button", { type: "button", class: "ca-icon", "aria-label": "Close the assistant", title: "Close" }, "\u2715");
-    if (suggestionList().length) head.appendChild(ideas);
+    head.appendChild(ideas);
     head.appendChild(fresh); head.appendChild(close);
     log = el("div", { class: "ca-log", role: "log", "aria-live": "polite", "aria-label": "Conversation", tabindex: "0" });
     var foot = el("form", { class: "ca-foot" });

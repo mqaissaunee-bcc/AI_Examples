@@ -6883,6 +6883,27 @@
    * part of term, whatever the screen shows. enrollment-assistant.js calls
    * window.getAssistantContext(recentQuestions) before each question.
    * ========================================================================= */
+  // Where each part of term is in its cycle, from today's date and its census
+  // date in the manifest. Classes start about 10 days before census.
+  //   registration: classes haven't started; open seats and waitlists matter
+  //   early:        classes started, census not yet; add/drop period
+  //   settled:      census has passed; enrollment is largely set
+  function potPhase(pot) {
+    const census = state.census && state.census[pot];
+    if (!census) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const c = new Date(census + 'T00:00:00');
+    const days = Math.round((c - today) / 86400000);
+    return { census, days, phase: days > 10 ? 'registration' : days >= 0 ? 'early' : 'settled' };
+  }
+  function phaseText(pot) {
+    const ph = potPhase(pot);
+    if (!ph) return 'census date not set';
+    if (ph.phase === 'registration') return `registration open, classes not started yet, census ${ph.census} (open seats and waitlists matter now)`;
+    if (ph.phase === 'early') return `classes under way, census ${ph.census} is ${ph.days === 0 ? 'today' : `in ${ph.days} day${ph.days === 1 ? '' : 's'}`} (add/drop period)`;
+    return `census ${ph.census} has passed, enrollment is largely set (current waitlists are not meaningful)`;
+  }
+
   window.getAssistantContext = function (question) {
     const q = String(question || '');
     const BUDGET = 22000;
@@ -6917,7 +6938,7 @@
     // Header: term, what's on screen, and a summary of every part of term
     const lines = [
       'ENROLLMENT DATA (from the dashboard\'s loaded data for all disciplines, not just what is on screen)',
-      `Term: ${termLabel}. Data updated: ${state.manifestUpdatedAt || 'unknown'}.`,
+      `Term: ${termLabel}. Data updated: ${state.manifestUpdatedAt || 'unknown'}. Today is ${new Date().toISOString().slice(0, 10)}.`,
       `The user is viewing: ${partOfTermLabel(state.activePartOfTerm)}. Disciplines selected on screen: ${state.selectedDisciplines.size ? [...state.selectedDisciplines].join(', ') : 'none'}.`,
       'Open seats = Avail Seats from the college report. Fill = enrolled / capacity. FTE = student credit hours / 30. Special projects (-295) and internships (-299) are excluded.',
       '',
@@ -6927,11 +6948,11 @@
     pots.forEach(p => {
       const t = totals(latest[p].rows);
       collegeSch += t.sch;
-      const census = state.census && state.census[p] ? `, census date ${state.census[p]}` : '';
-      lines.push(`- ${partOfTermLabel(p)} (snapshot ${latest[p].date}${census}): ${t.sections} sections, ${t.enr}/${t.cap} enrolled (${pct(t.enr, t.cap)} fill), ${t.open} open seats, waitlist ${t.wl}, SCH ${t.sch}, FTE ${(t.sch / 30).toFixed(1)}`);
+      lines.push(`- ${partOfTermLabel(p)} (snapshot ${latest[p].date}; ${phaseText(p)}): ${t.sections} sections, ${t.enr}/${t.cap} enrolled (${pct(t.enr, t.cap)} fill), ${t.open} open seats, waitlist ${t.wl}, SCH ${t.sch}, FTE ${(t.sch / 30).toFixed(1)}`);
     });
     const goal = state.goals && state.goals.fte;
     lines.push(`College FTE (all parts of term): ${(collegeSch / 30).toFixed(1)}${goal ? ` against a goal of ${goal}` : ''}.`);
+    lines.push('Fit answers to where each part of term is: before classes start, focus on open seats, low fill and waitlists; after census, focus on enrollment, fill and FTE, and treat waitlists as history for planning rather than current demand. Mention waitlists for a settled part of term only if the user asks about them.');
     const header = lines.join('\n');
 
     // Which parts of term the question is about (else the one on screen)
@@ -6986,7 +7007,7 @@
 
     // History: questions about earlier snapshots, trends or peaks get a
     // snapshot-by-snapshot series plus the sections with the largest waitlists.
-    const historyMode = /\b(snapshots?|histor(y|ical)|trends?|over time|over the (term|semester)|earlier|previous|past|peak|week[\s-]by[\s-]week|week[\s-]to[\s-]week|since|grew|growth|changed?)\b/i.test(q);
+    const historyMode = /\b(snapshots?|histor(y|ical)|trends?|over time|over the (term|semester)|earlier|previous|past|peak|week[\s-]by[\s-]week|week[\s-]to[\s-]week|since|grew|growth|changed?|planning|before classes)\b/i.test(q);
     let history = '';
     if (historyMode) {
       const HIST_BUDGET = 12000;
@@ -7051,6 +7072,56 @@
       note += `\n[Detailed lists above cover only ${focus.map(partOfTermLabel).join(' and ')}. The summary covers every part of term. For detail on ${others.join(', ')}, ask the user to name that part of term in their question, for example "7B" or "11-week". The data is not limited by the menu on screen.]`;
     }
     return header + '\n' + history + '\n' + detail + note;
+  };
+
+  // Suggested questions for the chat, chosen from where each part of term is
+  // right now and from the user's selected disciplines. enrollment-assistant.js
+  // calls this each time it shows suggestions. [Brackets] mark text the user
+  // types over.
+  window.assistantSuggestions = function () {
+    if (state.loadStatus !== 'loaded') return null;   // the widget falls back to its own list
+    const pots = availablePartsOfTerm();
+    const disc = state.selectedDisciplines.size ? `[${[...state.selectedDisciplines].sort()[0]}]` : '[your discipline]';
+    const ask = {
+      registration: L => [
+        `Which ${L} courses still have open seats?`,
+        `Which ${L} sections have waitlists right now?`,
+        `Which ${L} sections are below 50% fill?`,
+        `Which ${L} sections still have open seats in ${disc}?`,
+      ],
+      early: (L, ph) => [
+        `Which ${L} sections still have open seats before the ${fmtDateShort(ph.census)} census?`,
+        `How has ${L} enrollment changed since the last snapshot?`,
+        `Which ${L} sections are below 50% fill in ${disc}?`,
+      ],
+      settled: (L, ph) => [
+        `How did ${L} enrollment change between the ${fmtDateShort(ph.census)} census and now?`,
+        `Which ${L} sections are below 50% fill in ${disc}?`,
+        `Which ${L} disciplines have the highest fill?`,
+        `For planning next year: which ${L} sections had the largest waitlists before classes started?`,
+      ],
+    };
+    // Parts of term still enrolling come first, then the one on screen, then the rest
+    const rank = p => { const ph = potPhase(p); return !ph ? 3 : ph.phase === 'registration' ? 0 : ph.phase === 'early' ? 1 : p === state.activePartOfTerm ? 2 : 3; };
+    const ordered = pots.slice().sort((a, b) => rank(a) - rank(b));
+    const short = p => ({ '7A': '7A', '7B': '7B' })[p] || partOfTermLabel(p);
+    const out = [];
+    ordered.forEach((p, i) => {
+      const ph = potPhase(p);
+      const qs = ask[ph ? ph.phase : 'settled'](short(p), ph || { census: 'census' });
+      out.push(...qs.slice(0, i === 0 ? 2 : 1));      // two from the top part of term, one from each other
+    });
+    out.splice(2, 0, 'How close are we to the college FTE goal?');
+    const extras = [];
+    ordered.forEach(p => { const ph = potPhase(p); extras.push(...ask[ph ? ph.phase : 'settled'](short(p), ph || { census: 'census' })); });
+    extras.forEach(q => { if (!out.includes(q)) out.push(q); });
+    // Keep one fill-in-your-discipline question among the first four shown,
+    // preferring the part of term on screen
+    const activeShort = short(state.activePartOfTerm);
+    const di = out.findIndex(q => q.includes(disc) && q.includes(activeShort));
+    const dj = di >= 0 ? di : out.findIndex(q => q.includes(disc));
+    if (dj > 3) out.splice(3, 0, out.splice(dj, 1)[0]);
+    return out;
   };
 })();
 </script>
