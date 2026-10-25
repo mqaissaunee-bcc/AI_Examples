@@ -2,9 +2,39 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.32
-  Date:     October 8, 2026
-  Features: Census surfaces as a bar beneath the KPI strip.
+  Version:  v5.33
+  Date:     October 25, 2026
+  Features: Multi-term dashboard — Winterim 2027 and Spring 2027 join
+            Fall 2026 as peer terms in a unified sub-term picker.
+            - Reads data/terms.json at load; fetches each listed term's
+              manifest and spreadsheets in parallel. All snapshots go into
+              the same state.snapshots array, tagged with their term code.
+            - Compound (term, POT) state model: state.activeTerm +
+              state.activePartOfTerm identify what's currently in view.
+              Both are persisted to localStorage separately.
+            - Lifecycle computation: each (term, POT) option is tagged
+              UPCOMING / IN_SESSION / ENDING_SOON / COMPLETE based on
+              today's date vs. the pot_dates in each manifest. The POT
+              dropdown groups and sorts by lifecycle so operationally-
+              relevant terms sit at the top.
+            - Winterim's single-session structure handled via the FULL
+              sentinel POT (pot_dates={} in manifest triggers this).
+            - Term/POT labels fully dynamic — term_label from manifest
+              drives the title bar and dropdown labels.
+            - AI assistant context now covers all terms with a two-layer
+              structure: forward-looking (IN SESSION + UPCOMING + ENDING
+              SOON) and historical (COMPLETE). The system prompt tells
+              the assistant to lean forward for open-ended questions and
+              scope to a specific term when the user names one.
+            - Row ingest now accepts terms matching any configured term
+              prefix (26FA, 27WN, 27SP, future). Pre-v5.33 behavior
+              preserved for Fall data already loaded.
+            - Backward compatible: dashboards without terms.json fall
+              back to loading data/26FA/ only (v5.32 behavior exactly).
+            Built on v5.32.
+
+  v5.32 (previous):
+            Census surfaces as a bar beneath the KPI strip.
             - The census information no longer renders as a free-floating
               banner above the KPI strip. It's now a secondary KPI row
               that sits flush beneath the live strip, with matching column
@@ -2384,7 +2414,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.32</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.33</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -2403,14 +2433,25 @@
   /* =========================================================================
    * CONFIGURATION
    * =========================================================================
-   * The dashboard loads enrollment reports from a GitHub-hosted data folder.
-   * To track a different semester, change DATA_PATH and update the manifest.
-   * To work locally with files instead, leave as-is and serve the directory
-   * with a static server (python3 -m http.server, etc.) — fetch() respects
-   * relative paths.
+   * The dashboard loads enrollment reports from multiple term folders, each
+   * under data/<termcode>/ (e.g. data/26FA/, data/27WN/, data/27SP/). The
+   * top-level data/terms.json file lists which terms are active:
+   *   { "terms": ["26FA", "27WN", "27SP"] }
+   * For each listed term, the dashboard fetches data/<termcode>/manifest.json
+   * and its referenced snapshot files. All loaded data goes into the same
+   * state.snapshots array, tagged with the term code; the active term + POT
+   * selection determines what's visible.
+   *
+   * BACKWARD COMPATIBILITY: if terms.json is missing or empty, falls back to
+   * loading data/26FA/ (the pre-v5.33 behavior).
    */
-  const DATA_PATH = 'data/26FA/';
+  const DATA_ROOT = 'data/';
+  const TERMS_INDEX_FILE = 'terms.json';
   const MANIFEST_FILE = 'manifest.json';
+
+  // Legacy constant used only by error messages that reference the pre-v5.33
+  // "single data folder" model. Kept so error strings don't crash.
+  const DATA_PATH = DATA_ROOT + '26FA/';
 
   /* =========================================================================
    * STATE & STORAGE
@@ -2428,6 +2469,7 @@
     DISCIPLINE_ROW_EXPANSION: 'enroll-disc-row-expansion',
     WHATS_NEW_SEEN: 'enroll-whats-new-seen',
     ACTIVE_PART_OF_TERM: 'enroll-active-part-of-term',
+    ACTIVE_TERM: 'enroll-active-term',  // v5.33: term code (e.g. '26FA')
     MOVER_WINDOW: 'enroll-mover-window',
     GOAL_MET_CELEBRATED: 'enroll-goal-met-celebrated',
   };
@@ -2446,13 +2488,14 @@
   // pill renders as "UPDATED" instead of "NEW", and the modal auto-opens
   // once on first load. First-time visitors (no stored value) see "NEW"
   // with no auto-open — the badge alone is their introduction.
-  const WHATS_NEW_VERSION = '2026-10-08';
+  const WHATS_NEW_VERSION = '2026-10-25';
   const WHATS_NEW_CONTENT = `
     <ul>
-      <li><strong>10th-day census is now pinned.</strong> When viewing 15W, you'll see the official state-reportable number from September 21 — the day the college's census is captured. The banner stays visible for the rest of the term, independent of which snapshot you're currently exploring.</li>
-      <li><strong>Census marker on the trend chart.</strong> The Enrollment Over Time chart now shows a blue vertical line on the census date, with the enrollment count labeled. Easier to see "this is the number that counts" in context of the whole trajectory.</li>
-      <li><strong>Movers now compare snapshot-to-snapshot.</strong> No more "+30" on sections that filled up months ago. Use the toggle to see "Since start" for the long view.</li>
-      <li><strong>College FTE aggregates all sub-terms.</strong> Fall-total FTE (15W + 11W + 7A + 7B) is measured against the fall goal. A sub-line shows your view's contribution.</li>
+      <li><strong>Winterim 2027 and Spring 2027 are now visible.</strong> The sub-term picker in the title now shows all three semesters together, grouped by lifecycle: what's in session, what's coming up, what's complete. Click any sub-term to switch. Fall 2026 options still work the same way.</li>
+      <li><strong>Lifecycle badges on every option.</strong> Each sub-term shows where it is in its cycle — IN SESSION, UPCOMING, ENDING SOON, or COMPLETE — so you always know what to focus on. Completed sub-terms are dimmed and shown at the bottom.</li>
+      <li><strong>Dynamic title bar.</strong> The title now shows which term you're viewing ("Fall 2026 — 15 Weeks", "Spring 2027 — 7A", etc.) rather than a hardcoded label.</li>
+      <li><strong>AI assistant now covers all terms.</strong> Ask about any sub-term — Winterim seats, Spring registration trends, Fall final numbers — and the assistant has the data loaded. It prioritizes forward-looking questions ("what should I watch?") toward current and upcoming terms.</li>
+      <li><strong>Per-POT FTE goals, when set.</strong> Spring 2027 ships with per-POT goal breakdowns (15W: 2,620; 11W: 324; 7A: 12; 7B: 24). Future enhancement will display them next to the headline goal.</li>
     </ul>
   `;
 
@@ -2463,13 +2506,31 @@
     instituteIndex: {},     // { 'BUSS': ['CULA','ACCT',...], ... }
     allDisciplines: [],     // [{ code, institute, count }]
 
-    // Part-of-term selection. Each snapshot belongs to exactly one part of
-    // term (15W, 11W, 7A, 7B — or SU1/SU2/SU3 for summer). The active POT
-    // filters which snapshots are considered "in view" — currentSnapshot(),
-    // previousSnapshot(), and any aggregation across snapshots (trend chart,
-    // movers, waitlist) all operate on the active POT only. Default is 15W
-    // which matches the existing dashboard behavior when only 15W data
-    // exists. Persisted to localStorage so the user's choice sticks.
+    // v5.33: Multi-term support. The dashboard loads multiple term manifests
+    // in parallel (26FA Fall, 27WN Winterim, 27SP Spring) and tags every
+    // snapshot with its term. The ACTIVE SELECTION is a compound (term, pot)
+    // tuple identifying which snapshots are in view. All downstream rendering
+    // (KPIs, trends, movers, discipline summary) filters by both.
+    //
+    // The POT dropdown presents a unified cross-term list, sorted by
+    // lifecycle (IN SESSION, UPCOMING, ENDING SOON, COMPLETE) so chairs
+    // always see the operationally-relevant terms first. Each selection
+    // updates both activeTerm and activePartOfTerm at once.
+    //
+    // Default is 26FA + 15W to match pre-v5.33 behavior. On first visit
+    // after upgrade, the sticky localStorage value will be interpreted as
+    // Fall unless activeTerm is also set.
+
+    // Loaded term configurations: { "26FA": { term_label, term_start, term_end, goals, census, pot_dates, ... }, ... }
+    // Keyed by term code. Populated during loadFromManifests. Each entry
+    // mirrors the top-level fields of the term's manifest.json (excluding
+    // snapshots, which go into state.snapshots).
+    terms: {},
+
+    activeTerm: '26FA',
+
+    // Part-of-term code. Fall and Spring use 15W/11W/7A/7B. Winterim uses
+    // 'FULL' (sentinel for single-session terms with empty pot_dates).
     activePartOfTerm: '15W',
 
     // Movers panel comparison window. 'previous' compares the current
@@ -2524,13 +2585,14 @@
     loadStatus: 'idle',     // 'idle' | 'loading' | 'loaded' | 'error'
     loadError: null,
     loadedAt: null,         // when manifest was fetched
-    manifestUpdatedAt: null,// "updated" field from manifest if present
-    goals: null,            // { fte: 2953.0 } from manifest, or null
+    manifestUpdatedAt: null,// "updated" field from the ACTIVE term's manifest (recomputed on term switch)
 
-    // 10th-day census dates (one per POT) from manifest.
-    // e.g., { "15W": "2026-09-21" }. The dashboard pins the snapshot
-    // captured on this date as the official state-reportable number
-    // and marks it on the trend chart.
+    // v5.33: goals and census now live PER TERM inside state.terms[termCode].
+    // These fields remain as computed accessors — see fteGoal() and
+    // activeCensusInfo(), which read from the active term's config.
+    // Legacy fields kept null so any orphan reference degrades to "no goal set"
+    // rather than crashing.
+    goals: null,
     census: null,
   };
 
@@ -2646,6 +2708,11 @@
       const apot = localStorage.getItem(STORAGE.ACTIVE_PART_OF_TERM);
       if (apot) state.activePartOfTerm = apot;
 
+      // v5.33: active term code (e.g. '26FA'). Backward compat: if missing,
+      // activePartOfTerm from pre-v5.33 implicitly belongs to 26FA.
+      const at = localStorage.getItem(STORAGE.ACTIVE_TERM);
+      if (at) state.activeTerm = at;
+
       const mw = localStorage.getItem(STORAGE.MOVER_WINDOW);
       if (mw === 'previous' || mw === 'start') state.moverWindow = mw;
     } catch (err) {
@@ -2663,6 +2730,7 @@
       localStorage.setItem(STORAGE.GROUPED_VIEW, String(state.groupedView));
       localStorage.setItem(STORAGE.DISCIPLINE_ROW_EXPANSION, JSON.stringify(state.disciplineRowExpansion));
       localStorage.setItem(STORAGE.ACTIVE_PART_OF_TERM, state.activePartOfTerm);
+      localStorage.setItem(STORAGE.ACTIVE_TERM, state.activeTerm);
       localStorage.setItem(STORAGE.MOVER_WINDOW, state.moverWindow);
     } catch (err) {
       console.error('Storage save error (likely quota):', err);
@@ -2716,95 +2784,185 @@
     reader.readAsArrayBuffer(file);
   }
 
-  // Fetch manifest + all listed spreadsheets from the configured DATA_PATH.
-  // Manifest format:
+  // v5.33 MULTI-TERM LOADER.
+  //
+  // Fetches data/terms.json, then fetches each listed term's manifest in
+  // parallel, then fetches each term's listed spreadsheets in parallel.
+  // All snapshots go into the same state.snapshots array, each tagged with
+  // its term code. Term configs (label, dates, goals, census, pot_dates)
+  // land in state.terms keyed by term code.
+  //
+  // Backward compatibility: if terms.json is missing or empty, falls back
+  // to the pre-v5.33 single-term behavior (loads data/26FA/ only).
+  //
+  // Each per-term manifest looks like:
   //   {
-  //     "updated": "2026-05-03T14:00:00Z",   // optional, ISO timestamp
-  //     "term": "26FA",                       // optional, display label
-  //     "snapshots": [
-  //       { "date": "2026-04-28", "file": "26FA_Course_Enrollment_Report_042826.xlsx" },
-  //       ...
-  //     ]
+  //     "term": "26FA",
+  //     "term_label": "Fall 2026",
+  //     "term_start": "2026-09-02",
+  //     "term_end": "2026-12-15",
+  //     "updated": "2026-10-25T14:00:00Z",
+  //     "goals": { "fte": 3335.0, "fte_by_pot": { "15W": ..., ... } },
+  //     "census": { "15W": "2026-09-21", ... },
+  //     "pot_dates": { "15W": { "start": "...", "end": "..." }, ... },
+  //     "snapshots": [ { "date": "...", "file": "..." }, ... ]
   //   }
-  async function loadFromManifest() {
+  //
+  // For Winterim (no POTs), pot_dates is an empty object; snapshots are
+  // ingested with POT='FULL' as the sentinel for "single-session term".
+  async function loadFromManifests() {
     state.loadStatus = 'loading';
     render();
 
-    const manifestUrl = DATA_PATH + MANIFEST_FILE;
     try {
-      // Cache-bust to ensure freshly-pushed data shows up without hard refresh
-      const manifestResp = await fetch(manifestUrl + '?t=' + Date.now());
-      if (!manifestResp.ok) {
-        throw new Error(`Manifest not found (HTTP ${manifestResp.status} at ${manifestUrl})`);
+      // Step 1: Discover active terms via data/terms.json. If it fails,
+      // fall back to the single-term pre-v5.33 behavior (26FA).
+      let termCodes = ['26FA'];
+      try {
+        const idxUrl = DATA_ROOT + TERMS_INDEX_FILE + '?t=' + Date.now();
+        const idxResp = await fetch(idxUrl);
+        if (idxResp.ok) {
+          const idx = await idxResp.json();
+          if (idx && Array.isArray(idx.terms) && idx.terms.length > 0) {
+            termCodes = idx.terms;
+          }
+        }
+      } catch (err) {
+        console.warn(`terms.json not available, falling back to 26FA only:`, err);
       }
-      const manifest = await manifestResp.json();
 
-      if (!manifest.snapshots || !Array.isArray(manifest.snapshots) || manifest.snapshots.length === 0) {
-        throw new Error('Manifest contains no snapshots.');
+      // Step 2: Fetch each term's manifest in parallel. Keep terms with
+      // valid manifests; log and skip any that fail (so one broken term
+      // doesn't block the others).
+      const termManifests = await Promise.all(termCodes.map(async code => {
+        try {
+          const url = DATA_ROOT + code + '/' + MANIFEST_FILE + '?t=' + Date.now();
+          const resp = await fetch(url);
+          if (!resp.ok) {
+            console.warn(`No manifest for term ${code} (HTTP ${resp.status})`);
+            return { code, manifest: null };
+          }
+          const manifest = await resp.json();
+          return { code, manifest };
+        } catch (err) {
+          console.warn(`Failed to load manifest for ${code}:`, err);
+          return { code, manifest: null };
+        }
+      }));
+
+      // Step 3: Reset snapshots and term configs. Populate state.terms with
+      // the config for every term that returned a manifest (regardless of
+      // whether it has snapshots — an empty 27SP term still appears in
+      // the dropdown as UPCOMING).
+      state.snapshots = [];
+      state.terms = {};
+
+      termManifests.forEach(({ code, manifest }) => {
+        if (!manifest) return;
+        state.terms[code] = {
+          term: manifest.term || code,
+          term_label: manifest.term_label || termLabelFromCode(code),
+          term_start: manifest.term_start || null,
+          term_end: manifest.term_end || null,
+          updated: manifest.updated || null,
+          goals: manifest.goals || null,
+          census: manifest.census || {},
+          pot_dates: manifest.pot_dates || {},
+        };
+      });
+
+      // Step 4: Collect all snapshot entries across all terms, tagged with
+      // their term, and fetch them all in parallel.
+      const allEntries = [];
+      termManifests.forEach(({ code, manifest }) => {
+        if (!manifest || !Array.isArray(manifest.snapshots)) return;
+        manifest.snapshots.forEach(entry => {
+          allEntries.push({ ...entry, _term: code });
+        });
+      });
+
+      if (allEntries.length === 0) {
+        // No snapshots anywhere. This is OK — Winterim/Spring may be
+        // configured but Laura hasn't started uploading yet. Show the
+        // "awaiting first snapshot" state rather than an error.
+        state.loadStatus = 'loaded';
+        state.loadError = null;
+        state.loadedAt = new Date().toISOString();
+        state.manifestUpdatedAt = null;
+        // Pick a sensible default activeTerm from what's configured.
+        if (!state.terms[state.activeTerm]) {
+          const first = Object.keys(state.terms)[0];
+          if (first) state.activeTerm = first;
+        }
+        render();
+        return;
       }
 
-      state.manifestUpdatedAt = manifest.updated || null;
-      state.goals = manifest.goals || null;  // e.g., { fte: 2953.0 } or null if not set
-      state.census = manifest.census || null;  // e.g., { "15W": "2026-09-21" } — 10th-day census dates per POT
-
-      // Fetch all spreadsheets in parallel
-      const fetches = manifest.snapshots.map(async entry => {
-        const fileUrl = DATA_PATH + entry.file;
-        const resp = await fetch(fileUrl);
-        if (!resp.ok) throw new Error(`Failed to fetch ${entry.file} (HTTP ${resp.status})`);
-        const buf = await resp.arrayBuffer();
-        return { entry, buf };
+      const fetches = allEntries.map(async entry => {
+        const fileUrl = DATA_ROOT + entry._term + '/' + entry.file;
+        try {
+          const resp = await fetch(fileUrl);
+          if (!resp.ok) {
+            console.warn(`Failed to fetch ${fileUrl} (HTTP ${resp.status})`);
+            return { entry, buf: null };
+          }
+          const buf = await resp.arrayBuffer();
+          return { entry, buf };
+        } catch (err) {
+          console.warn(`Failed to fetch ${fileUrl}:`, err);
+          return { entry, buf: null };
+        }
       });
 
       const results = await Promise.all(fetches);
 
-      // Reset snapshots and rebuild from manifest order
-      state.snapshots = [];
-
+      // Step 5: Parse each spreadsheet and ingest. Pass the term code so
+      // ingestRowsSilent can tag rows and filter by the correct term prefix.
       for (const { entry, buf } of results) {
+        if (!buf) continue;
         try {
           const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
-          // Sheet-name detection: prefer the per-POT convention ("Individual
-          // Sects All"), fall back to the combined-file convention ("Query
-          // result"), then anything else as a last resort. Both conventions
-          // ship the same column set, so the ingest logic is oblivious to
-          // which sheet was used.
           const sheetName = wb.SheetNames.find(n => /individual\s*sect/i.test(n))
                          || wb.SheetNames.find(n => /query\s*result/i.test(n))
                          || wb.SheetNames[0];
           const sheet = wb.Sheets[sheetName];
           const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
           const rows = resolveRowsForEntry(rawRows, entry);
-          ingestRowsSilent(rows, entry.file, entry.date, entry.part_of_term);
+          ingestRowsSilent(rows, entry.file, entry.date, entry.part_of_term, entry._term);
         } catch (err) {
           console.error(`Failed to parse ${entry.file}:`, err);
         }
       }
 
-      if (state.snapshots.length === 0) {
-        throw new Error('No snapshots could be parsed from manifest entries.');
-      }
-
+      // Even if no rows parsed (e.g. only placeholder manifests present),
+      // keep loadStatus=loaded so the UI shows terms with empty snapshot
+      // sets rather than a hard error.
       state.snapshots.sort((a, b) => a.date.localeCompare(b.date));
-      state.currentSnapshotId = state.snapshots[state.snapshots.length - 1].id;
+      state.currentSnapshotId = state.snapshots.length
+        ? state.snapshots[state.snapshots.length - 1].id
+        : null;
       recomputeAllDisciplines();
+
+      // Step 6: Decide the active (term, POT). Prefer the sticky
+      // localStorage value if both still exist in loaded data; otherwise
+      // pick a sensible default based on lifecycle.
+      pickActiveTermAndPot();
 
       state.loadStatus = 'loaded';
       state.loadError = null;
       state.loadedAt = new Date().toISOString();
 
-      // First-time visitors: open the discipline picker since they haven't
-      // chosen yet. Returning visitors keep their saved disciplines.
+      // manifestUpdatedAt now mirrors the ACTIVE term's updated field so
+      // the footer stamp reflects what the user is looking at.
+      const activeTermConfig = state.terms[state.activeTerm];
+      state.manifestUpdatedAt = activeTermConfig ? activeTermConfig.updated : null;
+
       const isFirstVisit = state.selectedDisciplines.size === 0;
       render();
       if (isFirstVisit) {
         openDisciplineModal();
       }
 
-      // Fire the goal-met celebration if the college aggregate has
-      // crossed the goal AND this user hasn't already been shown the
-      // celebration for the current term. Function no-ops for users
-      // who have already seen it or who have prefers-reduced-motion.
       maybeCelebrateGoal();
     } catch (err) {
       console.error('Failed to load enrollment data:', err);
@@ -2812,6 +2970,34 @@
       state.loadError = err.message || String(err);
       render();
     }
+  }
+
+  // Legacy name for callers that haven't been updated yet.
+  const loadFromManifest = loadFromManifests;
+
+  // v5.33: Pick the active (term, POT) at load time. Honors a sticky
+  // localStorage value when both still exist in the loaded data. Falls
+  // back to the first (term, POT) that's IN SESSION; if none is active,
+  // picks the earliest UPCOMING; else the most recent COMPLETE.
+  function pickActiveTermAndPot() {
+    const options = allTermPotOptions();
+    if (options.length === 0) return;
+
+    const stickyKey = (state.activeTerm || '') + '|' + (state.activePartOfTerm || '');
+    const stickyMatch = options.find(o => (o.term + '|' + o.pot) === stickyKey);
+    if (stickyMatch) {
+      state.activeTerm = stickyMatch.term;
+      state.activePartOfTerm = stickyMatch.pot;
+      return;
+    }
+
+    // Lifecycle priority: IN SESSION > UPCOMING (closest first) > ENDING SOON > COMPLETE
+    const inSession = options.find(o => o.lifecycle === 'IN_SESSION');
+    const upcoming = options.find(o => o.lifecycle === 'UPCOMING');
+    const endingSoon = options.find(o => o.lifecycle === 'ENDING_SOON');
+    const chosen = inSession || upcoming || endingSoon || options[options.length - 1];
+    state.activeTerm = chosen.term;
+    state.activePartOfTerm = chosen.pot;
   }
 
   // Apply the manifest entry's optional pot_term_filter, then defensively
@@ -2856,22 +3042,25 @@
   // Like ingestRows, but used during manifest load — does not toast or modify
   // currentSnapshotId (the caller decides). Uses the manifest-provided date
   // rather than re-parsing it from the filename.
-  function ingestRowsSilent(rawRows, filename, manifestDate, partOfTerm) {
-    // partOfTerm identifies which sub-term this snapshot belongs to. Comes
-    // from the manifest entry's part_of_term field (added in the Step 1
-    // pipeline update). Snapshots produced before the pipeline update, or
-    // any missing/undefined value, default to '15W' — that was the effective
-    // meaning of "no sub-term declared" in the pre-sub-term-support era.
-    const pot = partOfTerm || '15W';
+  //
+  // v5.33: termCode identifies which term this snapshot belongs to. The
+  // row filter now accepts rows whose Term column starts with the term
+  // code (so 27SP, 27SP11, 27SP7A, 27SP7B are all accepted when loading
+  // Spring 2027). Falls back to the old 'FA' filter when termCode isn't
+  // provided (manual uploads from the Snapshots tab).
+  function ingestRowsSilent(rawRows, filename, manifestDate, partOfTerm, termCode) {
+    const pot = partOfTerm || (termCode === '27WN' ? 'FULL' : '15W');
+    const term = termCode || '26FA';
+    const upperTerm = String(term).toUpperCase();
     const fall = rawRows.filter(r => {
-      const term = String(r.Term || '').toUpperCase();
+      const rowTerm = String(r.Term || '').toUpperCase();
       // Drop -295 (Special Project) and -299 (Internship) sections entirely
       // at the ingest step. The dashboard never sees these, so KPI totals,
       // FTE math, Trends, and every render path are unaffected by them.
-      // Use a local pattern check rather than calling isIndependentEnrollment
-      // because at ingest time r is the raw row, not a normalized row yet.
       if (r.Course && /-29[59]$/.test(String(r.Course))) return false;
-      return r.Course && term.includes('FA');
+      // Accept any row whose Term column starts with the term code we're
+      // ingesting (so 26FA matches 26FA, 26FA11, 26FA7A, 26FA7B).
+      return r.Course && rowTerm.startsWith(upperTerm);
     }).map(r => {
       const prefix = getCoursePrefix(r.Course);
       return {
@@ -2920,6 +3109,7 @@
       label: fmtDate(date),
       filename,
       part_of_term: pot,
+      term,                 // v5.33: term code tag
       rows: fall,
       uploadedAt: new Date().toISOString(),
     });
@@ -2927,15 +3117,19 @@
 
   function ingestRows(rawRows, filename) {
     // Manual upload path (not from manifest). Assume the file belongs to
-    // whichever part-of-term the user is currently viewing — that's the
-    // implicit context of "here's a file I want to add." If they were on
-    // 7A view and uploaded a 15W file, they'd want to switch to 15W first.
+    // whichever (term, part-of-term) the user is currently viewing — that's
+    // the implicit context of "here's a file I want to add." If they were
+    // on Spring 7A view and uploaded a Fall 15W file, they'd want to switch
+    // first. v5.33: now term-aware; filter accepts rows whose Term column
+    // starts with the active term code.
     const pot = state.activePartOfTerm || '15W';
+    const termCode = state.activeTerm || '26FA';
+    const upperTerm = String(termCode).toUpperCase();
     const fall = rawRows.filter(r => {
       const term = String(r.Term || '').toUpperCase();
       // Drop -295 / -299 sections at ingest. See note in ingestRowsSilent.
       if (r.Course && /-29[59]$/.test(String(r.Course))) return false;
-      return r.Course && term.includes('FA');
+      return r.Course && term.startsWith(upperTerm);
     }).map(r => {
       const prefix = getCoursePrefix(r.Course);
       return {
@@ -2964,7 +3158,7 @@
     }).filter(r => r._prefix);
 
     if (fall.length === 0) {
-      toast('⚠ No fall sections found in this spreadsheet.', 5000);
+      toast(`⚠ No ${termCode} sections found in this spreadsheet. (Expected Term column to start with "${termCode}".)`, 5000);
       return;
     }
 
@@ -2982,16 +3176,21 @@
     let date = parseDateFromFilename(filename);
     if (!date) date = new Date().toISOString().slice(0, 10);
 
-    // Check for duplicate (date, part_of_term) pair — a 15W and 7A snapshot
-    // on the same date are different snapshots; only a same-POT duplicate
-    // should trigger the replace path.
-    const existingIdx = state.snapshots.findIndex(s => s.date === date && (s.part_of_term || '15W') === pot);
+    // Check for duplicate (date, term, part_of_term) triple — a 15W and 7A
+    // snapshot on the same date are different; so are a Fall 15W and
+    // Spring 15W. Only a same-(term, POT) duplicate should trigger replace.
+    const existingIdx = state.snapshots.findIndex(s =>
+      s.date === date &&
+      (s.term || '26FA') === termCode &&
+      (s.part_of_term || '15W') === pot
+    );
     const snapshot = {
       id: uid(),
       date,
       label: fmtDate(date),
       filename,
       part_of_term: pot,
+      term: termCode,  // v5.33
       rows: fall,
       uploadedAt: new Date().toISOString(),
     };
@@ -3049,15 +3248,19 @@
    * ========================================================================= */
 
   // Returns the subset of state.snapshots belonging to the currently
-  // active part-of-term. This is the single source of truth for "which
-  // snapshots are visible to the user right now" — every function that
-  // needs to iterate across the history (trend chart, movers, snapshot
-  // library) uses this instead of state.snapshots directly. Snapshots
-  // missing the part_of_term field default to '15W' for backward
-  // compatibility with any old data loaded before Step 1.
+  // active (term, part-of-term) compound. This is the single source of
+  // truth for "which snapshots are visible to the user right now" — every
+  // function that needs to iterate across the history (trend chart,
+  // movers, snapshot library) uses this instead of state.snapshots
+  // directly. Snapshots missing the part_of_term field default to '15W',
+  // and snapshots missing the term field default to '26FA', for backward
+  // compatibility with pre-v5.33 data.
   function activeSnapshots() {
+    const termWanted = state.activeTerm || '26FA';
+    const potWanted = state.activePartOfTerm || '15W';
     return state.snapshots.filter(s =>
-      (s.part_of_term || '15W') === state.activePartOfTerm
+      (s.term || '26FA') === termWanted &&
+      (s.part_of_term || '15W') === potWanted
     );
   }
 
@@ -3402,8 +3605,28 @@
     return anyPriorHistory ? total : null;
   }
 
+  // v5.33: Returns the FTE goal for the active term. Reads from
+  // state.terms[activeTerm].goals.fte. Returns null if no goal is set.
+  //
+  // Spring 27 and later may also have per-POT goals under
+  // state.terms[activeTerm].goals.fte_by_pot[pot]. Callers that need the
+  // per-POT goal (not the college-wide number) use fteGoalForPot().
   function fteGoal() {
-    return state.goals && state.goals.fte ? Number(state.goals.fte) : null;
+    const cfg = state.terms[state.activeTerm];
+    if (cfg && cfg.goals && cfg.goals.fte != null) return Number(cfg.goals.fte);
+    // Legacy fallback for pre-v5.33 state that stored goals at the top level
+    if (state.goals && state.goals.fte != null) return Number(state.goals.fte);
+    return null;
+  }
+
+  // v5.33: Per-POT FTE goal for the active term, if configured.
+  // Returns null if the term has no per-POT breakdown (fall back to fteGoal()).
+  function fteGoalForPot(pot) {
+    const cfg = state.terms[state.activeTerm];
+    const byPot = cfg && cfg.goals && cfg.goals.fte_by_pot;
+    if (!byPot) return null;
+    const v = byPot[pot];
+    return v != null ? Number(v) : null;
   }
 
   function pctOfGoal(fte) {
@@ -3472,39 +3695,195 @@
     bindAllEvents();
   }
 
-  // Canonical ordering for the POT dropdown. Fall/spring parts of term
-  // sit before summer sessions; within fall/spring the sequence is 15W
-  // (longest / default) followed by the shorter variants. Any POT code
-  // not in this list is appended alphabetically at the end so unfamiliar
-  // codes still appear rather than being silently dropped.
-  const POT_ORDER = ['15W', '11W', '7A', '7B', 'SU1', 'SU2', 'SU3'];
+  // Canonical ordering for POT codes within a term.
+  const POT_ORDER = ['15W', '11W', '7A', '7B', 'FULL', 'SU1', 'SU2', 'SU3'];
 
-  // Returns the parts of term that have at least one snapshot in the
-  // loaded data, sorted in canonical order. Used to populate the picker
-  // menu so users only see options they can actually switch to.
+  // v5.33: Term code → human label fallback when term_label isn't in the
+  // manifest. Parses "26FA" → "Fall 2026", "27WN" → "Winterim 2027", etc.
+  function termLabelFromCode(code) {
+    if (!code) return '';
+    const m = String(code).match(/^(\d{2})(FA|SP|SU|WI|WN)$/i);
+    if (!m) return code;
+    const year = 2000 + parseInt(m[1], 10);
+    const seasons = { FA: 'Fall', SP: 'Spring', SU: 'Summer', WI: 'Winter', WN: 'Winterim' };
+    return `${seasons[m[2].toUpperCase()]} ${year}`;
+  }
+
+  // v5.33: Returns ALL (term, POT) options the user can select, drawn from
+  // the loaded term configs AND the loaded snapshots. A term whose manifest
+  // configures 4 POTs but has no snapshots yet still shows those 4 POTs
+  // (as UPCOMING), so Spring 15W appears in the dropdown before Laura
+  // uploads her first Spring file. Each returned entry includes lifecycle
+  // metadata so the dropdown can group and sort.
+  //
+  // Return: [{ term, pot, lifecycle, daysToStart, daysToEnd, snapCount }, ...]
+  //   lifecycle: 'UPCOMING' | 'IN_SESSION' | 'ENDING_SOON' | 'COMPLETE' | 'UNKNOWN'
+  //
+  // Ordering: IN SESSION first (by proximity to end), then UPCOMING (closest
+  // start first), then ENDING SOON, then COMPLETE (most recent first).
+  // Winterim (POT='FULL') appears before Spring POTs when both are UPCOMING
+  // so chairs see the next thing to happen at the top.
+  function allTermPotOptions() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTs = today.getTime();
+
+    const opts = [];
+    const seen = new Set();
+
+    // From loaded term configs — covers POTs with no snapshots yet
+    Object.keys(state.terms).forEach(termCode => {
+      const cfg = state.terms[termCode];
+      const potDates = cfg.pot_dates || {};
+      const pots = Object.keys(potDates);
+
+      if (pots.length === 0) {
+        // Single-session term (e.g. Winterim). Use 'FULL' as the sentinel POT.
+        const start = cfg.term_start ? new Date(cfg.term_start + 'T00:00:00').getTime() : null;
+        const end = cfg.term_end ? new Date(cfg.term_end + 'T00:00:00').getTime() : null;
+        opts.push(buildOption(termCode, 'FULL', start, end, todayTs));
+        seen.add(termCode + '|FULL');
+      } else {
+        pots.forEach(pot => {
+          const pd = potDates[pot] || {};
+          const start = pd.start ? new Date(pd.start + 'T00:00:00').getTime() : null;
+          const end = pd.end ? new Date(pd.end + 'T00:00:00').getTime() : null;
+          opts.push(buildOption(termCode, pot, start, end, todayTs));
+          seen.add(termCode + '|' + pot);
+        });
+      }
+    });
+
+    // From loaded snapshots — covers legacy snapshots that have term+pot
+    // tags but whose configs don't list those pots (shouldn't happen in
+    // normal operation, but defensive)
+    state.snapshots.forEach(s => {
+      const termCode = s.term || '26FA';
+      const pot = s.part_of_term || '15W';
+      const key = termCode + '|' + pot;
+      if (seen.has(key)) return;
+      seen.add(key);
+      opts.push(buildOption(termCode, pot, null, null, todayTs));
+    });
+
+    // Snapshot counts per (term, pot)
+    const counts = {};
+    state.snapshots.forEach(s => {
+      const key = (s.term || '26FA') + '|' + (s.part_of_term || '15W');
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    opts.forEach(o => { o.snapCount = counts[o.term + '|' + o.pot] || 0; });
+
+    // Lifecycle rank for sort: IN_SESSION (0), ENDING_SOON (1), UPCOMING (2),
+    // COMPLETE (3), UNKNOWN (4). Within each bucket, secondary sort by
+    // proximity to today.
+    const rank = l => ({ IN_SESSION: 0, ENDING_SOON: 1, UPCOMING: 2, COMPLETE: 3, UNKNOWN: 4 }[l] ?? 4);
+    opts.sort((a, b) => {
+      const r = rank(a.lifecycle) - rank(b.lifecycle);
+      if (r !== 0) return r;
+      // Within IN_SESSION/ENDING_SOON: sort by end date ascending (ending sooner first)
+      if (a.lifecycle === 'IN_SESSION' || a.lifecycle === 'ENDING_SOON') {
+        return (a.daysToEnd ?? 999) - (b.daysToEnd ?? 999);
+      }
+      // UPCOMING: closest start first
+      if (a.lifecycle === 'UPCOMING') {
+        return (a.daysToStart ?? 999) - (b.daysToStart ?? 999);
+      }
+      // COMPLETE: most recent end first (negative days to end, closer to 0 = more recent)
+      if (a.lifecycle === 'COMPLETE') {
+        return (b.daysToEnd ?? -999) - (a.daysToEnd ?? -999);
+      }
+      // UNKNOWN: by term then pot
+      const t = a.term.localeCompare(b.term);
+      if (t !== 0) return t;
+      return POT_ORDER.indexOf(a.pot) - POT_ORDER.indexOf(b.pot);
+    });
+
+    return opts;
+  }
+
+  function buildOption(termCode, pot, start, end, todayTs) {
+    const DAY = 86400000;
+    const daysToStart = start != null ? Math.round((start - todayTs) / DAY) : null;
+    const daysToEnd = end != null ? Math.round((end - todayTs) / DAY) : null;
+
+    let lifecycle = 'UNKNOWN';
+    if (start != null && end != null) {
+      if (daysToStart > 0) {
+        lifecycle = 'UPCOMING';
+      } else if (daysToEnd < 0) {
+        lifecycle = 'COMPLETE';
+      } else if (daysToEnd <= 14) {
+        lifecycle = 'ENDING_SOON';
+      } else {
+        lifecycle = 'IN_SESSION';
+      }
+    }
+
+    return {
+      term: termCode,
+      pot,
+      start,
+      end,
+      daysToStart,
+      daysToEnd,
+      lifecycle,
+      snapCount: 0,
+    };
+  }
+
+  // Legacy: Returns the parts of term that have at least one snapshot in the
+  // CURRENTLY ACTIVE term's loaded data, sorted in canonical order. Kept for
+  // backward compat with callers inside the AI assistant context and anywhere
+  // else that still thinks in single-term terms.
   function availablePartsOfTerm() {
     const found = new Set();
-    state.snapshots.forEach(s => found.add(s.part_of_term || '15W'));
+    state.snapshots.forEach(s => {
+      if ((s.term || '26FA') === state.activeTerm) {
+        found.add(s.part_of_term || '15W');
+      }
+    });
     const known = POT_ORDER.filter(p => found.has(p));
     const extra = [...found].filter(p => !POT_ORDER.includes(p)).sort();
     return [...known, ...extra];
   }
 
-  // Human-readable label for a part-of-term code. Used by the masthead
-  // subtitle pill. The suffixed variants ("7A · first half", "7B · second
-  // half") make the abbreviated codes readable to someone unfamiliar with
-  // Brookdale's sub-term naming without cluttering the label for the
-  // common 15W/11W cases.
+  // Human-readable label for a POT code. 'FULL' is the sentinel for
+  // single-session terms (Winterim); its label is the term name.
   function partOfTermLabel(code) {
     switch (code) {
       case '15W': return '15-week';
       case '11W': return '11-week';
       case '7A':  return '7A · first half';
       case '7B':  return '7B · second half';
+      case 'FULL': return 'Full term';
       case 'SU1': return 'Summer I';
       case 'SU2': return 'Summer II';
       case 'SU3': return 'Summer III';
       default:    return code || '15-week';
+    }
+  }
+
+  // v5.33: Combined label for a (term, POT) option, used in the picker
+  // and the subtitle. Winterim shows as "Winterim 2027"; Spring 15W shows
+  // as "Spring 2027 — 15 Weeks"; etc.
+  function termPotLabel(termCode, pot) {
+    const cfg = state.terms[termCode];
+    const termLabel = cfg && cfg.term_label ? cfg.term_label : termLabelFromCode(termCode);
+    if (pot === 'FULL') return termLabel;
+    const potShort = { '15W': '15 Weeks', '11W': '11 Weeks', '7A': '7A', '7B': '7B',
+                       'SU1': 'Summer I', 'SU2': 'Summer II', 'SU3': 'Summer III' }[pot] || pot;
+    return `${termLabel} — ${potShort}`;
+  }
+
+  // v5.33: Short badge text for a lifecycle state
+  function lifecycleBadge(lc) {
+    switch (lc) {
+      case 'IN_SESSION':  return 'IN SESSION';
+      case 'UPCOMING':    return 'UPCOMING';
+      case 'ENDING_SOON': return 'ENDING SOON';
+      case 'COMPLETE':    return 'COMPLETE';
+      default:            return '';
     }
   }
 
@@ -3520,21 +3899,28 @@
       el('reportDate').textContent = 'No data loaded';
     }
 
-    // Title subtitle: visible only once data has loaded. Populates the POT
-    // pill from state.activePartOfTerm. The term label ("Fall 2026") is
-    // still hardcoded — the dashboard is scoped to a single term at a time
-    // and 26FA is the current focus. When multi-term support arrives
-    // later, this can be replaced with a dynamic term-code → label helper.
+    // v5.33: Title subtitle shows the ACTIVE (term, POT) context, pulled
+    // from state.activeTerm + state.activePartOfTerm. Pill shows the
+    // combined label (e.g. "Spring 2027 — 15 Weeks"). The dropdown lists
+    // ALL (term, POT) options across every loaded term, grouped by
+    // lifecycle (IN SESSION / UPCOMING / ENDING SOON / COMPLETE). Each
+    // entry shows a lifecycle badge and snapshot count.
     const subtitle = el('titleSubtitle');
     if (subtitle) {
-      const showSubtitle = snap && state.loadStatus !== 'loading' && state.loadStatus !== 'error';
-      subtitle.style.display = showSubtitle ? 'flex' : 'none';
-      if (showSubtitle) {
+      const dataIsReady = state.loadStatus !== 'loading' && state.loadStatus !== 'error';
+      subtitle.style.display = dataIsReady ? 'flex' : 'none';
+      if (dataIsReady) {
         const activePot = state.activePartOfTerm;
-        const isDefault = activePot === '15W';
-        const label = partOfTermLabel(activePot);
+        const activeTerm = state.activeTerm;
+        const label = termPotLabel(activeTerm, activePot);
 
-        // Pill label + non-default state (amber treatment when not 15W)
+        // Compute lifecycle for the active option
+        const allOpts = allTermPotOptions();
+        const activeOpt = allOpts.find(o => o.term === activeTerm && o.pot === activePot);
+        const activeLc = activeOpt ? activeOpt.lifecycle : 'UNKNOWN';
+        const isDefault = activeTerm === '26FA' && activePot === '15W';
+
+        // Pill label + non-default state (amber treatment when not Fall 15W)
         const pillLabel = el('titlePotPillLabel');
         if (pillLabel) pillLabel.textContent = label;
         const pillBtn = el('titlePotPill');
@@ -3543,26 +3929,50 @@
           pillBtn.setAttribute('aria-expanded', pillBtn.getAttribute('aria-expanded') === 'true' ? 'true' : 'false');
         }
 
-        // Rebuild the dropdown menu contents from currently-available POTs
+        // Rebuild the dropdown menu with cross-term options, grouped by
+        // lifecycle. data-pot now carries the compound "term|pot" key.
         const menu = el('potMenu');
         if (menu) {
-          const available = availablePartsOfTerm();
-          menu.innerHTML = available.map(pot => {
-            const count = state.snapshots.filter(s => (s.part_of_term || '15W') === pot).length;
-            const isActive = pot === activePot;
+          const activeKey = activeTerm + '|' + activePot;
+          const grouped = { IN_SESSION: [], ENDING_SOON: [], UPCOMING: [], COMPLETE: [], UNKNOWN: [] };
+          allOpts.forEach(o => grouped[o.lifecycle].push(o));
+
+          const groupTitle = {
+            IN_SESSION: 'In session',
+            ENDING_SOON: 'Ending soon',
+            UPCOMING: 'Upcoming',
+            COMPLETE: 'Completed',
+            UNKNOWN: 'Other',
+          };
+
+          const renderOpt = o => {
+            const key = o.term + '|' + o.pot;
+            const isActive = key === activeKey;
             const check = isActive ? '<span class="check" aria-hidden="true">✓</span>' : '<span class="check" aria-hidden="true" style="visibility:hidden">✓</span>';
-            const countLabel = count === 1 ? '1 snapshot' : `${count} snapshots`;
+            const countLabel = o.snapCount === 0 ? 'no snapshots yet'
+                             : o.snapCount === 1 ? '1 snapshot'
+                             : `${o.snapCount} snapshots`;
+            const dim = o.lifecycle === 'COMPLETE' ? ' style="opacity:0.65"' : '';
             return `
-              <button type="button" class="pot-menu-item ${isActive ? 'is-active' : ''}" role="option" data-pot="${escapeHtml(pot)}" aria-selected="${isActive}">
+              <button type="button" class="pot-menu-item ${isActive ? 'is-active' : ''}" role="option" data-pot="${escapeHtml(key)}" aria-selected="${isActive}"${dim}>
                 ${check}
-                <span class="label">${escapeHtml(partOfTermLabel(pot))}</span>
+                <span class="label">${escapeHtml(termPotLabel(o.term, o.pot))}</span>
                 <span class="count">${countLabel}</span>
               </button>
             `;
-          }).join('');
+          };
+
+          let html = '';
+          ['IN_SESSION', 'ENDING_SOON', 'UPCOMING', 'COMPLETE', 'UNKNOWN'].forEach(lc => {
+            if (grouped[lc].length === 0) return;
+            html += `<div class="pot-menu-group-head" aria-hidden="true" style="padding:6px 14px 2px;font-size:10px;letter-spacing:0.08em;color:var(--ink-mute);font-weight:600;text-transform:uppercase;">${groupTitle[lc]}</div>`;
+            html += grouped[lc].map(renderOpt).join('');
+          });
+          menu.innerHTML = html;
         }
 
-        // Amber banner shown only when the active POT is not 15W
+        // Amber banner shown only when the active option is not Fall 15W.
+        // (Pre-v5.33 behavior.)
         const banner = el('potBanner');
         if (banner) {
           banner.style.display = isDefault ? 'none' : 'flex';
@@ -3617,7 +4027,7 @@
           <h2>Couldn't load enrollment data.</h2>
           <p>${escapeHtml(state.loadError || 'Unknown error.')}</p>
           <p style="font-size:12px;color:var(--ink-mute);margin-top:16px">
-            This dashboard reads from <code>${escapeHtml(DATA_PATH + MANIFEST_FILE)}</code> in the same folder as this page.
+            This dashboard reads from <code>${escapeHtml(DATA_ROOT + TERMS_INDEX_FILE)}</code> and each listed term's manifest in the same folder as this page.
             If you're testing locally, make sure you're serving the directory through a web server (open files via <code>file://</code> won't work — browsers block fetch from local files).
           </p>
           <button class="upload-btn" id="retryBtn" type="button">Retry</button>
@@ -3703,9 +4113,12 @@
   //
   // Returns null otherwise.
   function activeCensusInfo() {
-    if (!state.census) return null;
+    // v5.33: Pull census from the active term's config
+    const termCfg = state.terms[state.activeTerm];
+    const censusMap = (termCfg && termCfg.census) || state.census;
+    if (!censusMap) return null;
     const pot = state.activePartOfTerm || '15W';
-    const censusDate = state.census[pot];
+    const censusDate = censusMap[pot];
     if (!censusDate) return null;
 
     // Only consider showing once the census date has passed (compare in
@@ -3718,7 +4131,9 @@
     d.setDate(d.getDate() + 1);
     const dayAfter = d.toISOString().slice(0, 10);
 
+    const termWanted = state.activeTerm || '26FA';
     const snapsForPot = state.snapshots.filter(s =>
+      (s.term || '26FA') === termWanted &&
       (s.part_of_term || '15W') === pot
     );
 
@@ -6729,7 +7144,7 @@
     // Per-term persistence. Stores the term code so the same user gets
     // one celebration per term (next semester's goal-met crossing will
     // fire a fresh celebration).
-    const term = state.term || 'unknown';
+    const term = state.activeTerm || 'unknown';  // v5.33: compound-aware
     let celebrated = null;
     try { celebrated = localStorage.getItem(STORAGE.GOAL_MET_CELEBRATED); } catch (e) {}
     if (celebrated === term) return;
@@ -6802,16 +7217,34 @@
     if (pillBtn) pillBtn.setAttribute('aria-expanded', 'false');
   }
 
-  function switchPartOfTerm(pot) {
-    if (!pot || pot === state.activePartOfTerm) {
+  // v5.33: Accepts a compound "term|pot" key (e.g. "27SP|15W") OR a bare
+  // POT code (e.g. "15W") for backward compat with any internal callers
+  // that haven't been updated.
+  function switchPartOfTerm(key) {
+    if (!key) {
       closePotMenu();
       return;
     }
+    let term, pot;
+    if (key.indexOf('|') >= 0) {
+      [term, pot] = key.split('|');
+    } else {
+      term = state.activeTerm;
+      pot = key;
+    }
+    if (term === state.activeTerm && pot === state.activePartOfTerm) {
+      closePotMenu();
+      return;
+    }
+    state.activeTerm = term;
     state.activePartOfTerm = pot;
     // Reset current snapshot pointer — the stored ID belongs to a
-    // different POT. currentSnapshot() will fall back to the newest
-    // snapshot in the new POT on the next call.
+    // different (term, POT). currentSnapshot() will fall back to the
+    // newest snapshot in the new context on the next call.
     state.currentSnapshotId = null;
+    // Update footer-stamp "data updated" marker to reflect the new term
+    const activeTermConfig = state.terms[state.activeTerm];
+    state.manifestUpdatedAt = activeTermConfig ? activeTermConfig.updated : null;
     saveStorage();
     closePotMenu();
     render();
@@ -6878,18 +7311,51 @@
   state.currentSnapshotId = null;
   loadFromManifest();
 /* =========================================================================
-   * ASSISTANT CONTEXT
-   * Gives the chat assistant a compact summary of the loaded data for every
-   * part of term, whatever the screen shows. enrollment-assistant.js calls
-   * window.getAssistantContext(recentQuestions) before each question.
+   * ASSISTANT CONTEXT  (v5.33 — multi-term, two-layer)
+   *
+   * The dashboard now carries multiple terms (Fall 2026, Winterim 2027,
+   * Spring 2027, future). The assistant should prioritize forward-looking
+   * terms (what chairs can still act on) while retaining historical
+   * context (how prior terms wrapped up) for when the user asks.
+   *
+   * Context layers delivered to the assistant on every question:
+   *   LAYER 1 (forward-looking): active + upcoming + in-session POTs across
+   *     all terms, with current state and lifecycle context.
+   *   LAYER 2 (historical): recently-completed POTs with their final numbers,
+   *     for retrospective questions.
+   *
+   * The assistant decides which to lean on based on the question — explicit
+   * mention of a specific term/POT scopes the answer; open-ended questions
+   * lean forward-looking.
    * ========================================================================= */
-  // Where each part of term is in its cycle, from today's date and its census
-  // date in the manifest. Classes start about 10 days before census.
-  //   registration: classes haven't started; open seats and waitlists matter
-  //   early:        classes started, census not yet; add/drop period
-  //   settled:      census has passed; enrollment is largely set
+
+  // v5.33: Lifecycle-aware "phase" string for a (term, POT) option. Returns
+  // what the assistant should emphasize for that option: registration seats,
+  // add/drop activity, mid-term stability, or completed-term retrospective.
+  function phaseTextV2(opt) {
+    const cfg = state.terms[opt.term];
+    const census = cfg && cfg.census && cfg.census[opt.pot];
+    switch (opt.lifecycle) {
+      case 'UPCOMING':
+        return `registration open, classes start in ${opt.daysToStart} day${opt.daysToStart === 1 ? '' : 's'} on ${new Date(opt.start).toISOString().slice(0, 10)} (focus: open seats, waitlists, course mix)`;
+      case 'IN_SESSION':
+        return census ? `classes under way, census ${census}${opt.daysToEnd != null ? `, ${opt.daysToEnd} day${opt.daysToEnd === 1 ? '' : 's'} until term ends` : ''} (focus: current enrollment, movement, waitlists if still pre-census)`
+                      : `classes under way${opt.daysToEnd != null ? `, ${opt.daysToEnd} days until term ends` : ''}`;
+      case 'ENDING_SOON':
+        return `classes nearing end (${opt.daysToEnd} days remaining; focus: final enrollment, SCH, FTE)`;
+      case 'COMPLETE':
+        return `term complete (ended ${Math.abs(opt.daysToEnd)} days ago; focus: retrospective numbers only, waitlists not meaningful)`;
+      default:
+        return 'lifecycle unknown';
+    }
+  }
+
+  // Legacy phase helper used by assistantSuggestions. Looks up by POT alone
+  // in the active term, so pre-v5.33 single-term logic still works for
+  // suggested questions.
   function potPhase(pot) {
-    const census = state.census && state.census[pot];
+    const termCfg = state.terms[state.activeTerm];
+    const census = termCfg && termCfg.census && termCfg.census[pot];
     if (!census) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const c = new Date(census + 'T00:00:00');
@@ -6907,14 +7373,9 @@
   window.getAssistantContext = function (question) {
     const q = String(question || '');
     const BUDGET = 22000;
-    if (state.loadStatus !== 'loaded' || !state.snapshots.length) {
+    if (state.loadStatus !== 'loaded') {
       return 'ENROLLMENT DATA: not loaded yet. Tell the user to wait for the dashboard to finish loading, or to select Refresh.';
     }
-
-    // Term label from the data folder, e.g. data/26FA/ -> Fall 2026
-    const tm = DATA_PATH.match(/(\d{2})(FA|SP|SU|WI)/i);
-    const season = tm ? { FA: 'Fall', SP: 'Spring', SU: 'Summer', WI: 'Winter' }[tm[2].toUpperCase()] : '';
-    const termLabel = tm ? `${season} 20${tm[1]} (${tm[0].toUpperCase()})` : 'the current term';
 
     const pct = (a, b) => (b ? Math.round((1000 * a) / b) / 10 + '%' : 'n/a');
     const open = r => Math.max(0, r['Avail Seats'] || 0);
@@ -6927,33 +7388,94 @@
       return t;
     }
 
-    // Newest snapshot for each part of term
+    // Newest snapshot for each (term, POT) combination
     const latest = {};
     state.snapshots.forEach(s => {
-      const pot = s.part_of_term || '15W';
-      if (!latest[pot] || s.date >= latest[pot].date) latest[pot] = s;
+      const key = (s.term || '26FA') + '|' + (s.part_of_term || '15W');
+      if (!latest[key] || s.date >= latest[key].date) latest[key] = s;
     });
-    const pots = POT_ORDER.filter(p => latest[p]);
 
-    // Header: term, what's on screen, and a summary of every part of term
+    // All configured (term, POT) options, pre-sorted by lifecycle. Includes
+    // UPCOMING options that have no snapshots yet (Spring POTs before
+    // Laura starts uploading).
+    const options = allTermPotOptions();
+
+    const activeTermLabel = termLabelFromCode(state.activeTerm);
+    const activeLabel = termPotLabel(state.activeTerm, state.activePartOfTerm);
+
+    // Header
     const lines = [
-      'ENROLLMENT DATA (from the dashboard\'s loaded data for all disciplines, not just what is on screen)',
-      `Term: ${termLabel}. Data updated: ${state.manifestUpdatedAt || 'unknown'}. Today is ${new Date().toISOString().slice(0, 10)}.`,
-      `The user is viewing: ${partOfTermLabel(state.activePartOfTerm)}. Disciplines selected on screen: ${state.selectedDisciplines.size ? [...state.selectedDisciplines].join(', ') : 'none'}.`,
+      'ENROLLMENT DATA (across all loaded terms, from the dashboard\'s loaded data for all disciplines, not just what is on screen)',
+      `The user is currently viewing: ${activeLabel}. Disciplines selected on screen: ${state.selectedDisciplines.size ? [...state.selectedDisciplines].join(', ') : 'none'}.`,
+      `Today is ${new Date().toISOString().slice(0, 10)}.`,
       'Open seats = Avail Seats from the college report. Fill = enrolled / capacity. FTE = student credit hours / 30. Special projects (-295) and internships (-299) are excluded.',
+      'Answer forward-looking questions ("how are things?", "what should I watch for?") using the IN SESSION and UPCOMING terms. Answer retrospective questions about completed terms using the COMPLETED block. When the user names a specific term or sub-term, scope your answer there.',
       '',
-      'SUMMARY BY PART OF TERM (newest snapshot of each):',
     ];
+
+    // LAYER 1: Forward-looking — IN SESSION + UPCOMING + ENDING SOON
+    const forward = options.filter(o => o.lifecycle === 'IN_SESSION' || o.lifecycle === 'ENDING_SOON' || o.lifecycle === 'UPCOMING');
+    const completed = options.filter(o => o.lifecycle === 'COMPLETE');
+
+    if (forward.length > 0) {
+      lines.push('FORWARD-LOOKING (what chairs can still act on):');
+      forward.forEach(opt => {
+        const key = opt.term + '|' + opt.pot;
+        const snap = latest[key];
+        const label = termPotLabel(opt.term, opt.pot);
+        if (snap) {
+          const t = totals(snap.rows);
+          lines.push(`- ${label} [${lifecycleBadge(opt.lifecycle)}] — snapshot ${snap.date}; ${phaseTextV2(opt)}: ${t.sections} sections, ${t.enr}/${t.cap} enrolled (${pct(t.enr, t.cap)} fill), ${t.open} open seats, waitlist ${t.wl}, SCH ${t.sch}, FTE ${(t.sch / 30).toFixed(1)}`);
+        } else {
+          lines.push(`- ${label} [${lifecycleBadge(opt.lifecycle)}] — ${phaseTextV2(opt)}; no snapshots yet (Laura hasn't uploaded any for this part of term yet).`);
+        }
+      });
+      lines.push('');
+    }
+
+    // LAYER 2: Historical — completed POTs with final numbers
+    if (completed.length > 0) {
+      lines.push('COMPLETED (retrospective context — use when the user asks about these terms):');
+      completed.forEach(opt => {
+        const key = opt.term + '|' + opt.pot;
+        const snap = latest[key];
+        const label = termPotLabel(opt.term, opt.pot);
+        if (snap) {
+          const t = totals(snap.rows);
+          lines.push(`- ${label} [COMPLETE] — final snapshot ${snap.date}: ${t.sections} sections, ${t.enr}/${t.cap} enrolled (${pct(t.enr, t.cap)} fill), SCH ${t.sch}, FTE ${(t.sch / 30).toFixed(1)}`);
+        } else {
+          lines.push(`- ${label} [COMPLETE] — no snapshots recorded.`);
+        }
+      });
+      lines.push('');
+    }
+
+    // College FTE across all parts of term, for the ACTIVE term only
     let collegeSch = 0;
-    pots.forEach(p => {
-      const t = totals(latest[p].rows);
-      collegeSch += t.sch;
-      lines.push(`- ${partOfTermLabel(p)} (snapshot ${latest[p].date}; ${phaseText(p)}): ${t.sections} sections, ${t.enr}/${t.cap} enrolled (${pct(t.enr, t.cap)} fill), ${t.open} open seats, waitlist ${t.wl}, SCH ${t.sch}, FTE ${(t.sch / 30).toFixed(1)}`);
+    const activeTermPots = options.filter(o => o.term === state.activeTerm);
+    activeTermPots.forEach(o => {
+      const key = o.term + '|' + o.pot;
+      if (latest[key]) collegeSch += totals(latest[key].rows).sch;
     });
-    const goal = state.goals && state.goals.fte;
-    lines.push(`College FTE (all parts of term): ${(collegeSch / 30).toFixed(1)}${goal ? ` against a goal of ${goal}` : ''}.`);
-    lines.push('Fit answers to where each part of term is: before classes start, focus on open seats, low fill and waitlists; after census, focus on enrollment, fill and FTE, and treat waitlists as history for planning rather than current demand. Mention waitlists for a settled part of term only if the user asks about them.');
+    const goal = fteGoal();
+    if (collegeSch > 0 || goal) {
+      lines.push(`${activeTermLabel} College FTE (all parts of term): ${(collegeSch / 30).toFixed(1)}${goal ? ` against a goal of ${goal}` : ''}.`);
+    }
     const header = lines.join('\n');
+
+    // Downstream detail / history blocks (unchanged from v5.32) operate on
+    // snapshots within the ACTIVE term, keyed by POT. Rebuild a simpler
+    // index for them that mirrors the pre-v5.33 shape.
+    const activeTerm = state.activeTerm || '26FA';
+    const activePot = state.activePartOfTerm;
+    const latestActive = {};
+    state.snapshots.forEach(s => {
+      if ((s.term || '26FA') !== activeTerm) return;
+      const pot = s.part_of_term || '15W';
+      if (!latestActive[pot] || s.date >= latestActive[pot].date) latestActive[pot] = s;
+    });
+    const pots = POT_ORDER.filter(p => latestActive[p]);
+    const termLabel = activeTermLabel;
 
     // Which parts of term the question is about (else the one on screen)
     const potPatterns = [
@@ -6967,8 +7489,13 @@
     ];
     let focus = /\b(all|every|each)\b.*\b(parts? of term|sessions?)\b/i.test(q)
       ? pots.slice()
-      : potPatterns.filter(([p, re]) => latest[p] && re.test(q)).map(([p]) => p);
-    if (!focus.length) focus = [latest[state.activePartOfTerm] ? state.activePartOfTerm : pots[0]];
+      : potPatterns.filter(([p, re]) => latestActive[p] && re.test(q)).map(([p]) => p);
+    if (!focus.length) focus = [latestActive[state.activePartOfTerm] ? state.activePartOfTerm : pots[0]];
+    // If still nothing (no snapshots in active term at all — e.g. empty
+    // Spring at page load), bail with the header alone.
+    if (!focus.length) {
+      return header;
+    }
 
     // Courses (NETW 110, NETW-110) and discipline prefixes (NETW) named in the question
     const prefixes = new Set();
@@ -6986,9 +7513,9 @@
     const secLine = r => `${r.Section} | ${r['Course Title'] || ''} | ${r['Enrolled Students']}/${r.Capacity} enrolled | ${open(r)} open | waitlist ${r['Wait List']} | ${r['Meeting Days'] || '-'} ${r['Section Start Time'] || ''} | ${r.Location || '-'} | ${r.Instructor || 'TBA'}`;
 
     function block(pot, level) {
-      let rows = latest[pot].rows;
+      let rows = latestActive[pot].rows;
       if (filtered) rows = rows.filter(matches);
-      const head = `\n${partOfTermLabel(pot).toUpperCase()} (snapshot ${latest[pot].date})` +
+      const head = `\n${partOfTermLabel(pot).toUpperCase()} (snapshot ${latestActive[pot].date})` +
         (filtered ? ', only the courses or disciplines asked about' : ', all disciplines') +
         `: ${rows.length} sections, listed by ${level}`;
       if (!rows.length) return head + '\n(no matching sections)';
@@ -7012,8 +7539,10 @@
     if (historyMode) {
       const HIST_BUDGET = 12000;
       history = focus.map(pot => {
-        const snaps = state.snapshots.filter(s => (s.part_of_term || '15W') === pot)
-          .slice().sort((a, b) => a.date.localeCompare(b.date));
+        const snaps = state.snapshots.filter(s =>
+            (s.term || '26FA') === activeTerm &&
+            (s.part_of_term || '15W') === pot
+          ).slice().sort((a, b) => a.date.localeCompare(b.date));
         const series = snaps.map(s => {
           const rows = filtered ? s.rows.filter(matches) : s.rows;
           const t = totals(rows);
@@ -7040,7 +7569,7 @@
             peak.set(r.Section, { wl: r['Wait List'], date: s.date, title: r['Course Title'] || '' });
           }
         }));
-        const latestWl = new Map(latest[pot].rows.map(r => [r.Section, r['Wait List']]));
+        const latestWl = new Map(latestActive[pot].rows.map(r => [r.Section, r['Wait List']]));
         const peaks = [...peak.entries()].sort((a, b) => b[1].wl - a[1].wl).slice(0, 15)
           .map(([sec, v]) => `${sec} | ${v.title} | peak waitlist ${v.wl} on ${v.date} | waitlist now ${latestWl.has(sec) ? latestWl.get(sec) : 'section not in newest snapshot'}`);
         return `\n${partOfTermLabel(pot).toUpperCase()} HISTORY` +
