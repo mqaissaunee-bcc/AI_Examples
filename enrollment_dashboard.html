@@ -2,9 +2,27 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.33.5
+  Version:  v5.33.6
   Date:     October 25, 2026
-  Features: Copy — empty-state view messaging revised. Removed references
+  Features: Remove — amber "non-default view" banner removed entirely,
+            along with the pill's amber "non-default" treatment.
+            Rationale: in the single-term era the banner was a safety
+            rail ("you're on a weird POT, click here to go back").
+            In multi-term that framing is wrong — every term's default
+            is legitimate, every POT selection is intentional, and the
+            banner started producing false positives on Fall 15W plus
+            broken navigation on term switches (clicking "Back to Fall"
+            could land users on a context with no data).
+            - HTML element #potBanner removed from body
+            - banner click handler removed
+            - updateHeader no longer renders banner-related state
+            - pill no longer toggles the is-non-default class
+            - CSS for .pot-banner and .is-non-default retained (unused)
+              in case we reintroduce selective warnings in the future
+            Built on v5.33.5.
+
+  v5.33.5 (previous):
+            Copy — empty-state view messaging revised. Removed references
             to individuals or internal processes ("Laura begins uploading",
             "Laura's team on a schedule"); replaced with neutral language
             ("once registration data starts flowing in", "once reporting
@@ -2478,16 +2496,16 @@
     <button type="button" id="whatsNewBtn" class="whats-new-btn" title="See what's new since your last visit"><span class="wn-icon" aria-hidden="true">?</span> What's new <span class="wn-pill" id="whatsNewPill">NEW</span></button>
   </div>
 
-  <div id="potBanner" class="pot-banner" style="display:none">
-    <span aria-hidden="true">▸</span>
-    Viewing <strong id="potBannerLabel">7A · first half</strong> sections only
-    <button type="button" class="pot-banner-reset" id="potBannerReset" title="Return to default view">Back to default</button>
-  </div>
+  <!-- v5.33.6: The "non-default view" amber banner was removed. In a
+       multi-term dashboard every term's default is legitimate and every
+       POT selection is intentional — the banner's "warning" treatment
+       belonged to the single-term era and became misleading in multi-term
+       (false positives on Fall 15W, broken navigation on term switches). -->
 
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.33.5</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.33.6</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -4120,25 +4138,18 @@
         const activeTerm = state.activeTerm;
         const label = termPotLabel(activeTerm, activePot);
 
-        // Compute lifecycle for the active option
+        // v5.33.6: In multi-term, every (term, POT) selection is a
+        // legitimate choice. The pill no longer gets amber "non-default"
+        // treatment — all selections look the same, and the user navigates
+        // between them via the dropdown without being warned they're on
+        // something "unusual."
         const allOpts = allTermPotOptions();
-        const activeOpt = allOpts.find(o => o.term === activeTerm && o.pot === activePot);
-        const activeLc = activeOpt ? activeOpt.lifecycle : 'UNKNOWN';
-        // v5.33.4: "default" means the active POT IS the term's default POT
-        // (15W for Fall/Spring, FULL for single-session terms like Winterim).
-        // The amber banner shows when the user is viewing a non-default POT
-        // WITHIN THEIR CURRENT TERM — i.e., Spring 7A triggers the banner
-        // (default is Spring 15W), but Winterim does NOT (its default is
-        // Winterim's only option).
-        const termDefault = defaultPotForTerm(activeTerm);
-        const isDefault = activePot === termDefault;
 
-        // Pill label + non-default state (amber treatment when not Fall 15W)
         const pillLabel = el('titlePotPillLabel');
         if (pillLabel) pillLabel.textContent = label;
         const pillBtn = el('titlePotPill');
         if (pillBtn) {
-          pillBtn.classList.toggle('is-non-default', !isDefault);
+          pillBtn.classList.remove('is-non-default');
           pillBtn.setAttribute('aria-expanded', pillBtn.getAttribute('aria-expanded') === 'true' ? 'true' : 'false');
         }
 
@@ -4184,26 +4195,8 @@
           menu.innerHTML = html;
         }
 
-        // v5.33.4: Amber banner shown when the active POT is not the
-        // active TERM's default POT. Spring 7A triggers it (default is
-        // Spring 15W); Winterim does NOT (its own default is itself).
-        // The reset button text also reads from the active term —
-        // "Back to Fall 15-week", "Back to Spring 15-week", etc.
-        const banner = el('potBanner');
-        if (banner) {
-          banner.style.display = isDefault ? 'none' : 'flex';
-          if (!isDefault) {
-            const bannerLabel = el('potBannerLabel');
-            if (bannerLabel) bannerLabel.textContent = label;
-            const bannerReset = el('potBannerReset');
-            if (bannerReset) {
-              bannerReset.textContent = termDefaultResetLabel(activeTerm);
-              bannerReset.setAttribute('title', `Return to ${termLabelFromCode(activeTerm)} default view`);
-              // Store the destination POT so the click handler knows where to go
-              bannerReset.dataset.destinationPot = termDefault;
-            }
-          }
-        }
+        // v5.33.6: Amber "non-default view" banner removed. See the
+        // HTML comment near the former <div id="potBanner"> for rationale.
       }
     }
 
@@ -7528,14 +7521,9 @@
   });
 
   // "Back to 15-week" quick-reset button in the amber banner
-  const potBannerReset = el('potBannerReset');
-  if (potBannerReset) {
-    // v5.33.4: Go to the ACTIVE TERM's default POT, not Fall's hardcoded 15W.
-    // The destination POT is stored as a data attribute by updateHeader().
-    potBannerReset.addEventListener('click', () => {
-      const destPot = potBannerReset.dataset.destinationPot || defaultPotForTerm(state.activeTerm);
-      switchPartOfTerm(state.activeTerm + '|' + destPot);
-    });
+  // v5.33.6: Banner click handler removed with the banner itself.
+  const potBannerReset = null;
+  if (false) {
   }
 
   /* =========================================================================
