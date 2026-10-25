@@ -2,9 +2,29 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.33.2
+  Version:  v5.33.3
   Date:     October 25, 2026
-  Features: Fix — selecting a (term, POT) with no loaded snapshots now
+  Features: Fix — false "goal met" celebration no longer fires when the
+            active term's goal is small relative to another loaded term's
+            aggregate FTE. Root cause: aggregateCollegeFTE() and
+            previousAggregateCollegeFTE() iterated ALL loaded snapshots
+            and grouped by POT only, ignoring term. On a user who
+            navigated to Winterim (goal: 65.0) or an unloaded Spring
+            POT, that function returned Fall's full FTE (3,000+) and
+            the goal celebration fired at 4,877%+ of goal.
+            - aggregateCollegeFTE and previousAggregateCollegeFTE now
+              filter by state.activeTerm before summing.
+            - maybeCelebrateGoal() additionally checks that the active
+              term has at least one loaded snapshot before considering
+              celebration (defense in depth).
+            - STORAGE.GOAL_MET_CELEBRATED key bumped to '…-v2' to
+              invalidate any false-positive state saved during v5.33
+              through v5.33.2. Users who were falsely celebrated get a
+              fresh chance when their real goal is actually met.
+            Built on v5.33.2.
+
+  v5.33.2 (previous):
+            Fix — selecting a (term, POT) with no loaded snapshots now
             shows a dedicated "no data yet" view instead of silently
             keeping stale data from a previously-selected context in
             the KPI strip, discipline table, course grid, etc. The
@@ -2439,7 +2459,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.33.2</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.33.3</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -2496,7 +2516,11 @@
     ACTIVE_PART_OF_TERM: 'enroll-active-part-of-term',
     ACTIVE_TERM: 'enroll-active-term',  // v5.33: term code (e.g. '26FA')
     MOVER_WINDOW: 'enroll-mover-window',
-    GOAL_MET_CELEBRATED: 'enroll-goal-met-celebrated',
+    // v5.33.3: Bumped from 'enroll-goal-met-celebrated' to 'enroll-goal-met-celebrated-v2'
+    // to abandon any value stored during a false-positive celebration fired
+    // by v5.33 / v5.33.1 / v5.33.2 (where aggregateCollegeFTE summed across
+    // all loaded terms). Any legitimate future "goal met" will fire fresh.
+    GOAL_MET_CELEBRATED: 'enroll-goal-met-celebrated-v2',
   };
 
   // -----------------------------------------------------------------------
@@ -3590,10 +3614,16 @@
   // stood at that point in time, rather than the always-newest total.
   // If referenceSnap is omitted, the whole history is considered
   // (equivalent to "as of today").
+  // v5.33.3: Term-aware. Sums the latest-per-POT FTE within the ACTIVE
+  // TERM only. Previously summed across all loaded terms, which produced
+  // a false "goal met" celebration when the user had switched to a
+  // small-goal term (Winterim 65.0) with Fall data still in state.
   function aggregateCollegeFTE(referenceSnap) {
     const refDate = referenceSnap ? referenceSnap.date : null;
+    const termWanted = state.activeTerm || '26FA';
     const potLatest = new Map();
     state.snapshots.forEach(s => {
+      if ((s.term || '26FA') !== termWanted) return;
       if (refDate && s.date > refDate) return;
       const pot = s.part_of_term || '15W';
       const existing = potLatest.get(pot);
@@ -3612,8 +3642,10 @@
   // snapshots (in which case no delta is meaningful).
   function previousAggregateCollegeFTE(referenceSnap) {
     const refDate = referenceSnap ? referenceSnap.date : null;
+    const termWanted = state.activeTerm || '26FA';  // v5.33.3: term-aware
     const potGroups = new Map();
     state.snapshots.forEach(s => {
+      if ((s.term || '26FA') !== termWanted) return;
       if (refDate && s.date > refDate) return;
       const pot = s.part_of_term || '15W';
       if (!potGroups.has(pot)) potGroups.set(pot, []);
@@ -7249,10 +7281,22 @@
 
   function maybeCelebrateGoal() {
     const goal = fteGoal();
-    if (!goal || state.snapshots.length === 0) return;
+    if (!goal) return;
+
+    // v5.33.3: Must have snapshots IN THE ACTIVE TERM, not just anywhere.
+    // Previously checked state.snapshots.length only, which included
+    // snapshots from other loaded terms — producing false positives when
+    // the user was on an empty term with a small goal (e.g. Winterim
+    // 65.0 FTE goal against Fall's 3,100+ FTE total).
+    const termWanted = state.activeTerm || '26FA';
+    const hasActiveTermData = state.snapshots.some(s =>
+      (s.term || '26FA') === termWanted
+    );
+    if (!hasActiveTermData) return;
 
     // "As of today" aggregate — deliberately ignores the currently-viewed
     // snapshot, so browsing back through history doesn't retrigger.
+    // (aggregateCollegeFTE itself is now term-aware; see v5.33.3 comment.)
     const collegeFTE = aggregateCollegeFTE();
     const pct = pctOfGoal(collegeFTE);
     if (pct === null || pct < 100) return;
