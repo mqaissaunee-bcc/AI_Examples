@@ -2,9 +2,23 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.33.1
+  Version:  v5.33.2
   Date:     October 25, 2026
-  Features: Fix — phantom "no snapshots yet" entry no longer appears for
+  Features: Fix — selecting a (term, POT) with no loaded snapshots now
+            shows a dedicated "no data yet" view instead of silently
+            keeping stale data from a previously-selected context in
+            the KPI strip, discipline table, course grid, etc. The
+            empty-state view adapts its message to the lifecycle:
+            UPCOMING sub-terms show "classes start in N days,
+            registration is open"; IN_SESSION/ENDING_SOON show "no
+            snapshots loaded yet"; COMPLETE shows "no snapshots were
+            recorded"; UNKNOWN gets a generic message. The Snapshots
+            tab still renders normally so users can manually upload
+            a file for an empty context.
+            Built on v5.33.1.
+
+  v5.33.1 (previous):
+            Fix — phantom "no snapshots yet" entry no longer appears for
             terms whose manifest lacks pot_dates but which do have
             snapshots tagged with real POT codes (15W/11W/7A/7B). The
             previous behavior synthesized a FULL sentinel entry on the
@@ -2425,7 +2439,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.33.1</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.33.2</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -3685,6 +3699,21 @@
 
     el('disciplineBtn').style.display = '';
 
+    // v5.33.2: Empty-state short-circuit. If the active (term, POT) has
+    // no loaded snapshots, show a dedicated "no data yet" view instead
+    // of letting the KPI strip / discipline table / etc. fall back to
+    // stale data from a previously-selected context. The Snapshots tab
+    // (manual upload UI) still renders normally — users may want to add
+    // a snapshot there even for an empty context.
+    const activeSnaps = activeSnapshots();
+    if (activeSnaps.length === 0 && state.activeTab !== 'snapshots') {
+      let body = renderTabs();
+      body += renderEmptyTermPotView();
+      dash.innerHTML = body;
+      bindAllEvents();
+      return;
+    }
+
     let body = renderTabs();
     if (state.activeTab === 'snapshot') {
       body += renderKPIs();
@@ -3704,6 +3733,60 @@
 
     dash.innerHTML = body;
     bindAllEvents();
+  }
+
+  // v5.33.2: Renders a clean "no data yet" state tailored to the active
+  // (term, POT)'s lifecycle. UPCOMING terms get a "registration open,
+  // check back soon" tone; IN_SESSION/ENDING_SOON get "Laura hasn't
+  // uploaded a snapshot yet"; COMPLETE gets "no snapshots were recorded";
+  // UNKNOWN gets a generic message. In every case, no stale data from
+  // another context is visible beneath.
+  function renderEmptyTermPotView() {
+    const allOpts = allTermPotOptions();
+    const opt = allOpts.find(o =>
+      o.term === state.activeTerm && o.pot === state.activePartOfTerm
+    );
+    const label = termPotLabel(state.activeTerm, state.activePartOfTerm);
+    const lc = opt ? opt.lifecycle : 'UNKNOWN';
+
+    let heading, body, cta;
+    if (lc === 'UPCOMING') {
+      const days = opt && opt.daysToStart != null ? opt.daysToStart : null;
+      heading = `${label} hasn't started yet`;
+      const whenStr = days != null
+        ? `Classes start in ${days} day${days === 1 ? '' : 's'}.`
+        : 'Classes have not started yet.';
+      body = `${whenStr} Registration is open; enrollment snapshots will appear here once Laura begins uploading them for this sub-term. Nothing to do on your end — the dashboard will pick them up automatically.`;
+      cta = `Switch to a sub-term that's in session to see current numbers.`;
+    } else if (lc === 'IN_SESSION' || lc === 'ENDING_SOON') {
+      heading = `${label} — no snapshots loaded yet`;
+      body = `This sub-term is in session but no enrollment snapshots have been uploaded for it yet. Snapshots are usually uploaded by Laura's team on a schedule; check back once the first file is in place.`;
+      cta = `Switch to a different sub-term, or add a snapshot manually from the Snapshots tab if you have the file.`;
+    } else if (lc === 'COMPLETE') {
+      heading = `${label} — no snapshots were recorded`;
+      body = `This sub-term has ended and no enrollment snapshots were recorded for it. There's nothing to display here.`;
+      cta = `Switch to a sub-term with data to continue.`;
+    } else {
+      heading = `${label} — no data`;
+      body = `No enrollment snapshots are loaded for this sub-term.`;
+      cta = `Switch to a sub-term with data from the picker above.`;
+    }
+
+    return `
+      <div class="empty-term-pot" style="max-width:720px;margin:40px auto;padding:0 24px;">
+        <div style="padding:36px 32px;background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--info);border-radius:4px;">
+          <h2 style="font-family:'Iowan Old Style', Palatino, Georgia, serif;font-weight:400;font-size:24px;line-height:1.25;letter-spacing:-0.01em;margin:0 0 14px;color:var(--ink);">
+            ${escapeHtml(heading)}
+          </h2>
+          <p style="font-size:14px;line-height:1.6;color:var(--ink-soft);margin:0 0 14px;">
+            ${escapeHtml(body)}
+          </p>
+          <p style="font-size:13px;line-height:1.5;color:var(--ink-mute);margin:0;font-style:italic;">
+            ${escapeHtml(cta)}
+          </p>
+        </div>
+      </div>
+    `;
   }
 
   // Canonical ordering for POT codes within a term.
