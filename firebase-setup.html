@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add live, shared data to a static website with Firebase</title>
+<meta name="description" content="A step-by-step guide to adding live, shared data to any static web page with Firebase Realtime Database and anonymous sign-in, using a classroom voting game as the worked example.">
+<style>
+:root{
+  --paper:#F6F7FB; --surface:#FFFFFF; --sunk:#ECEEF6;
+  --ink:#1A2032; --ink-soft:#4A5268; --line:#D5D9E6;
+  --accent:#4536C9; --accent-soft:#E8E5FB; --accent-ink:#FFFFFF;
+  --ok:#1D6B34; --ok-soft:#E1F3E6; --warn:#8A5A00; --warn-soft:#FFF3D6;
+  --code-bg:#1E2233; --code-ink:#E6E9F5;
+  --focus:#1F6FEB;
+  --font-head:"Avenir Next","Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  --font-body:Charter,"Bitstream Charter","Iowan Old Style","Sitka Text",Cambria,Georgia,serif;
+  --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+  --r-sm:6px; --r-md:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#12151F; --surface:#1A1F2D; --sunk:#222839;
+    --ink:#E7EAF3; --ink-soft:#AEB5C8; --line:#343B50;
+    --accent:#A99DFF; --accent-soft:#2B2654; --accent-ink:#12151F;
+    --ok:#7DD89A; --ok-soft:#173222; --warn:#F2C45A; --warn-soft:#3A2E12;
+    --code-bg:#0E111A; --focus:#7FB2FF;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:clamp(1rem,.96rem + .2vw,1.1rem);line-height:1.65}
+a{color:var(--accent);text-underline-offset:.18em}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.skip-link{position:absolute;left:-9999px;top:0;background:var(--ink);color:var(--paper);padding:.5rem 1rem;z-index:10}
+.skip-link:focus{left:1rem;top:1rem}
+.wrap{max-width:820px;margin:0 auto;padding:0 1rem}
+header{padding:3rem 0 1.5rem}
+.crumb{font-family:var(--font-ui);font-size:.9rem;margin:0 0 1rem}
+h1{font-family:var(--font-head);font-size:clamp(2rem,1.4rem + 2.6vw,3rem);line-height:1.08;letter-spacing:-.02em;margin:0 0 1rem}
+.lede{font-size:1.15rem;color:var(--ink-soft);margin:0;max-width:62ch}
+.facts{display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;margin:1.5rem 0 0;padding:.75rem 1rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);font-family:var(--font-ui);font-size:.92rem}
+.facts div{display:flex;gap:.4rem}
+.facts dt{font-weight:650}.facts dd{margin:0}
+h2{font-family:var(--font-head);font-size:clamp(1.35rem,1.2rem + .7vw,1.75rem);line-height:1.2;margin:3rem 0 1rem;scroll-margin-top:1rem}
+h3{font-family:var(--font-ui);font-size:1rem;margin:1.5rem 0 .5rem}
+p{margin:0 0 1rem;max-width:68ch}
+ol,ul{padding-left:1.3rem;max-width:68ch}
+li{margin-bottom:.45rem}
+.ui{font-family:var(--font-ui);font-weight:650;font-size:.95em;background:var(--sunk);padding:1px 6px;border-radius:4px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+code{font-family:var(--font-mono);font-size:.88em;background:var(--sunk);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:1rem 1.25rem;font-family:var(--font-ui);font-size:.95rem}
+nav.toc h2{font-size:1rem;margin:0 0 .5rem;font-family:var(--font-ui)}
+nav.toc ol,nav.toc ul{margin:0 0 .25rem;columns:2 240px;column-gap:2rem}
+nav.toc .toc-h{font-size:.85rem;margin:.75rem 0 .25rem;color:var(--ink-soft)}
+nav.toc li{break-inside:avoid}
+.step{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--accent);border-radius:var(--r-md);padding:1.25rem 1.5rem;margin:0 0 1.25rem;scroll-margin-top:1rem}
+.step h2{margin:0 0 .75rem;display:flex;gap:.75rem;align-items:baseline;flex-wrap:wrap}
+.step .n{font-family:var(--font-ui);font-size:.85rem;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:99px;padding:2px 10px;flex:none}
+.done{font-family:var(--font-ui);font-size:.92rem;display:flex;gap:.5rem;align-items:center;margin-top:1rem;padding-top:.75rem;border-top:1px dashed var(--line);cursor:pointer;width:fit-content}
+.done input{width:1.15rem;height:1.15rem;accent-color:var(--ok)}
+.step.is-done{border-left-color:var(--ok)}
+.step.is-done .n{background:var(--ok-soft);color:var(--ok)}
+.note,.warn{border-radius:var(--r-sm);padding:.75rem 1rem;margin:1rem 0;font-size:.97rem;max-width:68ch}
+.note{background:var(--accent-soft)}
+.warn{background:var(--warn-soft)}
+.note p:last-child,.warn p:last-child{margin:0}
+.note strong:first-child,.warn strong:first-child{font-family:var(--font-ui)}
+.codebox{position:relative;margin:1rem 0}
+.codebox pre{margin:0;background:var(--code-bg);color:var(--code-ink);border-radius:var(--r-sm);padding:1rem 1.1rem;overflow-x:auto;font-family:var(--font-mono);font-size:.84rem;line-height:1.5}
+.copy{position:absolute;top:.5rem;right:.5rem;font-family:var(--font-ui);font-weight:650;font-size:.82rem;padding:.35rem .7rem;border-radius:var(--r-sm);border:1px solid #5A6180;background:#2C3147;color:#fff;cursor:pointer}
+.copy:hover{filter:brightness(1.15)}
+table{border-collapse:collapse;width:100%;font-size:.95rem;margin:1rem 0}
+th,td{text-align:left;padding:.55rem .7rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--font-ui);font-size:.88rem}
+.tablewrap{overflow-x:auto}
+.progress{position:sticky;top:0;z-index:5;background:var(--paper);padding:.6rem 0;font-family:var(--font-ui);font-size:.88rem;color:var(--ink-soft);border-bottom:1px solid var(--line)}
+.progress .bar{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden;margin-top:.35rem}
+.progress .bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .2s}
+details{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:.6rem 1rem;margin:0 0 .6rem}
+details summary{cursor:pointer;font-family:var(--font-ui);font-weight:650}
+details[open] summary{margin-bottom:.5rem}
+footer{border-top:1px solid var(--line);margin-top:3rem;padding:1.5rem 0 3rem;font-family:var(--font-ui);font-size:.85rem;color:var(--ink-soft)}
+</style>
+
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+<div class="wrap">
+<header>
+  <p class="crumb"><a href="index.html">AI Examples</a> / Firebase tutorial</p>
+  <h1>Add live, shared data to a static website with Firebase</h1>
+  <p class="lede">Make a web page where many people’s phones and laptops share the same data in real time: votes, poll answers, game rounds, sign-ups. No server to run, no cost for classroom-sized use. This guide uses a real classroom game as its worked example, but the steps work for any project.</p>
+  <dl class="facts">
+    <div><dt>Time:</dt><dd>About 20 minutes</dd></div>
+    <div><dt>Cost:</dt><dd>Free (no credit card)</dd></div>
+    <div><dt>You need:</dt><dd>A Google account and a web page you can edit</dd></div>
+  </dl>
+</header>
+
+<div class="progress" aria-live="polite"><span id="progText">0 of 8 steps done</span><div class="bar" aria-hidden="true"><i id="progBar"></i></div></div>
+
+<main id="main">
+  <nav class="toc" aria-labelledby="toc-h">
+    <h2 id="toc-h">On this page</h2>
+    <h3 class="toc-h">Background</h3>
+    <ul>
+      <li><a href="#what">What Firebase is</a></li>
+      <li><a href="#when">When you need it</a></li>
+      <li><a href="#sample">The sample project</a></li>
+      <li><a href="#ideas">Key ideas before you start</a></li>
+    </ul>
+    <h3 class="toc-h">Setup: 8 steps</h3>
+    <ol>
+      <li><a href="#s1">Create a project</a></li>
+      <li><a href="#s2">Turn on anonymous sign-in</a></li>
+      <li><a href="#s3">Create the database</a></li>
+      <li><a href="#s4">Write your security rules</a></li>
+      <li><a href="#s5">Get your settings</a></li>
+      <li><a href="#s6">Allow your website</a></li>
+      <li><a href="#s7">Connect your page</a></li>
+      <li><a href="#s8">Test it</a></li>
+    </ol>
+    <h3 class="toc-h">After setup</h3>
+    <ul>
+      <li><a href="#ai">Optional: build a new page with an AI assistant</a></li>
+      <li><a href="#care">Privacy and upkeep</a></li>
+      <li><a href="#trouble">Troubleshooting</a></li>
+    </ul>
+  </nav>
+
+  <h2 id="what">What Firebase is</h2>
+  <p><strong>Firebase</strong> is Google’s set of ready-made tools for building apps and websites. You use the pieces you need and skip the rest. This guide uses two of them:</p>
+  <ul>
+    <li><strong>Realtime Database.</strong> A database in the cloud that your web page reads and writes directly. When one person’s page changes something, every other open page sees the change within about a second, without anyone reloading.</li>
+    <li><strong>Authentication.</strong> A way to know which device is which. We use its <em>anonymous</em> option: each visitor gets a random ID automatically, with no name, email, or password.</li>
+  </ul>
+  <p>Firebase also does hosting, file storage, and more, but you don’t need any of that here. Your page can stay wherever it already lives, such as GitHub Pages or a college web server.</p>
+
+  <h2 id="when">When you need it</h2>
+  <p>Most course tools built as a single HTML file run entirely inside each person’s browser. That’s great until you want people to <em>share</em> something. A static page has no way to collect what 30 phones are doing, because there’s nowhere for that information to go. Firebase is the place it goes.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Good fit</th><th>Not a good fit</th></tr></thead>
+    <tbody>
+      <tr><td>Live polls, votes, and quizzes during class or a workshop</td><td>Grades, student records, or anything covered by FERPA</td></tr>
+      <tr><td>Classroom games where phones follow the projector</td><td>Names, emails, ID numbers, or other personal information</td></tr>
+      <tr><td>Anonymous question boards and word clouds</td><td>Anything that needs a real login with your college account</td></tr>
+      <tr><td>Sign-up sheets or shared checklists with first names only</td><td>Large files, videos, or long-term archives</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Why not something simpler?</h3>
+  <p>We tried a simpler route first, and it’s worth knowing why it didn’t hold up. Free public “relay” services can pass messages between browsers with no setup at all. They work well for one or two people. But they limit traffic <em>per internet address</em>, and on campus Wi-Fi a whole room usually shares one address. In a room of 30, phones started hitting those limits, and there was no room left for sending votes. Firebase counts each device separately, so the size of the room doesn’t matter.</p>
+
+  <h3>Free plan limits</h3>
+  <p>The free plan, called <strong>Spark</strong>, needs no credit card and can’t charge you. For classroom tools, the limit that matters is <strong>100 devices connected at once</strong> per database. It also includes 1 GB of stored data and 10 GB of downloads a month, far more than votes or poll answers will use. If you ever reach a limit, Firebase stops accepting new connections until usage drops. Nothing is billed.</p>
+
+  <h2 id="sample">The sample project: AI or Faculty?</h2>
+  <p>This guide follows a real example from the <a href="https://mqaissaunee-bcc.github.io/fall26-ai/" target="_blank" rel="noopener">Fall 2026 AI Teaching Workshop Series</a>. <a href="https://mqaissaunee-bcc.github.io/fall26-ai/ai-or-faculty.html" target="_blank" rel="noopener">AI or Faculty?</a> is an icebreaker where each round shows a short piece of teaching writing, and players guess whether a colleague or AI wrote it.</p>
+  <ul>
+    <li>The facilitator runs the game on a projector. Players join from their phones with a game code.</li>
+    <li>When the facilitator reveals an answer or moves to the next round, every phone follows.</li>
+    <li>Each phone’s vote is counted on the projector as it comes in, and the results can be downloaded as a spreadsheet.</li>
+  </ul>
+  <p>Throughout the steps, boxes labeled <strong>In the sample project</strong> show exactly what was done for this game. Everything else applies to any project. The sample uses a project named <code>ai-or-faculty</code>; wherever you see that, use your own project’s name.</p>
+
+  <h2 id="ideas">Key ideas before you start</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Term</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Project</strong></td><td>A container in Firebase for one app or tool. One project can serve several related pages.</td></tr>
+      <tr><td><strong>Path</strong></td><td>The database is one big tree of data, like folders. A path such as <code>games/4821/votes</code> points to one branch of it.</td></tr>
+      <tr><td><strong>Security rules</strong></td><td>A short set of instructions stored in Firebase that decides who can read and write each path. Your rules, not secrecy, are what protect your data.</td></tr>
+      <tr><td><strong>Config</strong></td><td>A small block of settings that tells your page which project to talk to. It’s meant to be public and safe to put in a web page.</td></tr>
+      <tr><td><strong>Authorized domain</strong></td><td>A website address you’ve told Firebase to accept sign-ins from, such as <code>yourname.github.io</code>.</td></tr>
+    </tbody>
+  </table></div>
+
+  <section class="step" id="s1">
+    <h2><span class="n">Step 1</span>Create a Firebase project</h2>
+    <ol>
+      <li>Go to <a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a> and sign in with a Google account. Your college doesn’t need to be a Google school; a personal account works. See <a href="#care">Privacy and upkeep</a> before picking which account.</li>
+      <li>Click <span class="ui">Create a project</span> (on some screens, <span class="ui">Get started by setting up a Firebase project</span>).</li>
+      <li>Type a project name. Firebase turns it into a <strong>project ID</strong>. If the name is already taken by someone else, it adds random characters, like <code>my-poll-4f7c2</code>. Either way is fine. Note the ID it shows; you’ll see it again.</li>
+      <li>Accept the terms and continue.</li>
+      <li>When asked about <strong>Google Analytics</strong>, turn it <strong>off</strong>. You don’t need it, and it means less data collected about your users.</li>
+      <li>If it asks about Gemini or AI assistance in Firebase, either choice is fine.</li>
+      <li>Click <span class="ui">Create project</span>, wait, then click <span class="ui">Continue</span>.</li>
+    </ol>
+    <div class="note"><p><strong>In the sample project:</strong> the name <code>ai-or-faculty</code> was available, so the project ID came out exactly <code>ai-or-faculty</code> with no extra characters.</p></div>
+    <label class="done"><input type="checkbox" data-step="s1"> Done with step 1</label>
+  </section>
+
+  <section class="step" id="s2">
+    <h2><span class="n">Step 2</span>Turn on anonymous sign-in</h2>
+    <p>Anonymous sign-in gives every device a random ID the moment the page opens. Your rules can then say things like “each device may only change its own vote,” without asking anyone to create an account.</p>
+    <div class="warn"><p><strong>Finding Authentication:</strong> it is <em>not</em> in the gear-icon menu (that menu only has project settings like General, Usage and billing, and Integrations). The quickest way to get there is the <strong>search box at the top of the console</strong>: type <strong>Authentication</strong> and choose it. You can also expand the left menu, which may be collapsed to icons, and look under <span class="ui">Security</span> or <span class="ui">Build</span>.</p></div>
+    <ol>
+      <li>Open <span class="ui">Authentication</span> using the search box.</li>
+      <li>Click <span class="ui">Get started</span>.</li>
+      <li>Open the <span class="ui">Sign-in method</span> tab.</li>
+      <li>In the list of providers, click <span class="ui">Anonymous</span>.</li>
+      <li>Turn on <span class="ui">Enable</span>, then click <span class="ui">Save</span>.</li>
+    </ol>
+    <p>Anonymous should now show as <strong>Enabled</strong>. You don’t need any other provider.</p>
+    <label class="done"><input type="checkbox" data-step="s2"> Done with step 2</label>
+  </section>
+
+  <section class="step" id="s3">
+    <h2><span class="n">Step 3</span>Create the database</h2>
+    <ol>
+      <li>Search for <strong>Realtime Database</strong> in the box at the top of the console and open it. Make sure it says <strong>Realtime Database</strong>, not <em>Firestore</em>, which is a different Firebase database.</li>
+      <li>Click <span class="ui">Create Database</span>.</li>
+      <li>Choose a location. <strong>United States (us-central1)</strong> is a good default in the U.S.</li>
+      <li>Choose <span class="ui">Start in locked mode</span>. Locked means nobody can read or write anything until you add rules in the next step. That’s the safe starting point.</li>
+      <li>Click <span class="ui">Enable</span>.</li>
+    </ol>
+    <p>You’ll land on the <span class="ui">Data</span> tab. At the top is your <strong>database URL</strong>, which looks like <code>https://your-project-id-default-rtdb.firebaseio.com</code>. If you chose a location outside us-central1, it ends in <code>firebasedatabase.app</code> instead.</p>
+    <div class="note"><p><strong>Quick check:</strong> paste your database URL into a browser and add <code>/.json</code> to the end. A message saying <strong>Permission denied</strong> is exactly what you want: the database exists and it’s locked.</p></div>
+    <label class="done"><input type="checkbox" data-step="s3"> Done with step 3</label>
+  </section>
+
+  <section class="step" id="s4">
+    <h2><span class="n">Step 4</span>Write your security rules</h2>
+    <p>Rules are the most important part of the setup. Your page’s code runs on other people’s devices, so anyone could edit it. Rules are enforced by Firebase itself, so they protect your data no matter what code someone runs.</p>
+    <h3>How rules read</h3>
+    <ul>
+      <li><code>".read"</code> and <code>".write"</code> say <em>who</em> can read or change a path. <code>auth != null</code> means “any signed-in device,” and <code>auth.uid === $uid</code> means “only the device whose ID matches this spot.”</li>
+      <li><code>".validate"</code> says <em>what</em> the data must look like, such as a number, a short piece of text, or one of a few allowed words.</li>
+      <li>A name starting with <code>$</code>, like <code>$uid</code>, is a placeholder that matches any key at that level.</li>
+      <li>Start from <code>false</code> at the top and open up only the paths your page uses.</li>
+    </ul>
+    <h3>Apply your rules</h3>
+    <ol>
+      <li>In Realtime Database, open the <span class="ui">Rules</span> tab.</li>
+      <li>Select everything in the editor and delete it.</li>
+      <li>Click <strong>Copy</strong> on one of the rule sets below and paste it in.</li>
+      <li>Click <span class="ui">Publish</span>.</li>
+    </ol>
+
+    <h3>Starter rules for a poll or response board</h3>
+    <p>Use these for a simple project where each visitor submits one answer and everyone can see all answers. Each device can only write its own entry, and each entry must be a short answer plus a time. Pair them with the example code in step 7.</p>
+    <div class="codebox">
+      <button class="copy" type="button" data-copy="rulesStarter">Copy</button>
+<pre id="rulesStarter">{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "responses": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null &amp;&amp; auth.uid === $uid",
+        ".validate": "newData.hasChildren(['answer', 'time'])",
+        "answer": { ".validate": "newData.isString() &amp;&amp; newData.val().length &lt;= 200" },
+        "time": { ".validate": "newData.isNumber() &amp;&amp; newData.val() &lt;= now" },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}</pre>
+    </div>
+
+    <details>
+      <summary>In the sample project: the rules for AI or Faculty?</summary>
+      <p>The game needs more control: one device (the projector) owns each game, phones may only cast their own vote, and voting closes 24 hours after a game starts. Under <code>games/<em>code</em></code> it stores an owner ID, a start time, the current round, and the votes. These are a good model for any project with one “host” device and many participants.</p>
+      <div class="codebox">
+        <button class="copy" type="button" data-copy="rulesSample">Copy</button>
+<pre id="rulesSample">{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "games": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null &amp;&amp; (!data.exists() || data.child('owner').val() === auth.uid)",
+        ".validate": "$code.matches(/^[0-9]{4,5}$/) &amp;&amp; newData.child('owner').isString() &amp;&amp; newData.child('created').isNumber()",
+        "owner": {
+          ".validate": "newData.isString() &amp;&amp; (data.exists() ? newData.val() === data.val() : newData.val() === auth.uid)"
+        },
+        "created": {
+          ".validate": "newData.isNumber() &amp;&amp; (data.exists() ? newData.val() === data.val() : newData.val() &lt;= now)"
+        },
+        "state": {
+          ".validate": "newData.hasChildren(['i', 'n', 'r'])",
+          "i": { ".validate": "newData.isNumber() &amp;&amp; newData.val() &gt;= 0 &amp;&amp; newData.val() &lt;= 100" },
+          "n": { ".validate": "newData.isNumber() &amp;&amp; newData.val() &gt;= 1 &amp;&amp; newData.val() &lt;= 100" },
+          "r": { ".validate": "newData.isBoolean()" },
+          "$other": { ".validate": false }
+        },
+        "votes": {
+          "$round": {
+            ".validate": "$round.matches(/^[0-9]{1,3}$/)",
+            "$uid": {
+              ".write": "auth != null &amp;&amp; auth.uid === $uid &amp;&amp; root.child('games/' + $code + '/created').val() &gt; now - 86400000",
+              ".validate": "newData.val() === 'ai' || newData.val() === 'faculty'"
+            }
+          }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}</pre>
+      </div>
+      <p>In plain terms: nothing outside <code>games</code> is reachable. Anyone signed in can start a game with an unused code; after that, only the device that started it can change rounds, clear votes, or delete it. Each phone can write only its own vote, only “ai” or “faculty,” and only within 24 hours.</p>
+    </details>
+
+    <div class="note"><p><strong>If Publish shows an error,</strong> a bracket was probably lost when pasting. Select all, delete, and paste again using the Copy button.</p></div>
+    <label class="done"><input type="checkbox" data-step="s4"> Done with step 4</label>
+  </section>
+
+  <section class="step" id="s5">
+    <h2><span class="n">Step 5</span>Register a web app and get your settings</h2>
+    <p>This creates the <strong>config</strong>: the block of settings your page uses to find your project.</p>
+    <ol>
+      <li>Click the gear icon next to <span class="ui">Project Overview</span>, then <span class="ui">Project settings</span>.</li>
+      <li>On the <span class="ui">General</span> tab, scroll to <span class="ui">Your apps</span> and click the web icon, <code>&lt;/&gt;</code>.</li>
+      <li>Give the app a nickname, such as the name of your tool.</li>
+      <li>Leave <span class="ui">Also set up Firebase Hosting</span> <strong>unchecked</strong> unless you want Firebase to host the page too.</li>
+      <li>Click <span class="ui">Register app</span>, then <span class="ui">Continue to console</span>. You can skip the rest of Firebase’s setup instructions.</li>
+    </ol>
+    <h3>Copy your real config</h3>
+    <p>Back on <span class="ui">Project settings</span> → <span class="ui">General</span>, scroll to your app under <span class="ui">Your apps</span>. Under <span class="ui">SDK setup and configuration</span>, choose <span class="ui">Config</span>. You’ll see a block shaped like this one, with your own values:</p>
+    <div class="codebox"><pre>const firebaseConfig = {
+  apiKey: "AIzaSy...about 39 characters...",
+  authDomain: "your-project-id.firebaseapp.com",
+  databaseURL: "https://your-project-id-default-rtdb.firebaseio.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project-id.firebasestorage.app",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:..."
+};</pre></div>
+    <div class="warn"><p><strong>Copy it from Firebase, not from this page.</strong> The block above, and any example you see in a tutorial, is only a shape. If your config contains <code>your-project-id</code>, dots like <code>AIzaSy...</code>, or another project’s name, the page won’t connect.</p></div>
+    <div class="warn"><p><strong>Check for databaseURL.</strong> If your block has no <code>databaseURL</code> line, add one using the database URL from the top of the Realtime Database <span class="ui">Data</span> tab, in quotes with a comma after it.</p></div>
+    <div class="note"><p><strong>Is it safe to publish this?</strong> Yes. Despite its name, the <code>apiKey</code> isn’t a password. It only identifies your project, and Firebase expects it to be visible in web pages. Your security rules are what protect the data.</p></div>
+    <label class="done"><input type="checkbox" data-step="s5"> Done with step 5</label>
+  </section>
+
+  <section class="step" id="s6">
+    <h2><span class="n">Step 6</span>Allow your website</h2>
+    <p>Firebase only accepts sign-ins from websites you list.</p>
+    <ol>
+      <li>Search for <strong>Authentication</strong> again and open its <span class="ui">Settings</span> tab.</li>
+      <li>Click <span class="ui">Authorized domains</span>, then <span class="ui">Add domain</span>.</li>
+      <li>Enter just the site’s domain: no <code>https://</code>, no slashes, no page names. For GitHub Pages that’s <code>yourname.github.io</code>, even if your page is in a folder like <code>yourname.github.io/course/</code>.</li>
+      <li>Click <span class="ui">Add</span>.</li>
+    </ol>
+    <p><code>localhost</code> is usually already on the list, which lets you test on your own computer.</p>
+    <div class="note"><p><strong>In the sample project:</strong> the game lives at <code>mqaissaunee-bcc.github.io/fall26-ai/</code>, so the authorized domain is <code>mqaissaunee-bcc.github.io</code>.</p></div>
+    <label class="done"><input type="checkbox" data-step="s6"> Done with step 6</label>
+  </section>
+
+  <section class="step" id="s7">
+    <h2><span class="n">Step 7</span>Connect your page</h2>
+    <p>Your page needs three things: Firebase’s code libraries, your config, and a few lines that sign in and read or write data.</p>
+    <h3>A minimal working example</h3>
+    <p>This matches the starter rules from step 4. It signs each visitor in anonymously, saves their answer, and shows everyone’s answers live. Paste it near the end of your page’s <code>&lt;body&gt;</code> and replace the config with yours.</p>
+    <div class="codebox">
+      <button class="copy" type="button" data-copy="codeStarter">Copy</button>
+<pre id="codeStarter">&lt;script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"&gt;&lt;/script&gt;
+&lt;script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"&gt;&lt;/script&gt;
+&lt;script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  // 1. Your settings from step 5
+  const firebaseConfig = {
+    apiKey: "...",
+    authDomain: "your-project-id.firebaseapp.com",
+    databaseURL: "https://your-project-id-default-rtdb.firebaseio.com",
+    projectId: "your-project-id",
+    appId: "..."
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // 2. Give this device a random ID, then use the database
+  firebase.auth().signInAnonymously().then(({ user }) =&gt; {
+
+    // Save this visitor's answer (each device can only write its own)
+    function sendAnswer(text) {
+      db.ref("responses/" + user.uid).set({
+        answer: text,
+        time: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+    sendAnswer("Hello from " + navigator.platform);
+
+    // Show everyone's answers, updating live
+    db.ref("responses").on("value", snapshot =&gt; {
+      const all = snapshot.val() || {};
+      console.log(Object.keys(all).length + " answers:", all);
+    });
+
+  }).catch(err =&gt; console.error("Firebase sign-in failed:", err.code));
+&lt;/script&gt;</pre>
+    </div>
+    <p>Open the page in two browser windows and check the console (F12, then <span class="ui">Console</span>). Both windows should list both answers.</p>
+
+    <div class="note">
+      <p><strong>In the sample project:</strong> the game already contains all the Firebase code. It has one line near the top of its script, <code>const FIREBASE_CONFIG = null;</code>. Setup meant replacing <code>null</code> with only the part of the config from <code>{</code> to <code>}</code>, leaving out Firebase’s <code>const firebaseConfig =</code>, because the game already has its own name for it. While the value is <code>null</code>, the game falls back to counting votes by hand, so it still works before setup is done.</p>
+    </div>
+    <div class="warn"><p><strong>Paste once.</strong> A common mistake is pasting Firebase’s whole block, including <code>const firebaseConfig =</code>, into a line that already starts with <code>const</code>. You end up with two <code>const</code>s and the page stops working. Check that the finished line has one <code>const</code> and ends with <code>};</code>.</p></div>
+    <label class="done"><input type="checkbox" data-step="s7"> Done with step 7</label>
+  </section>
+
+  <section class="step" id="s8">
+    <h2><span class="n">Step 8</span>Test it</h2>
+    <ol>
+      <li>Upload your page. On GitHub Pages, wait a minute or two for it to update.</li>
+      <li>Open it on two devices, such as a laptop and a phone, and do whatever the page does: vote, answer, join.</li>
+      <li>Check that what you do on one device shows up on the other within a second or two.</li>
+      <li>In the Firebase console, open <span class="ui">Realtime Database</span> → <span class="ui">Data</span>. You should see your data appear in the tree as you use the page.</li>
+      <li>Test once more on the network you’ll actually use, such as campus Wi-Fi in the room where you’ll teach. Some networks block certain services.</li>
+    </ol>
+    <h3>Optional: test your rules</h3>
+    <p>On the <span class="ui">Rules</span> tab, the <span class="ui">Rules Playground</span> lets you try a pretend read or write and see whether your rules allow it. Try something that <em>should</em> be refused, such as writing to another device’s spot or writing a value your rules don’t allow, and confirm it’s denied.</p>
+    <div class="note"><p><strong>In the sample project:</strong> testing confirmed anonymous sign-in worked, a game could be created, a valid vote was accepted, a made-up vote value was refused, and reading without signing in was refused. Every test sign-in leaves an anonymous user in Authentication → <span class="ui">Users</span>. That’s harmless, and you can delete them.</p></div>
+    <label class="done"><input type="checkbox" data-step="s8"> Done with step 8</label>
+  </section>
+
+  <h2 id="ai">Optional: build a new page with an AI assistant</h2>
+  <p>Setup is complete after step 8. This section is for later, when you want a <em>new</em> tool that uses your Firebase project, such as a live poll or a question board. You don’t need it for the sample game, which already has its Firebase code.</p>
+  <p>An AI assistant can write the page for you. Give it your config and your rules so the code it writes actually matches your database. A prompt that works well:</p>
+  <div class="codebox">
+    <button class="copy" type="button" data-copy="promptAI">Copy</button>
+<pre id="promptAI">Build a single self-contained HTML page for [describe your tool, e.g. a live
+class poll where students pick A, B, C, or D and the projector shows a bar chart].
+
+Use Firebase Realtime Database with the compat SDK from
+https://www.gstatic.com/firebasejs/10.12.2/ (app, auth, database) and anonymous
+sign-in. Here is my config:
+[paste your config]
+
+These are my security rules. The page must only read and write data in exactly
+this shape:
+[paste your rules]
+
+Don't collect names or any personal information. Show a clear message if
+Firebase can't connect, and keep the page usable without it if possible.</pre>
+  </div>
+  <p>If you change what the page stores, change the rules to match. Ask the assistant to update both together.</p>
+
+  <h2 id="care">Privacy and upkeep</h2>
+  <ul>
+    <li><strong>Store as little as possible.</strong> Anonymous IDs and answers are enough for most classroom tools. Don’t store student names, emails, ID numbers, or grades, and follow your institution’s policies on student data.</li>
+    <li><strong>Choose the account carefully.</strong> The project belongs to whichever Google account creates it. If a tool will be used by a department for years, consider a shared departmental account, or add a colleague as a second owner under the gear icon → <span class="ui">Users and permissions</span>, so the project isn’t lost if you leave.</li>
+    <li><strong>Clean up.</strong> Delete old data from the <span class="ui">Data</span> tab: hover over a branch, open its three-dot menu, and choose <span class="ui">Delete</span>. Your rules and settings stay, so the page keeps working. The sample game deletes each game’s data automatically when the facilitator starts a new one.</li>
+    <li><strong>One project, several tools.</strong> You can reuse a project for related tools by giving each its own top-level path, like <code>games</code> and <code>polls</code>, each with its own rules.</li>
+  </ul>
+
+  <h2 id="trouble">Troubleshooting</h2>
+  <details>
+    <summary>I can’t find Authentication or Realtime Database</summary>
+    <p>They aren’t in the gear-icon menu. Use the search box at the top of the console, or go straight to them by address, replacing <code>your-project-id</code> with your project ID (shown under Project settings → General):</p>
+    <p><code>https://console.firebase.google.com/project/your-project-id/authentication</code><br><code>https://console.firebase.google.com/project/your-project-id/database</code></p>
+  </details>
+  <details>
+    <summary>An error mentions “operation-not-allowed” or “admin-restricted-operation”</summary>
+    <p>Anonymous sign-in isn’t turned on. Go back to step 2.</p>
+  </details>
+  <details>
+    <summary>An error mentions “unauthorized-domain”</summary>
+    <p>Your website isn’t on the authorized domains list, or it’s entered with <code>https://</code> or a folder name. Go back to step 6.</p>
+  </details>
+  <details>
+    <summary>An error mentions “invalid-api-key” or the page never connects</summary>
+    <p>The config is probably an example rather than your own. Copy it again from Project settings → General → Your apps → Config (step 5).</p>
+  </details>
+  <details>
+    <summary>An error says “permission denied”</summary>
+    <p>Your rules refused the read or write. Either the rules didn’t publish, or the page is writing to a path or in a shape the rules don’t allow. Compare the path and data in your code with your rules, and try the write in the Rules Playground.</p>
+  </details>
+  <details>
+    <summary>Nothing happens, and there’s no error</summary>
+    <p>Usually the <code>databaseURL</code> line is missing or wrong. Compare it with the address at the top of the Realtime Database Data tab, including whether it ends in <code>firebaseio.com</code> or <code>firebasedatabase.app</code>.</p>
+  </details>
+  <details>
+    <summary>The page stopped working after I pasted the config</summary>
+    <p>Look for a doubled <code>const</code>, a missing comma between lines, or a missing <code>};</code> at the end. Your browser’s console (F12) shows the line with the problem.</p>
+  </details>
+  <details>
+    <summary>It works at home but not on campus</summary>
+    <p>The network may be blocking Firebase. Ask IT to allow <code>*.firebaseio.com</code>, <code>*.firebasedatabase.app</code>, and <code>identitytoolkit.googleapis.com</code>, or have people use cellular data.</p>
+  </details>
+  <details>
+    <summary>Some devices can’t connect in a very large group</summary>
+    <p>The free plan allows 100 devices connected to one database at a time. For bigger groups, plan a way for extra people to take part without connecting, such as a show of hands.</p>
+  </details>
+</main>
+
+<footer>
+  <p>AI Examples by Professor Qaissaunee. Firebase’s screens change from time to time; if a button has a slightly different name, look for the closest match or use the console’s search box.</p>
+</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY="fb-setup-done", boxes=[].slice.call(document.querySelectorAll("[data-step]"));
+  var done={}; try{done=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){}
+  function paint(){
+    var n=0;
+    boxes.forEach(function(b){var on=!!done[b.dataset.step];b.checked=on;document.getElementById(b.dataset.step).classList.toggle("is-done",on);if(on)n++;});
+    document.getElementById("progText").textContent=n+" of "+boxes.length+" steps done";
+    document.getElementById("progBar").style.width=(n/boxes.length*100)+"%";
+  }
+  boxes.forEach(function(b){b.addEventListener("change",function(){done[b.dataset.step]=b.checked;try{localStorage.setItem(KEY,JSON.stringify(done))}catch(e){}paint();});});
+  paint();
+  document.querySelectorAll("[data-copy]").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var text=document.getElementById(btn.dataset.copy).textContent;
+      var reset=function(){setTimeout(function(){btn.textContent="Copy"},1800)};
+      if(navigator.clipboard){navigator.clipboard.writeText(text).then(function(){btn.textContent="Copied";reset()},function(){btn.textContent="Select and copy";reset()})}
+      else{btn.textContent="Select and copy";reset()}
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
