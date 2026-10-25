@@ -2,9 +2,27 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.33.3
+  Version:  v5.33.4
   Date:     October 25, 2026
-  Features: Fix — false "goal met" celebration no longer fires when the
+  Features: Fix — amber "non-default view" banner is now term-aware.
+            Previously, the banner's "non-default" test was hardcoded to
+            Fall 15W, so Spring 15W triggered the banner (even though
+            it's Spring's default) and Winterim showed a "Back to 15-week"
+            button for a term that has no 15-week POT.
+            - New defaultPotForTerm(termCode) helper: returns '15W' for
+              terms with a 15W pot_dates entry, 'FULL' for single-session
+              terms (empty pot_dates), or the first POT in canonical order.
+            - isDefault test now compares activePartOfTerm to the active
+              TERM's default, not Fall's hardcoded default.
+            - Banner reset button text now dynamic: "Back to Fall 15-week",
+              "Back to Spring 15-week", "Back to Winterim". Click routes
+              to the active term's own default POT.
+            - Banner remains hidden entirely for single-session terms
+              (there's no non-default POT to warn about).
+            Built on v5.33.3.
+
+  v5.33.3 (previous):
+            Fix — false "goal met" celebration no longer fires when the
             active term's goal is small relative to another loaded term's
             aggregate FTE. Root cause: aggregateCollegeFTE() and
             previousAggregateCollegeFTE() iterated ALL loaded snapshots
@@ -2453,13 +2471,13 @@
   <div id="potBanner" class="pot-banner" style="display:none">
     <span aria-hidden="true">▸</span>
     Viewing <strong id="potBannerLabel">7A · first half</strong> sections only
-    <button type="button" class="pot-banner-reset" id="potBannerReset" title="Return to 15-week view">Back to 15-week</button>
+    <button type="button" class="pot-banner-reset" id="potBannerReset" title="Return to default view">Back to default</button>
   </div>
 
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.33.3</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.33.4</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -4024,6 +4042,36 @@
     return `${termLabel} — ${potShort}`;
   }
 
+  // v5.33.4: Returns the "default" POT for a given term — i.e., the POT
+  // that the amber "non-default view" banner's reset button should go back
+  // to. For Fall and Spring, that's '15W' (the full-semester POT). For
+  // Winterim and other single-session terms, that's 'FULL' (the sentinel
+  // POT). If the term config is unknown, falls back to '15W'.
+  function defaultPotForTerm(termCode) {
+    const cfg = state.terms[termCode];
+    if (!cfg) return '15W';
+    const potDates = cfg.pot_dates || {};
+    const keys = Object.keys(potDates);
+    // Empty pot_dates → single-session term; default POT is FULL
+    if (keys.length === 0) return 'FULL';
+    // Prefer 15W if available, else the first POT in canonical order
+    if (potDates['15W']) return '15W';
+    return POT_ORDER.find(p => potDates[p]) || keys[0];
+  }
+
+  // v5.33.4: Human-friendly label for the term+default-POT, used in the
+  // amber banner's reset button. E.g. "Back to Fall 15-week" when active
+  // term is 26FA.
+  function termDefaultResetLabel(termCode) {
+    const cfg = state.terms[termCode];
+    const termShort = cfg && cfg.term_label
+      ? cfg.term_label.replace(/\s+\d{4}$/, '')  // "Fall 2026" → "Fall"
+      : termLabelFromCode(termCode).replace(/\s+\d{4}$/, '');
+    const pot = defaultPotForTerm(termCode);
+    if (pot === 'FULL') return `Back to ${termShort}`;
+    return `Back to ${termShort} 15-week`;
+  }
+
   // v5.33: Short badge text for a lifecycle state
   function lifecycleBadge(lc) {
     switch (lc) {
@@ -4066,7 +4114,14 @@
         const allOpts = allTermPotOptions();
         const activeOpt = allOpts.find(o => o.term === activeTerm && o.pot === activePot);
         const activeLc = activeOpt ? activeOpt.lifecycle : 'UNKNOWN';
-        const isDefault = activeTerm === '26FA' && activePot === '15W';
+        // v5.33.4: "default" means the active POT IS the term's default POT
+        // (15W for Fall/Spring, FULL for single-session terms like Winterim).
+        // The amber banner shows when the user is viewing a non-default POT
+        // WITHIN THEIR CURRENT TERM — i.e., Spring 7A triggers the banner
+        // (default is Spring 15W), but Winterim does NOT (its default is
+        // Winterim's only option).
+        const termDefault = defaultPotForTerm(activeTerm);
+        const isDefault = activePot === termDefault;
 
         // Pill label + non-default state (amber treatment when not Fall 15W)
         const pillLabel = el('titlePotPillLabel');
@@ -4119,14 +4174,24 @@
           menu.innerHTML = html;
         }
 
-        // Amber banner shown only when the active option is not Fall 15W.
-        // (Pre-v5.33 behavior.)
+        // v5.33.4: Amber banner shown when the active POT is not the
+        // active TERM's default POT. Spring 7A triggers it (default is
+        // Spring 15W); Winterim does NOT (its own default is itself).
+        // The reset button text also reads from the active term —
+        // "Back to Fall 15-week", "Back to Spring 15-week", etc.
         const banner = el('potBanner');
         if (banner) {
           banner.style.display = isDefault ? 'none' : 'flex';
           if (!isDefault) {
             const bannerLabel = el('potBannerLabel');
             if (bannerLabel) bannerLabel.textContent = label;
+            const bannerReset = el('potBannerReset');
+            if (bannerReset) {
+              bannerReset.textContent = termDefaultResetLabel(activeTerm);
+              bannerReset.setAttribute('title', `Return to ${termLabelFromCode(activeTerm)} default view`);
+              // Store the destination POT so the click handler knows where to go
+              bannerReset.dataset.destinationPot = termDefault;
+            }
           }
         }
       }
@@ -7455,7 +7520,12 @@
   // "Back to 15-week" quick-reset button in the amber banner
   const potBannerReset = el('potBannerReset');
   if (potBannerReset) {
-    potBannerReset.addEventListener('click', () => switchPartOfTerm('15W'));
+    // v5.33.4: Go to the ACTIVE TERM's default POT, not Fall's hardcoded 15W.
+    // The destination POT is stored as a data attribute by updateHeader().
+    potBannerReset.addEventListener('click', () => {
+      const destPot = potBannerReset.dataset.destinationPot || defaultPotForTerm(state.activeTerm);
+      switchPartOfTerm(state.activeTerm + '|' + destPot);
+    });
   }
 
   /* =========================================================================
