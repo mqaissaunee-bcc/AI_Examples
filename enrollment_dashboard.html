@@ -2,9 +2,20 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.33
+  Version:  v5.33.1
   Date:     October 25, 2026
-  Features: Multi-term dashboard — Winterim 2027 and Spring 2027 join
+  Features: Fix — phantom "no snapshots yet" entry no longer appears for
+            terms whose manifest lacks pot_dates but which do have
+            snapshots tagged with real POT codes (15W/11W/7A/7B). The
+            previous behavior synthesized a FULL sentinel entry on the
+            assumption of a single-session term; now it checks whether
+            snapshots with real POTs exist and skips the phantom when
+            they do. Legitimate single-session terms (Winterim) still
+            get their FULL entry as before.
+            Built on v5.33.
+
+  v5.33 (previous):
+            Multi-term dashboard — Winterim 2027 and Spring 2027 join
             Fall 2026 as peer terms in a unified sub-term picker.
             - Reads data/terms.json at load; fetches each listed term's
               manifest and spreadsheets in parallel. All snapshots go into
@@ -2414,7 +2425,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.33</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.33.1</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -3731,14 +3742,36 @@
     const opts = [];
     const seen = new Set();
 
-    // From loaded term configs — covers POTs with no snapshots yet
+    // From loaded term configs — covers POTs with no snapshots yet.
+    //
+    // v5.33.1 (Fix B): A term with empty pot_dates was previously assumed
+    // to be single-session (Winterim-style), producing a FULL sentinel entry.
+    // But if the term also carries snapshots with real POT codes (15W, 11W,
+    // 7A, 7B) — which can happen with a legacy manifest that hasn't been
+    // backfilled with pot_dates yet — we'd end up with BOTH a phantom FULL
+    // entry AND the real POT entries from snapshots. The phantom shows as
+    // "Fall 2026 — NO SNAPSHOTS YET" in the dropdown, which is confusing.
+    //
+    // To avoid this: when pot_dates is empty, check whether any loaded
+    // snapshot for this term has a non-FULL POT. If yes, skip the phantom
+    // and let the snapshot-driven path below surface the real options.
     Object.keys(state.terms).forEach(termCode => {
       const cfg = state.terms[termCode];
       const potDates = cfg.pot_dates || {};
       const pots = Object.keys(potDates);
 
       if (pots.length === 0) {
-        // Single-session term (e.g. Winterim). Use 'FULL' as the sentinel POT.
+        // Check whether this term has any snapshots with a real (non-FULL)
+        // POT. If so, don't synthesize a phantom FULL entry — the real
+        // POTs will come from the snapshot-driven loop below.
+        const hasRealPotSnapshots = state.snapshots.some(s =>
+          (s.term || '26FA') === termCode &&
+          (s.part_of_term || '15W') !== 'FULL'
+        );
+        if (hasRealPotSnapshots) return;
+
+        // Genuinely single-session term (e.g. Winterim with pot_dates={}).
+        // Use 'FULL' as the sentinel POT.
         const start = cfg.term_start ? new Date(cfg.term_start + 'T00:00:00').getTime() : null;
         const end = cfg.term_end ? new Date(cfg.term_end + 'T00:00:00').getTime() : null;
         opts.push(buildOption(termCode, 'FULL', start, end, todayTs));
