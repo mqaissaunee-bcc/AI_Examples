@@ -7,45 +7,18 @@ Discovers snapshot files in the specified data directory and writes
 source file, and any required content filter. Preserves custom top-level
 manifest fields (goals, etc.) across regenerations.
 
-The term code is derived from the data directory name — data/26FA/ → 26FA,
-data/27SP/ → 27SP, etc. All POT patterns are built dynamically from the term
-code, so this script works for future semesters without modification.
-
-Two file paths supported per term:
-
-  1. Per-POT files (legacy).
-     Filename patterns (using 26FA as the term-code example):
-       26FA_*_MMDDYY.xlsx    → 15W
-       26FA11_*_MMDDYY.xlsx  → 11W
-       26FA7A_*_MMDDYY.xlsx  → 7A
-       26FA7B_*_MMDDYY.xlsx  → 7B
-     Location: subfolder (<data_dir>/15W/, etc.) preferred, or loose in
-     <data_dir>/. Subfolder location takes precedence over filename prefix
-     when both are present.
-     Manifest: one entry per file.
-
-  2. Combined files (new).
-     Filename pattern: <term>R_*_MMDDYY.xlsx  (e.g. 26FAR_...)
-     Location: loose in <data_dir>/
-     Content: one xlsx containing rows from every POT. POT is identified
-     by the "Term" column: <term> = 15W, <term>11 = 11W, <term>7A = 7A,
-     <term>7B = 7B.
-     Manifest: one entry per POT actually present in the file, all pointing
-     at the same source file with a "pot_term_filter" field indicating which
-     Term value to keep at ingest.
-
-Reversibility: ENABLE_COMBINED_FILES flag below. Set to False to disable
-combined-file support entirely — combined files are silently ignored and
-only per-POT files land in the manifest. Existing per-POT flow is untouched.
-
-Collision policy: if a date has both a combined file AND per-POT files for
-POTs covered by the combined file, the combined file wins silently. The
-per-POT files for those POTs get dropped from the manifest for that date.
-This supports a gradual transition where a stale per-POT file may briefly
-coexist with a combined file for the same date.
+v2 (2026-10-26): Added defensive abort when protected top-level fields would
+be lost in regeneration. See PROTECTED_FIELDS below. If an existing manifest
+has 'goals', 'census', 'pot_dates', 'term_label', 'term_start', or 'term_end'
+and the new write would drop them (because they weren't present in the file
+the script actually read from disk at run time), the script now aborts with
+a loud error and writes nothing. This prevents silent data loss when a race
+condition or stale read strips the fields. To intentionally remove a
+protected field, pass --allow-field-removal.
 
 Usage:
     python3 generate_manifest.py --data-dir data/26FA
+    python3 generate_manifest.py --data-dir data/26FA --allow-field-removal
 """
 
 import argparse
@@ -61,11 +34,25 @@ import pandas as pd
 # ==============================================================================
 # FEATURE FLAG
 # ==============================================================================
-# Set to False to disable combined-file support entirely.
-# Existing per-POT files continue to work either way. Flipping this flag and
-# rerunning the workflow is the intended rollback path if the combined-file
-# path causes problems.
 ENABLE_COMBINED_FILES = True
+
+
+# ==============================================================================
+# PROTECTED FIELDS (v2 safety net)
+# ==============================================================================
+# Top-level manifest fields that should never silently disappear across a
+# regeneration. If the existing manifest had any of these and the preservation
+# logic would strip them, the script aborts. See defensive abort in
+# write_manifest(). This specifically guards against races and stale reads
+# that previously corrupted manifests silently.
+PROTECTED_FIELDS = {
+    'goals',
+    'census',
+    'pot_dates',
+    'term_label',
+    'term_start',
+    'term_end',
+}
 
 
 # ==============================================================================
@@ -78,25 +65,17 @@ SHEET_NAMES = ['Individual Sects All', 'Query result']
 def build_config(term_code):
     """
     Build the term-specific patterns and mappings from a term code (e.g. '26FA').
-    All prefix regexes and Term-value → POT mappings derive from this so the
-    same script works for any current or future term.
     """
     escaped = re.escape(term_code)
     return {
         'term_code': term_code,
-        # Combined-file prefix — e.g. 26FAR_ (Colleague's naming for the
-        # report-style query that returns all POTs in one file).
         'combined_pattern': re.compile(rf'^{escaped}R[_ ]', re.IGNORECASE),
-        # Filename prefix → POT for loose per-POT files. Order matters:
-        # more-specific patterns are checked first so '26FA11_' doesn't
-        # match '26FA_' by accident.
         'individual_prefix_map': [
             ('11W', re.compile(rf'^{escaped}11[_ ]', re.IGNORECASE)),
             ('7A',  re.compile(rf'^{escaped}7A[_ ]', re.IGNORECASE)),
             ('7B',  re.compile(rf'^{escaped}7B[_ ]', re.IGNORECASE)),
             ('15W', re.compile(rf'^{escaped}[_ ]',   re.IGNORECASE)),
         ],
-        # Term column values → POT identifier. Used to split combined rows.
         'term_to_pot': {
             term_code:            '15W',
             f'{term_code}11':     '11W',
@@ -110,10 +89,6 @@ def build_config(term_code):
 # FILENAME PARSING
 # ==============================================================================
 def parse_date_from_filename(filename):
-    """
-    Extract MMDDYY date from filenames ending with _MMDDYY.xlsx or space
-    MMDDYY.xlsx. Returns a date object or None if no match.
-    """
     m = re.search(r'[_ ](\d{2})(\d{2})(\d{2})\.xlsx?$', filename, re.IGNORECASE)
     if not m:
         return None
@@ -125,7 +100,6 @@ def parse_date_from_filename(filename):
 
 
 def detect_individual_pot_from_filename(filename, config):
-    """Detect POT from a per-POT filename prefix. Returns POT string or None."""
     if config['combined_pattern'].match(filename):
         return None
     for pot, pattern in config['individual_prefix_map']:
@@ -142,10 +116,6 @@ def is_combined_file(filename, config):
 # FILE READING
 # ==============================================================================
 def read_sheet(path):
-    """
-    Read the appropriate sheet from an xlsx file. Tries known sheet names in
-    order. Raises RuntimeError if none present.
-    """
     xls = pd.ExcelFile(path)
     for name in SHEET_NAMES:
         if name in xls.sheet_names:
@@ -161,11 +131,6 @@ def read_sheet(path):
 # DISCOVERY
 # ==============================================================================
 def discover_individual_snapshots(data_root, config):
-    """
-    Find per-POT files in subfolders or loose in data_root. Returns a list of
-    dicts: {'file': relpath_from_data_root, 'date': date, 'pot': pot_code}.
-    Subfolder-based discovery is preferred over prefix-based for loose files.
-    """
     results = []
     seen_paths = set()
 
@@ -204,11 +169,6 @@ def discover_individual_snapshots(data_root, config):
 
 
 def discover_combined_snapshots(data_root, config):
-    """
-    Find combined files in data_root. Reads each to determine which POTs are
-    present via the Term column. Returns a list of dicts:
-      {'file': filename, 'date': date, 'pot_map': {pot: term_value, ...}}
-    """
     if not ENABLE_COMBINED_FILES:
         return []
 
@@ -263,12 +223,6 @@ def discover_combined_snapshots(data_root, config):
 # MANIFEST BUILD
 # ==============================================================================
 def build_snapshot_entries(individual, combined):
-    """
-    Merge individual and combined snapshot descriptors into a single sorted
-    snapshot list. Collision policy: for any (date, pot) also covered by a
-    combined file, the combined entry wins and the individual entry is
-    silently dropped.
-    """
     snapshots = []
 
     combined_coverage = set()
@@ -304,7 +258,6 @@ def build_snapshot_entries(individual, combined):
 
 
 def load_existing_manifest(manifest_path):
-    """Return the previous manifest's contents as a dict, or {} if none."""
     if not manifest_path.exists():
         return {}
     try:
@@ -316,13 +269,49 @@ def load_existing_manifest(manifest_path):
         return {}
 
 
-def write_manifest(data_root, term_code, snapshots):
-    """Assemble and write the manifest, preserving custom top-level fields."""
+def write_manifest(data_root, term_code, snapshots, allow_field_removal=False):
+    """
+    Assemble and write the manifest, preserving custom top-level fields.
+
+    v2 (2026-10-26): defensive abort. If the existing manifest had any of the
+    PROTECTED_FIELDS (goals, census, pot_dates, term dates/label) and the
+    newly-computed preserved set has lost them, abort with a loud error and
+    write nothing. This prevents silent data loss when a race condition or
+    stale read makes the existing manifest look stripped at run time.
+
+    Pass allow_field_removal=True to override (needed only if you deliberately
+    want to remove a protected field).
+    """
     manifest_path = data_root / 'manifest.json'
     existing = load_existing_manifest(manifest_path)
 
     auto_generated_keys = {'term', 'updated', 'snapshots'}
     preserved = {k: v for k, v in existing.items() if k not in auto_generated_keys}
+
+    # Defensive abort — see docstring and PROTECTED_FIELDS comment above.
+    existing_protected = {k for k in existing.keys() if k in PROTECTED_FIELDS}
+    preserved_protected = {k for k in preserved.keys() if k in PROTECTED_FIELDS}
+    missing = existing_protected - preserved_protected
+
+    if missing and not allow_field_removal:
+        print(
+            f"\n*** ABORT: refusing to strip protected fields from {manifest_path} ***\n"
+            f"The existing manifest had protected fields: {sorted(existing_protected)}\n"
+            f"The regeneration would preserve: {sorted(preserved_protected)}\n"
+            f"That would silently drop: {sorted(missing)}\n"
+            f"\n"
+            f"This usually means a race condition or stale read corrupted the existing\n"
+            f"manifest, or the manifest was overwritten by an incomplete edit. The\n"
+            f"script is refusing to write to prevent data loss. Nothing has changed.\n"
+            f"\n"
+            f"To proceed:\n"
+            f"  1. Inspect {manifest_path} and verify it has all expected fields.\n"
+            f"  2. If fields are legitimately missing, restore them and re-run.\n"
+            f"  3. If you really do want to remove the fields, re-run with\n"
+            f"     --allow-field-removal.\n",
+            file=sys.stderr,
+        )
+        return None
 
     manifest = {
         'term': term_code,
@@ -349,6 +338,10 @@ def main():
         '--data-dir', type=pathlib.Path, required=True,
         help='Path to the term data folder (e.g. data/26FA)',
     )
+    parser.add_argument(
+        '--allow-field-removal', action='store_true',
+        help='Override the defensive abort when protected fields would be stripped.',
+    )
     args = parser.parse_args()
 
     data_root = args.data_dir
@@ -364,13 +357,22 @@ def main():
 
     print(f"Scanning {data_root} (term: {term_code})...")
     print(f"  Combined-file support: {'ENABLED' if ENABLE_COMBINED_FILES else 'DISABLED'}")
+    print(f"  Protected fields: {sorted(PROTECTED_FIELDS)}")
+    if args.allow_field_removal:
+        print(f"  Field-removal override: ENABLED")
 
     individual = discover_individual_snapshots(data_root, config)
     combined = discover_combined_snapshots(data_root, config)
 
     snapshots, dropped_by_collision = build_snapshot_entries(individual, combined)
 
-    manifest_path = write_manifest(data_root, term_code, snapshots)
+    manifest_path = write_manifest(
+        data_root, term_code, snapshots,
+        allow_field_removal=args.allow_field_removal,
+    )
+
+    if manifest_path is None:
+        return 1
 
     combined_entries = sum(1 for s in snapshots if 'pot_term_filter' in s)
     individual_entries = len(snapshots) - combined_entries
