@@ -7,17 +7,25 @@ Discovers snapshot files in the specified data directory and writes
 source file, and any required content filter. Preserves custom top-level
 manifest fields (goals, etc.) across regenerations.
 
+v3 (2026-10-26): Added support for single-session terms (Winterim, Summer-
+single). The bare term code in the Term column previously always mapped to
+the '15W' POT (the Fall/Spring convention). For a single-session term like
+Winterim 2027, there is no 15W — the only POT is 'FULL'. Winterim's season
+code is 'WN', which is added to SINGLE_SESSION_TERMS below. Any file whose
+Term column equals the bare term code (e.g. '27WN') is now mapped to
+'FULL' instead of '15W' for these terms.
+
 v2 (2026-10-26): Added defensive abort when protected top-level fields would
 be lost in regeneration. See PROTECTED_FIELDS below. If an existing manifest
 has 'goals', 'census', 'pot_dates', 'term_label', 'term_start', or 'term_end'
 and the new write would drop them (because they weren't present in the file
 the script actually read from disk at run time), the script now aborts with
-a loud error and writes nothing. This prevents silent data loss when a race
-condition or stale read strips the fields. To intentionally remove a
-protected field, pass --allow-field-removal.
+a loud error and writes nothing. To intentionally remove a protected field,
+pass --allow-field-removal.
 
 Usage:
     python3 generate_manifest.py --data-dir data/26FA
+    python3 generate_manifest.py --data-dir data/27WN
     python3 generate_manifest.py --data-dir data/26FA --allow-field-removal
 """
 
@@ -35,6 +43,18 @@ import pandas as pd
 # FEATURE FLAG
 # ==============================================================================
 ENABLE_COMBINED_FILES = True
+
+
+# ==============================================================================
+# SINGLE-SESSION TERMS (v3)
+# ==============================================================================
+# Terms whose season code identifies a single-session term — no POTs, one
+# session only. For these terms, the bare term code (e.g. '27WN') maps to
+# the sentinel POT 'FULL' instead of '15W'. Winterim uses 'WN'. Future
+# "Summer single" or other compressed terms can be added here.
+#
+# Fall and Spring are NOT single-session; they have 15W/11W/7A/7B POTs.
+SINGLE_SESSION_TERMS = {'WN'}
 
 
 # ==============================================================================
@@ -62,25 +82,52 @@ POT_SUBFOLDERS = ['15W', '11W', '7A', '7B']
 SHEET_NAMES = ['Individual Sects All', 'Query result']
 
 
+def is_single_session_term(term_code):
+    """
+    True if the term's season code is in SINGLE_SESSION_TERMS. Season code
+    is the last 2 characters of the term code (e.g. '27WN' → 'WN').
+    """
+    if len(term_code) < 2:
+        return False
+    return term_code[-2:].upper() in SINGLE_SESSION_TERMS
+
+
 def build_config(term_code):
     """
     Build the term-specific patterns and mappings from a term code (e.g. '26FA').
+
+    v3: For single-session terms (Winterim, etc.), the bare term code maps to
+    'FULL' instead of '15W'. Multi-POT terms (Fall, Spring) keep the '15W'
+    default for the bare term code.
     """
     escaped = re.escape(term_code)
+    single_session = is_single_session_term(term_code)
+    default_pot = 'FULL' if single_session else '15W'
+
     return {
         'term_code': term_code,
+        'is_single_session': single_session,
+        # Combined-file prefix — e.g. 26FAR_, 27WNR_, 27SPR_ (Colleague's
+        # naming for the report-style query that returns all POTs in one file).
         'combined_pattern': re.compile(rf'^{escaped}R[_ ]', re.IGNORECASE),
+        # Filename prefix → POT for loose per-POT files. Order matters:
+        # more-specific patterns are checked first so '26FA11_' doesn't
+        # match '26FA_' by accident.
         'individual_prefix_map': [
             ('11W', re.compile(rf'^{escaped}11[_ ]', re.IGNORECASE)),
             ('7A',  re.compile(rf'^{escaped}7A[_ ]', re.IGNORECASE)),
             ('7B',  re.compile(rf'^{escaped}7B[_ ]', re.IGNORECASE)),
-            ('15W', re.compile(rf'^{escaped}[_ ]',   re.IGNORECASE)),
+            (default_pot, re.compile(rf'^{escaped}[_ ]', re.IGNORECASE)),
         ],
+        # Term column values → POT identifier. Used to split combined rows.
+        # For single-session terms, the bare term code maps to FULL. The
+        # suffix mappings (11, 7A, 7B) are still defined for safety but
+        # should never be present in a single-session term's data.
         'term_to_pot': {
-            term_code:            '15W',
-            f'{term_code}11':     '11W',
-            f'{term_code}7A':     '7A',
-            f'{term_code}7B':     '7B',
+            term_code:         default_pot,
+            f'{term_code}11':  '11W',
+            f'{term_code}7A':  '7A',
+            f'{term_code}7B':  '7B',
         },
     }
 
@@ -89,6 +136,10 @@ def build_config(term_code):
 # FILENAME PARSING
 # ==============================================================================
 def parse_date_from_filename(filename):
+    """
+    Extract MMDDYY date from filenames ending with _MMDDYY.xlsx or space
+    MMDDYY.xlsx. Returns a date object or None if no match.
+    """
     m = re.search(r'[_ ](\d{2})(\d{2})(\d{2})\.xlsx?$', filename, re.IGNORECASE)
     if not m:
         return None
@@ -100,6 +151,7 @@ def parse_date_from_filename(filename):
 
 
 def detect_individual_pot_from_filename(filename, config):
+    """Detect POT from a per-POT filename prefix. Returns POT string or None."""
     if config['combined_pattern'].match(filename):
         return None
     for pot, pattern in config['individual_prefix_map']:
@@ -116,6 +168,10 @@ def is_combined_file(filename, config):
 # FILE READING
 # ==============================================================================
 def read_sheet(path):
+    """
+    Read the appropriate sheet from an xlsx file. Tries known sheet names in
+    order. Raises RuntimeError if none present.
+    """
     xls = pd.ExcelFile(path)
     for name in SHEET_NAMES:
         if name in xls.sheet_names:
@@ -131,6 +187,11 @@ def read_sheet(path):
 # DISCOVERY
 # ==============================================================================
 def discover_individual_snapshots(data_root, config):
+    """
+    Find per-POT files in subfolders or loose in data_root. Returns a list of
+    dicts: {'file': relpath_from_data_root, 'date': date, 'pot': pot_code}.
+    Subfolder-based discovery is preferred over prefix-based for loose files.
+    """
     results = []
     seen_paths = set()
 
@@ -169,6 +230,11 @@ def discover_individual_snapshots(data_root, config):
 
 
 def discover_combined_snapshots(data_root, config):
+    """
+    Find combined files in data_root. Reads each to determine which POTs are
+    present via the Term column. Returns a list of dicts:
+      {'file': filename, 'date': date, 'pot_map': {pot: term_value, ...}}
+    """
     if not ENABLE_COMBINED_FILES:
         return []
 
@@ -223,6 +289,12 @@ def discover_combined_snapshots(data_root, config):
 # MANIFEST BUILD
 # ==============================================================================
 def build_snapshot_entries(individual, combined):
+    """
+    Merge individual and combined snapshot descriptors into a single sorted
+    snapshot list. Collision policy: for any (date, pot) also covered by a
+    combined file, the combined entry wins and the individual entry is
+    silently dropped.
+    """
     snapshots = []
 
     combined_coverage = set()
@@ -258,6 +330,7 @@ def build_snapshot_entries(individual, combined):
 
 
 def load_existing_manifest(manifest_path):
+    """Return the previous manifest's contents as a dict, or {} if none."""
     if not manifest_path.exists():
         return {}
     try:
@@ -357,6 +430,7 @@ def main():
 
     print(f"Scanning {data_root} (term: {term_code})...")
     print(f"  Combined-file support: {'ENABLED' if ENABLE_COMBINED_FILES else 'DISABLED'}")
+    print(f"  Single-session term: {'YES (bare term → FULL)' if config['is_single_session'] else 'NO (bare term → 15W)'}")
     print(f"  Protected fields: {sorted(PROTECTED_FIELDS)}")
     if args.allow_field_removal:
         print(f"  Field-removal override: ENABLED")
