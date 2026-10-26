@@ -2,9 +2,23 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.33.7
+  Version:  v5.33.8
   Date:     October 26, 2026
-  Features: Fix — ingest now tolerates files that lack the Section column
+  Features: Fix — row normalization moved to resolveRowsForEntry, running
+            BEFORE the dedup pass. In v5.33.7 the normalization lived only
+            inside ingestRowsSilent, but resolveRowsForEntry had its own
+            dedup that ran first and collapsed every Winterim row to the
+            same empty-Section key, dropping 27 of 28 rows before ingest
+            ever saw them. The dashboard then showed 0 snapshots for
+            Winterim despite the manifest correctly listing the file.
+            With normalization moved upstream, dedup sees unique Section
+            values for each row and preserves all 28 rows (minus the 3
+            -295/-299 special projects filtered at ingest). Fall data
+            unchanged (its rows already have Section values).
+            Built on v5.33.7.
+
+  v5.33.7 (previous):
+            Fix — ingest now tolerates files that lack the Section column
             and that pack the full section identifier into Course. The
             scraper's new Winterim/Spring export format produces rows like:
                 Course = "ARTS-115-DE01C"
@@ -2526,7 +2540,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.33.7</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.33.8</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -3184,7 +3198,11 @@
   // enrollment without this. Also safe for per-POT files where sections
   // are already unique per Term — dedup finds nothing to drop.
   function resolveRowsForEntry(rawRows, entry) {
-    let rows = rawRows;
+    // v5.33.8: normalize rows FIRST — synthesizes a Section column from
+    // Course when the source file doesn't ship one (scraper's new Winterim
+    // and Spring format). Without this, dedup below sees every row as
+    // having the same empty Section key and collapses them all into one.
+    let rows = rawRows.map(normalizeRawRow);
 
     if (entry && entry.pot_term_filter) {
       rows = rows.filter(r => {
@@ -3219,7 +3237,9 @@
     const pot = partOfTerm || (termCode === '27WN' ? 'FULL' : '15W');
     const term = termCode || '26FA';
     const upperTerm = String(term).toUpperCase();
-    // v5.33.7: normalize before filter so both file formats work (see normalizeRawRow)
+    // v5.33.8: rows arriving via loadFromManifests → resolveRowsForEntry
+    // are already normalized. Normalize here anyway in case a caller
+    // bypasses resolveRowsForEntry (defense in depth).
     const normalizedRows = rawRows.map(normalizeRawRow);
     const fall = normalizedRows.filter(r => {
       const rowTerm = String(r.Term || '').toUpperCase();
