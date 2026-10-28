@@ -96,6 +96,7 @@ a.btn:hover{border-color:var(--accent)}
 .sec-sub{display:block;font-size:.86rem;color:var(--muted);overflow-wrap:anywhere}
 .sec-words{font-size:.86rem;color:var(--muted);white-space:nowrap}
 .sec-btn{font-size:.88rem;padding:.4rem .75rem}
+.copy-msg{font-weight:600;color:var(--ok)}
 .removed{border:1px dashed var(--line);border-radius:var(--r-md);padding:.8rem .9rem;margin:0 0 .9rem}
 .removed h3{margin-bottom:.2rem}
 .removed .secs{background:transparent;margin-top:.5rem}
@@ -224,8 +225,14 @@ html{scroll-behavior:smooth}
       <details class="ai" id="ai-box">
         <summary>Refine the plan with an AI chatbot (optional)</summary>
         <p>Copy this prompt into Copilot Chat, Claude, or another chatbot. It includes only your outline (section titles, word counts, and short excerpts), not the full source. Paste the reply below to get better titles, learning objectives, and key concepts in every video prompt.</p>
-        <div class="row" style="margin-bottom:1rem">
+        <div class="row" style="margin-bottom:.6rem">
           <button id="btn-copy-meta">Copy AI prompt</button>
+          <span class="copy-msg" id="meta-msg" aria-hidden="true"></span>
+        </div>
+        <div class="field">
+          <label for="meta-text">AI prompt</label>
+          <textarea id="meta-text" rows="8" readonly></textarea>
+          <p class="hint">This updates as you change the plan. If the copy button doesn't work in your browser, select all in this box and copy it yourself.</p>
         </div>
         <div class="field">
           <label for="ai-reply">Chatbot's reply</label>
@@ -682,6 +689,7 @@ function renderPlan(focusSel){
   $('#removed').hidden=!removed.length;
   $('#removed').innerHTML=removed.length?'<h3>Removed sections ('+removed.length+')</h3><p class="hint">These are left out of every video. Restore one to put it back in its original place.</p><ul class="secs">'+
     removed.map(function(s){return '<li class="sec"><div class="sec-main"><span class="sec-title">'+esc(s.title)+'</span></div><span class="sec-words">'+plural(s.words,'word')+'</span><button class="sec-btn" data-act="restore" data-sec="'+esc(s.id)+'">Restore</button></li>';}).join('')+'</ul>':'';
+  $('#meta-text').value=metaPrompt();
   if(focusSel){var f=document.querySelector(focusSel);if(f)f.focus();}
 }
 function renderRun(){
@@ -817,10 +825,11 @@ function applyAi(){
 }
 
 /* ---------- Clipboard and download ---------- */
-function copyText(text,label){
+function copyText(text,label,btn){
+  function done(ok){announce(ok?label+' copied':'Copy failed. Select the text and copy it manually.');if(btn){var o=btn.getAttribute('data-label')||btn.textContent;btn.setAttribute('data-label',o);btn.textContent=ok?'Copied ✓':'Copy failed';clearTimeout(btn._t);btn._t=setTimeout(function(){btn.textContent=o;},2000);}}
   function fallback(){var t=document.createElement('textarea');t.value=text;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();
-    try{document.execCommand('copy');announce(label+' copied');}catch(e){announce('Copy failed. Select the text and copy it manually.');}document.body.removeChild(t);}
-  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).then(function(){announce(label+' copied');},fallback);}else fallback();
+    var ok=false;try{ok=document.execCommand('copy');}catch(e){}done(ok);document.body.removeChild(t);}
+  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).then(function(){done(true);},fallback);}else fallback();
 }
 function allPromptsText(md){
   var eps=getEpisodes(),S=state.settings;
@@ -912,7 +921,7 @@ $('#strip').addEventListener('click',function(e){
   var id=b.getAttribute('data-goto'),li=document.getElementById('ep-'+id);
   if(li){li.scrollIntoView({block:'start'});var t=document.getElementById('t-'+id);if(t)t.focus({preventScroll:true});}
 });
-$('#btn-copy-meta').addEventListener('click',function(){copyText(metaPrompt(),'AI prompt');});
+$('#btn-copy-meta').addEventListener('click',function(e){var t=metaPrompt();$('#meta-text').value=t;copyText(t,'AI prompt',e.currentTarget);});
 $('#btn-apply-ai').addEventListener('click',applyAi);
 $('#btn-clear-ai').addEventListener('click',function(){state.meta={};save();renderRun();setStatus($('#ai-status'),'ok','Removed objectives, key concepts, and hooks from the prompts. Titles were kept.');});
 
@@ -941,7 +950,7 @@ runList.addEventListener('input',function(e){
 runList.addEventListener('focusout',function(e){if(e.target.classList.contains('prompt')){var id=e.target.getAttribute('data-ep');var hadBtn=!!document.querySelector('[data-reset="'+id+'"]');if(hadBtn!==!!state.overrides[id])renderRun();}});
 runList.addEventListener('click',function(e){
   var cn=e.target.closest('[data-copyname]');
-  if(cn){var eps3=getEpisodes(),ep3=eps3.find(function(x){return x.id===cn.getAttribute('data-copyname');});if(ep3)copyText(videoName(ep3,eps3),'Video name');return;}
+  if(cn){var eps3=getEpisodes(),ep3=eps3.find(function(x){return x.id===cn.getAttribute('data-copyname');});if(ep3)copyText(videoName(ep3,eps3),'Video name',cn);return;}
   var co=e.target.closest('[data-copyopen]');
   if(co){
     var ta2=document.getElementById('p-'+co.getAttribute('data-copyopen'));
@@ -952,7 +961,7 @@ runList.addEventListener('click',function(e){
     return;
   }
   var c=e.target.closest('[data-copy]');
-  if(c){var id=c.getAttribute('data-copy'),ta=document.getElementById('p-'+id);copyText(ta.value,'Prompt');return;}
+  if(c){var id=c.getAttribute('data-copy'),ta=document.getElementById('p-'+id);copyText(ta.value,'Prompt',c);return;}
   var r=e.target.closest('[data-reset]');
   if(r){var rid=r.getAttribute('data-reset');delete state.overrides[rid];save();renderRun();var t=document.getElementById('p-'+rid);if(t)t.focus();announce('Prompt reset');}
 });
@@ -961,7 +970,7 @@ runList.addEventListener('change',function(e){
   if(e.target.checked)state.done[d]=true;else delete state.done[d];save();
   var li=document.getElementById('run-'+d);if(li)li.classList.toggle('done',e.target.checked);updateProgress();
 });
-$('#btn-copy-all').addEventListener('click',function(){copyText(allPromptsText(false),'All prompts');});
+$('#btn-copy-all').addEventListener('click',function(){copyText(allPromptsText(false),'All prompts',$('#btn-copy-all'));});
 $('#btn-download').addEventListener('click',download);
 $('#btn-reset').addEventListener('click',function(){
   if(!window.confirm('Clear the source, plan, and progress? Your voice settings are kept.'))return;
