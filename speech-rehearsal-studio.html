@@ -578,6 +578,12 @@ canvas.spark{width:100%;height:52px;display:block;background:var(--field);
 .help-link:hover{color:var(--ink)}
 .help-link:focus-visible{outline:3px solid var(--lamp);outline-offset:2px;border-radius:3px}
 
+.profile{border:1px solid var(--line);border-left:3px solid var(--lamp);border-radius:var(--radius-sm);
+  background:var(--field);padding:11px 14px;margin:10px 0}
+.profile-name{font-weight:600;font-size:.95rem}
+.profile-meta{font-family:var(--font-mono);font-size:.74rem;color:var(--ink-soft);margin:4px 0 6px}
+.profile p{margin:0;font-size:.88rem}
+
 /* footer */
 footer.site{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--ink-soft);font-size:.84rem}
 footer.site .program{color:var(--ink);font-weight:600}
@@ -656,6 +662,10 @@ footer.site .program{color:var(--ink);font-weight:600}
 
     <!-- ============ STAGE ============ -->
     <div class="stage-col">
+      <div class="notice" id="assignBanner" hidden style="margin:0 0 16px">
+        <span class="n-ico" aria-hidden="true">✓</span>
+        <span><strong>Your instructor set up this take.</strong> <span id="assignFor"></span> The prompt and settings are ready — just turn on your camera and record.</span>
+      </div>
       <div class="stage-card" id="card1" data-active="1" style="margin-top:0">
         <div class="stage-head">
           <span class="stage-num">1</span>
@@ -777,6 +787,24 @@ footer.site .program{color:var(--ink);font-weight:600}
             <p class="hint">A relaxed, clear public-speaking pace sits around 130–160.</p>
           </div>
           <div class="field">
+            <label for="language">Speaking language</label>
+            <select id="language">
+              <option value="en-US">English (US)</option>
+              <option value="en-GB">English (UK)</option>
+              <option value="es-US">Spanish (US)</option>
+              <option value="es-MX">Spanish (Mexico)</option>
+              <option value="es-ES">Spanish (Spain)</option>
+              <option value="pt-BR">Portuguese (Brazil)</option>
+              <option value="fr-FR">French</option>
+              <option value="ht-HT">Haitian Creole</option>
+              <option value="zh-CN">Chinese (Mandarin)</option>
+              <option value="ar-SA">Arabic</option>
+              <option value="hi-IN">Hindi</option>
+              <option value="tl-PH">Tagalog / Filipino</option>
+            </select>
+            <p class="hint">Sets the language for live captions, and loads filler words for that language below. Recognition quality for non-English languages varies by browser — always read over your transcript and fix it.</p>
+          </div>
+          <div class="field">
             <label for="fillerInput">Filler words to flag</label>
             <input type="text" id="fillerInput" value="um, uh, er, ah, like, you know, so, basically, actually, literally, right, okay">
             <p class="hint">Comma-separated. Common words like “like” and “so” have legitimate uses, so read flagged counts as a prompt to check, not a verdict.</p>
@@ -802,6 +830,7 @@ Time management</textarea>
           </div>
           <label class="toggle"><input type="checkbox" id="capToggle" checked> Live captions while recording</label>
           <label class="toggle"><input type="checkbox" id="countToggle" checked> 3-2-1 countdown before recording</label>
+          <label class="toggle"><input type="checkbox" id="practiceToggle"> Practice mode — don't save takes <span style="font-weight:400;color:var(--ink-soft)">(record freely, nothing is kept)</span></label>
         </div>
       </details>
 
@@ -871,6 +900,13 @@ Time management</textarea>
             <canvas class="trace" id="traceCanvas" width="600" height="120" role="img" aria-label="A trace of your speaking volume across the take, showing where you were louder, quieter, or paused."></canvas>
           </div>
 
+          <div class="trace-wrap" id="paceTraceWrap" hidden>
+            <div class="trace-label"><span>Pace over the take</span><span id="paceHint">words per minute · green = your target</span></div>
+            <canvas class="trace" id="paceCanvas" width="600" height="120" role="img" aria-label="A line showing your speaking pace in words per minute across the take, with your target band shaded." aria-describedby="paceSummary"></canvas>
+            <p class="sr-only" id="paceSummary"></p>
+            <p class="hint" style="margin-top:8px;font-size:.78rem;color:var(--ink-soft)">A fairly flat line means steady pacing. Big dips and spikes mean you sped up and slowed down — often you race the start and drag the middle. Needs live captions to show.</p>
+          </div>
+
           <div class="transcript-wrap">
             <h3>Transcript <span>edit to fix mistakes</span></h3>
             <p class="accuracy-note" style="margin-bottom:10px"><span class="n-ico" aria-hidden="true">i</span><span>This transcript is made automatically and often misreads accents, names, and technical words. Read it over and fix anything wrong before trusting the counts above.</span></p>
@@ -906,6 +942,7 @@ Time management</textarea>
             </div>
             <div class="t-actions">
               <button class="btn-solid btn-sm" id="btnSaveTake" type="button">Save take to history</button>
+              <span class="copy-note" id="practiceNote" hidden style="color:var(--ink-soft)">Practice mode is on — this take won't be saved.</span>
               <span class="copy-note" id="saveNote" hidden></span>
             </div>
           </div>
@@ -916,20 +953,20 @@ Time management</textarea>
             <span class="stage-when" id="when4">After you score yourself</span>
           </div>
           <div class="coach-wrap" style="padding-top:14px">
-            <h3 class="sr-only">Coaching from Claude</h3>
-            <p class="coach-lead">Hand this take to an AI assistant for specific feedback on your delivery — pace, fillers, flow, and word choice. Use whichever one your school provides or you already have.</p>
+            <h3 class="sr-only">Coaching from an AI assistant</h3>
+            <p class="coach-lead">Hand this take to an AI assistant for specific feedback on your delivery — pace, fillers, flow, and word choice. Use whichever one your school provides or you already have. If your school is a Microsoft school, you may already have Copilot free through your login.</p>
             <div class="assistant-row">
               <div class="field">
                 <label for="assistant">Which assistant will you use?</label>
                 <select id="assistant">
-                  <option value="claude">Claude</option>
                   <option value="copilot">Microsoft Copilot</option>
+                  <option value="claude">Claude</option>
                   <option value="chatgpt">ChatGPT</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="other">Something else</option>
                 </select>
               </div>
-              <a class="open-link" id="openAssistant" href="https://claude.ai/new" target="_blank" rel="noopener noreferrer">Open Claude</a>
+              <a class="open-link" id="openAssistant" href="https://copilot.microsoft.com" target="_blank" rel="noopener noreferrer">Open Microsoft Copilot</a>
             </div>
             <div class="t-actions">
               <button class="btn-solid btn-sm" id="btnCopyCoach" type="button">Copy coaching prompt</button>
@@ -984,7 +1021,7 @@ Time management</textarea>
           <div class="hist-empty" id="histEmpty">No saved takes yet. Score a take and choose “Save take to history” to start tracking your progress.</div>
           <div class="spark-wrap" id="sparkWrap" hidden>
             <div class="spark-label"><span>Progress across takes</span><span id="sparkLegend"></span></div>
-            <canvas class="spark" id="sparkCanvas" width="600" height="104" role="img" aria-label="A chart of your filler-word rate and speaking pace across saved takes." aria-describedby="sparkSummary"></canvas>
+            <canvas class="spark" id="sparkCanvas" width="600" height="104" role="img" aria-label="A chart of your filler-word rate, speaking pace, and self-score across saved takes." aria-describedby="sparkSummary"></canvas>
             <p class="sr-only" id="sparkSummary"></p>
           </div>
           <div id="histList"></div>
@@ -1144,6 +1181,51 @@ Time management</textarea>
         </div>
       </details>
 
+      <details class="help" id="refProfiles">
+        <summary>
+          <span>What good sounds like — reference points</span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </summary>
+        <div class="help-body">
+          <p class="hint" style="margin-top:0">These are rough pictures of common delivery styles — <b>not targets to hit</b>. Excellent speakers often sit outside any band on purpose. Use them to make sense of your own numbers, not to chase a score.</p>
+          <div class="profile">
+            <div class="profile-name">A clear informative talk</div>
+            <div class="profile-meta">Pace around 130–150 wpm · few fillers · steady energy with gentle variation · well-varied words</div>
+            <p>Easy to follow, calm authority. The pace sits in the relaxed band and the energy rises and falls a little to mark what matters.</p>
+          </div>
+          <div class="profile">
+            <div class="profile-name">An energetic persuasive speech</div>
+            <div class="profile-meta">Pace often faster (150–180 wpm) · strong energy variation · frequently builds toward the end</div>
+            <p>Great persuasive speakers push past the “relaxed” pace band on purpose. If your take is fast but clear and full of energy, don’t read a “moving quickly” flag as failure — read it as a style choice to control.</p>
+          </div>
+          <div class="profile">
+            <div class="profile-name">A flat read — what to lift</div>
+            <div class="profile-meta">Very level energy (low variation) · flat or fading arc · words often technically fine</div>
+            <p>Usually a sign of reading word-for-word off a page or slides. The fix isn’t speaking louder — it’s lifting your voice on the lines you care about and looking up between them.</p>
+          </div>
+        </div>
+      </details>
+
+      <details class="help" id="forInstructors">
+        <summary>
+          <span>For instructors — create an assignment link</span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </summary>
+        <div class="help-body">
+          <p style="font-size:.9rem;margin-top:0">Set up the take the way you want it in <b>Set up the take</b> above — the prompt, target length, pace band, filler words, self-scoring criteria, and language. Then build a link that opens this tool pre-configured for your assignment. Share the link in your course; every student lands on the same setup. Nothing is stored on a server — the whole assignment travels inside the link.</p>
+          <button class="btn-solid btn-sm" id="btnBuildLink" type="button">Build the student link</button>
+          <div id="linkOut" hidden style="margin-top:14px">
+            <label for="assignLink" style="display:block;font-weight:600;font-size:.86rem;margin-bottom:5px">Student link</label>
+            <input type="text" id="assignLink" readonly style="font-family:var(--font-mono);font-size:.82rem">
+            <div class="t-actions" style="margin-top:10px">
+              <button class="btn-solid btn-sm" id="btnCopyLink" type="button">Copy link</button>
+              <span class="copy-note" id="linkNote" hidden></span>
+            </div>
+            <p class="hint" style="margin-top:10px">Paste this into your Canvas assignment, a page, or an announcement. Students can still open <b>Set up the take</b> and adjust things if they need to.</p>
+          </div>
+        </div>
+      </details>
+
       <div class="notice" id="privNotice" style="margin-top:16px">
         <span class="n-ico" aria-hidden="true">i</span>
         <span><strong>A note on privacy.</strong> Video stays on your device — it's never uploaded here. Live captions in Chrome-family browsers process audio through the browser's built-in speech service to turn talk into text. For fully private practice, turn captions off and type your transcript in by hand.</span>
@@ -1245,9 +1327,97 @@ Time management</textarea>
       wpmLow: parseInt($("wpmLow").value,10) || 130,
       wpmHigh: parseInt($("wpmHigh").value,10) || 160,
       fillers: fillers,
-      captionsOn: $("capToggle").checked
+      captionsOn: $("capToggle").checked,
+      language: $("language").value || "en-US"
     };
   }
+
+  // Filler words by language (keyed by the language-code prefix). Changing the
+  // speaking language loads the matching set; an instructor or student can still
+  // edit the list afterward.
+  const FILLER_SETS = {
+    en: "um, uh, er, ah, like, you know, so, basically, actually, literally, right, okay",
+    es: "eh, este, pues, o sea, como, bueno, entonces, mmm, verdad, digamos",
+    pt: "é, tipo, né, então, assim, sabe, aí, bem",
+    fr: "euh, ben, bah, du coup, genre, en fait, voilà, quoi, hein",
+    ht: " e, en, alò, kidonk, kòmsi, enben",
+    zh: "那个, 就是, 然后, 这个, 嗯",
+    ar: "يعني, اه, يعنى",
+    hi: "matlab, actually, basically, haan, toh",
+    tl: "parang, ano, kasi, tapos, diba, ganun"
+  };
+  function fillersForLang(code){
+    const pre = (code || "en-US").split("-")[0];
+    return FILLER_SETS[pre] || FILLER_SETS.en;
+  }
+  $("language").addEventListener("change", function(){
+    $("fillerInput").value = fillersForLang($("language").value);
+    try{ localStorage.setItem("rr_lang", $("language").value); }catch(e){}
+  });
+
+  // Practice mode: record and review freely, but keep nothing. Lowers the stakes
+  // of a first take.
+  function updatePracticeUI(){
+    const on = $("practiceToggle").checked;
+    $("btnSaveTake").hidden = on;
+    $("practiceNote").hidden = !on;
+  }
+  $("practiceToggle").addEventListener("change", function(){
+    updatePracticeUI();
+    try{ localStorage.setItem("rr_practice", $("practiceToggle").checked ? "1" : "0"); }catch(e){}
+  });
+
+  // ---------- instructor assignment links ----------
+  // The whole assignment (prompt, targets, rubric, language) is packed into the
+  // URL fragment — no server. Students open the link and land pre-configured.
+  function b64urlEncode(str){
+    return btoa(unescape(encodeURIComponent(str)))
+      .replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  }
+  function b64urlDecode(s){
+    s = s.replace(/-/g,"+").replace(/_/g,"/");
+    while(s.length % 4) s += "=";
+    return decodeURIComponent(escape(atob(s)));
+  }
+  function buildAssignmentLink(){
+    const cfg = {
+      p: $("promptInput").value.trim(),
+      tmin: $("targetMin").value, tmax: $("targetMax").value,
+      wlo: $("wpmLow").value, whi: $("wpmHigh").value,
+      f: $("fillerInput").value.trim(),
+      r: $("rubricInput").value.trim(),
+      lang: $("language").value
+    };
+    const enc = b64urlEncode(JSON.stringify(cfg));
+    return location.origin + location.pathname + "#assign=" + enc;
+  }
+  function applyAssignmentFromHash(){
+    const m = (location.hash || "").match(/assign=([^&]+)/);
+    if(!m) return null;
+    let cfg;
+    try{ cfg = JSON.parse(b64urlDecode(m[1])); }catch(e){ return null; }
+    if(!cfg || typeof cfg !== "object") return null;
+    const set = function(id, v){ if(v != null && v !== "") $(id).value = v; };
+    // language first (set value directly — don't trigger the filler-reset handler)
+    if(cfg.lang) $("language").value = cfg.lang;
+    set("promptInput", cfg.p);
+    set("targetMin", cfg.tmin); set("targetMax", cfg.tmax);
+    set("wpmLow", cfg.wlo); set("wpmHigh", cfg.whi);
+    set("fillerInput", cfg.f);
+    set("rubricInput", cfg.r);
+    return cfg;
+  }
+  $("btnBuildLink").addEventListener("click", function(){
+    $("assignLink").value = buildAssignmentLink();
+    $("linkOut").hidden = false;
+    $("assignLink").focus(); $("assignLink").select();
+  });
+  $("btnCopyLink").addEventListener("click", function(){
+    const url = $("assignLink").value || buildAssignmentLink();
+    copyText(url,
+      function(){ const n=$("linkNote"); n.textContent="Link copied."; n.hidden=false; n.className="copy-note"; },
+      function(){ const n=$("linkNote"); n.textContent="Couldn't copy — select the box and copy manually."; n.hidden=false; n.className="copy-note warn"; });
+  });
 
   function refreshPromptStrip(){
     const t = $("promptInput").value.trim();
@@ -1389,7 +1559,7 @@ Time management</textarea>
     recog = new Rec();
     recog.continuous = true;
     recog.interimResults = true;
-    recog.lang = "en-US";
+    recog.lang = $("language").value || "en-US";
     recog.onresult = function(ev){
       interim = "";
       for(let i=ev.resultIndex;i<ev.results.length;i++){
@@ -1857,6 +2027,7 @@ Time management</textarea>
     }
 
     renderTranscript(m.text, s.fillers);
+    updatePracticeUI();
     setStageState(true);
     announce("Your results are ready. " + m.wc + " words at " + m.wpm + " words per minute.");
   }
@@ -1924,6 +2095,56 @@ Time management</textarea>
       ctx.fillRect(x0, 0, w, H);
       ctx.beginPath(); ctx.moveTo(x0,0); ctx.lineTo(x0,H); ctx.stroke();
     });
+  }
+
+  // Pace over the take, from the timestamps on the live captions. A single
+  // average hides the common habit of racing the intro and dragging the middle.
+  function drawPaceTrace(){
+    const wrap = $("paceTraceWrap"), cv = $("paceCanvas"), ctx = cv.getContext("2d");
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+    const dur = elapsedMs || 0;
+    if(finals.length < 3 || dur < 6000){ wrap.hidden = true; return; }
+    wrap.hidden = false;
+    const s = getSettings();
+
+    // cumulative words at each caption's timestamp
+    const pts = []; let cum = 0;
+    finals.forEach(function(f){
+      const w = (f.text.toLowerCase().match(/\b[\w'\u2019-]+\b/g) || []).length;
+      cum += w; pts.push({ t:f.t, cum:cum });
+    });
+    const cumAt = function(tt){ if(tt<=0) return 0; let c=0; for(let k=0;k<pts.length;k++){ if(pts[k].t<=tt) c=pts[k].cum; else break; } return c; };
+
+    const WIN = 12000, N = 90;
+    const series = [];
+    for(let i=0;i<=N;i++){
+      const t = (dur*i)/N, winStart = Math.max(0, t-WIN);
+      const words = cumAt(t) - cumAt(winStart), mins = (t-winStart)/60000;
+      series.push({ t:t, wpm: mins>0 ? words/mins : 0 });
+    }
+    const peak = series.reduce(function(mx,p){ return Math.max(mx,p.wpm); }, 0);
+    const yMax = Math.max(peak*1.1, (s.wpmHigh||160)*1.25, 60);
+    const xOf = function(t){ return (t/dur)*W; };
+    const yOf = function(w){ return H - (Math.min(w,yMax)/yMax)*(H-4) - 2; };
+
+    // target band
+    if(s.wpmHigh > 0){
+      const y1 = yOf(s.wpmHigh), y2 = yOf(s.wpmLow);
+      ctx.fillStyle = "rgba(95,164,122,.20)"; ctx.fillRect(0, y1, W, y2-y1);
+      ctx.strokeStyle = "rgba(95,164,122,.55)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0,y1); ctx.lineTo(W,y1); ctx.moveTo(0,y2); ctx.lineTo(W,y2); ctx.stroke();
+    }
+    // skip the first few seconds where the trailing window is partial and noisy
+    const startI = Math.max(1, Math.round((4000/dur)*N));
+    ctx.beginPath();
+    for(let i=startI;i<=N;i++){ const x=xOf(series[i].t), y=yOf(series[i].wpm); i===startI?ctx.moveTo(x,y):ctx.lineTo(x,y); }
+    ctx.strokeStyle = "#ffd89e"; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+
+    let mn=Infinity, mx=-Infinity;
+    for(let i=startI;i<=N;i++){ mn=Math.min(mn,series[i].wpm); mx=Math.max(mx,series[i].wpm); }
+    $("paceSummary").textContent = "Your pace ranged from about " + Math.round(mn) + " to " + Math.round(mx)
+      + " words per minute across the take" + (s.wpmHigh>0 ? (", with a target band of " + s.wpmLow + " to " + s.wpmHigh) : "") + ".";
   }
 
   // ---------- recount from edited transcript ----------
@@ -2077,7 +2298,7 @@ Time management</textarea>
     other:   { name:"your assistant",    url:"" }
   };
   function currentAssistant(){
-    return ASSISTANTS[$("assistant").value] || ASSISTANTS.claude;
+    return ASSISTANTS[$("assistant").value] || ASSISTANTS.copilot;
   }
   function refreshAssistant(){
     const a = currentAssistant();
@@ -2099,7 +2320,8 @@ Time management</textarea>
       + "You are given a practice-speech transcript (auto-generated, so it may contain small transcription errors - do not nitpick those) and objective delivery metrics measured by a browser tool. "
       + "Coach the student's DELIVERY - pacing, filler words, flow, clarity, word choice, and how the delivery is organized - not the correctness of their ideas or opinions, unless a prompt or rubric below asks you to. "
       + "Be warm, concrete, and actionable. Point to specific moments in the transcript, tie advice to the metrics where relevant, and never shame. Prioritize the two or three changes that would most improve the next take. "
-      + "Do not claim to have heard the audio, and do not infer emotion, confidence, or tone of voice - you only have text and numbers. Treat every metric as an approximation from a browser tool, not a grade.";
+      + "Do not claim to have heard the audio, and do not infer emotion, confidence, or tone of voice - you only have text and numbers. Treat every metric as an approximation from a browser tool, not a grade. "
+      + "Write your feedback in the same language the transcript is written in.";
   }
 
   function contextText(m){
@@ -2376,6 +2598,7 @@ Time management</textarea>
   }
 
   $("btnSaveTake").addEventListener("click", function(){
+    if($("practiceToggle").checked){ flashSave("Practice mode is on — turn it off in Set up the take to save.", true); return; }
     const m = currentMetrics();
     if(!m.durSec){ flashSave("Record a take first.", true); return; }
     const takes = loadTakes();
@@ -2472,33 +2695,58 @@ Time management</textarea>
     const wrap = $("sparkWrap");
     if(takes.length < 2){ wrap.hidden = true; return; }
     wrap.hidden = false;
-    $("sparkLegend").innerHTML = '<span style="color:var(--over)">&#9632;</span> fillers/min &nbsp; <span style="color:var(--lamp)">&#9632;</span> pace';
     const cv = $("sparkCanvas"), ctx = cv.getContext("2d");
     const W = cv.width, H = cv.height, pad = 10;
     ctx.clearRect(0,0,W,H);
+
+    const n = takes.length;
+    const xAt = function(i){ return pad + (n>1 ? (i/(n-1)) : 0)*(W-pad*2); };
+    // self-score average per take (null where the take has no rubric scores)
+    const selfVals = takes.map(function(t){
+      const k = Object.keys(t.rubric||{});
+      return k.length ? k.reduce(function(a,key){ return a+t.rubric[key]; },0)/k.length : null;
+    });
+    const hasSelf = selfVals.filter(function(v){ return v!=null; }).length >= 2;
+
     const series = [
       { vals: takes.map(function(t){ return t.fillRate; }), color:"#d8894a" },
       { vals: takes.map(function(t){ return t.wpm; }), color:"#e8a33d" }
     ];
+    if(hasSelf) series.push({ vals: selfVals, color:"#5b8fb0", fixed:[0,4] });
+
     series.forEach(function(sv){
-      const mx = Math.max.apply(null, sv.vals), mn = Math.min.apply(null, sv.vals);
+      const present = sv.vals.filter(function(v){ return v!=null; });
+      let mn, mx;
+      if(sv.fixed){ mn = sv.fixed[0]; mx = sv.fixed[1]; }
+      else { mn = Math.min.apply(null, present); mx = Math.max.apply(null, present); }
       const span = (mx - mn) || 1;
-      ctx.beginPath();
+      const yAt = function(v){ return H - pad - ((v-mn)/span)*(H-pad*2); };
+      // line across non-null points
+      ctx.beginPath(); let started = false;
       sv.vals.forEach(function(v,i){
-        const x = pad + (i/(sv.vals.length-1))*(W-pad*2);
-        const y = H - pad - ((v-mn)/span)*(H-pad*2);
-        i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+        if(v==null) return;
+        const x = xAt(i), y = yAt(v);
+        started ? ctx.lineTo(x,y) : ctx.moveTo(x,y); started = true;
       });
       ctx.strokeStyle = sv.color; ctx.lineWidth = 2; ctx.lineJoin="round"; ctx.stroke();
       sv.vals.forEach(function(v,i){
-        const x = pad + (i/(sv.vals.length-1))*(W-pad*2);
-        const y = H - pad - ((v-mn)/span)*(H-pad*2);
-        ctx.beginPath(); ctx.arc(x,y,2.6,0,Math.PI*2); ctx.fillStyle = sv.color; ctx.fill();
+        if(v==null) return;
+        ctx.beginPath(); ctx.arc(xAt(i), yAt(v), 2.6, 0, Math.PI*2); ctx.fillStyle = sv.color; ctx.fill();
       });
     });
-    $("sparkSummary").textContent = "Across " + takes.length + " takes, filler rate went from "
-      + takes[0].fillRate + " to " + takes[takes.length-1].fillRate + " per minute, and pace from "
-      + takes[0].wpm + " to " + takes[takes.length-1].wpm + " words per minute.";
+
+    $("sparkLegend").innerHTML = '<span style="color:#d8894a">&#9632;</span> fillers/min &nbsp; <span style="color:#e8a33d">&#9632;</span> pace'
+      + (hasSelf ? ' &nbsp; <span style="color:#5b8fb0">&#9632;</span> self-score' : '');
+
+    const first = takes[0], last = takes[n-1];
+    let sum = "Across " + n + " takes, filler rate went from " + first.fillRate + " to " + last.fillRate
+      + " per minute, and pace from " + first.wpm + " to " + last.wpm + " words per minute.";
+    if(hasSelf){
+      const fs = selfVals.find(function(v){ return v!=null; });
+      let ls=null; for(let i=selfVals.length-1;i>=0;i--){ if(selfVals[i]!=null){ ls=selfVals[i]; break; } }
+      if(fs!=null && ls!=null) sum += " Your self-score went from " + fs.toFixed(1) + " to " + ls.toFixed(1) + " out of 4.";
+    }
+    $("sparkSummary").textContent = sum;
   }
 
   function download(name, text, mime){
@@ -2640,6 +2888,7 @@ Time management</textarea>
     prevTake = { fill:{total:lastMetrics.fill.total}, wpm:lastMetrics.wpm, durSec:lastMetrics.durSec };
     takeNum++;
     drawTrace();
+    drawPaceTrace();
     document.querySelector(".analysis").scrollIntoView({ behavior:"smooth", block:"nearest" });
   }
 
@@ -2679,6 +2928,7 @@ Time management</textarea>
       lastMetrics = computeMetrics();
       renderResults(lastMetrics);
       drawTrace();
+    drawPaceTrace();
       setCapNote("Imported " + cues.length + " caption cues from " + f.name + ".", false);
     };
     rd.onerror = function(){ setCapNote("Couldn't read that caption file.", true); };
@@ -2926,6 +3176,19 @@ Time management</textarea>
   }catch(e){}
   refreshAssistant();
   updateEnableLabel();
+  // An instructor link wins; otherwise restore the student's last language choice.
+  const assignCfg = applyAssignmentFromHash();
+  if(assignCfg){
+    $("assignBanner").hidden = false;
+    if(assignCfg.p){ $("assignFor").textContent = "Prompt: \u201c" + assignCfg.p.slice(0,120) + (assignCfg.p.length>120?"\u2026":"") + "\u201d"; }
+  } else {
+    try{
+      const savedLang = localStorage.getItem("rr_lang");
+      if(savedLang){ $("language").value = savedLang; $("fillerInput").value = fillersForLang(savedLang); }
+    }catch(e){}
+  }
+  try{ if(localStorage.getItem("rr_practice") === "1") $("practiceToggle").checked = true; }catch(e){}
+  updatePracticeUI();
   setStageState(false);
   renderRubric();
   renderHistory();
@@ -2941,6 +3204,7 @@ Time management</textarea>
     btnEnable.disabled = true;
   }
   refreshTargetLabel();
+  refreshPromptStrip();
 })();
 </script>
 </body>
