@@ -2,9 +2,19 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.33.8
-  Date:     October 26, 2026
-  Features: Fix — row normalization moved to resolveRowsForEntry, running
+  Version:  v5.33.9
+  Date:     November 12, 2026
+  Features: Fix — assistant suggested questions no longer print "Invalid
+            Date" for a term with no census dates in its manifest (27SP,
+            27WN). potPhase() now falls back to pot_dates / term_start to
+            pick the phase, so a term that has not started reads as
+            registration instead of settled, and the question templates
+            leave the census date out when none is set. Only the
+            assistant block changed.
+            Built on v5.33.8.
+
+  v5.33.8 (previous):
+            Fix — row normalization moved to resolveRowsForEntry, running
             BEFORE the dedup pass. In v5.33.7 the normalization lived only
             inside ingestRowsSilent, but resolveRowsForEntry had its own
             dedup that ran first and collapsed every Winterim row to the
@@ -7684,8 +7694,17 @@
   function potPhase(pot) {
     const termCfg = state.terms[state.activeTerm];
     const census = termCfg && termCfg.census && termCfg.census[pot];
-    if (!census) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (!census) {
+      // v5.33.9: no census date yet (a new term before its dates are
+      // confirmed). Decide the phase from the start date instead, and return
+      // census: null so the suggested questions leave the date out.
+      const pd = termCfg && termCfg.pot_dates && termCfg.pot_dates[pot];
+      const start = (pd && pd.start) || (termCfg && termCfg.term_start);
+      if (!start) return null;
+      const since = Math.round((today - new Date(start + 'T00:00:00')) / 86400000);
+      return { census: null, days: null, phase: since < 0 ? 'registration' : since <= 14 ? 'early' : 'settled' };
+    }
     const c = new Date(census + 'T00:00:00');
     const days = Math.round((c - today) / 86400000);
     return { census, days, phase: days > 10 ? 'registration' : days >= 0 ? 'early' : 'settled' };
@@ -7693,6 +7712,7 @@
   function phaseText(pot) {
     const ph = potPhase(pot);
     if (!ph) return 'census date not set';
+    if (!ph.census) return ph.phase === 'registration' ? 'registration open, classes not started yet, census date not set' : 'classes under way, census date not set';
     if (ph.phase === 'registration') return `registration open, classes not started yet, census ${ph.census} (open seats and waitlists matter now)`;
     if (ph.phase === 'early') return `classes under way, census ${ph.census} is ${ph.days === 0 ? 'today' : `in ${ph.days} day${ph.days === 1 ? '' : 's'}`} (add/drop period)`;
     return `census ${ph.census} has passed, enrollment is largely set (current waitlists are not meaningful)`;
@@ -7947,12 +7967,14 @@
         `Which ${L} sections still have open seats in ${disc}?`,
       ],
       early: (L, ph) => [
-        `Which ${L} sections still have open seats before the ${fmtDateShort(ph.census)} census?`,
+        ph.census ? `Which ${L} sections still have open seats before the ${fmtDateShort(ph.census)} census?`
+                  : `Which ${L} sections still have open seats?`,
         `How has ${L} enrollment changed since the last snapshot?`,
         `Which ${L} sections are below 50% fill in ${disc}?`,
       ],
       settled: (L, ph) => [
-        `How did ${L} enrollment change between the ${fmtDateShort(ph.census)} census and now?`,
+        ph.census ? `How did ${L} enrollment change between the ${fmtDateShort(ph.census)} census and now?`
+                  : `How has ${L} enrollment changed across the snapshots so far?`,
         `Which ${L} sections are below 50% fill in ${disc}?`,
         `Which ${L} disciplines have the highest fill?`,
         `For planning next year: which ${L} sections had the largest waitlists before classes started?`,
@@ -7965,12 +7987,12 @@
     const out = [];
     ordered.forEach((p, i) => {
       const ph = potPhase(p);
-      const qs = ask[ph ? ph.phase : 'settled'](short(p), ph || { census: 'census' });
+      const qs = ask[ph ? ph.phase : 'settled'](short(p), ph || { census: null });
       out.push(...qs.slice(0, i === 0 ? 2 : 1));      // two from the top part of term, one from each other
     });
     out.splice(2, 0, 'How close are we to the college FTE goal?');
     const extras = [];
-    ordered.forEach(p => { const ph = potPhase(p); extras.push(...ask[ph ? ph.phase : 'settled'](short(p), ph || { census: 'census' })); });
+    ordered.forEach(p => { const ph = potPhase(p); extras.push(...ask[ph ? ph.phase : 'settled'](short(p), ph || { census: null })); });
     extras.forEach(q => { if (!out.includes(q)) out.push(q); });
     // Keep one fill-in-your-discipline question among the first four shown,
     // preferring the part of term on screen
