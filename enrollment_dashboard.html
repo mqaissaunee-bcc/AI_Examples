@@ -2,9 +2,30 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.35
+  Version:  v5.36
   Date:     November 12, 2026
-  Features: Polish — Signals panel gets a presentation-worthy upgrade:
+  Features: Feature — cross-term cycle comparison in the AI assistant.
+            The assistant can now answer "how is Spring 27 pacing vs Fall
+            26 at the same point in the registration cycle?". Snapshots
+            are matched by days-before-term-start, not calendar date, so
+            a Spring-at-69-days-to-start compares cleanly to a Fall-at-
+            69-days-to-start, independent of the two-term calendar offset.
+            New helpers: potStartDateStr(), daysBetweenIso(),
+            findSnapshotAtCycleDay() (±10 day tolerance),
+            buildCrossTermComparison(), buildCrossTermCourseComparison().
+            Assistant context now has a CROSS-TERM CYCLE COMPARISON block
+            covering every POT both terms have data for (sections, enr/cap,
+            FTE, pace delta vs benchmark). When the user names a course in
+            their question (e.g. "how is BIOL-112 trending vs Fall?"), a
+            per-course comparison block is added too. Benchmark selection
+            is automatic: uses the most recent prior term in state.terms
+            (27SP → 26FA, 27WN → 26FA). Suggested questions list gets a
+            new "How does [term] compare to [prior term] at this point?"
+            entry. No UI change — all in the assistant layer.
+            Built on v5.35.
+
+  v5.35 (previous):
+            Polish — Signals panel gets a presentation-worthy upgrade:
             hero typography on the section title (28px) and card counts
             (42px), a pulsing live-indicator dot next to the header,
             animated count-up on the three card numbers (600ms ease-out,
@@ -2855,7 +2876,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.35</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.36</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -8416,6 +8437,176 @@
     return `census ${ph.census} has passed, enrollment is largely set (current waitlists are not meaningful)`;
   }
 
+  /* =========================================================================
+   * CROSS-TERM COMPARISON HELPERS — v5.36
+   *
+   * For questions like "how is Spring 27 pacing vs Fall 26 at the same point
+   * in the registration cycle?", we need to match snapshots by "days before
+   * term start" rather than by calendar date. Fall started 2026-09-02;
+   * Spring starts 2027-01-20. Spring at Nov 12 (today, 69 days to start)
+   * compares cleanly to Fall at ~2026-06-25 (69 days before Sept 2).
+   *
+   * These helpers find the right prior-term snapshot for each POT and produce
+   * compact comparison text for the AI assistant's context budget.
+   * ========================================================================= */
+
+  // Return the start date (ISO string) for a given (term, pot), falling back
+  // to the term's own start if pot_dates has no entry (e.g. single-session).
+  function potStartDateStr(termCode, pot) {
+    const cfg = state.terms[termCode];
+    if (!cfg) return null;
+    if (pot === 'FULL' || !cfg.pot_dates || !cfg.pot_dates[pot]) {
+      return cfg.term_start || null;
+    }
+    return (cfg.pot_dates[pot] && cfg.pot_dates[pot].start) || cfg.term_start || null;
+  }
+
+  // Calendar days between two ISO date strings. Positive if d1 is before d2.
+  function daysBetweenIso(d1Str, d2Str) {
+    if (!d1Str || !d2Str) return null;
+    const d1 = new Date(d1Str + 'T00:00:00').getTime();
+    const d2 = new Date(d2Str + 'T00:00:00').getTime();
+    return Math.round((d2 - d1) / 86400000);
+  }
+
+  // For a (term, pot), find the snapshot whose days-before-start is closest
+  // to targetDaysBeforeStart. Returns { snap, actualDaysBeforeStart, diff } or
+  // null if no acceptable snapshot exists. Caller sets tolerance for how far
+  // off "closest" is still acceptable.
+  function findSnapshotAtCycleDay(termCode, pot, targetDaysBeforeStart, toleranceDays) {
+    const startStr = potStartDateStr(termCode, pot);
+    if (!startStr) return null;
+    const candidates = state.snapshots.filter(s =>
+      (s.term || '26FA') === termCode && (s.part_of_term || '15W') === pot
+    );
+    if (candidates.length === 0) return null;
+    let best = null;
+    let bestDiff = Infinity;
+    candidates.forEach(snap => {
+      const daysBefore = daysBetweenIso(snap.date, startStr);  // positive if snap is before start
+      if (daysBefore == null) return;
+      const diff = Math.abs(daysBefore - targetDaysBeforeStart);
+      if (diff < bestDiff) {
+        best = { snap, actualDaysBeforeStart: daysBefore, diff };
+        bestDiff = diff;
+      }
+    });
+    if (best && toleranceDays != null && best.diff > toleranceDays) return null;
+    return best;
+  }
+
+  // Build comparison lines between the "focus" term (usually the active upcoming
+  // term, e.g. 27SP) and a "benchmark" term (usually the most recent prior same-
+  // season term, e.g. 26FA). For each POT present in the focus term, compute
+  // "where focus is now" vs "where benchmark was at matched cycle day" and
+  // return a compact array of text lines for inclusion in the assistant's
+  // context.
+  function buildCrossTermComparison(focusTerm, benchmarkTerm) {
+    const focusCfg = state.terms[focusTerm];
+    const benchCfg = state.terms[benchmarkTerm];
+    if (!focusCfg || !benchCfg) return [];
+
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const lines = [];
+    const pots = ['15W', '11W', '7A', '7B', 'FULL'];
+    const sum = (rows, k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+
+    pots.forEach(pot => {
+      const focusStart = potStartDateStr(focusTerm, pot);
+      const benchStart = potStartDateStr(benchmarkTerm, pot);
+      if (!focusStart || !benchStart) return;
+
+      // Does focus have any snapshots in this POT? Grab the latest.
+      const focusSnaps = state.snapshots.filter(s =>
+        (s.term || '26FA') === focusTerm && (s.part_of_term || '15W') === pot
+      );
+      if (focusSnaps.length === 0) return;
+      focusSnaps.sort((a, b) => (a.date > b.date ? 1 : -1));
+      const focusLatest = focusSnaps[focusSnaps.length - 1];
+      const focusDaysBefore = daysBetweenIso(focusLatest.date, focusStart);
+      if (focusDaysBefore == null) return;
+
+      // Find benchmark snapshot at the same cycle day.
+      // Tolerance: ±10 days — more than that and the comparison loses meaning.
+      const match = findSnapshotAtCycleDay(benchmarkTerm, pot, focusDaysBefore, 10);
+      if (!match) {
+        lines.push(`${termPotLabel(focusTerm, pot)} at ${focusDaysBefore}d to start: no comparable ${termPotLabel(benchmarkTerm, pot)} snapshot (would need one from ~${focusDaysBefore}d before ${benchStart}; closest available is outside tolerance).`);
+        return;
+      }
+
+      const ft = {
+        sec: focusLatest.rows.length,
+        enr: sum(focusLatest.rows, 'Enrolled Students'),
+        cap: sum(focusLatest.rows, 'Capacity'),
+        sch: sum(focusLatest.rows, 'Total Student Credit Hours'),
+      };
+      const bt = {
+        sec: match.snap.rows.length,
+        enr: sum(match.snap.rows, 'Enrolled Students'),
+        cap: sum(match.snap.rows, 'Capacity'),
+        sch: sum(match.snap.rows, 'Total Student Credit Hours'),
+      };
+      const ftFTE = ft.sch / 30;
+      const btFTE = bt.sch / 30;
+      const enrPctDelta = bt.enr > 0 ? ((ft.enr - bt.enr) / bt.enr * 100) : null;
+      const ftePctDelta = btFTE > 0 ? ((ftFTE - btFTE) / btFTE * 100) : null;
+
+      lines.push(
+        `${termPotLabel(focusTerm, pot)} at ${focusDaysBefore}d before ${focusStart} (snap ${focusLatest.date}): ` +
+        `${ft.sec} sec, ${ft.enr}/${ft.cap} enr, ${ftFTE.toFixed(1)} FTE. ` +
+        `${termPotLabel(benchmarkTerm, pot)} at ${match.actualDaysBeforeStart}d before ${benchStart} (snap ${match.snap.date}): ` +
+        `${bt.sec} sec, ${bt.enr}/${bt.cap} enr, ${btFTE.toFixed(1)} FTE. ` +
+        `Pace: enrollment ${enrPctDelta != null ? (enrPctDelta >= 0 ? '+' : '') + enrPctDelta.toFixed(1) + '%' : 'n/a'}, ` +
+        `FTE ${ftePctDelta != null ? (ftePctDelta >= 0 ? '+' : '') + ftePctDelta.toFixed(1) + '%' : 'n/a'} vs. ${benchmarkTerm}.`
+      );
+    });
+    return lines;
+  }
+
+  // Per-course cycle comparison. Given a course prefix + number (e.g. "BIOL-112"),
+  // compare focus term's current enrollment to benchmark term's enrollment at
+  // the matched cycle day for each POT the course appeared in both terms.
+  function buildCrossTermCourseComparison(courseKey, focusTerm, benchmarkTerm) {
+    const [prefix, number] = courseKey.split('-');
+    if (!prefix || !number) return [];
+    const lines = [];
+    const pots = ['15W', '11W', '7A', '7B', 'FULL'];
+    const sum = (rows, k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+    const courseMatches = r => r._prefix === prefix.toUpperCase() &&
+      String(r.Course).toUpperCase().startsWith(prefix.toUpperCase() + '-' + number.toUpperCase());
+
+    pots.forEach(pot => {
+      const focusStart = potStartDateStr(focusTerm, pot);
+      if (!focusStart) return;
+      const focusSnaps = state.snapshots.filter(s =>
+        (s.term || '26FA') === focusTerm && (s.part_of_term || '15W') === pot
+      );
+      if (focusSnaps.length === 0) return;
+      focusSnaps.sort((a, b) => (a.date > b.date ? 1 : -1));
+      const focusLatest = focusSnaps[focusSnaps.length - 1];
+      const focusRows = focusLatest.rows.filter(courseMatches);
+      if (focusRows.length === 0) return;
+      const focusDaysBefore = daysBetweenIso(focusLatest.date, focusStart);
+      if (focusDaysBefore == null) return;
+
+      const match = findSnapshotAtCycleDay(benchmarkTerm, pot, focusDaysBefore, 10);
+      if (!match) return;
+      const benchRows = match.snap.rows.filter(courseMatches);
+      if (benchRows.length === 0) return;
+
+      const fEnr = sum(focusRows, 'Enrolled Students');
+      const fCap = sum(focusRows, 'Capacity');
+      const bEnr = sum(benchRows, 'Enrolled Students');
+      const bCap = sum(benchRows, 'Capacity');
+      lines.push(
+        `${courseKey} ${termPotLabel(focusTerm, pot)}: ${focusRows.length} sec, ${fEnr}/${fCap} enr ` +
+        `at ${focusDaysBefore}d to start. ` +
+        `${termPotLabel(benchmarkTerm, pot)} same cycle point: ${benchRows.length} sec, ${bEnr}/${bCap} enr.`
+      );
+    });
+    return lines;
+  }
+
   window.getAssistantContext = function (question) {
     const q = String(question || '');
     const BUDGET = 22000;
@@ -8477,6 +8668,47 @@
         }
       });
       lines.push('');
+    }
+
+    // LAYER 1b (v5.36): Cross-term cycle comparison.
+    // When an active upcoming or in-session term has a prior comparable term
+    // in the loaded data, show "where focus is now vs where benchmark was at
+    // matched cycle day". For Spring 27 vs Fall 26 this lets the assistant
+    // answer "how is Spring pacing compared to Fall?" without hallucinating.
+    //
+    // Benchmark selection: use whatever prior term is in state.terms, in order
+    // of recency. For now this will typically be 26FA when the user is in
+    // 27SP or 27WN. If multiple benchmarks exist (future: 25FA, 26FA), pick
+    // the most recent before the focus term.
+    const termOrder = Object.keys(state.terms).sort();  // '26FA' < '27SP' < '27WN'
+    const focusIdx = termOrder.indexOf(state.activeTerm);
+    const benchmarkTerm = focusIdx > 0 ? termOrder[focusIdx - 1] : null;
+    if (benchmarkTerm && benchmarkTerm !== state.activeTerm) {
+      const cmpLines = buildCrossTermComparison(state.activeTerm, benchmarkTerm);
+      if (cmpLines.length > 0) {
+        lines.push(`CROSS-TERM CYCLE COMPARISON — ${termLabelFromCode(state.activeTerm)} now vs ${termLabelFromCode(benchmarkTerm)} at matched days-before-start. Use for pacing / "how does X compare to last term" questions. Match tolerance: ±10 days.`);
+        cmpLines.forEach(l => lines.push(`- ${l}`));
+        lines.push('');
+      }
+
+      // Per-course comparison when the question names specific courses
+      const courseNameMatches = [];
+      (q.match(/\b[A-Za-z]{2,5}[\s-]?\d{3}[A-Za-z]*\b/g) || []).forEach(tok => {
+        const mm = tok.match(/^([A-Za-z]{2,5})[\s-]?(\d{3}[A-Za-z]*)$/);
+        if (mm) courseNameMatches.push(mm[1].toUpperCase() + '-' + mm[2].toUpperCase());
+      });
+      if (courseNameMatches.length > 0) {
+        const courseLines = [];
+        courseNameMatches.slice(0, 5).forEach(ck => {
+          const cl = buildCrossTermCourseComparison(ck, state.activeTerm, benchmarkTerm);
+          cl.forEach(l => courseLines.push(l));
+        });
+        if (courseLines.length > 0) {
+          lines.push(`CROSS-TERM COURSE COMPARISON — courses named in the question:`);
+          courseLines.forEach(l => lines.push(`- ${l}`));
+          lines.push('');
+        }
+      }
     }
 
     // LAYER 2: Historical — completed POTs with final numbers
@@ -8689,6 +8921,19 @@
       out.push(...qs.slice(0, i === 0 ? 2 : 1));      // two from the top part of term, one from each other
     });
     out.splice(2, 0, 'How close are we to the college FTE goal?');
+
+    // v5.36: Cross-term comparison suggestion when a benchmark term exists.
+    // Finds the most recent prior term in state.terms (e.g. 26FA for user
+    // viewing 27SP) and surfaces a pacing comparison question.
+    const termOrder = Object.keys(state.terms).sort();
+    const focusIdx = termOrder.indexOf(state.activeTerm);
+    const benchmarkTerm = focusIdx > 0 ? termOrder[focusIdx - 1] : null;
+    if (benchmarkTerm) {
+      const focusLabel = termLabelFromCode(state.activeTerm);
+      const benchLabel = termLabelFromCode(benchmarkTerm);
+      out.splice(3, 0, `How does ${focusLabel} enrollment compare to ${benchLabel} at this point in the registration cycle?`);
+    }
+
     const extras = [];
     ordered.forEach(p => { const ph = potPhase(p); extras.push(...ask[ph ? ph.phase : 'settled'](short(p), ph || { census: null })); });
     extras.forEach(q => { if (!out.includes(q)) out.push(q); });
