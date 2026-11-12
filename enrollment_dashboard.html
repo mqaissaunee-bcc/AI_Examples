@@ -2,9 +2,31 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.33.9
+  Version:  v5.34
   Date:     November 12, 2026
-  Features: Fix — assistant suggested questions no longer print "Invalid
+  Features: Feature — new Signals panel on the Current Snapshot tab,
+            sitting between the census bar and the fill/location filters.
+            Surfaces three signal types when they fire in the active
+            (term, POT) view:
+              1. Capacity pressure — sections with waitlist >= 5 or at
+                 95%+ fill with any waitlist. Candidates to add capacity.
+              2. 7-day trajectory — biggest gainers/losers vs. a snapshot
+                 from ~7 days ago (fires when a 5-10 day prior snapshot
+                 exists in the same POT).
+              3. At-risk sections — < 50% fill with >= 1 enrolled. Only
+                 fires in the final 21 days before a POT starts (the
+                 cancellation decision window).
+            Cards show a count + top 3 preview collapsed; click to expand
+            the full list. Click collapses with a "Collapse ↑" control.
+            Expand/collapse is local DOM — doesn't trigger re-render.
+            Panel hides entirely when no signals fire. Respects the
+            selected discipline set. Does NOT respect fill/location
+            sub-filters (signals should surface regardless of active
+            chips so you can see them when filtered).
+            Built on v5.33.9.
+
+  v5.33.9 (previous):
+            Fix — assistant suggested questions no longer print "Invalid
             Date" for a term with no census dates in its manifest (27SP,
             27WN). potPhase() now falls back to pot_dates / term_start to
             pick the phase, so a term that has not started reads as
@@ -1176,6 +1198,190 @@
     }
     .census-cell { border-right: none; border-bottom: 1px solid var(--rule); }
   }
+
+  /* ========================================================================
+     Signals panel — v5.34.
+     Surfaces the three signal types (capacity pressure, trajectory, at-risk)
+     as compact cards that expand on click. Sits between census bar and
+     filters in the Current Snapshot tab.
+     ======================================================================== */
+  .signals-section {
+    margin-bottom: 28px;
+  }
+  .signals-section .sig-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .signals-section .sig-header h2 {
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-size: 22px;
+    font-weight: normal;
+    color: var(--ink);
+    margin: 0;
+    line-height: 1;
+  }
+  .signals-section .sig-header .sig-sub {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .signals-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 960px) {
+    .signals-grid { grid-template-columns: 1fr; }
+  }
+  .signal-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--sig-color, var(--info));
+    padding: 14px 16px 12px;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease;
+  }
+  .signal-card:hover { box-shadow: var(--shadow); }
+  .signal-card .sig-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .signal-card .sig-card-title {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sig-color, var(--info));
+  }
+  .signal-card .sig-card-count {
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .signal-card .sig-card-desc {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+    line-height: 1.35;
+  }
+  .signal-card .sig-card-preview {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+  .signal-card .sig-card-preview .sig-prev-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 3px 0;
+    border-top: 1px dotted var(--rule);
+  }
+  .signal-card .sig-card-preview .sig-prev-row:first-child { border-top: none; }
+  .signal-card .sig-card-preview .sig-prev-label {
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .signal-card .sig-card-preview .sig-prev-stat {
+    color: var(--sig-color, var(--ink-soft));
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .signal-card .sig-card-more {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    color: var(--ink-mute);
+    margin-top: 8px;
+    letter-spacing: 0.03em;
+  }
+  .signal-card.is-expanded {
+    grid-column: 1 / -1;
+    cursor: default;
+  }
+  .signal-card.is-expanded:hover { box-shadow: none; }
+  .signal-card.is-expanded .sig-card-more { display: none; }
+  .signal-card .sig-full-list {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+  }
+  .signal-card.is-expanded .sig-full-list { display: block; }
+  .signal-card .sig-full-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 180px) 1fr auto;
+    gap: 12px;
+    padding: 6px 0;
+    border-top: 1px dotted var(--rule);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .signal-card .sig-full-row:first-child { border-top: none; }
+  .signal-card .sig-full-row .sig-sec {
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .signal-card .sig-full-row .sig-title {
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .signal-card .sig-full-row .sig-stat {
+    color: var(--sig-color, var(--ink-soft));
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .signal-card .sig-collapse {
+    display: none;
+    text-align: right;
+    margin-top: 10px;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-mute);
+    cursor: pointer;
+  }
+  .signal-card.is-expanded .sig-collapse { display: block; }
+  .signal-card .sig-collapse:hover { color: var(--ink); }
+  /* Trajectory card: side-by-side gainers/losers in expanded view */
+  .signal-card .sig-trajectory {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 720px) {
+    .signal-card .sig-trajectory { grid-template-columns: 1fr; }
+  }
+  .signal-card .sig-trajectory .sig-traj-col h4 {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin: 0 0 8px;
+  }
+  .signal-card .sig-up { color: var(--up); }
+  .signal-card .sig-down { color: var(--down); }
 
   /* Vertical census marker rendered inside the trend chart SVG. */
   .tc-census-line {
@@ -2550,7 +2756,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.33.8</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.34</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -3906,6 +4112,7 @@
     if (state.activeTab === 'snapshot') {
       body += renderKPIs();
       body += renderCensusBar();
+      body += renderSignalsPanel();
       body += renderFilters();
       body += renderDisciplineSummaries();
       body += renderCourseGrid();
@@ -4727,6 +4934,309 @@
   /* =========================================================================
    * FILTERS
    * ========================================================================= */
+
+  /* =========================================================================
+   * SIGNALS — v5.34
+   *
+   * Three signal types surface what matters this week:
+   *
+   *   1. Capacity pressure — sections with waitlist >= 5, or 95%+ full
+   *      with any waitlist. Candidates to add capacity.
+   *   2. 7-day trajectory  — sections whose enrollment moved most in the
+   *      last ~7 days (requires a snapshot from 5-10 days ago).
+   *   3. At-risk sections  — < 50% full with at least 1 enrolled. Only
+   *      fires in the final 3 weeks before a POT starts (cancellation
+   *      decision window).
+   *
+   * All signals respect the current (term, POT) view and the selected
+   * discipline set. The panel hides entirely when no signals fire for
+   * the active view.
+   * ========================================================================= */
+
+  // Return the lifecycle dates for the active (term, POT). Used by the
+  // At-risk signal to decide whether we're inside the cancellation decision
+  // window. Falls back cleanly when term dates aren't configured.
+  function activePotLifecycle() {
+    const termCfg = state.terms[state.activeTerm];
+    if (!termCfg) return { daysToStart: null, daysToEnd: null };
+    const pot = state.activePartOfTerm;
+    const DAY = 86400000;
+    const todayTs = new Date();
+    todayTs.setHours(0, 0, 0, 0);
+
+    let startStr = null, endStr = null;
+    if (pot === 'FULL' || !termCfg.pot_dates || !termCfg.pot_dates[pot]) {
+      startStr = termCfg.term_start;
+      endStr = termCfg.term_end;
+    } else {
+      const dates = termCfg.pot_dates[pot];
+      startStr = dates.start;
+      endStr = dates.end;
+    }
+    const startTs = startStr ? new Date(startStr + 'T00:00:00').getTime() : null;
+    const endTs = endStr ? new Date(endStr + 'T00:00:00').getTime() : null;
+    return {
+      daysToStart: startTs != null ? Math.round((startTs - todayTs.getTime()) / DAY) : null,
+      daysToEnd: endTs != null ? Math.round((endTs - todayTs.getTime()) / DAY) : null,
+    };
+  }
+
+  // Given the active snapshot, find a prior snapshot in the same (term, POT)
+  // that is closest to being 7 days earlier. Returns null when nothing within
+  // a 5-10 day window exists. The 5-10 bound keeps "trajectory" meaningful —
+  // very recent (1-2 day) comparisons are noisy, very old (2+ week) ones
+  // stop reflecting this week's movement.
+  function findWeekAgoSnapshot(snap) {
+    if (!snap) return null;
+    const active = activeSnapshots();
+    const curIdx = active.findIndex(s => s.id === snap.id);
+    if (curIdx <= 0) return null;
+    const curTs = new Date(snap.date + 'T00:00:00').getTime();
+    const DAY = 86400000;
+    let best = null;
+    let bestDiff = Infinity;
+    for (let i = curIdx - 1; i >= 0; i--) {
+      const prevTs = new Date(active[i].date + 'T00:00:00').getTime();
+      const daysBack = (curTs - prevTs) / DAY;
+      if (daysBack < 5) continue;         // too recent to call "trajectory"
+      if (daysBack > 10) break;           // array is sorted, older entries won't help
+      const diff = Math.abs(daysBack - 7);
+      if (diff < bestDiff) {
+        best = active[i];
+        bestDiff = diff;
+      }
+    }
+    return best;
+  }
+
+  function computeSignals() {
+    const snap = currentSnapshot();
+    if (!snap || !snap.rows) return null;
+
+    // Scope to selected disciplines — if the user has narrowed discipline
+    // selection, signals narrow with them. (Does NOT apply fill/location
+    // sub-filters — signals should surface regardless of active filter chips.)
+    const rows = snap.rows.filter(r => state.selectedDisciplines.has(r._prefix));
+    if (rows.length === 0) return null;
+
+    // --- 1. Capacity pressure ---
+    const pressure = rows
+      .filter(r => {
+        const wl = Number(r['Wait List']) || 0;
+        const cap = Number(r.Capacity) || 0;
+        const enr = Number(r['Enrolled Students']) || 0;
+        const fill = cap > 0 ? (enr / cap * 100) : 0;
+        return wl >= 5 || (fill >= 95 && wl >= 1);
+      })
+      .sort((a, b) => {
+        // Rank by waitlist desc, then by fill desc
+        const dWl = (Number(b['Wait List']) || 0) - (Number(a['Wait List']) || 0);
+        if (dWl !== 0) return dWl;
+        const fa = (Number(a.Capacity) || 0) > 0 ? (Number(a['Enrolled Students']) || 0) / Number(a.Capacity) : 0;
+        const fb = (Number(b.Capacity) || 0) > 0 ? (Number(b['Enrolled Students']) || 0) / Number(b.Capacity) : 0;
+        return fb - fa;
+      });
+
+    // --- 2. 7-day trajectory ---
+    const compareSnap = findWeekAgoSnapshot(snap);
+    let trajectory = null;
+    let trajectoryDaysSpan = null;
+    if (compareSnap) {
+      const curTs = new Date(snap.date + 'T00:00:00').getTime();
+      const prevTs = new Date(compareSnap.date + 'T00:00:00').getTime();
+      trajectoryDaysSpan = Math.round((curTs - prevTs) / 86400000);
+      const prevBySection = new Map();
+      compareSnap.rows.forEach(r => {
+        prevBySection.set(r.Section, Number(r['Enrolled Students']) || 0);
+      });
+      const movers = rows
+        .map(r => {
+          if (!prevBySection.has(r.Section)) return null;
+          const prev = prevBySection.get(r.Section);
+          const now = Number(r['Enrolled Students']) || 0;
+          const delta = now - prev;
+          if (delta === 0) return null;
+          return { row: r, delta, prev, now };
+        })
+        .filter(Boolean);
+      const gainers = movers.filter(m => m.delta > 0).sort((a, b) => b.delta - a.delta);
+      const losers  = movers.filter(m => m.delta < 0).sort((a, b) => a.delta - b.delta);
+      trajectory = { gainers, losers };
+    }
+
+    // --- 3. At-risk (underfill) ---
+    const lifecycle = activePotLifecycle();
+    const underfillActive = lifecycle.daysToStart !== null
+      && lifecycle.daysToStart > 0
+      && lifecycle.daysToStart <= 21;
+    let underfill = null;
+    if (underfillActive) {
+      underfill = rows
+        .filter(r => {
+          const cap = Number(r.Capacity) || 0;
+          const enr = Number(r['Enrolled Students']) || 0;
+          if (cap === 0 || enr === 0) return false;
+          return (enr / cap * 100) < 50;
+        })
+        .sort((a, b) => {
+          const fa = (Number(a['Enrolled Students']) || 0) / (Number(a.Capacity) || 1);
+          const fb = (Number(b['Enrolled Students']) || 0) / (Number(b.Capacity) || 1);
+          return fa - fb;
+        });
+    }
+
+    return {
+      pressure,
+      trajectory,
+      trajectoryDaysSpan,
+      underfill,
+      underfillActive,
+      daysToStart: lifecycle.daysToStart,
+    };
+  }
+
+  function renderSignalsPanel() {
+    const sig = computeSignals();
+    if (!sig) return '';
+
+    const cards = [];
+
+    // --- Capacity pressure card ---
+    if (sig.pressure.length > 0) {
+      const preview = sig.pressure.slice(0, 3).map(r => {
+        const wl = Number(r['Wait List']) || 0;
+        const cap = Number(r.Capacity) || 0;
+        const enr = Number(r['Enrolled Students']) || 0;
+        const fill = cap > 0 ? Math.round(enr / cap * 100) : 0;
+        const stat = wl >= 5 ? `${wl} waiting` : `${fill}% · ${wl} waiting`;
+        return `
+          <div class="sig-prev-row">
+            <span class="sig-prev-label">${escapeHtml(r.Section)}</span>
+            <span class="sig-prev-stat">${stat}</span>
+          </div>`;
+      }).join('');
+      const full = sig.pressure.map(r => {
+        const wl = Number(r['Wait List']) || 0;
+        const cap = Number(r.Capacity) || 0;
+        const enr = Number(r['Enrolled Students']) || 0;
+        const fill = cap > 0 ? Math.round(enr / cap * 100) : 0;
+        return `
+          <div class="sig-full-row">
+            <span class="sig-sec">${escapeHtml(r.Section)}</span>
+            <span class="sig-title">${escapeHtml(r['Course Title'] || '')}</span>
+            <span class="sig-stat">${enr}/${cap} · ${fill}% · ${wl} waiting</span>
+          </div>`;
+      }).join('');
+      cards.push(`
+        <div class="signal-card" data-signal="pressure" style="--sig-color: var(--warn);">
+          <div class="sig-card-head">
+            <span class="sig-card-title">Capacity pressure</span>
+            <span class="sig-card-count">${sig.pressure.length}</span>
+          </div>
+          <div class="sig-card-desc">Sections with heavy waitlists or near-capacity with people waiting. Candidates to add capacity.</div>
+          <div class="sig-card-preview">${preview}</div>
+          ${sig.pressure.length > 3 ? `<div class="sig-card-more">Click to see all ${sig.pressure.length} ↓</div>` : ''}
+          <div class="sig-full-list">${full}</div>
+          <div class="sig-collapse" data-collapse="pressure">Collapse ↑</div>
+        </div>`);
+    }
+
+    // --- Trajectory card ---
+    if (sig.trajectory && (sig.trajectory.gainers.length > 0 || sig.trajectory.losers.length > 0)) {
+      const topUp = sig.trajectory.gainers.slice(0, 3);
+      const topDown = sig.trajectory.losers.slice(0, 3);
+      const previewRows = [];
+      topUp.forEach(m => previewRows.push(`
+        <div class="sig-prev-row">
+          <span class="sig-prev-label">${escapeHtml(m.row.Section)}</span>
+          <span class="sig-prev-stat sig-up">+${m.delta}</span>
+        </div>`));
+      topDown.forEach(m => previewRows.push(`
+        <div class="sig-prev-row">
+          <span class="sig-prev-label">${escapeHtml(m.row.Section)}</span>
+          <span class="sig-prev-stat sig-down">${m.delta}</span>
+        </div>`));
+      const renderMoverCol = (arr, cls, label) => {
+        if (arr.length === 0) return `<div class="sig-traj-col"><h4>${label}</h4><div style="font-size:11px;color:var(--ink-mute);">None</div></div>`;
+        const items = arr.map(m => `
+          <div class="sig-full-row">
+            <span class="sig-sec">${escapeHtml(m.row.Section)}</span>
+            <span class="sig-title">${escapeHtml(m.row['Course Title'] || '')}</span>
+            <span class="sig-stat ${cls}">${m.delta > 0 ? '+' : ''}${m.delta} (${m.prev}→${m.now})</span>
+          </div>`).join('');
+        return `<div class="sig-traj-col"><h4>${label}</h4>${items}</div>`;
+      };
+      const totalMovers = sig.trajectory.gainers.length + sig.trajectory.losers.length;
+      cards.push(`
+        <div class="signal-card" data-signal="trajectory" style="--sig-color: var(--info);">
+          <div class="sig-card-head">
+            <span class="sig-card-title">${sig.trajectoryDaysSpan}-day trajectory</span>
+            <span class="sig-card-count">${totalMovers}</span>
+          </div>
+          <div class="sig-card-desc">Biggest enrollment moves vs. ${sig.trajectoryDaysSpan} days ago. Top gainers & losers.</div>
+          <div class="sig-card-preview">${previewRows.join('')}</div>
+          ${totalMovers > previewRows.length ? `<div class="sig-card-more">Click to see all ${totalMovers} ↓</div>` : ''}
+          <div class="sig-full-list">
+            <div class="sig-trajectory">
+              ${renderMoverCol(sig.trajectory.gainers, 'sig-up', `↑ Gainers (${sig.trajectory.gainers.length})`)}
+              ${renderMoverCol(sig.trajectory.losers, 'sig-down', `↓ Losers (${sig.trajectory.losers.length})`)}
+            </div>
+          </div>
+          <div class="sig-collapse" data-collapse="trajectory">Collapse ↑</div>
+        </div>`);
+    }
+
+    // --- Underfill card ---
+    if (sig.underfillActive && sig.underfill && sig.underfill.length > 0) {
+      const preview = sig.underfill.slice(0, 3).map(r => {
+        const cap = Number(r.Capacity) || 0;
+        const enr = Number(r['Enrolled Students']) || 0;
+        const fill = cap > 0 ? Math.round(enr / cap * 100) : 0;
+        return `
+          <div class="sig-prev-row">
+            <span class="sig-prev-label">${escapeHtml(r.Section)}</span>
+            <span class="sig-prev-stat">${enr}/${cap} · ${fill}%</span>
+          </div>`;
+      }).join('');
+      const full = sig.underfill.map(r => {
+        const cap = Number(r.Capacity) || 0;
+        const enr = Number(r['Enrolled Students']) || 0;
+        const fill = cap > 0 ? Math.round(enr / cap * 100) : 0;
+        return `
+          <div class="sig-full-row">
+            <span class="sig-sec">${escapeHtml(r.Section)}</span>
+            <span class="sig-title">${escapeHtml(r['Course Title'] || '')}</span>
+            <span class="sig-stat">${enr}/${cap} · ${fill}% full</span>
+          </div>`;
+      }).join('');
+      cards.push(`
+        <div class="signal-card" data-signal="underfill" style="--sig-color: var(--wait);">
+          <div class="sig-card-head">
+            <span class="sig-card-title">At-risk sections</span>
+            <span class="sig-card-count">${sig.underfill.length}</span>
+          </div>
+          <div class="sig-card-desc">Under 50% full with ${sig.daysToStart} day${sig.daysToStart === 1 ? '' : 's'} to term start. Cancellation decision window.</div>
+          <div class="sig-card-preview">${preview}</div>
+          ${sig.underfill.length > 3 ? `<div class="sig-card-more">Click to see all ${sig.underfill.length} ↓</div>` : ''}
+          <div class="sig-full-list">${full}</div>
+          <div class="sig-collapse" data-collapse="underfill">Collapse ↑</div>
+        </div>`);
+    }
+
+    if (cards.length === 0) return '';
+
+    return `
+      <section class="signals-section" role="region" aria-label="Enrollment signals">
+        <div class="sig-header">
+          <h2>Signals</h2>
+          <span class="sig-sub">Click a card to expand</span>
+        </div>
+        <div class="signals-grid">
+          ${cards.join('')}
+        </div>
+      </section>
+    `;
+  }
 
   function renderFilters() {
     const snap = currentSnapshot();
@@ -6894,6 +7404,24 @@
       t.addEventListener('click', () => {
         state.activeTab = t.dataset.tab;
         render();
+      });
+    });
+
+    // v5.34: Signals cards — click a collapsed card to expand it,
+    // click the "Collapse" footer to re-collapse. Interaction is local
+    // to the DOM, so it doesn't trigger a full re-render (which would
+    // reset every other card's state and feel janky).
+    document.querySelectorAll('.signal-card').forEach(card => {
+      card.addEventListener('click', (ev) => {
+        // Collapse control inside an expanded card
+        if (ev.target.closest('.sig-collapse')) {
+          card.classList.remove('is-expanded');
+          return;
+        }
+        // Otherwise, clicking anywhere on a collapsed card expands it
+        if (!card.classList.contains('is-expanded')) {
+          card.classList.add('is-expanded');
+        }
       });
     });
 
