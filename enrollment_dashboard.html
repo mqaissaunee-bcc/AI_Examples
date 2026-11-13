@@ -2,9 +2,28 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.36
+  Version:  v5.37
   Date:     November 12, 2026
-  Features: Feature — cross-term cycle comparison in the AI assistant.
+  Features: Feature — Flagged Questions widget for capturing assistant
+            questions that couldn't be fully answered. Hybrid storage
+            (localStorage per-browser + optional shared pool loaded from
+            data/flagged_questions.json). Auto-detection hooks
+            window.getAssistantContext to know every question asked, then
+            watches body DOM mutations within a 30-second window for new
+            text containing trigger phrases ("I don't have", "no snapshot",
+            "unable to compare", etc.). When matched, auto-flags the pair.
+            Manual flagging: floating ⚑ button bottom-right opens a modal
+            with the list; "Flag a question" button opens a two-field form
+            (question + response). Modal supports Mark addressed, Delete,
+            Export JSON (download for repo commit), Clear all. No dependency
+            on enrollment-assistant.js internals — the widget is fully
+            self-contained in the dashboard HTML. On startup, merges local
+            flags with any shared pool at data/flagged_questions.json
+            (shared pool wins on tie; both lose to newer local edits).
+            Built on v5.36.
+
+  v5.36 (previous):
+            Feature — cross-term cycle comparison in the AI assistant.
             The assistant can now answer "how is Spring 27 pacing vs Fall
             26 at the same point in the registration cycle?". Snapshots
             are matched by days-before-term-start, not calendar date, so
@@ -1503,6 +1522,224 @@
                 var(--shadow);
   }
 
+  /* ========================================================================
+     Flagged Questions — v5.37
+     Captures assistant questions the model couldn't fully answer (auto-
+     detected from trigger phrases in the response, or user-flagged via the
+     floating widget). Persisted in localStorage + merged with a shared pool
+     loaded from data/flagged_questions.json when present.
+     ======================================================================== */
+  .flagged-fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    border-radius: 24px;
+    padding: 10px 16px 10px 14px;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    z-index: 950;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .flagged-fab:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    transform: translateY(-1px);
+  }
+  .flagged-fab .flag-icon {
+    font-size: 14px;
+    line-height: 1;
+  }
+  .flagged-fab .flag-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: var(--warn);
+    color: #fff;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .flagged-fab.is-empty .flag-count {
+    background: var(--ink-mute);
+  }
+
+  .flagged-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .flagged-modal-backdrop.is-open {
+    display: flex;
+  }
+  .flagged-modal {
+    background: var(--surface);
+    border: 1px solid var(--rule-strong);
+    width: 100%;
+    max-width: 720px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+  .flagged-modal .fm-header {
+    padding: 18px 22px 14px;
+    border-bottom: 2px solid var(--rule-strong);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+  }
+  .flagged-modal .fm-header h2 {
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-size: 22px;
+    font-weight: normal;
+    margin: 0;
+    color: var(--ink);
+  }
+  .flagged-modal .fm-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    color: var(--ink-mute);
+    cursor: pointer;
+    padding: 0 4px;
+  }
+  .flagged-modal .fm-close:hover { color: var(--ink); }
+  .flagged-modal .fm-toolbar {
+    padding: 10px 22px;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .flagged-modal .fm-toolbar button {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .flagged-modal .fm-toolbar button:hover {
+    background: var(--surface);
+    border-color: var(--rule-strong);
+  }
+  .flagged-modal .fm-body {
+    overflow-y: auto;
+    flex: 1;
+    padding: 4px 22px 18px;
+  }
+  .flagged-modal .fm-empty {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--ink-mute);
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+  }
+  .flagged-item {
+    padding: 14px 0 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .flagged-item:last-child { border-bottom: none; }
+  .flagged-item .fi-meta {
+    display: flex;
+    gap: 10px;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .flagged-item .fi-src-auto {
+    color: var(--warn);
+  }
+  .flagged-item .fi-src-user {
+    color: var(--info);
+  }
+  .flagged-item .fi-question {
+    font-family: 'Iowan Old Style', Palatino, Georgia, serif;
+    font-size: 15px;
+    color: var(--ink);
+    margin-bottom: 6px;
+    line-height: 1.4;
+  }
+  .flagged-item .fi-response {
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    padding: 6px 10px;
+    background: var(--surface-2);
+    border-left: 2px solid var(--rule);
+    margin-bottom: 6px;
+    font-style: italic;
+  }
+  .flagged-item .fi-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .flagged-item .fi-actions button {
+    background: none;
+    border: none;
+    padding: 2px 6px;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 11px;
+    color: var(--ink-mute);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .flagged-item .fi-actions button:hover { color: var(--ink); }
+  .flagged-item .fi-actions .fi-del:hover { color: var(--down); }
+
+  .flagged-manual-form {
+    padding: 14px 0 6px;
+    display: none;
+  }
+  .flagged-manual-form.is-open { display: block; }
+  .flagged-manual-form textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px 10px;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 13px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    color: var(--ink);
+    margin-bottom: 8px;
+    box-sizing: border-box;
+    resize: vertical;
+  }
+  .flagged-manual-form .fmf-actions {
+    display: flex;
+    gap: 8px;
+  }
+
   /* Vertical census marker rendered inside the trend chart SVG. */
   .tc-census-line {
     stroke: var(--info);
@@ -2876,7 +3113,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.36</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.37</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -8947,6 +9184,431 @@
   };
 })();
 </script>
+  <!-- v5.37 Flagged Questions widget -->
+  <button class="flagged-fab is-empty" id="flaggedFab" type="button" style="display:none" title="View flagged questions">
+    <span class="flag-icon" aria-hidden="true">⚑</span>
+    <span>Flagged</span>
+    <span class="flag-count" id="flaggedFabCount">0</span>
+  </button>
+
+  <div class="flagged-modal-backdrop" id="flaggedModal" role="dialog" aria-labelledby="flaggedModalTitle" aria-hidden="true">
+    <div class="flagged-modal">
+      <div class="fm-header">
+        <h2 id="flaggedModalTitle">Flagged Questions</h2>
+        <button class="fm-close" id="flaggedModalClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="fm-toolbar">
+        <button id="flaggedAddBtn" type="button">⚑ Flag a question</button>
+        <button id="flaggedExportBtn" type="button">Export JSON</button>
+        <button id="flaggedClearBtn" type="button">Clear all</button>
+      </div>
+      <div class="fm-body">
+        <div class="flagged-manual-form" id="flaggedManualForm">
+          <textarea id="flaggedManualQ" placeholder="The question the assistant couldn't answer well..."></textarea>
+          <textarea id="flaggedManualR" placeholder="What the assistant said (optional)..."></textarea>
+          <div class="fmf-actions">
+            <button id="flaggedManualSave" type="button">Save flag</button>
+            <button id="flaggedManualCancel" type="button">Cancel</button>
+          </div>
+        </div>
+        <div id="flaggedList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* =========================================================================
+     * Flagged Questions — v5.37
+     *
+     * Captures questions the AI assistant couldn't fully answer so Q and
+     * Laura can review them periodically and prioritize data uploads /
+     * feature work. Uses a hybrid storage model:
+     *
+     *  1. Local: browser localStorage, keyed per-browser (per-user de facto)
+     *  2. Shared: optional data/flagged_questions.json in the repo — loaded
+     *     at startup and merged with local flags (dedup by id). Q can commit
+     *     exported JSON periodically to update the shared pool for everyone.
+     *
+     * Auto-detection: hooks window.getAssistantContext to know every question
+     * asked, then watches body mutations for new substantial text additions
+     * containing trigger phrases ("I don't have", "no snapshot", etc.). When
+     * one lands within 30s of a question, that question+response gets auto-
+     * flagged.
+     *
+     * Manual flagging: floating button → modal → "Flag a question" button
+     * opens a two-field form (question + response) so users can save anything
+     * they want to revisit.
+     * ========================================================================= */
+    (function () {
+      const STORAGE_KEY = 'brookdale_flagged_questions_v1';
+      const SHARED_POOL_URL = 'data/flagged_questions.json';
+      const AUTO_FLAG_WINDOW_MS = 30 * 1000;
+      const TRIGGER_PHRASES = [
+        "i don't have",
+        "i do not have",
+        "we don't have",
+        "we do not have",
+        "no data",
+        "no snapshot",
+        "no snapshots",
+        "cannot find",
+        "can't find",
+        "unable to compare",
+        "unable to answer",
+        "not loaded",
+        "insufficient data",
+        "no comparable",
+        "do not have access",
+        "don't have access",
+        "no information",
+        "not available in the loaded data",
+      ];
+
+      // In-memory state. Shape of each flag:
+      //   { id, question, response, timestamp, source: 'auto'|'user'|'manual',
+      //     term, pot, addressed: bool }
+      let flagged = [];
+
+      // Track the most recent question asked so the auto-detector can attribute
+      // a matched response to it. Updated via wrapper around getAssistantContext.
+      let lastQuestion = null;
+      let lastQuestionAt = 0;
+      let autoDetectArmed = false;
+
+      function uid() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      }
+
+      function loadLocal() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          console.warn('[flagged] loadLocal failed:', e);
+          return [];
+        }
+      }
+
+      function saveLocal() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(flagged));
+        } catch (e) {
+          console.warn('[flagged] saveLocal failed:', e);
+        }
+      }
+
+      async function loadSharedPool() {
+        try {
+          const resp = await fetch(SHARED_POOL_URL + '?t=' + Date.now());
+          if (!resp.ok) return [];
+          const parsed = await resp.json();
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          // Shared pool is optional — a 404 just means no one has committed one yet
+          return [];
+        }
+      }
+
+      function mergeById(a, b) {
+        const seen = new Map();
+        a.forEach(f => seen.set(f.id, f));
+        b.forEach(f => {
+          const existing = seen.get(f.id);
+          if (!existing || (f.timestamp > existing.timestamp)) {
+            seen.set(f.id, f);
+          }
+        });
+        return [...seen.values()].sort((x, y) => (y.timestamp || '').localeCompare(x.timestamp || ''));
+      }
+
+      function activeTermPot() {
+        try {
+          return {
+            term: (window.state && window.state.activeTerm) || null,
+            pot: (window.state && window.state.activePartOfTerm) || null,
+          };
+        } catch (e) {
+          return { term: null, pot: null };
+        }
+      }
+
+      function addFlag(flag) {
+        // Dedup — if the same question+source already exists within last hour, skip
+        const dupCutoff = Date.now() - 60 * 60 * 1000;
+        const dup = flagged.find(f => {
+          const ft = new Date(f.timestamp).getTime();
+          return f.source === flag.source
+            && f.question === flag.question
+            && ft > dupCutoff;
+        });
+        if (dup) return false;
+        flagged.unshift(flag);
+        saveLocal();
+        refreshUI();
+        return true;
+      }
+
+      function removeFlag(id) {
+        flagged = flagged.filter(f => f.id !== id);
+        saveLocal();
+        refreshUI();
+      }
+
+      function toggleAddressed(id) {
+        const f = flagged.find(x => x.id === id);
+        if (!f) return;
+        f.addressed = !f.addressed;
+        saveLocal();
+        refreshUI();
+      }
+
+      function refreshUI() {
+        const fab = document.getElementById('flaggedFab');
+        const countEl = document.getElementById('flaggedFabCount');
+        const list = document.getElementById('flaggedList');
+        if (!fab || !countEl || !list) return;
+
+        const outstanding = flagged.filter(f => !f.addressed);
+        countEl.textContent = outstanding.length;
+        fab.classList.toggle('is-empty', outstanding.length === 0);
+        fab.style.display = '';  // always visible — low-friction entry to manual flagging
+
+        if (flagged.length === 0) {
+          list.innerHTML = '<div class="fm-empty">No flagged questions yet. Auto-detection will capture responses where the assistant says it can\'t answer — or use "Flag a question" above to save one manually.</div>';
+          return;
+        }
+
+        list.innerHTML = flagged.map(f => {
+          const dateShort = f.timestamp ? new Date(f.timestamp).toLocaleString(undefined, { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '';
+          const srcClass = f.source === 'auto' ? 'fi-src-auto' : 'fi-src-user';
+          const srcLabel = f.source === 'auto' ? 'Auto-detected' : (f.source === 'manual' ? 'Manual' : 'User-flagged');
+          const ctx = [f.term, f.pot].filter(Boolean).join(' · ');
+          return `
+            <div class="flagged-item" data-id="${escHtml(f.id)}">
+              <div class="fi-meta">
+                <span class="${srcClass}">${srcLabel}</span>
+                <span>${escHtml(dateShort)}</span>
+                ${ctx ? `<span>${escHtml(ctx)}</span>` : ''}
+                ${f.addressed ? '<span style="color:var(--up)">✓ Addressed</span>' : ''}
+              </div>
+              <div class="fi-question">${escHtml(f.question || '(no question captured)')}</div>
+              ${f.response ? `<div class="fi-response">${escHtml(truncate(f.response, 320))}</div>` : ''}
+              <div class="fi-actions">
+                <button class="fi-addressed" data-id="${escHtml(f.id)}">${f.addressed ? 'Reopen' : 'Mark addressed'}</button>
+                <button class="fi-del" data-id="${escHtml(f.id)}">Delete</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        // Bind action buttons
+        list.querySelectorAll('.fi-del').forEach(btn => {
+          btn.addEventListener('click', () => removeFlag(btn.dataset.id));
+        });
+        list.querySelectorAll('.fi-addressed').forEach(btn => {
+          btn.addEventListener('click', () => toggleAddressed(btn.dataset.id));
+        });
+      }
+
+      function escHtml(s) {
+        return String(s || '').replace(/[&<>"']/g, c => ({
+          '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        })[c]);
+      }
+      function truncate(s, n) {
+        s = String(s || '');
+        return s.length > n ? s.slice(0, n).trimEnd() + '…' : s;
+      }
+
+      function openModal() {
+        document.getElementById('flaggedModal').classList.add('is-open');
+        document.getElementById('flaggedModal').setAttribute('aria-hidden', 'false');
+        refreshUI();
+      }
+      function closeModal() {
+        document.getElementById('flaggedModal').classList.remove('is-open');
+        document.getElementById('flaggedModal').setAttribute('aria-hidden', 'true');
+        document.getElementById('flaggedManualForm').classList.remove('is-open');
+      }
+
+      function exportJson() {
+        const data = JSON.stringify(flagged, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'flagged_questions.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      function clearAll() {
+        if (!confirm('Clear all flagged questions? This affects only your browser — shared pool stays intact until next load.')) return;
+        flagged = [];
+        saveLocal();
+        refreshUI();
+      }
+
+      // === Auto-detection ===
+      // Wraps window.getAssistantContext so every question flows through here
+      // before being passed to the assistant. We remember the question + arm
+      // the auto-detector.
+      function hookAssistantContext() {
+        const original = window.getAssistantContext;
+        if (typeof original !== 'function') return;
+        if (original.__flaggedHooked) return;  // idempotent
+        window.getAssistantContext = function (question) {
+          try {
+            if (question && String(question).trim().length > 0) {
+              lastQuestion = String(question);
+              lastQuestionAt = Date.now();
+              autoDetectArmed = true;
+              // Arm window: after 30s, don't auto-flag anymore for this question
+              setTimeout(() => { autoDetectArmed = false; }, AUTO_FLAG_WINDOW_MS);
+            }
+          } catch (e) { /* non-fatal */ }
+          return original.apply(this, arguments);
+        };
+        window.getAssistantContext.__flaggedHooked = true;
+      }
+
+      function checkTextForTrigger(text) {
+        if (!text || text.length < 50) return false;
+        const lower = text.toLowerCase();
+        return TRIGGER_PHRASES.some(phrase => lower.includes(phrase));
+      }
+
+      // Walk added nodes looking for substantial text containing trigger phrases.
+      // When found during the armed window, auto-flag the current lastQuestion.
+      function checkMutationsForAutoFlag(mutations) {
+        if (!autoDetectArmed || !lastQuestion) return;
+        for (const m of mutations) {
+          for (const node of m.addedNodes) {
+            if (!node || node.nodeType !== 1) continue;
+            // Ignore dashboard-internal mutations (our own UI)
+            if (node.closest && node.closest('.flagged-modal, .flagged-fab, #app, .signal-card, .signals-section')) continue;
+            const text = (node.textContent || '').trim();
+            if (!checkTextForTrigger(text)) continue;
+            // Found a likely "can't answer" response
+            const ctx = activeTermPot();
+            const added = addFlag({
+              id: uid(),
+              question: lastQuestion,
+              response: truncate(text, 400),
+              timestamp: new Date().toISOString(),
+              source: 'auto',
+              term: ctx.term,
+              pot: ctx.pot,
+              addressed: false,
+            });
+            if (added) {
+              // Disarm so we don't double-flag on cascading DOM changes
+              autoDetectArmed = false;
+              return;
+            }
+          }
+        }
+      }
+
+      // === Manual flagging ===
+      function bindUI() {
+        const fab = document.getElementById('flaggedFab');
+        const modal = document.getElementById('flaggedModal');
+        const closeBtn = document.getElementById('flaggedModalClose');
+        const addBtn = document.getElementById('flaggedAddBtn');
+        const exportBtn = document.getElementById('flaggedExportBtn');
+        const clearBtn = document.getElementById('flaggedClearBtn');
+        const manualForm = document.getElementById('flaggedManualForm');
+        const manualQ = document.getElementById('flaggedManualQ');
+        const manualR = document.getElementById('flaggedManualR');
+        const manualSave = document.getElementById('flaggedManualSave');
+        const manualCancel = document.getElementById('flaggedManualCancel');
+
+        if (!fab || !modal) return;
+
+        fab.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
+        });
+
+        addBtn.addEventListener('click', () => {
+          manualForm.classList.add('is-open');
+          manualQ.focus();
+        });
+        manualCancel.addEventListener('click', () => {
+          manualForm.classList.remove('is-open');
+          manualQ.value = '';
+          manualR.value = '';
+        });
+        manualSave.addEventListener('click', () => {
+          const q = manualQ.value.trim();
+          if (!q) { manualQ.focus(); return; }
+          const ctx = activeTermPot();
+          addFlag({
+            id: uid(),
+            question: q,
+            response: manualR.value.trim(),
+            timestamp: new Date().toISOString(),
+            source: 'manual',
+            term: ctx.term,
+            pot: ctx.pot,
+            addressed: false,
+          });
+          manualForm.classList.remove('is-open');
+          manualQ.value = '';
+          manualR.value = '';
+        });
+
+        exportBtn.addEventListener('click', exportJson);
+        clearBtn.addEventListener('click', clearAll);
+      }
+
+      // === Init ===
+      async function init() {
+        // Load local first so the UI shows up fast
+        flagged = loadLocal();
+        bindUI();
+        refreshUI();
+        // Merge in shared pool (if present) — doesn't overwrite local flags
+        // that are newer than the shared copies
+        try {
+          const shared = await loadSharedPool();
+          if (shared.length > 0) {
+            flagged = mergeById(flagged, shared);
+            saveLocal();
+            refreshUI();
+          }
+        } catch (e) { /* non-fatal */ }
+        // Hook the assistant context function (may not be ready yet — retry)
+        const tryHook = () => {
+          if (typeof window.getAssistantContext === 'function') {
+            hookAssistantContext();
+          } else {
+            setTimeout(tryHook, 500);
+          }
+        };
+        tryHook();
+        // Mutation observer for auto-detection
+        const observer = new MutationObserver(checkMutationsForAutoFlag);
+        observer.observe(document.body, { childList: true, subtree: true });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+
   <script src="enrollment-assistant.js" defer></script>
 </body>
 </html>
