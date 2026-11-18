@@ -2,9 +2,28 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.37
-  Date:     November 12, 2026
-  Features: Feature — Flagged Questions widget for capturing assistant
+  Version:  v5.38
+  Date:     November 18, 2026
+  Features: Change — removed per-section signal badges (✦ Pressure,
+            ↑ Gainer, ↓ Loser, ⚠ At-risk) from the By Discipline section
+            cards. Laura flagged two concerns: (1) "Loser" reads as a
+            judgment on faculty teaching that section, and (2) sections
+            could show both Pressure and Loser at the same time (strong
+            waitlist plus a one-student-dip over the last week), giving
+            contradictory signals on the same card. The Signals panel at
+            the top of the Current Snapshot tab already surfaces the
+            actionable items, so per-card duplication added noise without
+            insight. Signal computation and the panel itself are unchanged
+            — only the per-card rendering was removed. CSS for the badges
+            and the has-signal-flag highlight ring was kept in place for
+            now (dead but harmless) in case a different per-card treatment
+            emerges later. _signalFlagCache module var is still populated
+            by renderSignalsPanel but no longer read anywhere; left in to
+            avoid churn in the signals plumbing.
+            Built on v5.37.
+
+  v5.37 (previous):
+            Feature — Flagged Questions widget for capturing assistant
             questions that couldn't be fully answered. Hybrid storage
             (localStorage per-browser + optional shared pool loaded from
             data/flagged_questions.json). Auto-detection hooks
@@ -3113,7 +3132,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.37</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.38</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -6017,17 +6036,15 @@
     else if (r['Enrolled Students'] === 0) tags.push('<span class="tag empty">● Empty</span>');
     if (r['Wait List'] > 0) tags.push(`<span class="tag wait">+${r['Wait List']} waitlist</span>`);
 
-    // v5.35: Signal badges — surface Signals-panel flags on individual
-    // section cards. Visually ties the Signals panel above to the grid below.
-    const flags = _signalFlagCache ? (_signalFlagCache.get(r.Section) || []) : [];
-    const hasSignalFlag = flags.length > 0;
-    const signalBadges = flags.map(f => {
-      if (f === 'pressure') return '<span class="sig-badge sig-badge-pressure" title="Flagged in Capacity Pressure signal">✦ Pressure</span>';
-      if (f === 'gainer')   return '<span class="sig-badge sig-badge-gainer" title="Top gainer in 7-day trajectory">↑ Gainer</span>';
-      if (f === 'loser')    return '<span class="sig-badge sig-badge-loser" title="Top loser in 7-day trajectory">↓ Loser</span>';
-      if (f === 'atrisk')   return '<span class="sig-badge sig-badge-atrisk" title="Flagged in At-Risk signal">⚠ At-risk</span>';
-      return '';
-    }).join('');
+    // v5.38: Per-Laura's feedback (2026-11-18), section-level signal badges
+    // have been removed. Rationale: (1) the "Loser" label reads harshly when
+    // applied to a faculty member's section, and (2) a section can
+    // legitimately show both Pressure and Loser at once (strong waitlist but
+    // one or two drops over the week), which sends a contradictory message.
+    // The Signals panel at the top of the Current Snapshot tab already
+    // surfaces the actionable items; duplicating onto individual cards adds
+    // noise without insight. Signal computation + the top panel are
+    // unchanged — only this per-card rendering was removed.
 
     const days = cleanCell(r['Meeting Days'], '—');
     const time = cleanCell(r['Section Start Time'], 'TBA');
@@ -6055,12 +6072,11 @@
     }
 
     return `
-      <div class="course-card${hasSignalFlag ? ' has-signal-flag' : ''}" style="border-left-color:${color}">
+      <div class="course-card" style="border-left-color:${color}">
         <div class="cc-head">
           <span class="code">${escapeHtml(r.Section)}</span>
           <span class="loc">${escapeHtml(r.Location || '—')}</span>
         </div>
-        ${signalBadges ? `<div class="sig-badges-row">${signalBadges}</div>` : ''}
         <div class="title">${escapeHtml(r['Course Title'] || '')}</div>
         <div class="meter"><div class="fill" style="width:${fillCapped}%;background:${color}"></div></div>
         <div class="num-row">
