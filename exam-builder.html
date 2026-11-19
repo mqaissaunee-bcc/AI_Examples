@@ -636,6 +636,9 @@ footer .program{color:var(--cyan);font-weight:600;}
           <span class="hint">Two columns keeps the problem and figure in view while you reveal the solution step by step. You can also switch on the page itself.</span></div>
         <div class="field"><label class="lab" for="inclassPoints">In-class page</label>
           <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;min-height:44px;"><input type="checkbox" id="inclassPoints" style="width:auto;min-height:auto;accent-color:var(--cyan);"> Show points</label></div>
+        <div class="field"><label class="lab" for="shrinkFigs">Figures in downloads</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;min-height:44px;"><input type="checkbox" id="shrinkFigs" checked style="width:auto;min-height:auto;accent-color:var(--cyan);"> Shrink figures for a smaller file</label>
+          <span class="hint">Re-encodes each uploaded figure (longest side up to 1280&nbsp;px) when you download, so the file stays small enough for GitHub. Your originals in the builder are untouched. Uncheck to embed them at full size.</span></div>
       </div>
     </div>
     <div class="card">
@@ -661,6 +664,7 @@ footer .program{color:var(--cyan);font-weight:600;}
   <div class="head"><h2>How This Tool Works</h2><p>A workflow for turning chapter coverage into a verified, traditional exam. <b>Version <span class="app-ver"></span></b> &mdash; the version number also shows in the header and footer, so you can tell when your copy is out of date.</p></div>
   <div class="card"><h3>&#128221; What&rsquo;s new</h3>
     <ul class="glist">
+      <li><b>v1.5</b> &mdash; <b>smaller downloads</b>: a new &ldquo;Shrink figures for a smaller file&rdquo; option under Export &rarr; Options (on by default) re-encodes uploaded figures when you download the student copy, answer key, Canvas page or in-class page, so a figure-heavy file drops from tens of megabytes to a few and fits on GitHub. The download message now shows the file size. Saved JSON keeps your original images.</li>
       <li><b>v1.4</b> &mdash; <b>two-column in-class page</b>: the problem and its figure stay on the left while the answer, steps and full solution reveal on the right, in both page and slide view. Set the starting layout under Export &rarr; Options (&ldquo;In-class layout&rdquo;) or switch it live with the &ldquo;Two columns&rdquo; button on the page. In slide view, the down-arrow key reveals the next step. Narrow screens and printouts fall back to one column.</li>
       <li><b>v1.3</b> &mdash; <b>PowerPoint and PDF sources</b>, two ways: every problem slot and Blueprint row has a &ldquo;Source file&rdquo; field for a file you attach in the LLM chat (the Prompt tab reminds you which files to attach), and Source Content has an upload that pulls the text out of .pptx and .pdf files in your browser and adds it to the prompt. Homework mode gets a matching &ldquo;Lesson file&rdquo; field.</li>
       <li><b>v1.2</b> &mdash; <b>more detailed solution steps</b>: a new &ldquo;Solution step detail&rdquo; default (Concise, Detailed, Very detailed) controls how finely the in-class step-by-step reveal is broken down, with statics-specific guidance (free-body diagram, components, one equilibrium equation per step). <b>New figure looks</b>: a &ldquo;Textbook illustration (color, dimensioned)&rdquo; preset and a &ldquo;Hand-sketched free-body diagram&rdquo; preset; a &ldquo;Figure labels&rdquo; default that puts dimensions, angles and given values on the figure; and an optional <b>solution figure</b> (free-body diagram) per problem that appears only with the solution.</li>
@@ -816,7 +820,7 @@ function typeset(el){
 })();
 
 /* ════════════════ tabs ════════════════ */
-const APP_VERSION='1.4.0';
+const APP_VERSION='1.5.0';
 document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.app-ver').forEach(e=>{e.textContent='v'+APP_VERSION;});document.title='Quantitative Exam Builder v'+APP_VERSION+' [Alpha]';});
 const TABS=['config','prompt','review','figures','export','guide'];
 let unitTerm='Chapter';
@@ -1807,6 +1811,7 @@ function toggleVerify(i){
   refreshCard(i); refreshExport();
 }
 function refreshExport(){
+  prepFigures();
   const has=problems.length>0;
   $('exportReady').style.display=has?'block':'none';
   $('exportEmpty').style.display=has?'none':'block';
@@ -1855,13 +1860,49 @@ function safeName(){const v=($('versionLabel')&&$('versionLabel').value.trim()&&
 function figureExportHtml(f){
   if(!f||f.mode==='none')return '';
   if(f.mode==='image'){
-    if(f.dataUrl)return '<div class="fig"><img src="'+escAttr(f.dataUrl)+'" alt="'+escAttr(f.alt||f.caption||'figure')+'">'+(f.caption?'<div class="figcap">'+escH(f.caption)+'</div>':'')+'</div>';
+    if(f.dataUrl)return '<div class="fig"><img src="'+escAttr(figSrc(f))+'" alt="'+escAttr(f.alt||f.caption||'figure')+'">'+(f.caption?'<div class="figcap">'+escH(f.caption)+'</div>':'')+'</div>';
     return '<div class="figcap-only">[ Figure to insert'+(f.caption?': '+escH(f.caption):'')+' ]</div>';
   }
   if(f.mode==='exhibit'&&f.text)return '<div class="fig">'+(f.caption?'<div class="figcap">'+escH(f.caption)+'</div>':'')+'<pre class="exhibit">'+escH(f.text)+'</pre></div>';
   return '';
 }
 function solFigureExportHtml(p){const f=p&&p.solFigure;return (f&&f.mode==='image'&&f.dataUrl)?figureExportHtml(f):'';}
+/* ── shrink figures for exported files (keeps downloads small enough for GitHub) ── */
+const FIG_SMALL=new Map();   // original dataUrl -> re-encoded dataUrl
+const FIG_MAX_PX=1280;
+function shrinkOn(){const c=$('shrinkFigs');return !c||c.checked;}
+function figSrc(f){return (shrinkOn()&&FIG_SMALL.get(f.dataUrl))||f.dataUrl;}
+function shrinkDataUrl(url){return new Promise(res=>{
+  if(!/^data:image\/(png|jpe?g|webp|bmp)/i.test(url)){res(url);return;}
+  const im=new Image();
+  im.onload=()=>{try{
+    const w=im.naturalWidth,h=im.naturalHeight; if(!w||!h){res(url);return;}
+    const k=Math.min(1,FIG_MAX_PX/Math.max(w,h));
+    const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k));
+    const g=c.getContext('2d'); g.imageSmoothingQuality='high'; g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height);
+    let out=c.toDataURL('image/webp',0.82);
+    if(out.indexOf('data:image/webp')!==0) out=c.toDataURL('image/jpeg',0.85);   // browsers that cannot write WebP
+    res(out.length<url.length?out:url);
+  }catch(e){res(url);}};
+  im.onerror=()=>res(url); im.src=url;
+});}
+let figPrep=Promise.resolve();
+function prepFigures(){
+  figPrep=figPrep.then(async()=>{
+    if(!shrinkOn())return;
+    const live=new Set();
+    problems.forEach(p=>{[p.figure,p.solFigure].forEach(f=>{if(f&&f.mode==='image'&&f.dataUrl)live.add(f.dataUrl);});});
+    Array.from(FIG_SMALL.keys()).forEach(k=>{if(!live.has(k))FIG_SMALL.delete(k);});
+    for(const u of live){ if(!FIG_SMALL.has(u)) FIG_SMALL.set(u,await shrinkDataUrl(u)); }
+  }).catch(()=>{});
+  return figPrep;
+}
+function fmtBytes(n){return n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';}
+async function dlHtml(build,suffix,msg){
+  await prepFigures();
+  const b=new Blob([build()],{type:'text/html'});
+  dl(b,safeName()+suffix); toast(msg+' ('+fmtBytes(b.size)+').','success');
+}
 const KATEX_TAIL='<scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></scr'+'ipt><scr'+'ipt src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></scr'+'ipt><scr'+'ipt>renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],throwOnError:false});</scr'+'ipt>';
 const KATEX_CSS='<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">';
 
@@ -2189,10 +2230,11 @@ function guardExport(){
   if(done<total){ if(!confirm((total-done)+' problem(s) are not yet marked verified. Export anyway?')) return false; }
   return true;
 }
-$('expStudent').addEventListener('click',()=>{if(!guardExport())return;dl(new Blob([studentExamHtml()],{type:'text/html'}),safeName()+'_student.html');toast('Student exam downloaded.','success');});
-$('expKey').addEventListener('click',()=>{if(!problems.length){toast('Validate first.','error');return;}dl(new Blob([answerKeyHtml()],{type:'text/html'}),safeName()+'_answer_key.html');toast('Answer key downloaded.','success');});
-$('expCanvas').addEventListener('click',()=>{if(!guardExport())return;dl(new Blob([canvasHtml()],{type:'text/html'}),safeName()+'_canvas.html');toast('Canvas page downloaded.','success');});
-$('expInclass').addEventListener('click',()=>{if(!guardExport())return;dl(new Blob([inclassHtml()],{type:'text/html'}),safeName()+'_inclass.html');toast('In-class examples downloaded.','success');});
+$('expStudent').addEventListener('click',()=>{if(!guardExport())return;dlHtml(studentExamHtml,'_student.html','Student exam downloaded');});
+$('expKey').addEventListener('click',()=>{if(!problems.length){toast('Validate first.','error');return;}dlHtml(answerKeyHtml,'_answer_key.html','Answer key downloaded');});
+$('expCanvas').addEventListener('click',()=>{if(!guardExport())return;dlHtml(canvasHtml,'_canvas.html','Canvas page downloaded');});
+$('expInclass').addEventListener('click',()=>{if(!guardExport())return;dlHtml(inclassHtml,'_inclass.html','In-class examples downloaded');});
+$('shrinkFigs').addEventListener('change',()=>{prepFigures();});
 $('expInclassCanvas').addEventListener('click',()=>{
   if(!guardExport())return;
   const frag=inclassCanvasFragment();
