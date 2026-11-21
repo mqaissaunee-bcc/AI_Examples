@@ -132,7 +132,7 @@ details.panel[open]>summary{margin-bottom:14px}
   <header class="masthead">
     <p class="eyebrow">Retail and automation</p>
     <h1>Retail Tech Revolution</h1>
-    <p class="lede">You are the chief technology officer of a retail chain with $10 million to spend on AI, robotics and automation. Make four strategic decisions, choose your technologies, and see how the board scores you.</p>
+    <p class="lede">You are the chief technology officer of a retail chain with $5 million to spend on AI, robotics and automation. Make four strategic decisions, choose your technologies, and see how the board scores you.</p>
     <span class="asof">Real-world figures updated November 2026</span>
   </header>
 
@@ -192,21 +192,21 @@ details.panel[open]>summary{margin-bottom:14px}
 
 <script>
 const TECH = [
-  { name:"AI-powered logistics", cost:2.0, e:25, s:10, x:5, d:"Route optimization and demand forecasting across the supply chain.",
+  { name:"AI-powered logistics", cost:2.0, e:15, s:5, x:0, d:"Route optimization and demand forecasting across the supply chain.",
     good:["Faster, cheaper deliveries","Lower fuel use and emissions","Better demand forecasts"], bad:["Complex to integrate with older systems","Staff need training"] },
-  { name:"Robotic warehouses", cost:3.0, e:35, s:5, x:10, d:"Automated fulfillment. Amazon alone runs more than a million robots.",
+  { name:"Robotic warehouses", cost:3.0, e:22, s:-4, x:5, d:"Automated fulfillment. Amazon alone runs more than a million robots.",
     good:["Large efficiency gains","Robots take the most strenuous lifting","Amazon's touch-sensing Vulcan robot handles about 75% of item types"], bad:["Highest upfront cost","Specialist maintenance","Workers worry about displacement"] },
-  { name:"Cashierless stores", cost:1.5, e:20, s:15, x:-5, d:"Walk-out checkout. Popular with shoppers, harder to run than it looks.",
+  { name:"Cashierless stores", cost:1.5, e:12, s:10, x:-8, d:"Walk-out checkout. Popular with shoppers, harder to run than it looks.",
     good:["Faster checkout","Lower labor cost per sale","A new experience for shoppers"], bad:["Amazon pulled the system from its Fresh grocery stores in 2024","Reported to rely on human reviewers behind the scenes","More cameras and data to secure"] },
-  { name:"Smart shelves", cost:0.8, e:15, s:8, x:8, d:"Sensors track stock in real time and trigger restocking.",
+  { name:"Smart shelves", cost:0.8, e:8, s:5, x:4, d:"Sensors track stock in real time and trigger restocking.",
     good:["Fewer empty shelves","Automatic restocking alerts","Better use of floor space"], bad:["Needs reliable store networks","Sensor upkeep","Shopper privacy questions"] },
-  { name:"Security AI", cost:1.2, e:5, s:5, x:30, d:"Automated threat detection and response.",
+  { name:"Security AI", cost:1.2, e:0, s:3, x:22, d:"Automated threat detection and response.",
     good:["Organizations using AI and automation in security save $1.93 million per breach on average","Threats spotted in real time","Supports compliance"], bad:["False alarms","Ongoing tuning","Attackers use AI too: AI-enabled breaches average $6 million"] },
-  { name:"Customer analytics AI", cost:1.0, e:10, s:20, x:5, d:"Personalized offers and better forecasting from purchase data.",
+  { name:"Customer analytics AI", cost:1.0, e:5, s:14, x:-4, d:"Personalized offers and better forecasting from purchase data.",
     good:["More relevant recommendations","Targeted promotions","Sharper demand forecasts"], bad:["Privacy regulation","Risk of biased recommendations","Needs large, clean data sets"] }
 ];
 const SCENARIOS = [
-  { title:"Decision 1: where to start", text:"The board wants results. For scale: Amazon expects to spend about $200 billion on capital projects in 2026, up from about $131 billion in 2025. You have $10 million. What comes first?",
+  { title:"Decision 1: where to start", text:"The board wants results. For scale: Amazon expects to spend about $200 billion on capital projects in 2026, up from about $131 billion in 2025. You have $5 million. What comes first?",
     choices:[
       { text:"Warehouse efficiency first", sub:"Unlocks robotic warehouses and AI-powered logistics", fx:{ e:5 }, unlock:[1,0], say:"Operations first. Automation of the back end is where the largest retailers have invested most heavily." },
       { text:"Customer experience first", sub:"Unlocks customer analytics and smart shelves", fx:{ s:10 }, unlock:[5,3], say:"Customers first. Loyalty follows from finding what you want, in stock, at the right price." },
@@ -227,7 +227,7 @@ const SCENARIOS = [
 
 const $ = id => document.getElementById(id);
 const clamp = n => Math.max(0, Math.min(100, n));
-const G = { budget:10, e:50, s:70, x:60, owned:[], rec:[], step:-1, badges:[] };
+const G = { budget:5, e:35, s:50, x:40, owned:[], rec:[], step:-1, badges:[] };
 const money = n => "$" + n.toFixed(1) + "M";
 const delta = (n, unit) => n ? `<span class="${n > 0 ? "plus" : "minus"}">${n > 0 ? "+" : ""}${n}${unit}</span>` : "";
 
@@ -261,10 +261,11 @@ function showScenario() {
   const sc = SCENARIOS[G.step];
   $("scTitle").textContent = sc.title;
   $("scBody").innerHTML = `<p>${sc.text}</p>`;
-  $("choices").innerHTML = sc.choices.map((c, i) => `<button data-c="${i}"><strong>${c.text}</strong><small>${c.sub}</small></button>`).join("");
+  $("choices").innerHTML = sc.choices.map((c, i) => `<button data-c="${i}"><strong>${c.text}</strong><small>${c.sub}${(-(c.fx.b || 0) > G.budget + 1e-9) ? " Not enough budget left: choosing this has no effect." : ""}</small></button>`).join("");
 }
 function choose(c) {
-  const fx = c.fx;
+  const funded = -(c.fx.b || 0) <= G.budget + 1e-9;
+  const fx = funded ? c.fx : {};
   G.budget = Math.round((G.budget + (fx.b || 0)) * 10) / 10;
   G.e = clamp(G.e + (fx.e || 0)); G.s = clamp(G.s + (fx.s || 0)); G.x = clamp(G.x + (fx.x || 0));
   c.unlock.forEach(i => { if (!G.rec.includes(i) && !G.owned.includes(i)) G.rec.push(i); });
@@ -275,7 +276,8 @@ function choose(c) {
 }
 function finish() {
   const score = (G.e + G.s + G.x) / 3;
-  const verdict = score >= 85 ? "Excellent. You are leading the industry." : score >= 70 ? "On track. The transformation is working." : score >= 50 ? "Mixed. There is room to improve." : "The board is not convinced. Try a different strategy.";
+  const weakest = Math.min(G.e, G.s, G.x);
+  const verdict = (score >= 85 && weakest >= 70) ? "Excellent. You are leading the industry." : (score >= 70 && weakest >= 55) ? "On track. The transformation is working." : score >= 50 ? "Mixed. One area is holding the company back; the board looks at your weakest number, not only the average." : "The board is not convinced. Try a different strategy.";
   $("scTitle").textContent = "The board's review";
   $("scBody").innerHTML = `<div class="stats"><div class="stat"><div class="k">Overall score</div><div class="v">${score.toFixed(1)}%</div></div><div class="stat"><div class="k">Budget left</div><div class="v">${money(G.budget)}</div></div><div class="stat"><div class="k">Technologies</div><div class="v">${G.owned.length} of ${TECH.length}</div></div></div>
     <p><strong>${verdict}</strong></p><h3>What the real numbers say</h3><ul>
