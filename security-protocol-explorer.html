@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wire Decoder: Network Protocols, Byte by Byte</title>
+<meta name="description" content="Step through 21 lessons on network and security protocols one packet at a time: DHCP, ARP, DNS, TCP, HTTP, TLS, QUIC, SSH, Kerberos, WPA3, IPsec, WireGuard and four attack walkthroughs. Decode every field and compare what an eavesdropper sees with what the endpoint decrypts.">
+<style>
+:root{
+  --bg:#f5f2ea; --panel:#fffdf8; --ink:#1b2330; --muted:#525c6b; --line:#cfc8b8;
+  --accent:#0a5f66; --accent-ink:#ffffff; --sel:#fde9b0; --sel-line:#8a5a00;
+  --good:#17603a; --bad:#9b1c1c; --bad-ink:#ffffff; --bad-bg:#fbe3e0; --cipher:#6b3f00; --cipher-bg:#f6e7c8;
+  --f0:#0a5f66; --f1:#a2420f; --f2:#5b3fa8; --f3:#1f6b2a; --f4:#a01f5c; --f5:#2a55a8;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --r:10px; --gap:clamp(.75rem,2vw,1.25rem);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#11151b; --panel:#1a2029; --ink:#e9edf3; --muted:#a9b3c2; --line:#394454;
+    --accent:#5fd0d6; --accent-ink:#06282b; --sel:#4a3a10; --sel-line:#f2c14e;
+    --good:#7ddc9f; --bad:#ff9d9d; --bad-ink:#2a0606; --bad-bg:#3a1616; --cipher:#f2c14e; --cipher-bg:#33290f;
+    --f0:#5fd0d6; --f1:#ff9e66; --f2:#b9a2ff; --f3:#84d68f; --f4:#ff8fc0; --f5:#8fb4ff;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;font-size:1rem}
+.skip-link{position:absolute;left:-999px;top:0;background:var(--accent);color:var(--accent-ink);padding:.75rem 1rem;z-index:10}
+.skip-link:focus{left:0}
+:focus-visible{outline:3px solid var(--sel-line);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 var(--gap)}
+header.top{padding:1.1rem 0 .4rem}
+h1{font-size:clamp(1.35rem,4vw,2rem);margin:0;letter-spacing:-.01em}
+h1 span{font-family:var(--mono);color:var(--accent)}
+.lede{margin:.25rem 0 0;color:var(--muted);max-width:62ch}
+h2{font-size:1.05rem;margin:0 0 .5rem}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.prog{display:flex;align-items:center;gap:.6rem;margin-top:.6rem;font-size:.85rem;color:var(--muted)}
+.prog progress{flex:1;max-width:260px;height:.6rem;accent-color:var(--accent)}
+
+.views{display:flex;gap:.25rem;overflow-x:auto;border-bottom:2px solid var(--line);margin-top:.5rem;scrollbar-width:thin}
+.views button{flex:0 0 auto;min-height:44px;padding:.4rem .8rem;border:0;border-bottom:4px solid transparent;margin-bottom:-2px;background:none;font-weight:700}
+.views button[aria-current="true"]{border-bottom-color:var(--accent);color:var(--accent)}
+.blurb{margin:.6rem 0 0;color:var(--muted)}
+.tabs{position:relative;display:flex;gap:.4rem;overflow-x:auto;padding:.5rem 0 .7rem;scrollbar-width:thin}
+.tabs button{position:relative;flex:0 0 auto;min-height:44px;min-width:44px;padding:.4rem .85rem;border:1.5px solid var(--line);border-radius:999px;background:var(--panel);font-weight:600}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:var(--gap)}
+.intro{margin:0 0 .5rem;color:var(--muted)}
+.intro strong{color:var(--ink)}
+details.goals{margin:0 0 var(--gap)}
+details.goals summary{min-height:44px;display:flex;align-items:center;font-weight:600;cursor:pointer}
+details.goals summary::before{content:"▸";margin-right:.4rem;color:var(--accent)}
+details.goals[open] summary::before{content:"▾"}
+details.goals ul{margin:0;padding-left:1.2rem}
+
+.stage{position:relative;height:190px;margin-bottom:.5rem;overflow:hidden}
+.node{position:absolute;top:8px;transform:translateX(-50%);max-width:150px;text-align:center;border:1.5px solid var(--ink);border-radius:8px;padding:.35rem .25rem .4rem;background:var(--bg);font-weight:600;font-size:clamp(.7rem,2.9vw,.85rem);line-height:1.2;min-height:82px;overflow-wrap:anywhere}
+.node .ico{display:block;margin:0 auto .15rem;color:var(--accent)}
+.node.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent) inset}
+.node.evil{border-style:dashed;border-color:var(--bad);background:var(--bad-bg)}
+.node.evil .ico{color:var(--bad)}
+.node.evil.on{box-shadow:0 0 0 3px var(--bad) inset}
+.drop{position:absolute;top:92px;width:0;height:66px;border-left:1.5px dashed var(--line)}
+.lane{position:absolute;left:4%;right:4%;top:146px;border-top:2px solid var(--line)}
+.pkt{position:absolute;top:128px;transform:translateX(-50%);display:flex;align-items:center;gap:.35rem;max-width:70%;padding:.3rem .6rem;border-radius:6px;background:var(--accent);color:var(--accent-ink);font-family:var(--mono);font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:left .9s cubic-bezier(.5,0,.2,1)}
+.pkt.bad{background:var(--bad);color:var(--bad-ink)}
+.pkt.jump{transition:none}
+.pkt svg{flex:0 0 auto}
+@media (prefers-reduced-motion: reduce){.pkt{transition:none}}
+
+.controls{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.btn{min-height:44px;min-width:44px;padding:.4rem .9rem;border:1.5px solid var(--ink);border-radius:8px;background:var(--panel);font-weight:600}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.count{font-family:var(--mono);color:var(--muted);margin-left:auto}
+.view{display:inline-flex;border:1.5px solid var(--ink);border-radius:8px;overflow:hidden}
+.view button{min-height:44px;padding:.4rem .8rem;border:0;background:var(--panel);font-weight:600}
+.view button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+.grid{display:grid;gap:var(--gap);margin-top:var(--gap)}
+@media (min-width:880px){.grid{grid-template-columns:minmax(260px,1fr) 2fr;align-items:start}}
+
+.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+.steps li{counter-increment:s}
+.steps button{display:grid;grid-template-columns:1.6rem 1fr;gap:.5rem;width:100%;min-height:44px;text-align:left;padding:.45rem .5rem;border:0;border-left:4px solid transparent;border-radius:0 6px 6px 0;background:none}
+.steps button::before{content:counter(s);font-family:var(--mono);color:var(--muted)}
+.steps button[aria-current="step"]{background:var(--sel);border-left-color:var(--sel-line)}
+.steps .dir{display:block;font-size:.8rem;color:var(--muted)}
+.steps .t{font-weight:600}
+.tag{display:inline-block;margin-left:.4rem;padding:0 .35rem;border:1.5px solid var(--bad);border-radius:4px;color:var(--bad);font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;vertical-align:middle}
+
+.say{margin:.25rem 0 .75rem}
+.stack{display:flex;flex-wrap:wrap;gap:.3rem;margin:0 0 .75rem;padding:0;list-style:none;font-family:var(--mono);font-size:.78rem}
+.stack li{border:1px solid var(--line);border-radius:4px;padding:.1rem .4rem}
+.stack li+li::before{content:"› ";color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:space-between;margin-bottom:.6rem}
+.size{font-family:var(--mono);color:var(--muted);font-size:.85rem}
+
+.hex{font-family:var(--mono);font-size:.82rem;line-height:2.1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.5rem .6rem;margin-bottom:.75rem;max-height:15rem;overflow:auto}
+.run{display:inline;border:0;border-bottom:3px solid var(--c);background:none;padding:.2rem .15rem;margin:0 .2rem 0 0;font-family:inherit;font-size:inherit;border-radius:3px 3px 0 0}
+.run.cipher{color:var(--cipher);background:var(--cipher-bg);font-style:italic}
+.run.forged{color:var(--bad);background:var(--bad-bg);font-weight:700}
+.run.sel{background:var(--sel);color:var(--ink);outline:2px solid var(--sel-line)}
+.more{color:var(--muted);font-style:normal;font-weight:400}
+.h0{--c:var(--f0)}.h1{--c:var(--f1)}.h2{--c:var(--f2)}.h3{--c:var(--f3)}.h4{--c:var(--f4)}.h5{--c:var(--f5)}
+
+.fields{list-style:none;margin:0;padding:0}
+.fields li{border-top:1px solid var(--line)}
+.frow{display:grid;grid-template-columns:1fr auto;gap:.1rem .75rem;width:100%;min-height:44px;text-align:left;padding:.45rem .5rem;border:0;border-left:4px solid var(--c);background:none}
+.frow .n{font-weight:600}
+.frow .b{font-family:var(--mono);font-size:.78rem;color:var(--muted);white-space:nowrap}
+.frow .v{grid-column:1/-1;font-family:var(--mono);font-size:.85rem;overflow-wrap:anywhere}
+.frow[aria-expanded="true"]{background:var(--sel)}
+.lock{color:var(--cipher);font-weight:700}
+.warn{color:var(--bad);font-weight:700}
+.desc{margin:0;padding:.35rem .6rem .7rem calc(.5rem + 4px);background:var(--sel);font-size:.95rem}
+.note{font-size:.85rem;color:var(--muted);margin:.75rem 0 0}
+
+.below{margin-top:var(--gap)}
+.q{margin:0 0 1rem;padding:0;border:0;min-width:0}
+.q legend{font-weight:600;padding:0;margin-bottom:.4rem}
+.q .opts{display:grid;gap:.4rem}
+.q .opts button,.q label{display:flex;align-items:center;gap:.6rem;min-height:44px;text-align:left;padding:.5rem .75rem;border:1.5px solid var(--line);border-radius:8px;background:var(--bg)}
+.q input[type=radio]{width:1.15rem;height:1.15rem;flex:0 0 auto;accent-color:var(--accent)}
+.q .right{border-color:var(--good);border-width:2.5px}
+.q .wrong{border-color:var(--bad);border-style:dashed;border-width:2.5px}
+.fb{margin:.4rem 0 0;min-height:1.5em}
+.fb.ok{color:var(--good)}.fb.no{color:var(--bad)}
+.score{font-size:1.15rem;font-weight:700;margin:.5rem 0}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.75rem 0}
+
+.search{display:grid;gap:.25rem;margin-bottom:.75rem;max-width:26rem}
+.search input{min-height:44px;padding:.4rem .6rem;border:1.5px solid var(--ink);border-radius:8px;background:var(--bg)}
+dl.gloss{margin:0;display:grid;gap:.6rem}
+@media (min-width:880px){dl.gloss{grid-template-columns:1fr 1fr;gap:.6rem 2rem}}
+dl.gloss dt{font-weight:700}
+dl.gloss dd{margin:0;color:var(--muted)}
+
+footer{color:var(--muted);font-size:.85rem;padding:1.5rem 0 2rem}
+#print{display:none}
+@media print{
+  :root{--bg:#fff;--panel:#fff;--ink:#000;--muted:#333;--line:#999;--accent:#000;--bad:#000;--cipher:#000}
+  body>*:not(#print){display:none!important}
+  #print{display:block;font-size:10.5pt;padding:0}
+  #print h1{font-size:16pt;margin:0 0 4pt}
+  #print h2{font-size:12pt;margin:12pt 0 2pt;break-after:avoid}
+  #print h3{font-size:11pt;margin:10pt 0 2pt}
+  #print p,#print ul,#print ol{margin:2pt 0 4pt}
+  #print table{width:100%;border-collapse:collapse;margin:4pt 0;font-size:9pt}
+  #print th,#print td{border:1px solid var(--line);padding:2pt 4pt;text-align:left;vertical-align:top}
+  #print .small{font-size:8.5pt;color:var(--muted)}
+}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+<header class="top wrap">
+  <h1><span>0x</span> Wire Decoder</h1>
+  <p class="lede">Twenty-one lessons, one packet at a time. Tap any field to see its bytes, then flip the view to compare what an eavesdropper captures with what the endpoint decrypts.</p>
+  <div class="prog"><progress id="prog" max="21" value="0" aria-labelledby="progl"></progress><span id="progl"></span></div>
+</header>
+
+<main id="main" class="wrap">
+  <nav aria-label="Sections"><div class="views" id="views"></div></nav>
+
+  <div id="v-lessons">
+    <p class="blurb" id="blurb"></p>
+    <div class="tabs" role="tablist" aria-label="Lessons in this section" id="tabs"></div>
+
+    <section class="panel" id="lesson" role="tabpanel" tabindex="-1">
+      <p class="intro" id="intro"></p>
+      <details class="goals"><summary>Learning objectives</summary><ul id="goals"></ul></details>
+      <div class="stage" id="stage" aria-hidden="true"></div>
+      <div class="controls">
+        <button class="btn" id="prev" type="button">&larr; Back</button>
+        <button class="btn primary" id="play" type="button">Play</button>
+        <button class="btn" id="next" type="button">Next &rarr;</button>
+        <button class="btn" id="printb" type="button">Print summary</button>
+        <span class="count" id="count"></span>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="panel" aria-labelledby="h-steps">
+        <h2 id="h-steps">Exchange</h2>
+        <ol class="steps" id="steps"></ol>
+      </section>
+      <section class="panel" aria-labelledby="h-pkt">
+        <h2 id="h-pkt"></h2>
+        <p class="say" id="say" aria-live="polite"></p>
+        <ul class="stack" id="stack" aria-label="Encapsulation"></ul>
+        <div class="meta">
+          <div class="view" role="group" aria-label="Packet view">
+            <button type="button" id="v-wire" aria-pressed="true">On the wire</button>
+            <button type="button" id="v-dec" aria-pressed="false">Decrypted</button>
+          </div>
+          <span class="size" id="size"></span>
+        </div>
+        <div class="hex" id="hex" aria-label="Packet bytes in hexadecimal"></div>
+        <ol class="fields" id="fields" aria-label="Decoded fields"></ol>
+        <p class="note">Layouts follow the RFCs and IEEE standards. Values are invented for teaching, long fields are shortened (+N), and some optional fields are trimmed.</p>
+      </section>
+    </div>
+
+    <section class="panel below" aria-labelledby="h-quiz">
+      <h2 id="h-quiz">Check yourself</h2>
+      <div id="quiz"></div>
+    </section>
+  </div>
+
+  <section class="panel below" id="v-gloss" aria-labelledby="h-gloss" hidden>
+    <h2 id="h-gloss">Glossary</h2>
+    <div class="search"><label for="gq">Filter terms</label><input id="gq" type="search" autocomplete="off"></div>
+    <p class="note" id="gcount" aria-live="polite"></p>
+    <dl class="gloss" id="gloss"></dl>
+  </section>
+
+  <section class="panel below" id="v-final" aria-labelledby="h-final" hidden>
+    <h2 id="h-final">Final quiz</h2>
+    <p id="fintro">Ten questions drawn at random from all 21 lessons. You get a score and a list of lessons to revisit.</p>
+    <p class="note" id="fbest"></p>
+    <div class="row"><button class="btn primary" id="fstart" type="button">Start quiz</button></div>
+    <form id="fform" hidden>
+      <div id="fqs"></div>
+      <div class="row"><button class="btn primary" id="fsubmit" type="submit">Submit answers</button></div>
+    </form>
+    <div id="fresult" aria-live="polite"></div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>Built for networking and cybersecurity courses &middot; Brookdale Community College &middot; 2026. Concept inspired by Dilum Sanjaya's Protocol Explorer; all code, design and content here are original.</p>
+</footer>
+<div id="print"></div>
+
+<script>
+(function(){
+'use strict';
+/*DATA*/
+// field: [name, bytes, decoded value, explanation, 'e' if encrypted on the wire]
+// bytes: hex tokens, optional trailing "+N" for N more bytes not shown, or "s:text" for ASCII
+var STA='3c 22 fb 4a 91 07', AP='9c 53 22 0e a4 10';
+function dot11(da,sa){return [
+  ['Frame control','b0 00','Management / Authentication','Type 0 (management), subtype 11 (authentication). Sent before any keys exist, so it is in the clear.'],
+  ['Duration','3a 01','314 µs','How long other stations should stay off the air.'],
+  ['Destination MAC',da,da.replace(/ /g,':'),'Receiver of this frame.'],
+  ['Source MAC',sa,sa.replace(/ /g,':'),'Transmitter of this frame.'],
+  ['BSSID',AP,AP.replace(/ /g,':'),'Identifies the access point’s network.'],
+  ['Sequence control','10 00','seq 1, fragment 0','Lets the receiver drop duplicate frames.']];}
+function saeCommit(da,sa,sc,el){return dot11(da,sa).concat([
+  ['Auth algorithm','03 00','3 = SAE','Simultaneous Authentication of Equals, the WPA3-Personal handshake (Dragonfly).'],
+  ['Auth sequence','01 00','1 = Commit','Both sides send a Commit; neither is “client” or “server”.'],
+  ['Status','00 00','Success',''],
+  ['Finite cyclic group','13 00','Group 19 (NIST P-256)','The elliptic curve both sides will do the math on.'],
+  ['Scalar',sc+' +28','32 bytes','A blinded value derived from two fresh random numbers. Reveals nothing about the password.'],
+  ['Element (x, y)',el+' +60','64 bytes: a point on P-256','Derived from the password-based secret element. An attacker who records this still has to interact with a live peer for every password guess, which is what defeats offline dictionary attacks.']]);}
+function saeConfirm(da,sa,cf){return dot11(da,sa).concat([
+  ['Auth algorithm','03 00','3 = SAE',''],
+  ['Auth sequence','02 00','2 = Confirm','Proves the sender derived the same key.'],
+  ['Status','00 00','Success',''],
+  ['Send-Confirm','01 00','1','Anti-replay counter.'],
+  ['Confirm',cf+' +28','32-byte HMAC-SHA-256','A keyed hash over both scalars and elements. Only someone who knew the password could compute it. The resulting PMK is unique to this session, giving forward secrecy.']]);}
+function eapolKey(len,info,infoTxt,infoWhy,nonceName,nonce,mic,micTxt,kdLen,kd){return [
+  ['EAPOL version','02','802.1X-2004',''],
+  ['EAPOL type','03','Key','EAPOL-Key frames carry the 4-way handshake.'],
+  ['Body length',len[0],len[1],''],
+  ['Descriptor type','02','RSN key descriptor',''],
+  ['Key information',info,infoTxt,infoWhy],
+  ['Key length','00 10','16 (CCMP-128)',''],
+  ['Replay counter','00 00 00 00 00 00 00 01','1','Increments so old handshake frames cannot be replayed.'],
+  [nonceName,nonce+' +28','32 random bytes','Each side contributes a nonce. PTK = PRF(PMK, ANonce, SNonce, both MACs).'],
+  ['Key IV','00 00 00 00 +12','zero','Unused with modern ciphers.'],
+  ['Key RSC','00 00 00 00 +4','0',''],
+  ['Reserved','00 00 00 00 +4','',''],
+  ['Key MIC',mic+' +12',micTxt,'Integrity check computed with the KCK half of the PTK.'],
+  ['Key data length',kdLen[0],kdLen[1],'']].concat(kd);}
+function ikeHdr(spir,np,npTxt,ex,exTxt,fl,flTxt,mid,len,lenTxt){return [
+  ['Initiator SPI','c4 71 0e 9a 55 b3 20 6d','IKE SA identifier (initiator)','Random 8-byte handle for this IKE security association.'],
+  ['Responder SPI',spir,spir==='00 00 00 00 00 00 00 00'?'zero: not yet assigned':'IKE SA identifier (responder)',''],
+  ['Next payload',np,npTxt,'IKE messages are a chain of payloads; each names the type of the next.'],
+  ['Version','20','IKEv2 (2.0)',''],
+  ['Exchange type',ex,exTxt,''],
+  ['Flags',fl,flTxt,''],
+  ['Message ID',mid,'request/response pair '+parseInt(mid.slice(-2),16),'Matches a response to its request and blocks replays.'],
+  ['Length',len,lenTxt,'']];}
+function ikeInit(spir,fl,flTxt,key,nonce,resp){return ikeHdr(spir,'21','33 = Security Association','22','34 = IKE_SA_INIT',fl,flTxt,'00 00 00 00','00 00 00 90','144 bytes').concat([
+  ['SA payload header','22 00 00 28','next = KE (34), 40 bytes',''],
+  ['Proposal','00 00 00 24 01 01 00 03','#1, protocol IKE, 3 transforms',resp?'The responder returns the single proposal it picked.':'The initiator offers cipher combinations.'],
+  ['Transform: ENCR','03 00 00 0c 01 00 00 14 80 0e 01 00','AES-GCM-16, 256-bit key','Authenticated encryption for the IKE SA itself.'],
+  ['Transform: PRF','03 00 00 08 02 00 00 05','HMAC-SHA2-256','Used to derive all keys (SKEYSEED).'],
+  ['Transform: DH','00 00 00 08 04 00 00 1f','Group 31 (Curve25519)',''],
+  ['KE payload header','28 00 00 28 00 1f 00 00','next = Nonce (40), group 31',''],
+  ['Key exchange data',key+' +24','32-byte Diffie-Hellman public value','Sent in the clear. Safe, because the shared secret cannot be computed from the two public values alone.'],
+  ['Nonce payload header','00 00 00 24','last payload, 36 bytes',''],
+  ['Nonce',nonce+' +24','32 random bytes','Freshness input to key derivation.']]);}
+function wgHead(t,txt){return ['Message type',t+' 00 00 00',txt,'One type byte plus three reserved zero bytes. WireGuard has no version or cipher negotiation at all.'];}
+function dnsHdr(id,flags,ftxt,fwhy,an,ar){return [
+  ['Transaction ID',id,'0x'+id.replace(' ',''),'Matches the reply to the query.'],
+  ['Flags',flags,ftxt,fwhy],
+  ['Questions','00 01','1',''],
+  ['Answer RRs','00 '+an,String(parseInt(an,16)),''],
+  ['Authority RRs','00 00','0',''],
+  ['Additional RRs','00 '+ar,String(parseInt(ar,16)),ar==='01'?'The EDNS(0) OPT pseudo-record.':'']];}
+function qname(type,txt){return [
+  ['Query name','07 65 78 61 6d 70 6c 65 03 63 6f 6d 00','example.com.','Length-prefixed labels: 7 “example”, 3 “com”, 0 for the root.'],
+  ['Query type',type,txt,''],
+  ['Query class','00 01','IN (Internet)','']];}
+var OPT=['EDNS OPT record','00 00 29 04 d0 00 00 80 00 00 00','UDP size 1232, DO = 1','The DO (“DNSSEC OK”) bit, 0x8000 in the flags word, asks the server to include signatures.'];
+var RRH=function(type,txt,ttl,len,ltxt){return ['RR header','c0 0c '+type+' 00 01 '+ttl+' '+len,txt+', '+ltxt,'c0 0c is a compression pointer back to the name at offset 12.'];};
+
+var P=[
+{id:'tls',name:'TLS 1.3',nodes:['Browser','Web server'],icons:['pc','server'],
+ intro:'<strong>TLS 1.3</strong> finishes its handshake in one round trip. Only the two hello messages travel in the clear; everything after is encrypted, including the server’s certificate.',
+ steps:[
+ {from:0,to:1,title:'ClientHello',stack:['TCP 443','TLS record','Handshake'],
+  say:'The browser proposes cipher suites and, without waiting, sends an ephemeral X25519 public key. The server name is visible to anyone on the path.',
+  f:[['Record type','16','22 = Handshake',''],
+   ['Legacy record version','03 01','TLS 1.0','Frozen at an old value so middleboxes do not choke. The real version is negotiated in an extension.'],
+   ['Record length','00 ac','172 bytes',''],
+   ['Handshake type','01','ClientHello',''],
+   ['Handshake length','00 00 a8','168 bytes',''],
+   ['Legacy version','03 03','TLS 1.2','Also frozen. See supported_versions below.'],
+   ['Client random','8f 2c 51 0a e4 77 b9 03 +24','32 random bytes','Mixed into the key schedule so every session has unique keys.'],
+   ['Legacy session ID','20 3d a1 7e 09 +28','32 bytes','Unused in 1.3; sent so the handshake resembles TLS 1.2 resumption.'],
+   ['Cipher suites','00 06 13 01 13 02 13 03','AES_128_GCM_SHA256, AES_256_GCM_SHA384, CHACHA20_POLY1305_SHA256','TLS 1.3 only allows AEAD ciphers. Key exchange and signature are negotiated separately.'],
+   ['Compression','01 00','null','Compression was removed after the CRIME attack.'],
+   ['Extensions length','00 59','89 bytes',''],
+   ['Ext: server_name','00 00 00 10 00 0e 00 00 0b','SNI, host name of 11 bytes',''],
+   ['SNI host name','s:example.com','example.com','In cleartext. An eavesdropper learns which site you are visiting even though the content is encrypted. Encrypted Client Hello (ECH) is the fix.'],
+   ['Ext: supported_groups','00 0a 00 04 00 02 00 1d','x25519',''],
+   ['Ext: signature_algorithms','00 0d 00 08 00 06 04 03 08 04 08 07','ECDSA-P256-SHA256, RSA-PSS-SHA256, Ed25519','What the client will accept on the certificate signature.'],
+   ['Ext: supported_versions','00 2b 00 03 02 03 04','TLS 1.3 (0x0304)','Where the real version lives.'],
+   ['Ext: key_share','00 33 00 26 00 24 00 1d 00 20','x25519, 32-byte key',''],
+   ['Client public key','5a 91 c3 0e 6b f2 18 d4 +24','X25519 ephemeral public key','Sending this up front is what saves a round trip compared with TLS 1.2.']]},
+ {from:1,to:0,title:'ServerHello',stack:['TCP 443','TLS record','Handshake'],
+  say:'The server picks one suite and returns its own key share. Both sides can now compute the same handshake keys.',
+  f:[['Record header','16 03 03 00 7a','Handshake, 122 bytes',''],
+   ['Handshake header','02 00 00 76','ServerHello, 118 bytes',''],
+   ['Legacy version','03 03','TLS 1.2',''],
+   ['Server random','e1 06 4d 92 7a 3f c8 55 +24','32 random bytes','The last 8 bytes carry a special marker if the server was forced to downgrade.'],
+   ['Session ID echo','20 3d a1 7e 09 +28','same 32 bytes',''],
+   ['Cipher suite','13 01','TLS_AES_128_GCM_SHA256','The single suite chosen.'],
+   ['Compression','00','null',''],
+   ['Extensions length','00 2e','46 bytes',''],
+   ['Ext: supported_versions','00 2b 00 02 03 04','TLS 1.3',''],
+   ['Ext: key_share','00 33 00 24 00 1d 00 20','x25519, 32-byte key',''],
+   ['Server public key','27 d8 b0 41 f6 0c 93 ea +24','X25519 ephemeral public key','ECDHE with fresh keys on both sides gives forward secrecy: stealing the server’s long-term key later does not decrypt this session.']]},
+ {from:1,to:0,title:'Certificate + Finished',stack:['TCP 443','TLS record','Encrypted handshake'],
+  say:'Everything from here is encrypted with the handshake keys. On the wire it looks like application data; inside are the certificate, a signature proving key ownership, and Finished.',
+  f:[['Record header','17 03 03 03 bb','“Application Data”, 955 bytes','Encrypted handshake records are disguised as type 23. The true type is hidden inside.'],
+   ['EncryptedExtensions','08 00 00 02 00 00','no extensions','','e'],
+   ['Certificate header','0b 00 03 2e 00 00 03 2a 00 03 25','one certificate, 805 bytes','','e'],
+   ['Certificate (DER)','30 82 03 21 +801','X.509 for example.com','In TLS 1.2 this was visible to eavesdroppers. In 1.3 it is encrypted.','e'],
+   ['Certificate extensions','00 00','none','','e'],
+   ['CertificateVerify','0f 00 00 4a 04 03 00 46','ECDSA-P256-SHA256, 70-byte signature','','e'],
+   ['Signature','30 44 02 20 +66','signature over the handshake transcript','Proves the server holds the private key for the certificate, and binds it to this exact handshake.','e'],
+   ['Finished header','14 00 00 20','Finished, 32 bytes','','e'],
+   ['Verify data','c7 3e 90 1b +28','HMAC over the transcript','Detects any tampering with earlier messages, such as stripping strong ciphers.','e'],
+   ['Inner content type','16','22 = Handshake','The real record type.','e'],
+   ['AEAD tag','9d 41 e8 02 +12','16-byte AES-GCM tag','Any modified ciphertext fails this check and the connection is torn down.']]},
+ {from:0,to:1,title:'Client Finished',stack:['TCP 443','TLS record','Encrypted handshake'],
+  say:'The browser validates the certificate chain, checks the signature, and confirms the transcript. The handshake is done after one round trip.',
+  f:[['Record header','17 03 03 00 35','“Application Data”, 53 bytes',''],
+   ['Finished header','14 00 00 20','Finished, 32 bytes','','e'],
+   ['Verify data','4b a2 0d 76 +28','HMAC over the transcript','','e'],
+   ['Inner content type','16','22 = Handshake','','e'],
+   ['AEAD tag','e0 5f 13 a9 +12','16 bytes','']]},
+ {from:0,to:1,title:'Application data',stack:['TCP 443','TLS record','HTTP'],
+  say:'The HTTP request rides inside a record protected by new application keys.',
+  f:[['Record header','17 03 03 00 36','Application Data, 54 bytes','Record length is visible, so traffic analysis by size and timing is still possible.'],
+   ['Request line','s:GET / HTTP/1.1\r\n','GET / HTTP/1.1','','e'],
+   ['Host header','s:Host: example.com\r\n','Host: example.com','','e'],
+   ['End of headers','0d 0a','CRLF','','e'],
+   ['Inner content type','17','23 = Application Data','','e'],
+   ['AEAD tag','31 c8 7a 0f +12','16 bytes','']]}],
+ quiz:[
+ {q:'A passive eavesdropper captures a TLS 1.3 handshake. Which of these can they read?',a:['The server name in the ClientHello','The server’s certificate','The HTTP request path','The Finished verify data'],why:'SNI is sent in clear unless Encrypted Client Hello is used. The certificate has been encrypted since TLS 1.3.'},
+ {q:'Why does TLS 1.3 need only one round trip?',a:['The client sends its key share in the ClientHello','It skips certificate validation','It reuses the previous session’s keys','It uses UDP instead of TCP'],why:'The client guesses the group and sends a public key immediately, so the server can derive keys as soon as it replies.'}]},
+
+{id:'ssh',name:'SSH',nodes:['SSH client','SSH server'],icons:['pc','server'],
+ intro:'<strong>SSH</strong> negotiates algorithms in the clear, runs a signed Diffie-Hellman exchange, then encrypts everything, including the login.',
+ steps:[
+ {from:0,to:1,title:'Version string',stack:['TCP 22','SSH identification'],
+  say:'Both ends announce a version as a plain text line. This is why banner grabbing works.',
+  f:[['Protocol','s:SSH-2.0-','SSH-2.0-','Protocol version 2.0.'],
+   ['Software','s:OpenSSH_9.6','OpenSSH_9.6','Visible to any scanner. Hiding it adds little; patching matters.'],
+   ['Line ending','0d 0a','CR LF','']]},
+ {from:0,to:1,title:'KEXINIT',stack:['TCP 22','SSH binary packet'],
+  say:'Each side lists the algorithms it supports, in preference order. The first match on the client’s list wins.',
+  f:[['Packet length','00 00 00 bc','188 bytes',''],
+   ['Padding length','05','5 bytes',''],
+   ['Message','14','20 = SSH_MSG_KEXINIT',''],
+   ['Cookie','b7 20 4e 9c +12','16 random bytes',''],
+   ['kex_algorithms length','00 00 00 11','17',''],
+   ['kex_algorithms','s:curve25519-sha256','curve25519-sha256','Key exchange method.'],
+   ['host_key_algorithms length','00 00 00 0b','11',''],
+   ['host_key_algorithms','s:ssh-ed25519','ssh-ed25519','How the server will prove its identity.'],
+   ['encryption (c→s) length','00 00 00 1d','29',''],
+   ['encryption (c→s)','s:chacha20-poly1305@openssh.com','chacha20-poly1305@openssh.com',''],
+   ['Remaining name-lists','00 00 00 1d 63 68 61 63 +88','encryption s→c, MACs, compression, languages','Unauthenticated at this point. They are later hashed into the signed exchange hash, so tampering is detected.'],
+   ['Padding','00 00 00 00 00','5 bytes','']]},
+ {from:0,to:1,title:'ECDH init',stack:['TCP 22','SSH binary packet'],
+  say:'The client sends an ephemeral Curve25519 public key.',
+  f:[['Packet length','00 00 00 2c','44 bytes',''],
+   ['Padding length','06','6 bytes',''],
+   ['Message','1e','30 = SSH_MSG_KEX_ECDH_INIT',''],
+   ['Key length','00 00 00 20','32',''],
+   ['Client ephemeral key','a3 5c 0e 71 d9 48 +26','Curve25519 public key',''],
+   ['Padding','00 00 00 00 00 00','6 bytes','']]},
+ {from:1,to:0,title:'ECDH reply + host key',stack:['TCP 22','SSH binary packet'],
+  say:'The server returns its host key, its ephemeral key, and a signature over the whole exchange. This is the moment the client asks “are you sure you want to continue connecting?”',
+  f:[['Packet length','00 00 00 bc','188 bytes',''],
+   ['Padding length','08','8 bytes',''],
+   ['Message','1f','31 = SSH_MSG_KEX_ECDH_REPLY',''],
+   ['Host key blob length','00 00 00 33','51',''],
+   ['Host key type','00 00 00 0b 73 73 68 2d 65 64 32 35 35 31 39','ssh-ed25519',''],
+   ['Host public key','00 00 00 20 6e 14 f0 +29','32-byte Ed25519 key','The client compares its fingerprint with known_hosts. Trust on first use: if you accept blindly, an on-path attacker can impersonate the server.'],
+   ['Server ephemeral key','00 00 00 20 1d 87 c2 +29','Curve25519 public key',''],
+   ['Signature length','00 00 00 53','83',''],
+   ['Signature','00 00 00 0b 73 73 68 2d +75','Ed25519 over the exchange hash H','H covers both version strings, both KEXINITs and all public keys. A valid signature proves the server owns the host key and nothing was altered.'],
+   ['Padding','00 00 00 00 00 00 00 00','8 bytes','']]},
+ {from:0,to:1,title:'NEWKEYS',stack:['TCP 22','SSH binary packet'],
+  say:'Each side says “switch to the new keys now”. This is the last cleartext packet.',
+  f:[['Packet length','00 00 00 0c','12 bytes',''],
+   ['Padding length','0a','10 bytes',''],
+   ['Message','15','21 = SSH_MSG_NEWKEYS',''],
+   ['Padding','00 00 00 00 00 00 00 00 00 00','10 bytes','']]},
+ {from:0,to:1,title:'User authentication',stack:['TCP 22','SSH binary packet','Encrypted'],
+  say:'Only now does the user log in. The user name, method and public-key signature all travel inside the encrypted channel.',
+  f:[['Packet length','00 00 00 d0','208 bytes','With chacha20-poly1305, even the length is encrypted with a separate key.','e'],
+   ['Padding length','06','6 bytes','','e'],
+   ['Message','32','50 = SSH_MSG_USERAUTH_REQUEST','','e'],
+   ['User name','00 00 00 07 73 74 75 64 65 6e 74','student','','e'],
+   ['Service + method','00 00 00 0e 73 73 68 2d +23','ssh-connection, publickey','','e'],
+   ['Public key + signature','01 00 00 00 0b +153','Ed25519 key and signature','The signature covers the session ID, so it cannot be replayed on another connection. The private key never leaves the client.','e'],
+   ['Padding','00 00 +4','6 bytes','','e'],
+   ['Poly1305 tag','58 e2 0b 94 +12','16 bytes','']]}],
+ quiz:[
+ {q:'What protects an SSH client from an on-path attacker impersonating the server?',a:['Verifying the host key fingerprint','The version string exchange','The NEWKEYS message','Using a long password'],why:'The signed exchange hash only helps if the client already trusts the host key. Blindly accepting a new or changed key defeats it.'},
+ {q:'When is the user name sent in an SSH session?',a:['After NEWKEYS, inside the encrypted channel','In the version string','In KEXINIT','Before the TCP handshake'],why:'User authentication runs as a service on top of the encrypted transport.'}]},
+
+{id:'wpa3',name:'WPA3',nodes:['Laptop','Access point'],icons:['laptop','ap'],
+ intro:'<strong>WPA3-Personal</strong> replaces the WPA2 pre-shared key exchange with SAE. A captured handshake can no longer be taken home and cracked offline.',
+ steps:[
+ {from:0,to:1,title:'SAE Commit',stack:['802.11 management','Authentication','SAE'],
+  say:'The laptop commits to a password-derived value without revealing anything a dictionary attack could test.',
+  f:saeCommit(AP,STA,'7d 30 a9 c1','b2 4f 08 e6')},
+ {from:1,to:0,title:'SAE Commit',stack:['802.11 management','Authentication','SAE'],
+  say:'The access point sends its own Commit. Both sides now compute the same shared secret, but only if both know the password.',
+  f:saeCommit(STA,AP,'19 e4 5b 72','0c d7 a1 3e')},
+ {from:0,to:1,title:'SAE Confirm',stack:['802.11 management','Authentication','SAE'],
+  say:'The laptop proves it derived the right key.',
+  f:saeConfirm(AP,STA,'f4 28 9b 05')},
+ {from:1,to:0,title:'SAE Confirm',stack:['802.11 management','Authentication','SAE'],
+  say:'The access point proves the same. Both hold a fresh PMK that was never transmitted.',
+  f:saeConfirm(STA,AP,'63 c0 1e d8')},
+ {from:1,to:0,title:'4-way handshake: message 1',stack:['802.11 data','LLC/SNAP 0x888E','EAPOL-Key'],
+  say:'The familiar 4-way handshake now runs on top of the SAE key to derive per-session encryption keys.',
+  f:eapolKey(['00 75','117 bytes'],'00 88','Pairwise, ACK','No MIC yet: the laptop cannot compute the PTK until it has this nonce.','ANonce','8a 15 f3 6c','00 00 00 00','zero (not yet keyed)',['00 16','22 bytes'],[
+   ['PMKID KDE header','dd 14 00 0f ac 04','vendor element, PMKID',''],
+   ['PMKID','2e 91 b4 07 +12','16 bytes','Names which PMK to use. In WPA2-PSK this field enabled an offline attack; with SAE the PMK is not derived from the password alone, so it does not.']])},
+ {from:0,to:1,title:'4-way handshake: message 2',stack:['802.11 data','LLC/SNAP 0x888E','EAPOL-Key'],
+  say:'The laptop replies with its nonce and a MIC, proving it holds the PMK.',
+  f:eapolKey(['00 75','117 bytes'],'01 08','Pairwise, MIC','','SNonce','d3 4a 77 b0','a9 0e 52 c6','16-byte MIC',['00 16','22 bytes'],[
+   ['RSN element','30 14 01 00 00 0f ac 04 01 00 00 0f ac 04 01 00 00 0f ac 08 c0 00','CCMP, AKM 8 (SAE), MFP required','Repeats the security settings chosen at association so a downgrade is detected. WPA3 requires management frame protection.']])},
+ {from:1,to:0,title:'4-way handshake: message 3',stack:['802.11 data','LLC/SNAP 0x888E','EAPOL-Key'],
+  say:'The access point delivers the group key, wrapped so only this laptop can read it.',
+  f:eapolKey(['00 97','151 bytes'],'13 c8','Pairwise, Install, ACK, MIC, Secure, Encrypted','','ANonce','8a 15 f3 6c','5c e7 31 0a','16-byte MIC',['00 38','56 bytes'],[
+   ['Key data','30 14 01 00 00 0f ac 04 +48','RSN element + group key (GTK)','AES key-wrapped with the KEK. The GTK decrypts broadcast and multicast traffic.','e']])},
+ {from:0,to:1,title:'4-way handshake: message 4',stack:['802.11 data','LLC/SNAP 0x888E','EAPOL-Key'],
+  say:'The laptop acknowledges. Both install the keys and data frames are encrypted with AES-CCMP from here on.',
+  f:eapolKey(['00 5f','95 bytes'],'03 08','Pairwise, MIC, Secure','','Nonce','00 00 00 00','b0 6d 94 2f','16-byte MIC',['00 00','0 bytes'],[])}],
+ quiz:[
+ {q:'An attacker records a full WPA3-SAE handshake. What can they do with it offline?',a:['Nothing useful: each password guess needs a live exchange','Run a dictionary attack against the capture','Read the PMK from the Confirm frame','Decrypt the session if the password is short'],why:'SAE is a password-authenticated key exchange. Captured Commit and Confirm frames cannot be used to test guesses offline.'},
+ {q:'Which key encrypts broadcast traffic for all stations?',a:['GTK','PMK','KCK','SAE scalar'],why:'The group temporal key is delivered encrypted in message 3.'}]},
+
+{id:'dot1x',name:'802.1X / RADIUS',nodes:['Supplicant','Switch','RADIUS server'],icons:['pc','switch','server'],
+ intro:'<strong>802.1X</strong> keeps a port closed until the device authenticates. The switch relays EAP between the device and a <strong>RADIUS</strong> server and never sees the credentials itself.',
+ steps:[
+ {from:0,to:1,title:'EAPOL-Start',stack:['Ethernet','EAPOL'],
+  say:'The device plugs in and announces it wants to authenticate. The port passes nothing but EAPOL.',
+  f:[['Destination MAC','01 80 c2 00 00 03','PAE group address','A reserved multicast address that bridges never forward, so this stays on the link.'],
+   ['Source MAC','3c 22 fb 4a 91 07','3c:22:fb:4a:91:07',''],
+   ['EtherType','88 8e','EAP over LAN',''],
+   ['EAPOL version','02','802.1X-2004',''],
+   ['EAPOL type','01','Start',''],
+   ['Body length','00 00','0','']]},
+ {from:1,to:0,title:'EAP-Request / Identity',stack:['Ethernet','EAPOL','EAP'],
+  say:'The switch asks “who are you?”',
+  f:[['EtherType','88 8e','EAP over LAN',''],
+   ['EAPOL header','02 00 00 05','EAP packet, 5 bytes',''],
+   ['EAP code','01','Request',''],
+   ['EAP identifier','01','1',''],
+   ['EAP length','00 05','5',''],
+   ['EAP type','01','Identity','']]},
+ {from:0,to:1,title:'EAP-Response / Identity',stack:['Ethernet','EAPOL','EAP'],
+  say:'The device answers with an outer identity. It is sent in the clear, which is why many sites configure “anonymous” here.',
+  f:[['EtherType','88 8e','EAP over LAN',''],
+   ['EAPOL header','02 00 00 16','EAP packet, 22 bytes',''],
+   ['EAP header','02 01 00 16 01','Response, id 1, 22 bytes, Identity',''],
+   ['Identity','s:alice@example.org','alice@example.org','Visible to anyone tapping the link. The realm after @ routes the request to the right RADIUS server.']]},
+ {from:1,to:2,title:'RADIUS Access-Request',stack:['UDP 1812','RADIUS','EAP'],
+  say:'The switch wraps the EAP message in RADIUS and forwards it. The switch is only a relay.',
+  f:[['Code','01','Access-Request',''],
+   ['Identifier','2a','42',''],
+   ['Length','00 5d','93 bytes',''],
+   ['Request authenticator','6f 13 a8 e0 +12','16 random bytes',''],
+   ['User-Name','01 13 61 6c 69 63 65 +12','alice@example.org','Attribute 1.'],
+   ['NAS-IP-Address','04 06 c0 a8 01 02','192.168.1.2','Which switch is asking.'],
+   ['NAS-Port','05 06 00 00 00 0c','12','Which physical port.'],
+   ['EAP-Message','4f 18 02 01 00 16 01 +17','the EAP response, verbatim','Attribute 79.'],
+   ['Message-Authenticator','50 12 9b 44 d1 +13','HMAC-MD5 over the packet','Keyed with the shared secret. Required to stop forged requests (the 2024 Blast-RADIUS attack exploited packets without it).']]},
+ {from:2,to:1,title:'RADIUS Access-Challenge',stack:['UDP 1812','RADIUS','EAP'],
+  say:'The server starts PEAP. Several challenge and request rounds follow, building a TLS tunnel from the device to the server through the switch. The password is checked inside that tunnel.',
+  f:[['Code','0b','Access-Challenge',''],
+   ['Identifier','2a','42',''],
+   ['Length','00 38','56 bytes',''],
+   ['Response authenticator','c2 70 3d 19 +12','MD5 over packet + shared secret',''],
+   ['EAP-Message','4f 08 01 02 00 06 19 20','EAP-Request, type 25 (PEAP), Start flag',''],
+   ['State','18 0a 7e 51 0c a3 +4','opaque session handle','The switch echoes it so the server can tie the rounds together.'],
+   ['Message-Authenticator','50 12 3a e8 07 +13','HMAC-MD5','']]},
+ {from:2,to:1,title:'RADIUS Access-Accept',stack:['UDP 1812','RADIUS','EAP'],
+  say:'Credentials check out. The server tells the switch to open the port, which VLAN to use, and hands over key material.',
+  f:[['Code','02','Access-Accept',''],
+   ['Identifier','2f','47',''],
+   ['Length','00 6a','106 bytes',''],
+   ['Response authenticator','05 d9 b6 42 +12','MD5 over packet + shared secret',''],
+   ['EAP-Message','4f 06 03 09 00 04','EAP-Success',''],
+   ['Tunnel-Private-Group-ID','51 04 32 30','VLAN “20”','Dynamic VLAN assignment: the same wall jack can place staff and students on different networks.'],
+   ['MS-MPPE-Recv-Key','1a 3a 00 00 01 37 11 34 +50','Microsoft vendor attribute, salted and encrypted key','Key material for the switch or access point. Its protection rests on the RADIUS shared secret and MD5, which is why RADIUS over TLS (RadSec) is recommended across untrusted networks.'],
+   ['Message-Authenticator','50 12 e4 0b 77 +13','HMAC-MD5','']]},
+ {from:1,to:0,title:'EAP-Success',stack:['Ethernet','EAPOL','EAP'],
+  say:'The switch relays the result and moves the port to the authorized state.',
+  f:[['EtherType','88 8e','EAP over LAN',''],
+   ['EAPOL header','02 00 00 04','EAP packet, 4 bytes',''],
+   ['EAP code','03','Success',''],
+   ['EAP identifier','09','9',''],
+   ['EAP length','00 04','4','']]}],
+ quiz:[
+ {q:'In 802.1X, what does the switch (authenticator) do with the user’s credentials?',a:['Relays EAP to the RADIUS server without seeing them','Checks them against a local database','Decrypts the PEAP tunnel and re-encrypts it','Stores them for the next login'],why:'With PEAP or EAP-TLS the tunnel ends at the RADIUS server. The switch only forwards EAP.'},
+ {q:'Which RADIUS attribute lets one wall jack serve different VLANs per user?',a:['Tunnel-Private-Group-ID','NAS-Port','State','User-Name'],why:'It is returned in Access-Accept, alongside Tunnel-Type and Tunnel-Medium-Type.'}]},
+
+{id:'ipsec',name:'IPsec',nodes:['Gateway A','Gateway B'],icons:['router','router'],
+ intro:'<strong>IPsec</strong> works in two phases: <strong>IKEv2</strong> authenticates the gateways and agrees keys, then <strong>ESP</strong> carries the encrypted traffic.',
+ steps:[
+ {from:0,to:1,title:'IKE_SA_INIT request',stack:['UDP 500','IKEv2'],
+  say:'Gateway A proposes algorithms and sends a Diffie-Hellman value and a nonce. Nothing is authenticated yet.',
+  f:ikeInit('00 00 00 00 00 00 00 00','08','Initiator, request','3b a0 6e f2 91 0c d5 47','e8 15 7c 03 a6 b9 42 d0',false)},
+ {from:1,to:0,title:'IKE_SA_INIT response',stack:['UDP 500','IKEv2'],
+  say:'Gateway B selects a proposal and returns its own values. Both derive SKEYSEED and the IKE SA keys.',
+  f:ikeInit('7e 02 b9 d4 16 a8 f3 5c','20','Response','90 4d e7 1a c3 68 0b f5','2c f1 86 5e 0d 93 b7 4a',true)},
+ {from:0,to:1,title:'IKE_AUTH request',stack:['UDP 500','IKEv2','Encrypted (SK)'],
+  say:'Now encrypted, gateway A proves its identity and proposes the first child SA and the traffic it should protect.',
+  f:ikeHdr('7e 02 b9 d4 16 a8 f3 5c','2e','46 = Encrypted (SK)','23','35 = IKE_AUTH','08','Initiator, request','00 00 00 01','00 00 00 e4','228 bytes').concat([
+   ['SK payload header','23 00 00 c8','first inner payload = IDi (35), 200 bytes',''],
+   ['IV','00 00 00 00 00 00 00 01','8 bytes','AES-GCM nonce input. Must never repeat under one key.'],
+   ['IDi','27 00 00 14 02 00 00 00 +12','FQDN gw-a.example.net','The gateway’s identity is hidden from eavesdroppers.','e'],
+   ['AUTH','21 00 00 28 02 00 00 00 +32','shared-key MIC over the first message','Proves knowledge of the pre-shared key (or a certificate’s private key) and binds it to the IKE_SA_INIT exchange, defeating an on-path attacker.','e'],
+   ['SA (child)','2c 00 00 24 00 00 00 20 01 03 04 02 +24','ESP, AES-GCM-256, new SPI','Proposes the ESP SA that will carry data.','e'],
+   ['Traffic selectors','2d 00 00 18 +72','10.1.0.0/16 ↔ 10.2.0.0/16','Which packets go into the tunnel, and padding.','e'],
+   ['ICV','b1 5e 07 c9 +12','16-byte AES-GCM tag','']])},
+ {from:1,to:0,title:'IKE_AUTH response',stack:['UDP 500','IKEv2','Encrypted (SK)'],
+  say:'Gateway B authenticates itself and accepts. The tunnel is up after two round trips.',
+  f:ikeHdr('7e 02 b9 d4 16 a8 f3 5c','2e','46 = Encrypted (SK)','23','35 = IKE_AUTH','20','Response','00 00 00 01','00 00 00 e4','228 bytes').concat([
+   ['SK payload header','24 00 00 c8','first inner payload = IDr (36), 200 bytes',''],
+   ['IV','00 00 00 00 00 00 00 01','8 bytes',''],
+   ['IDr, AUTH, SA, TSi, TSr','27 00 00 14 02 00 00 00 +164','responder identity, proof, chosen child SA','','e'],
+   ['ICV','4a d2 80 6f +12','16-byte tag','']])},
+ {from:0,to:1,title:'ESP data packet',stack:['IPv4, protocol 50','ESP (tunnel mode)'],
+  say:'A host behind gateway A pings a host behind B. The whole original IP packet is encrypted and given a new outer header.',
+  f:[['SPI','c9 0a 44 e1','Security Parameter Index','Tells the receiver which SA, and therefore which key, to use. Sent in clear.'],
+   ['Sequence number','00 00 00 01','1','Anti-replay: the receiver keeps a sliding window and drops duplicates.'],
+   ['IV','00 00 00 00 00 00 00 01','8 bytes',''],
+   ['Inner IP header','45 00 00 54 3e 1c 40 00 40 01 +10','10.1.0.5 → 10.2.0.9, ICMP','The real addresses. An eavesdropper sees only the two gateway addresses.','e'],
+   ['Inner payload','08 00 f7 4b 00 01 00 01 +56','ICMP echo request','','e'],
+   ['ESP trailer','01 02 02 04','2 bytes padding, next header 4 (IPv4)','Next header 4 means an entire IP packet is inside: tunnel mode.','e'],
+   ['ICV','7c 39 e0 b5 +12','16-byte AES-GCM tag','Authenticates the SPI, sequence number and ciphertext.']]}],
+ quiz:[
+ {q:'In ESP tunnel mode, what does an eavesdropper between the gateways learn?',a:['The gateway addresses, SPI and packet sizes','The internal source and destination hosts','The inner protocol and ports','Nothing at all'],why:'The inner IP header is encrypted, but outer addresses, SPI, sequence number and length are visible.'},
+ {q:'Which exchange authenticates the IKEv2 peers?',a:['IKE_AUTH','IKE_SA_INIT','The first ESP packet','CREATE_CHILD_SA'],why:'IKE_SA_INIT only agrees keys. Identities and proof are sent, encrypted, in IKE_AUTH.'}]},
+
+{id:'wg',name:'WireGuard',nodes:['Peer A','Peer B'],icons:['laptop','server'],
+ intro:'<strong>WireGuard</strong> has four message types, one fixed cipher set, and a one-round-trip handshake built on the Noise IK pattern. Peers are identified only by public keys.',
+ steps:[
+ {from:0,to:1,title:'Handshake initiation',stack:['UDP 51820','WireGuard'],
+  say:'Peer A already knows B’s public key from its config. One 148-byte message carries A’s ephemeral key and its encrypted identity.',
+  f:[wgHead('01','1 = Handshake Initiation'),
+   ['Sender index','a7 3f 00 1c','A’s session handle','A random 32-bit label B will use when replying.'],
+   ['Ephemeral public key','e2 51 9d 07 b8 3a +26','32-byte Curve25519 key','Fresh for every handshake, which gives forward secrecy.'],
+   ['Static public key','5f 08 c4 a1 +28','A’s long-term public key','Encrypted, so observers cannot tell which peer is connecting.','e'],
+   ['Poly1305 tag','1b 96 e0 43 +12','16 bytes',''],
+   ['Timestamp','40 00 00 00 69 17 c2 80 +4','TAI64N time','B rejects any timestamp not newer than the last one from this peer, which blocks replayed initiations.','e'],
+   ['Poly1305 tag','d0 72 3c 8f +12','16 bytes',''],
+   ['mac1','84 2b f6 19 +12','keyed hash using B’s public key','Without a valid mac1 the receiver stays completely silent. A port scan cannot even tell that WireGuard is listening.'],
+   ['mac2','00 00 00 00 +12','zero unless under load','Cookie-based DoS protection.']]},
+ {from:1,to:0,title:'Handshake response',stack:['UDP 51820','WireGuard'],
+  say:'Peer B answers with its own ephemeral key. Both now derive the transport keys.',
+  f:[wgHead('02','2 = Handshake Response'),
+   ['Sender index','0e d4 71 b2','B’s session handle',''],
+   ['Receiver index','a7 3f 00 1c','A’s handle, echoed',''],
+   ['Ephemeral public key','3c a9 14 f0 6d 82 +26','32-byte Curve25519 key',''],
+   ['Encrypted empty','97 05 be 2a +12','16-byte tag over nothing','Proves B could derive the key, so B must hold its static private key.'],
+   ['mac1','f3 60 1d a8 +12','keyed hash using A’s public key',''],
+   ['mac2','00 00 00 00 +12','zero','']]},
+ {from:0,to:1,title:'Transport data',stack:['UDP 51820','WireGuard','Inner IP'],
+  say:'Data flows. A must send first to confirm the handshake. The header is 16 bytes and everything else is ChaCha20-Poly1305 ciphertext.',
+  f:[wgHead('04','4 = Transport Data'),
+   ['Receiver index','0e d4 71 b2','B’s session handle',''],
+   ['Counter','00 00 00 00 00 00 00 00','0 (little-endian)','Doubles as the AEAD nonce and the anti-replay counter.'],
+   ['Inner IP header','45 00 00 54 91 0a 40 00 40 01 +10','10.8.0.2 → 10.8.0.1, ICMP','The receiver also checks the inner source address against the peer’s AllowedIPs (“cryptokey routing”).','e'],
+   ['Inner payload','08 00 3d c1 00 02 00 01 +56','ICMP echo request, padded to 16','','e'],
+   ['Poly1305 tag','6a f1 08 d5 +12','16 bytes','']]},
+ {from:1,to:0,title:'Keepalive',stack:['UDP 51820','WireGuard'],
+  say:'With nothing to send, a peer may emit an empty transport message to keep NAT mappings alive. Otherwise WireGuard is silent.',
+  f:[wgHead('04','4 = Transport Data'),
+   ['Receiver index','a7 3f 00 1c','A’s session handle',''],
+   ['Counter','00 00 00 00 00 00 00 00','0',''],
+   ['Poly1305 tag','c5 2e 97 40 +12','16 bytes, zero-length payload','A 32-byte packet: header plus tag, with nothing encrypted.']]}],
+ quiz:[
+ {q:'Why does a WireGuard port look closed to a scanner?',a:['Packets without a valid mac1 get no reply','It listens on a random port each time','It uses TCP stealth mode','The handshake is encrypted with TLS'],why:'Computing mac1 requires the responder’s public key, so unauthenticated probes are dropped silently.'},
+ {q:'How does WireGuard choose its ciphers?',a:['It does not negotiate: one fixed set per protocol version','The initiator proposes a list','The responder picks from a registry','They are set per packet'],why:'No negotiation means no downgrade attacks and a much smaller code base.'}]},
+
+{id:'dnssec',name:'DNSSEC',nodes:['Client','Resolver','Zone NS','.com NS'],icons:['pc','server','server','server'],
+ intro:'<strong>DNSSEC</strong> signs DNS data; it does not encrypt it. A validating resolver follows a chain of signatures from the answer up to the root trust anchor.',
+ steps:[
+ {from:1,to:2,title:'Query: A with DO bit',stack:['UDP 53','DNS'],
+  say:'The resolver asks for the address and sets the DO bit to request signatures.',
+  f:dnsHdr('4b 1d','00 00','standard query','Recursion not requested: the resolver is talking to an authoritative server.','00','01').concat(qname('00 01','A (IPv4 address)'),[OPT])},
+ {from:2,to:1,title:'Answer: A + RRSIG',stack:['UDP 53','DNS'],
+  say:'The answer arrives with a signature over the A record set. Both are readable by anyone.',
+  f:dnsHdr('4b 1d','84 00','response, authoritative','','02','01').concat(qname('00 01','A'),[
+   RRH('00 01','A','00 00 0e 10','00 04','TTL 3600, 4 bytes'),
+   ['Address','c0 00 02 0a','192.0.2.10','The data being protected.'],
+   RRH('00 2e','RRSIG','00 00 0e 10','00 5f','TTL 3600, 95 bytes'),
+   ['Type covered','00 01','A','This signature covers the A record set.'],
+   ['Algorithm','0d','13 = ECDSA P-256 with SHA-256',''],
+   ['Labels','02','2','Used to detect answers synthesized from wildcards.'],
+   ['Original TTL','00 00 0e 10','3600',''],
+   ['Signature expiration','6b 0e 0e 00','2026-12-01 00:00 UTC','Signatures have lifetimes. A zone whose signatures expire goes dark for validating resolvers.'],
+   ['Signature inception','6a f2 5e 80','2026-11-10 00:00 UTC',''],
+   ['Key tag','8d 2f','36143','Hints which DNSKEY made the signature.'],
+   ['Signer name','07 65 78 61 6d 70 6c 65 03 63 6f 6d 00','example.com.',''],
+   ['Signature','a4 19 7e c2 5b 03 +58','64-byte ECDSA signature','Made offline with the zone-signing key. The server does not need the private key to answer.'],
+   ['EDNS OPT record','00 00 29 04 d0 00 00 80 00 00 00','DO = 1','']])},
+ {from:1,to:2,title:'Query: DNSKEY',stack:['UDP 53','DNS'],
+  say:'To check the signature, the resolver fetches the zone’s public keys.',
+  f:dnsHdr('91 c0','00 00','standard query','','00','01').concat(qname('00 30','DNSKEY (48)'),[OPT])},
+ {from:2,to:1,title:'Answer: DNSKEY',stack:['UDP 53','DNS'],
+  say:'The zone publishes a zone-signing key (ZSK) and a key-signing key (KSK). The ZSK verifies the A signature; the KSK signs the key set.',
+  f:dnsHdr('91 c0','84 00','response, authoritative','','03','01').concat(qname('00 30','DNSKEY'),[
+   RRH('00 30','DNSKEY','00 00 0e 10','00 44','TTL 3600, 68 bytes'),
+   ['Flags','01 00','256 = zone key (ZSK)',''],
+   ['Protocol','03','3 (always)',''],
+   ['Algorithm','0d','13 = ECDSA P-256',''],
+   ['Public key','9f 30 c7 14 e8 +59','64 bytes','Key tag 36143. Verifies the RRSIG over the A records.'],
+   RRH('00 30','DNSKEY','00 00 0e 10','00 44','TTL 3600, 68 bytes'),
+   ['Flags','01 01','257 = zone key + secure entry point (KSK)','The parent zone vouches for this key.'],
+   ['Protocol + algorithm','03 0d','3, ECDSA P-256',''],
+   ['Public key','2a d5 08 b1 76 +59','64 bytes',''],
+   ['RRSIG over DNSKEY set','c0 0c 00 2e 00 01 +101','signed by the KSK',''],
+   ['EDNS OPT record','00 00 29 04 d0 00 00 80 00 00 00','DO = 1','']])},
+ {from:1,to:3,title:'Query: DS at the parent',stack:['UDP 53','DNS'],
+  say:'But why trust that KSK? The resolver asks the parent zone, .com, for a fingerprint of it.',
+  f:dnsHdr('e6 07','00 00','standard query','','00','01').concat(qname('00 2b','DS (43)'),[OPT])},
+ {from:3,to:1,title:'Answer: DS',stack:['UDP 53','DNS'],
+  say:'.com returns a hash of example.com’s KSK, signed with .com’s own key. The same check repeats up to the root, whose key the resolver already has.',
+  f:dnsHdr('e6 07','84 00','response, authoritative','','02','01').concat(qname('00 2b','DS'),[
+   RRH('00 2b','DS','00 01 51 80','00 24','TTL 86400, 36 bytes'),
+   ['Key tag','4f a1','20385','Identifies the child’s KSK.'],
+   ['Algorithm','0d','13 = ECDSA P-256',''],
+   ['Digest type','02','SHA-256',''],
+   ['Digest','b6 02 7d e9 41 +27','32-byte hash of the KSK','The link in the chain of trust between parent and child. Forgetting to update it during a key rollover breaks the whole zone.'],
+   ['RRSIG over DS','c0 0c 00 2e 00 01 +93','signed by .com’s ZSK',''],
+   ['EDNS OPT record','00 00 29 04 d0 00 00 80 00 00 00','DO = 1','']])},
+ {from:1,to:0,title:'Validated answer',stack:['UDP 53','DNS'],
+  say:'Every link checks out. The resolver sets the AD bit. If any signature had failed, the client would get SERVFAIL instead of a forged address.',
+  f:dnsHdr('13 a8','81 a0','response, RD, RA, AD','AD = Authenticated Data (0x0020). The client is trusting the resolver and the path to it, which is one reason to pair DNSSEC with DNS over TLS or HTTPS.','01','00').concat(qname('00 01','A'),[
+   RRH('00 01','A','00 00 0e 10','00 04','TTL 3600, 4 bytes'),
+   ['Address','c0 00 02 0a','192.0.2.10','Still cleartext. DNSSEC gives authenticity and integrity, not privacy.']])}],
+ quiz:[
+ {q:'What does DNSSEC protect?',a:['Authenticity and integrity of DNS answers','Confidentiality of DNS queries','The client’s IP address','Availability during a DDoS'],why:'Records are signed, not encrypted. Privacy needs DNS over TLS, HTTPS or QUIC.'},
+ {q:'Which record in the parent zone links to the child zone’s key?',a:['DS','RRSIG','A','OPT'],why:'The DS record holds a digest of the child’s key-signing key and is signed by the parent.'}]}
+];
+
+// ---------- shared helpers for the newer lessons ----------
+var PCM='3c 22 fb 4a 91 07', RTM='9c 53 22 0e a4 10', BADM='de ad be ef 00 66', BC='ff ff ff ff ff ff';
+var PCI='c0 a8 01 32', RTI='c0 a8 01 01', WEB='c0 00 02 0a', ZERO4='00 00 00 00';
+function m(x){return x.replace(/ /g,':');}
+function ipt(x){return x.split(' ').map(function(h){return parseInt(h,16);}).join('.');}
+function num(x){return parseInt(x.replace(/ /g,''),16);}
+function eth(d,s,t,dwhy,swhy){return [
+  ['Destination MAC',d,d===BC?'broadcast':m(d),dwhy||''],
+  ['Source MAC',s,m(s),swhy||''],
+  ['EtherType',t,t==='08 00'?'IPv4':t==='08 06'?'ARP':t,'Tells the receiver which protocol the frame carries.']];}
+function ip4(len,proto,s,d,swhy,dwhy){return [
+  ['Version, header length, DSCP','45 00','IPv4, 20-byte header',''],
+  ['Total length',len,num(len)+' bytes',''],
+  ['ID, flags, fragment offset','1c 46 40 00','Don’t Fragment set',''],
+  ['TTL','40','64','Decremented by every router. At zero the packet is dropped, which stops routing loops.'],
+  ['Protocol',proto,{'11':'17 = UDP','06':'6 = TCP','01':'1 = ICMP'}[proto],''],
+  ['Header checksum','b1 e6','illustrative',''],
+  ['Source IP',s,ipt(s),swhy||''],
+  ['Destination IP',d,ipt(d),dwhy||'']];}
+function udp(sp,dp,len,spwhy,dpwhy){return [
+  ['Source port',sp,String(num(sp)),spwhy||''],
+  ['Destination port',dp,String(num(dp)),dpwhy||''],
+  ['UDP length',len,num(len)+' bytes',''],
+  ['UDP checksum','7a 0c','illustrative','']];}
+function S(name,text,why,flag){var a=[name,'s:'+text+'\r\n',text,why||''];if(flag)a.push(flag);return a;}
+function dhcp(srv,ipLen,udpLen,yi,opts){
+  return (srv?eth(PCM,RTM,'08 00'):eth(BC,PCM,'08 00','Broadcast. The PC has no idea where a DHCP server is, so every device on the LAN receives this.'))
+  .concat(srv?ip4(ipLen,'11',RTI,PCI):ip4(ipLen,'11',ZERO4,'ff ff ff ff','The PC has no address yet, so it uses 0.0.0.0.','Limited broadcast. Routers never forward it, which is why other subnets need a DHCP relay.'))
+  .concat(srv?udp('00 43','00 44',udpLen):udp('00 44','00 43',udpLen,'68 = DHCP client','67 = DHCP server'))
+  .concat([
+  ['Op',srv?'02':'01',srv?'2 = reply':'1 = request',''],
+  ['Hardware type, length, hops','01 06 00','Ethernet, 6-byte MAC, 0 hops','Relay agents increment hops.'],
+  ['Transaction ID','3e 1d 7a 22','0x3e1d7a22','Chosen by the client. Ties the four messages together.'],
+  ['Seconds, flags','00 00 00 00','0 s, unicast reply accepted',''],
+  ['Client IP (ciaddr)',ZERO4,'0.0.0.0','Only filled in when renewing an existing lease.'],
+  ['Your IP (yiaddr)',yi,ipt(yi),srv?'The address the server is handing to the client.':''],
+  ['Server IP (siaddr)',srv?RTI:ZERO4,srv?ipt(RTI):'0.0.0.0',''],
+  ['Relay IP (giaddr)',ZERO4,'0.0.0.0','A relay agent writes its address here so the server knows which subnet to allocate from.'],
+  ['Client hardware address',PCM+' +10','MAC, padded to 16 bytes',''],
+  ['Server name + boot file','00 00 00 00 +188','192 bytes, unused','Left over from BOOTP. PXE network boot still uses them.'],
+  ['Magic cookie','63 82 53 63','DHCP','Marks the start of the options.']]).concat(opts);}
+var DHCP_SRV_OPTS=function(t,txt){return [
+  ['Option 53: message type','35 01 '+t,txt,''],
+  ['Option 54: server identifier','36 04 '+RTI,ipt(RTI),'Which server made this offer. There may be several.'],
+  ['Option 51: lease time','33 04 00 01 51 80','86400 s (24 hours)','The client tries to renew at half the lease time.'],
+  ['Option 1: subnet mask','01 04 ff ff ff 00','255.255.255.0',''],
+  ['Option 3: router','03 04 '+RTI,ipt(RTI),'The default gateway. Nothing authenticates this value: a rogue DHCP server can name itself and intercept all traffic. Switches defend with DHCP snooping.'],
+  ['Option 6: DNS server','06 04 '+RTI,ipt(RTI),'Also unauthenticated. A rogue server can point clients at a malicious resolver.'],
+  ['End','ff','end of options','']];};
+function arp(op,sha,spa,tha,tpa,shaWhy,flag){var r=[
+  ['Hardware type','00 01','Ethernet',''],
+  ['Protocol type','08 00','IPv4',''],
+  ['Address lengths','06 04','6-byte MAC, 4-byte IP',''],
+  ['Operation',op,op==='00 01'?'1 = request':'2 = reply',''],
+  ['Sender MAC',sha,m(sha),shaWhy||''],
+  ['Sender IP',spa,ipt(spa),''],
+  ['Target MAC',tha,tha==='00 00 00 00 00 00'?'unknown (that is the question)':m(tha),''],
+  ['Target IP',tpa,ipt(tpa),'']];
+  if(flag){r[4].push(flag);} return r;}
+var ICMP=[
+  ['ICMP type, code','08 00','echo request',''],
+  ['ICMP checksum','f7 4b','illustrative',''],
+  ['Identifier, sequence','00 01 00 01','id 1, seq 1',''],
+  ['Data','61 62 63 64 +52','56 bytes','']];
+function tcp(c2s,seq,seqTxt,ack,ackTxt,fl,flTxt,flWhy,opts,pay){return [
+  ['Source port',c2s?'c7 3a':'00 50',c2s?'51002 (ephemeral)':'80 (HTTP)',''],
+  ['Destination port',c2s?'00 50':'c7 3a',c2s?'80 (HTTP)':'51002',''],
+  ['Sequence number',seq,seqTxt,'Numbers the first byte of data in this segment.'],
+  ['Acknowledgment number',ack,ackTxt,'The next byte this side expects from the other.'],
+  ['Header length + flags',fl,flTxt,flWhy||''],
+  ['Window','fa f0','64240','Flow control: how many more bytes this side is ready to receive.'],
+  ['Checksum','5d 2e','illustrative','Covers the header, the data and a pseudo-header with the IP addresses.'],
+  ['Urgent pointer','00 00','unused','']].concat(opts||[],pay||[]);}
+var TCP_SYN_OPTS=[
+  ['Option: MSS','02 04 05 b4','1460 bytes','Largest segment this side can receive. Only sent in SYN segments.'],
+  ['Option: SACK permitted','04 02','yes','Allows selective acknowledgment of out-of-order data.'],
+  ['Option: timestamps','08 0a 00 1a 2b 3c 00 00 00 00','used for RTT measurement',''],
+  ['Option: NOP','01','padding',''],
+  ['Option: window scale','03 03 07','shift 7 (multiply window by 128)','The 16-bit window field is too small for fast links.']];
+var TCP_OPTS=[['Options: NOP, NOP, timestamps','01 01 08 0a 00 1a 2b 3d 00 9c 4e 10','12 bytes','']];
+
+P.push(
+{id:'dhcp',name:'DHCP',nodes:['PC','DHCP server'],icons:['pc','server'],
+ goals:['Name the four DORA messages and who sends each.','Explain why Discover is a broadcast from 0.0.0.0.','Describe what a rogue DHCP server can do and how DHCP snooping stops it.'],
+ intro:'<strong>DHCP</strong> gives a device its address, gateway and DNS server in four messages: Discover, Offer, Request, Acknowledge. None of them is authenticated.',
+ steps:[
+ {from:0,to:1,title:'Discover',stack:['Ethernet','IPv4','UDP 68 → 67','DHCP'],
+  say:'The PC has just joined the network and knows nothing. It shouts to everyone: is there a DHCP server?',
+  f:dhcp(false,'01 1f','01 0b',ZERO4,[
+   ['Option 53: message type','35 01 01','DHCPDISCOVER',''],
+   ['Option 55: parameter request list','37 04 01 03 06 0f','subnet mask, router, DNS, domain name','What the client would like to be told.'],
+   ['Option 61: client identifier','3d 07 01 '+PCM,'Ethernet, '+m(PCM),'Servers key leases on this. Randomized MACs on phones change it per network.'],
+   ['End','ff','end of options','']])},
+ {from:1,to:0,title:'Offer',stack:['Ethernet','IPv4','UDP 67 → 68','DHCP'],
+  say:'The server proposes an address and the settings that go with it.',
+  f:dhcp(true,'01 2e','01 1a',PCI,DHCP_SRV_OPTS('02','DHCPOFFER'))},
+ {from:0,to:1,title:'Request',stack:['Ethernet','IPv4','UDP 68 → 67','DHCP'],
+  say:'The PC accepts. It still broadcasts, so any other server that made an offer learns it was not chosen.',
+  f:dhcp(false,'01 22','01 0e',ZERO4,[
+   ['Option 53: message type','35 01 03','DHCPREQUEST',''],
+   ['Option 50: requested IP','32 04 '+PCI,ipt(PCI),''],
+   ['Option 54: server identifier','36 04 '+RTI,ipt(RTI),'Names the winning server.'],
+   ['Option 55: parameter request list','37 04 01 03 06 0f','subnet mask, router, DNS, domain name',''],
+   ['End','ff','end of options','']])},
+ {from:1,to:0,title:'Acknowledge',stack:['Ethernet','IPv4','UDP 67 → 68','DHCP'],
+  say:'The server confirms the lease. The PC configures its interface and usually ARPs for its own address to check nobody else has it.',
+  f:dhcp(true,'01 2e','01 1a',PCI,DHCP_SRV_OPTS('05','DHCPACK'))}],
+ quiz:[
+ {q:'Why does a DHCP Discover use source address 0.0.0.0?',a:['The client has no IP address yet','To hide the client from attackers','Because the server requires it for IPv6','It is the address of the default gateway'],why:'Getting an address is the whole point of the exchange.'},
+ {q:'Which switch feature blocks a rogue DHCP server?',a:['DHCP snooping','Port mirroring','Spanning tree','PoE'],why:'DHCP snooping only allows server messages (Offer, Ack) from trusted ports.'}]},
+
+{id:'arp',name:'ARP',nodes:['PC','Router'],icons:['pc','router'],
+ goals:['Explain why a host needs a MAC address before it can send an IP packet.','Read the sender and target fields of an ARP request and reply.','State why ARP is easy to abuse.'],
+ intro:'<strong>ARP</strong> answers one question: “who on this LAN has this IP address?” The PC needs the router’s MAC address before it can send anything off-network.',
+ steps:[
+ {from:0,to:1,title:'ARP request',stack:['Ethernet','ARP'],
+  say:'The PC wants to reach the internet, so it needs the MAC of its default gateway, 192.168.1.1. It asks everyone.',
+  f:eth(BC,PCM,'08 06','Broadcast: every device on the LAN hears the question.').concat(arp('00 01',PCM,PCI,'00 00 00 00 00 00',RTI))},
+ {from:1,to:0,title:'ARP reply',stack:['Ethernet','ARP'],
+  say:'The router answers directly. The PC caches the mapping for a few minutes.',
+  f:eth(PCM,RTM,'08 06').concat(arp('00 02',RTM,RTI,PCM,PCI,'The answer. The PC believes this without any proof, and will even accept replies it never asked for.'))},
+ {from:0,to:1,title:'First IP packet',stack:['Ethernet','IPv4','ICMP'],
+  say:'Now the PC can build the frame. Notice the destination IP is the far-away server, but the destination MAC is the router.',
+  f:eth(RTM,PCM,'08 00','The router’s MAC, learned a moment ago. MAC addresses only matter hop by hop.').concat(ip4('00 54','01',PCI,WEB,'','The final destination. This does not change as the packet crosses routers (ignoring NAT).'),ICMP)}],
+ quiz:[
+ {q:'A PC sends a packet to a server on another network. What is the destination MAC address?',a:['The default gateway’s MAC','The server’s MAC','The broadcast address','The switch’s MAC'],why:'Layer 2 addresses are rewritten at every hop. Only the IP addresses are end to end.'},
+ {q:'Why is ARP vulnerable to spoofing?',a:['Replies are accepted without authentication','It uses weak encryption','It runs over UDP','Routers forward it to the internet'],why:'Any host can claim any IP address. See the ARP spoofing lesson.'}]},
+
+{id:'dns',name:'DNS',nodes:['PC','Resolver','.com NS','Zone NS'],icons:['pc','server','server','server'],
+ goals:['Tell a recursive query from an iterative one by its flags.','Follow a referral from a TLD server to an authoritative server.','Explain what plain DNS exposes to an eavesdropper.'],
+ intro:'<strong>DNS</strong> turns a name into an address. The PC asks one resolver, and the resolver walks the hierarchy on its behalf. Everything is cleartext and unauthenticated.',
+ steps:[
+ {from:0,to:1,title:'Recursive query',stack:['UDP 53','DNS'],
+  say:'The PC asks its resolver for the address of example.com and sets “recursion desired”: please do the legwork.',
+  f:dnsHdr('7c 21','01 00','standard query, RD = 1','RD (recursion desired) asks the resolver to chase the answer down.','00','00').concat(qname('00 01','A (IPv4 address)'))},
+ {from:1,to:2,title:'Iterative query to .com',stack:['UDP 53','DNS'],
+  say:'Nothing is cached for example.com, but the resolver already knows the .com servers. It asks one of them.',
+  f:dnsHdr('b0 4e','00 00','standard query, RD = 0','Resolvers ask authoritative servers iteratively.','00','00').concat(qname('00 01','A'))},
+ {from:2,to:1,title:'Referral',stack:['UDP 53','DNS'],
+  say:'The .com server does not know the address. It knows who does, and says so.',
+  f:[['Transaction ID','b0 4e','0xb04e','Must match the query. Only 16 bits, which matters in the cache poisoning lesson.'],
+   ['Flags','80 00','response, not authoritative','No answer and no AA bit: this is a referral.'],
+   ['Questions','00 01','1',''],['Answer RRs','00 00','0',''],['Authority RRs','00 01','1',''],['Additional RRs','00 01','1','']]
+   .concat(qname('00 01','A'),[
+   ['NS record header','c0 0c 00 02 00 01 00 02 a3 00 00 06','example.com NS, TTL 172800, 6 bytes','c0 0c is a pointer back to the name at offset 12, saving space.'],
+   ['Name server','03 6e 73 31 c0 0c','ns1.example.com','“Ask this server instead.”'],
+   ['Glue record header','c0 29 00 01 00 01 00 02 a3 00 00 04','ns1.example.com A, 4 bytes',''],
+   ['Glue address','c0 00 02 35','192.0.2.53','Without glue the resolver would have to look up ns1.example.com, which is inside the zone it is trying to find.']])},
+ {from:1,to:3,title:'Iterative query to the zone',stack:['UDP 53','DNS'],
+  say:'The resolver repeats the question to the server it was referred to.',
+  f:dnsHdr('5a c3','00 00','standard query, RD = 0','','00','00').concat(qname('00 01','A'))},
+ {from:3,to:1,title:'Authoritative answer',stack:['UDP 53','DNS'],
+  say:'This server owns the zone and answers with authority.',
+  f:dnsHdr('5a c3','84 00','response, AA = 1','AA marks an answer from the zone’s own data.','01','00').concat(qname('00 01','A'),[
+   RRH('00 01','A','00 00 0e 10','00 04','TTL 3600, 4 bytes'),
+   ['Address','c0 00 02 0a','192.0.2.10','']])},
+ {from:1,to:0,title:'Answer to the PC',stack:['UDP 53','DNS'],
+  say:'The resolver caches the record for its TTL and replies. Anyone on the path saw which site was looked up, and could have forged the reply.',
+  f:dnsHdr('7c 21','81 80','response, RD, RA','RA: recursion available. No AA: this came from cache or recursion.','01','00').concat(qname('00 01','A'),[
+   RRH('00 01','A','00 00 0e 10','00 04','TTL 3600, 4 bytes'),
+   ['Address','c0 00 02 0a','192.0.2.10','']])}],
+ quiz:[
+ {q:'What does a referral response contain?',a:['NS records pointing to servers closer to the answer','The final A record','An error code','A signature'],why:'Each level of the hierarchy delegates to the next with NS records, plus glue addresses when needed.'},
+ {q:'What can an eavesdropper learn from plain DNS?',a:['Every name the device looks up','Nothing, it is encrypted','Only the resolver’s address','Only the TTL'],why:'Queries and answers are cleartext. DNS over TLS or HTTPS addresses privacy; DNSSEC addresses forgery.'}]},
+
+{id:'tcp',name:'TCP',nodes:['Browser','Web server'],icons:['pc','server'],
+ goals:['Trace sequence and acknowledgment numbers through the three-way handshake.','Identify SYN, ACK, PSH and FIN from the flags byte.','Explain why initial sequence numbers are random.'],
+ intro:'<strong>TCP</strong> turns unreliable packets into a reliable byte stream. It opens with a three-way handshake, numbers every byte, and closes each direction separately.',
+ steps:[
+ {from:0,to:1,title:'SYN',stack:['IPv4','TCP'],
+  say:'The browser asks to open a connection and announces its starting sequence number.',
+  f:tcp(true,'3a 1f 9c 00','client ISN','00 00 00 00','0 (nothing to acknowledge yet)','a0 02','40-byte header, SYN','A server must remember each half-open connection. A SYN flood exploits that; SYN cookies are the defense.',TCP_SYN_OPTS)},
+ {from:1,to:0,title:'SYN-ACK',stack:['IPv4','TCP'],
+  say:'The server agrees, picks its own sequence number, and acknowledges the client’s.',
+  f:tcp(false,'8e 44 d2 10','server ISN','3a 1f 9c 01','client ISN + 1','a0 12','40-byte header, SYN + ACK','The SYN itself counts as one byte, so the ack is ISN + 1.',TCP_SYN_OPTS)},
+ {from:0,to:1,title:'ACK',stack:['IPv4','TCP'],
+  say:'The browser acknowledges. The connection is open in both directions.',
+  f:tcp(true,'3a 1f 9c 01','client ISN + 1','8e 44 d2 11','server ISN + 1','80 10','32-byte header, ACK','An attacker who cannot see the server’s random ISN cannot complete this step with a spoofed address.',TCP_OPTS)},
+ {from:0,to:1,title:'Data (PSH, ACK)',stack:['IPv4','TCP','HTTP'],
+  say:'The browser sends 37 bytes of HTTP request.',
+  f:tcp(true,'3a 1f 9c 01','first data byte','8e 44 d2 11','unchanged','80 18','32-byte header, PSH + ACK','PSH asks the receiver to hand the data to the application now.',TCP_OPTS,[
+   S('HTTP request line','GET / HTTP/1.1','16 bytes of payload.'),
+   S('HTTP Host header','Host: example.com','19 bytes.'),
+   ['End of headers','0d 0a','CRLF','2 bytes. 37 in total.']])},
+ {from:1,to:0,title:'ACK of the data',stack:['IPv4','TCP'],
+  say:'The server acknowledges all 37 bytes by naming the next byte it expects.',
+  f:tcp(false,'8e 44 d2 11','server ISN + 1','3a 1f 9c 26','client ISN + 1 + 37','80 10','32-byte header, ACK','If this ACK never arrives, the browser retransmits.',TCP_OPTS)},
+ {from:0,to:1,title:'FIN',stack:['IPv4','TCP'],
+  say:'Later, the browser has nothing more to send and closes its direction.',
+  f:tcp(true,'3a 1f 9c 26','after the data','8e 44 d2 11','unchanged','80 11','32-byte header, FIN + ACK','FIN closes one direction only. The server could still send.',TCP_OPTS)},
+ {from:1,to:0,title:'FIN, ACK',stack:['IPv4','TCP'],
+  say:'The server acknowledges the FIN and closes its own direction in the same segment.',
+  f:tcp(false,'8e 44 d2 11','server ISN + 1','3a 1f 9c 27','client FIN counted as one byte','80 11','32-byte header, FIN + ACK','',TCP_OPTS)},
+ {from:0,to:1,title:'Final ACK',stack:['IPv4','TCP'],
+  say:'The browser acknowledges the server’s FIN. Both sides release the connection.',
+  f:tcp(true,'3a 1f 9c 27','','8e 44 d2 12','server FIN counted as one byte','80 10','32-byte header, ACK','',TCP_OPTS)}],
+ quiz:[
+ {q:'A client’s SYN has sequence number 1000. What acknowledgment number does the SYN-ACK carry?',a:['1001','1000','0','The server’s own ISN'],why:'The SYN consumes one sequence number, so the server expects 1001 next.'},
+ {q:'Why are initial sequence numbers random?',a:['So off-path attackers cannot inject or hijack segments','To make the handshake faster','To encrypt the payload','Because port numbers are random'],why:'Predictable ISNs let an attacker forge segments for a connection they cannot see.'}]},
+
+{id:'http',name:'HTTP',nodes:['Browser','Web server'],icons:['pc','server'],
+ goals:['Label the request line, headers and body of an HTTP message.','Explain how a cookie carries a session.','Show exactly what an eavesdropper captures from a login over plain HTTP.'],
+ intro:'<strong>HTTP</strong> is plain text: a request line or status line, headers, a blank line, then an optional body. Without TLS, every byte is readable on the wire.',
+ steps:[
+ {from:0,to:1,title:'GET request',stack:['TCP 80','HTTP'],
+  say:'The browser asks for a page.',
+  f:[S('Request line','GET /index.html HTTP/1.1','Method, path, version.'),
+   S('Host','Host: example.com','Lets one IP address serve many sites. Required in HTTP/1.1.'),
+   S('User-Agent','User-Agent: Mozilla/5.0','Identifies the browser. Useful for fingerprinting.'),
+   S('Accept','Accept: text/html','What content types the browser prefers.'),
+   ['End of headers','0d 0a','blank line','A bare CRLF ends the headers. GET has no body.']]},
+ {from:1,to:0,title:'200 OK',stack:['TCP 80','HTTP'],
+  say:'The server returns the page and sets a session cookie.',
+  f:[S('Status line','HTTP/1.1 200 OK','Version, status code, reason phrase.'),
+   S('Content-Type','Content-Type: text/html',''),
+   S('Content-Length','Content-Length: 15','Tells the browser where the body ends.'),
+   S('Set-Cookie','Set-Cookie: sid=8f3a2c; HttpOnly','HttpOnly hides the cookie from JavaScript. It lacks the Secure flag, so it will be sent over plain HTTP.'),
+   ['End of headers','0d 0a','blank line',''],
+   ['Body','s:<h1>Hello</h1>\n','<h1>Hello</h1>','15 bytes, matching Content-Length.']]},
+ {from:0,to:1,title:'POST login',stack:['TCP 80','HTTP'],
+  say:'The user signs in. Flip between the two views: nothing changes, because nothing here is encrypted.',
+  f:[S('Request line','POST /login HTTP/1.1',''),
+   S('Host','Host: example.com',''),
+   S('Cookie','Cookie: sid=8f3a2c','The browser returns the cookie on every request. Whoever copies it becomes this session.'),
+   S('Content-Type','Content-Type: application/x-www-form-urlencoded',''),
+   S('Content-Length','Content-Length: 23',''),
+   ['End of headers','0d 0a','blank line',''],
+   ['Body','s:user=alice&pass=hunter2','user=alice&pass=hunter2','The password, in the clear, readable by anyone on the same Wi-Fi or anywhere along the path. This is the case for HTTPS.']]},
+ {from:1,to:0,title:'302 redirect',stack:['TCP 80','HTTP'],
+  say:'Login succeeds. The server issues a fresh session ID and redirects.',
+  f:[S('Status line','HTTP/1.1 302 Found',''),
+   S('Location','Location: /account','Where the browser should go next.'),
+   S('Set-Cookie','Set-Cookie: sid=c41d9e; HttpOnly','Changing the ID at login prevents session fixation.'),
+   S('Content-Length','Content-Length: 0',''),
+   ['End of headers','0d 0a','blank line','']]}],
+ quiz:[
+ {q:'What separates HTTP headers from the body?',a:['A blank line (CRLF CRLF)','The Content-Length header','A null byte','The Host header'],why:'Headers end at the first empty line.'},
+ {q:'An attacker on the same open Wi-Fi captures a plain HTTP session. What do they get?',a:['Passwords and session cookies in cleartext','Only the server’s IP address','Only encrypted records','Nothing without the Wi-Fi password'],why:'HTTP has no confidentiality. TLS provides it.'}]}
+);
+
+function h2f(len,type,flags,txt,why){return ['HTTP/2 frame header',len+' '+type+' '+flags+' 00 00 00 01',txt,why||'','e'];}
+function krbHead(tag,tagTxt,seq,mt,mtTxt,rep){return [
+  ['Message tag',tag,tagTxt,'Kerberos is encoded in ASN.1 DER: every item is a tag, a length, then the value.'],
+  ['Sequence',seq,'SEQUENCE',''],
+  ['Protocol version',(rep?'a0':'a1')+' 03 02 01 05','5',''],
+  ['Message type',(rep?'a1':'a2')+' 03 02 01 '+mt,mtTxt,'']];}
+
+P.push(
+{id:'tls12',name:'TLS 1.2',nodes:['Browser','Web server'],icons:['pc','server'],
+ goals:['Count the round trips in a TLS 1.2 handshake and compare with TLS 1.3.','Point to the handshake messages that TLS 1.2 leaves in cleartext.','Explain why static RSA key exchange has no forward secrecy.'],
+ intro:'<strong>TLS 1.2</strong> is still widely deployed. Compare it with the TLS 1.3 lesson: two round trips instead of one, and the certificate crosses the network in the clear.',
+ steps:[
+ {from:0,to:1,title:'ClientHello',stack:['TCP 443','TLS record','Handshake'],
+  say:'The browser lists what it supports. Unlike TLS 1.3, it sends no key yet, because it does not know which key exchange the server will pick.',
+  f:[['Record header','16 03 01 00 5b','Handshake, 91 bytes',''],
+   ['Handshake header','01 00 00 57','ClientHello, 87 bytes',''],
+   ['Version','03 03','TLS 1.2','Here this field is the real offer.'],
+   ['Client random','8f 2c 51 0a e4 77 b9 03 +24','32 random bytes',''],
+   ['Session ID','00','empty: new session',''],
+   ['Cipher suites','00 06 c0 2f c0 30 00 9c','ECDHE_RSA_AES_128_GCM, ECDHE_RSA_AES_256_GCM, RSA_AES_128_GCM','In TLS 1.2 a suite names everything: key exchange, authentication, cipher and hash. The last one uses static RSA, which has no forward secrecy.'],
+   ['Compression','01 00','null',''],
+   ['Extensions length','00 28','40 bytes',''],
+   ['Ext: server_name','00 00 00 10 00 0e 00 00 0b','SNI header',''],
+   ['SNI host name','s:example.com','example.com','Cleartext, as in every TLS version without ECH.'],
+   ['Ext: supported_groups','00 0a 00 04 00 02 00 1d','x25519',''],
+   ['Ext: signature_algorithms','00 0d 00 08 00 06 04 03 08 04 08 07','ECDSA, RSA-PSS, Ed25519','']]},
+ {from:1,to:0,title:'ServerHello … ServerHelloDone',stack:['TCP 443','TLS record','Handshake'],
+  say:'The server sends four handshake messages, all unencrypted: its choice, its certificate, a signed Diffie-Hellman key, and “your turn”.',
+  f:[['ServerHello: record header','16 03 03 00 4a','Handshake, 74 bytes',''],
+   ['ServerHello: handshake header','02 00 00 46','ServerHello, 70 bytes',''],
+   ['Version','03 03','TLS 1.2',''],
+   ['Server random','e1 06 4d 92 7a 3f c8 55 +24','32 random bytes',''],
+   ['Session ID','20 51 b8 0c 77 +28','32 bytes, for resumption',''],
+   ['Cipher suite','c0 2f','ECDHE_RSA_WITH_AES_128_GCM_SHA256','The server picked an ephemeral key exchange.'],
+   ['Compression','00','null',''],
+   ['Certificate: record header','16 03 03 03 2f','Handshake, 815 bytes',''],
+   ['Certificate: lengths','0b 00 03 2b 00 03 28 00 03 25','one certificate, 805 bytes',''],
+   ['Certificate (DER)','30 82 03 21 +801','X.509 for example.com','In cleartext. Any observer can read the subject, issuer and serial number. TLS 1.3 encrypts this message.'],
+   ['ServerKeyExchange: headers','16 03 03 01 2c 0c 00 01 28','300-byte record, 296-byte message','This message does not exist with static RSA key exchange.'],
+   ['Curve','03 00 1d 20','named curve x25519, 32-byte key',''],
+   ['Server ECDHE public key','27 d8 b0 41 f6 0c 93 ea +24','ephemeral X25519 key',''],
+   ['Signature algorithm + length','08 04 01 00','RSA-PSS-SHA256, 256 bytes',''],
+   ['Signature','7b 13 c9 e4 +252','RSA signature over both randoms and the key','Binds the ephemeral key to the certificate. It does not cover the cipher suite list, which is one reason TLS 1.2 needed extra downgrade defenses.'],
+   ['ServerHelloDone','16 03 03 00 04 0e 00 00 00','empty message','']]},
+ {from:0,to:1,title:'ClientKeyExchange, ChangeCipherSpec, Finished',stack:['TCP 443','TLS record','Handshake'],
+  say:'The browser sends its key share, announces that it is switching to encryption, and sends the first encrypted message.',
+  f:[['ClientKeyExchange: headers','16 03 03 00 25 10 00 00 21 20','37-byte record, 32-byte key',''],
+   ['Client ECDHE public key','5a 91 c3 0e 6b f2 18 d4 +24','ephemeral X25519 key','With static RSA this would be the premaster secret encrypted to the server’s certificate. Anyone who later obtains that private key could decrypt recorded traffic.'],
+   ['ChangeCipherSpec','14 03 03 00 01 01','“encryption starts now”','Its own record type (20). Removed in TLS 1.3 except as a dummy for middleboxes.'],
+   ['Finished: record header','16 03 03 00 28','Handshake, 40 bytes','Still labelled as a handshake record, so observers know exactly what it is.'],
+   ['Explicit nonce','00 00 00 00 00 00 00 00','8 bytes','TLS 1.2 AES-GCM sends part of the nonce with each record.'],
+   ['Finished','14 00 00 0c','Finished, 12 bytes','','e'],
+   ['Verify data','a8 3c 5e 71 +8','12-byte PRF output over the transcript','Detects tampering with the handshake, but only after both sides have already committed to the negotiated parameters.','e'],
+   ['AEAD tag','e0 5f 13 a9 +12','16 bytes','']]},
+ {from:1,to:0,title:'ChangeCipherSpec, Finished',stack:['TCP 443','TLS record','Handshake'],
+  say:'The server does the same. Only now, after two full round trips, can data flow.',
+  f:[['ChangeCipherSpec','14 03 03 00 01 01','“encryption starts now”',''],
+   ['Finished: record header','16 03 03 00 28','Handshake, 40 bytes',''],
+   ['Explicit nonce','00 00 00 00 00 00 00 00','8 bytes',''],
+   ['Finished','14 00 00 0c','Finished, 12 bytes','','e'],
+   ['Verify data','19 f4 d0 2b +8','12 bytes','','e'],
+   ['AEAD tag','9d 41 e8 02 +12','16 bytes','']]},
+ {from:0,to:1,title:'Application data',stack:['TCP 443','TLS record','HTTP'],
+  say:'The HTTP request, encrypted.',
+  f:[['Record header','17 03 03 00 3d','Application Data, 61 bytes','The real content type is visible in TLS 1.2.'],
+   ['Explicit nonce','00 00 00 00 00 00 00 01','8 bytes',''],
+   S('Request line','GET / HTTP/1.1','','e'),
+   S('Host header','Host: example.com','','e'),
+   ['End of headers','0d 0a','CRLF','','e'],
+   ['AEAD tag','31 c8 7a 0f +12','16 bytes','']]}],
+ quiz:[
+ {q:'Which handshake message is cleartext in TLS 1.2 but encrypted in TLS 1.3?',a:['Certificate','ClientHello','ServerHello','Application data'],why:'TLS 1.3 encrypts everything after ServerHello.'},
+ {q:'Why is the suite TLS_RSA_WITH_AES_128_GCM_SHA256 discouraged?',a:['Static RSA key exchange gives no forward secrecy','AES-128 is broken','SHA-256 is broken','It requires client certificates'],why:'If the server’s private key leaks later, every recorded session can be decrypted. ECDHE suites avoid this.'}]},
+
+{id:'quic',name:'QUIC',nodes:['Browser','Web server'],icons:['pc','server'],
+ goals:['Tell a QUIC long header from a short header.','Explain why Initial packets are encrypted but not secret.','List what QUIC hides from the network that TCP exposes.'],
+ intro:'<strong>QUIC</strong> runs over UDP and builds TLS 1.3 into the transport. It is the basis of HTTP/3. Almost nothing about the connection is visible to the network.',
+ steps:[
+ {from:0,to:1,title:'Initial (ClientHello)',stack:['UDP 443','QUIC long header','CRYPTO'],
+  say:'One datagram carries both the transport handshake and the TLS ClientHello. It is padded to 1200 bytes.',
+  f:[['Header byte','c3','long header, Initial, 4-byte packet number','The low bits are masked by header protection.'],
+   ['Version','00 00 00 01','QUIC version 1',''],
+   ['Destination connection ID','08 83 94 c8 f0 3e 51 57 08','length 8 + 8 random bytes','Chosen at random by the client for the first flight.'],
+   ['Source connection ID','00','length 0',''],
+   ['Token length','00','no token',''],
+   ['Length','44 9e','1182 (variable-length integer)',''],
+   ['Packet number','00 00 00 00','0','Encrypted. Even packet numbers are hidden, so observers cannot easily measure loss or reordering.','e'],
+   ['CRYPTO frame header','06 00 40 fa','offset 0, 250 bytes','','e'],
+   ['TLS ClientHello','01 00 00 f6 03 03 +244','TLS 1.3 ClientHello with QUIC transport parameters','Encrypted with keys derived from the destination connection ID and a salt published in the RFC. Any observer can derive the same keys, so this stops accidental interference, not eavesdropping. SNI is still readable.','e'],
+   ['PADDING frames','00 00 00 00 +904','908 zero bytes','The server may send at most three times what it has received until the client address is validated. Padding limits amplification attacks and tests the path MTU.','e'],
+   ['AEAD tag','4f a2 77 1c +12','16 bytes','']]},
+ {from:1,to:0,title:'Initial + Handshake',stack:['UDP 443','QUIC long header','CRYPTO'],
+  say:'The server answers with two QUIC packets in one datagram: ServerHello in an Initial packet, then the rest of the TLS handshake under real handshake keys.',
+  f:[['Packet 1: header byte','c1','long header, Initial',''],
+   ['Version','00 00 00 01','QUIC version 1',''],
+   ['Destination connection ID','00','length 0 (the client’s choice)',''],
+   ['Source connection ID','08 f0 67 a5 50 2a 42 62 b5','length 8 + the server’s ID','The client must address later packets to this ID.'],
+   ['Token length','00','no token',''],
+   ['Length','40 75','117',''],
+   ['Packet number','00 00','0','','e'],
+   ['ACK frame','02 00 00 00 00','acknowledges packet 0','Acknowledgments are frames inside the encrypted payload.','e'],
+   ['CRYPTO frame header','06 00 40 5a','offset 0, 90 bytes','','e'],
+   ['TLS ServerHello','02 00 00 56 03 03 +84','ServerHello with key share','','e'],
+   ['AEAD tag','b8 13 60 d5 +12','16 bytes',''],
+   ['Packet 2: header byte','e1','long header, Handshake',''],
+   ['Version','00 00 00 01','QUIC version 1',''],
+   ['Connection IDs','00 08 f0 67 a5 50 2a 42 62 b5','destination empty, source as above',''],
+   ['Length','43 ba','954',''],
+   ['Packet number','00 00','0','','e'],
+   ['CRYPTO frame header','06 00 43 a4','offset 0, 932 bytes','','e'],
+   ['TLS handshake messages','08 00 00 +929','EncryptedExtensions, Certificate, CertificateVerify, Finished','Protected by keys from the Diffie-Hellman exchange. From here on, encryption is real.','e'],
+   ['AEAD tag','2d c9 04 fe +12','16 bytes','']]},
+ {from:0,to:1,title:'Handshake (Finished)',stack:['UDP 443','QUIC long header','CRYPTO'],
+  say:'The browser confirms the handshake. One round trip, the same as TLS 1.3 over TCP, but without a separate TCP handshake first.',
+  f:[['Header byte','e1','long header, Handshake',''],
+   ['Version','00 00 00 01','QUIC version 1',''],
+   ['Destination connection ID','08 f0 67 a5 50 2a 42 62 b5','the server’s ID',''],
+   ['Source connection ID','00','length 0',''],
+   ['Length','3e','62',''],
+   ['Packet number','00 00','0','','e'],
+   ['ACK frame','02 00 00 00 00','acknowledges packet 0','','e'],
+   ['CRYPTO frame header','06 00 24','offset 0, 36 bytes','','e'],
+   ['TLS Finished','14 00 00 20 +32','verify data','','e'],
+   ['AEAD tag','71 0b e3 96 +12','16 bytes','']]},
+ {from:0,to:1,title:'1-RTT data (HTTP/3)',stack:['UDP 443','QUIC short header','STREAM','HTTP/3'],
+  say:'Application data uses the short header: one flag byte and a connection ID. No version, no length, no visible sequence number or flags.',
+  f:[['Header byte','41','short header, key phase 0',''],
+   ['Destination connection ID','f0 67 a5 50 2a 42 62 b5','8 bytes, no length byte','If the phone moves from Wi-Fi to cellular, the IP address changes but this ID does not, so the connection survives.'],
+   ['Packet number','00 00','0','','e'],
+   ['STREAM frame header','0b 00 1c','stream 0, 28 bytes, FIN','Streams are independent, so one lost packet does not stall the others as it would with TCP.','e'],
+   ['HTTP/3 HEADERS','01 1a 00 00 +24','GET / for example.com, QPACK-compressed','','e'],
+   ['AEAD tag','5a e0 3d 87 +12','16 bytes','']]}],
+ quiz:[
+ {q:'Why can an observer decrypt a QUIC Initial packet?',a:['Its keys are derived from public values in the packet and the RFC','It uses a weak cipher','It is not encrypted at all','The server publishes its private key'],why:'Initial protection keeps middleboxes from tampering by accident. Confidentiality starts with the Handshake keys.'},
+ {q:'What lets a QUIC connection survive a change of IP address?',a:['The connection ID','The packet number','The TLS session ticket','The UDP checksum'],why:'Connections are identified by connection ID rather than by the address and port four-tuple.'}]},
+
+{id:'smtp',name:'SMTP + STARTTLS',nodes:['Mail client','Mail server'],icons:['pc','server'],
+ goals:['Follow an SMTP dialogue up to and through STARTTLS.','Explain why opportunistic STARTTLS can be stripped.','Decode an AUTH PLAIN credential.'],
+ intro:'<strong>SMTP</strong> began as cleartext. <strong>STARTTLS</strong> upgrades a connection to TLS part-way through, which works only if nobody removes the offer.',
+ steps:[
+ {from:1,to:0,title:'220 greeting',stack:['TCP 587','SMTP'],
+  say:'The server speaks first.',
+  f:[S('Greeting','220 mail.example.org ESMTP ready','220 means the service is ready.')]},
+ {from:0,to:1,title:'EHLO',stack:['TCP 587','SMTP'],
+  say:'The client introduces itself and asks what extensions are available.',
+  f:[S('Command','EHLO laptop.example.net','EHLO (rather than HELO) requests the extension list.')]},
+ {from:1,to:0,title:'250 capabilities',stack:['TCP 587','SMTP'],
+  say:'The server lists its extensions, including STARTTLS. All of this is cleartext.',
+  f:[S('Line 1','250-mail.example.org','A hyphen after the code means more lines follow.'),
+   S('Line 2','250-SIZE 35882577','Maximum message size.'),
+   S('Line 3','250-STARTTLS','The offer to upgrade. An attacker on the path can simply delete this line. A client that then carries on in cleartext has been downgraded without any error. MTA-STS and DANE let a domain declare that TLS is mandatory.'),
+   S('Line 4','250 8BITMIME','A space after the code marks the last line.')]},
+ {from:0,to:1,title:'STARTTLS',stack:['TCP 587','SMTP'],
+  say:'The client asks to switch to TLS.',
+  f:[S('Command','STARTTLS','')]},
+ {from:1,to:0,title:'220 go ahead',stack:['TCP 587','SMTP'],
+  say:'The server agrees. The next bytes on this TCP connection are a TLS ClientHello.',
+  f:[S('Reply','220 2.0.0 Ready to start TLS','')]},
+ {from:0,to:1,title:'TLS handshake',stack:['TCP 587','TLS record','Handshake'],
+  say:'A normal TLS handshake runs on the same connection (see the TLS 1.3 lesson). The client must validate the certificate, or an attacker can simply present their own.',
+  f:[['Record header','16 03 01 00 ac','Handshake, 172 bytes',''],
+   ['ClientHello','01 00 00 a8 03 03 +166','TLS ClientHello','Everything the client learned before this point was unauthenticated, so it must send EHLO again once TLS is up.']]},
+ {from:0,to:1,title:'AUTH PLAIN',stack:['TCP 587','TLS record','SMTP'],
+  say:'Inside TLS, the client logs in. AUTH PLAIN is only Base64, so it is safe solely because of the tunnel.',
+  f:[['Record header','17 03 03 00 32','Application Data, 50 bytes',''],
+   ['Command','s:AUTH PLAIN ','AUTH PLAIN','','e'],
+   ['Credentials','s:AGFsaWNlAGh1bnRlcjI=','Base64 of: NUL alice NUL hunter2','Base64 is an encoding, not encryption. Anyone who sees this string has the password.','e'],
+   ['Line ending','0d 0a','CRLF','','e'],
+   ['Inner content type','17','23 = Application Data','','e'],
+   ['AEAD tag','c0 7e 19 a4 +12','16 bytes','']]}],
+ quiz:[
+ {q:'How does a STARTTLS stripping attack work?',a:['The attacker removes STARTTLS from the server’s capability list','The attacker breaks the TLS cipher','The attacker guesses the password','The attacker floods port 587'],why:'The offer is sent in cleartext. A client that treats TLS as optional will continue unencrypted.'},
+ {q:'What protects an AUTH PLAIN login?',a:['Only the TLS tunnel around it','Base64 encoding','A challenge-response hash','The EHLO command'],why:'PLAIN sends the password itself. Without TLS it is trivially recovered.'}]},
+
+{id:'doh',name:'DNS over HTTPS',nodes:['Browser','DoH resolver'],icons:['pc','server'],
+ goals:['Compare what an observer sees for plain DNS and for DoH.','Identify the HTTP/2 frames that carry a DoH query.','Distinguish the privacy DoH gives from the authenticity DNSSEC gives.'],
+ intro:'<strong>DNS over HTTPS</strong> sends ordinary DNS messages inside an encrypted HTTPS connection on port 443, where they look like any other web traffic.',
+ steps:[
+ {from:0,to:1,title:'For comparison: plain DNS',stack:['UDP 53','DNS'],
+  say:'First, the classic query. Everything is readable.',
+  f:dnsHdr('7c 21','01 00','standard query, RD = 1','','00','00').concat(qname('00 01','A (IPv4 address)'))},
+ {from:0,to:1,title:'DoH request',stack:['TCP 443','TLS 1.3','HTTP/2','DNS'],
+  say:'The same 29-byte question, now the body of an HTTP POST inside TLS. The observer sees one more encrypted record going to port 443.',
+  f:[['TLS record header','17 03 03 00 70','Application Data, 112 bytes','All an observer gets: a size, a time, and the resolver’s IP address.'],
+   h2f('00 00 30','01','04','HEADERS, 48 bytes, END_HEADERS, stream 1'),
+   ['Header block (HPACK)','83 87 +46','POST https://dns.example/dns-query, content-type application/dns-message','0x83 and 0x87 are static-table shortcuts for “:method POST” and “:scheme https”.','e'],
+   h2f('00 00 1d','00','01','DATA, 29 bytes, END_STREAM'),
+   ['DNS transaction ID','00 00','0','DoH clients use ID 0 so that identical queries produce identical bytes and cache well. HTTP already matches responses to requests.','e'],
+   ['DNS flags','01 00','standard query, RD = 1','','e'],
+   ['DNS counts','00 01 00 00 00 00 00 00','1 question','','e'],
+   ['Query name','07 65 78 61 6d 70 6c 65 03 63 6f 6d 00','example.com.','Hidden from the local network and the ISP. The DoH resolver still sees it, so you are choosing whom to trust.','e'],
+   ['Query type + class','00 01 00 01','A, IN','','e'],
+   ['Inner content type','17','23 = Application Data','','e'],
+   ['AEAD tag','6b 02 d9 4c +12','16 bytes','']]},
+ {from:1,to:0,title:'DoH response',stack:['TCP 443','TLS 1.3','HTTP/2','DNS'],
+  say:'The answer returns the same way.',
+  f:[['TLS record header','17 03 03 00 6e','Application Data, 110 bytes',''],
+   h2f('00 00 1e','01','04','HEADERS, 30 bytes, END_HEADERS, stream 1'),
+   ['Header block (HPACK)','88 +29',':status 200, content-type application/dns-message, cache-control max-age=3600','0x88 is the static-table entry for “:status 200”. HTTP caching follows the DNS TTL.','e'],
+   h2f('00 00 2d','00','01','DATA, 45 bytes, END_STREAM'),
+   ['DNS header','00 00 81 80 00 01 00 01 00 00 00 00','response, 1 answer','','e'],
+   ['Question','07 65 78 61 6d 70 6c 65 03 63 6f 6d 00 00 01 00 01','example.com. A','','e'],
+   ['Answer record','c0 0c 00 01 00 01 00 00 0e 10 00 04 c0 00 02 0a','A 192.0.2.10, TTL 3600','TLS authenticates the resolver and protects this in transit. It does not prove the resolver told the truth; that is DNSSEC’s job.','e'],
+   ['Inner content type','17','23 = Application Data','','e'],
+   ['AEAD tag','f1 35 8a 0e +12','16 bytes','']]}],
+ quiz:[
+ {q:'With DoH, who can still see which names you look up?',a:['The DoH resolver','Anyone on the local network','Your ISP, from port 53','Nobody'],why:'DoH moves trust from the network path to the resolver operator.'},
+ {q:'Why is DoH harder for a network to block or filter than DNS over TLS?',a:['It shares port 443 with ordinary HTTPS','It uses stronger encryption','It runs over ICMP','It changes the destination IP on every query'],why:'DNS over TLS has its own port, 853, which is easy to identify.'}]},
+
+{id:'krb',name:'Kerberos',nodes:['Client','KDC','File server'],icons:['pc','server','server'],
+ goals:['Trace a logon from AS-REQ to a service ticket.','Say which key encrypts each ticket and who can read it.','Connect AS-REP roasting and Kerberoasting to specific messages.'],
+ intro:'<strong>Kerberos</strong> is how Active Directory logons work. The password never crosses the network. Instead a Key Distribution Center issues encrypted tickets that prove who you are.',
+ steps:[
+ {from:0,to:1,title:'AS-REQ',stack:['TCP/UDP 88','Kerberos'],
+  say:'The client asks the Authentication Service for a ticket-granting ticket, proving it knows the password by encrypting the current time.',
+  f:krbHead('6a 81 d8','AS-REQ (application tag 10), 216 bytes','30 81 d5','0a','10 = AS-REQ',false).concat([
+   ['Pre-auth data header','a3 3a 30 38 30 36 a1 03 02 01 02 a2 2f 04 2d','PA-ENC-TIMESTAMP (type 2), 45 bytes',''],
+   ['Encrypted timestamp','5c 80 f1 2e +41','2026-11-14 22:49:00 UTC','Encrypted with a key derived from the user’s password. If an account has pre-authentication disabled, the KDC will hand anyone an AS-REP to crack offline (AS-REP roasting). The 5-minute clock tolerance exists to limit replay.','e'],
+   ['Request body','a4 81 8c 30 81 89 +137','client alice, realm EXAMPLE.ORG, service krbtgt/EXAMPLE.ORG, AES256','The user name and realm are in cleartext.']])},
+ {from:1,to:0,title:'AS-REP',stack:['TCP/UDP 88','Kerberos'],
+  say:'The KDC returns two things: a ticket-granting ticket the client cannot read, and a session key the client can.',
+  f:krbHead('6b 82 02 38','AS-REP (application tag 11), 568 bytes','30 82 02 34','0b','11 = AS-REP',true).concat([
+   ['Client realm','a3 0d 1b 0b 45 58 41 4d 50 4c 45 2e 4f 52 47','EXAMPLE.ORG',''],
+   ['Client name','a4 12 30 10 a0 03 02 01 01 a1 09 30 07 1b 05 61 6c 69 63 65','alice',''],
+   ['Ticket header','a5 82 01 20','288 bytes',''],
+   ['Ticket-granting ticket (TGT)','61 82 01 1c 30 82 01 18 +280','opaque to the client','Encrypted with the KDC’s own krbtgt key. Whoever steals that key can mint tickets for any user: a golden ticket.'],
+   ['Encrypted part header','a6 81 e0 30 81 dd a0 03 02 01 12 a2 81 d5 04 81 d2','AES256-CTS-HMAC-SHA1, 210 bytes',''],
+   ['Encrypted part','0e 7a c3 59 +206','TGS session key, lifetime, nonce','Encrypted with the user’s password-derived key. Only the real user can open it.','e']])},
+ {from:0,to:1,title:'TGS-REQ',stack:['TCP/UDP 88','Kerberos'],
+  say:'To reach the file server, the client presents its TGT to the Ticket-Granting Service and names the service it wants.',
+  f:krbHead('6c 82 01 e1','TGS-REQ (application tag 12), 481 bytes','30 82 01 dd','0c','12 = TGS-REQ',false).concat([
+   ['Pre-auth data header','a3 82 01 5c 30 82 01 58 30 82 01 54 a1 03 02 01 01 a2 82 01 4b 04 82 01 47','PA-TGS-REQ (type 1), 327 bytes',''],
+   ['TGT, returned','6e 82 01 43 30 82 01 3f +259','the same opaque ticket','The client never decrypted it. It just hands it back.'],
+   ['Authenticator','a4 3a 30 38 +56','client name + timestamp','Encrypted with the TGS session key. Proves the sender is the party the TGT was issued to, not someone who merely copied the ticket.','e'],
+   ['Request body','a4 71 30 6f +111','service cifs/files.example.org','The service principal name (SPN) being requested.']])},
+ {from:1,to:0,title:'TGS-REP',stack:['TCP/UDP 88','Kerberos'],
+  say:'The KDC issues a service ticket. It does not check whether the user is allowed to use the service; that is the service’s job.',
+  f:krbHead('6d 82 02 38','TGS-REP (application tag 13), 568 bytes','30 82 02 34','0d','13 = TGS-REP',true).concat([
+   ['Client realm','a3 0d 1b 0b 45 58 41 4d 50 4c 45 2e 4f 52 47','EXAMPLE.ORG',''],
+   ['Client name','a4 12 30 10 a0 03 02 01 01 a1 09 30 07 1b 05 61 6c 69 63 65','alice',''],
+   ['Ticket header','a5 82 01 20','288 bytes',''],
+   ['Service ticket','61 82 01 1c 30 82 01 18 +280','opaque to the client','Encrypted with the service account’s key. Any domain user can request a ticket for any SPN and try to crack it offline. That is Kerberoasting, and the reason service accounts need long random passwords.'],
+   ['Encrypted part header','a6 81 e0 30 81 dd a0 03 02 01 12 a2 81 d5 04 81 d2','AES256, 210 bytes',''],
+   ['Encrypted part','93 1f 64 b0 +206','service session key','Encrypted with the TGS session key from the earlier step.','e']])},
+ {from:0,to:2,title:'AP-REQ',stack:['SMB session setup','SPNEGO','Kerberos'],
+  say:'The client presents the service ticket to the file server. The KDC is not involved in this step.',
+  f:krbHead('6e 82 01 77','AP-REQ (application tag 14), 375 bytes','30 82 01 73','0e','14 = AP-REQ',true).concat([
+   ['AP options','a2 07 03 05 00 20 00 00 00','mutual authentication required',''],
+   ['Ticket header','a3 82 01 20','288 bytes',''],
+   ['Service ticket','61 82 01 1c 30 82 01 18 +280','opaque to the client','The file server decrypts this with its own key and finds the user’s identity, group memberships and the session key.'],
+   ['Authenticator','a4 3a 30 38 +56','client name + timestamp','Encrypted with the service session key. The server keeps a replay cache of recent authenticators.','e']])},
+ {from:2,to:0,title:'AP-REP',stack:['SMB session setup','SPNEGO','Kerberos'],
+  say:'The server proves it could read the ticket, so the client knows it is talking to the real service.',
+  f:krbHead('6f 5b','AP-REP (application tag 15), 91 bytes','30 59','0f','15 = AP-REP',true).concat([
+   ['Encrypted part header','a2 4d','77 bytes',''],
+   ['Encrypted part','30 4b a0 03 +73','the client’s timestamp, echoed','Only a server holding the service key could have recovered the session key needed to produce this.','e']])}],
+ quiz:[
+ {q:'Which key encrypts a Kerberos service ticket?',a:['The service account’s key','The user’s password-derived key','The TGS session key','The KDC’s public key'],why:'That is why the client cannot read it, and why a weak service account password enables Kerberoasting.'},
+ {q:'What does the encrypted timestamp in AS-REQ prove?',a:['The requester knows the user’s password','The KDC is genuine','The clock is set to UTC','The ticket has not expired'],why:'Pre-authentication stops the KDC from handing out crackable material to anyone who asks.'}]}
+);
+
+var TWIN='02 1a 11 f0 0d 66', EVIL_IP='c6 33 64 42';
+function mgmt(fc,fcTxt,fcWhy,da,sa,bss,saWhy,saFlag){var r=[
+  ['Frame control',fc,fcTxt,fcWhy||''],
+  ['Duration','00 00','0',''],
+  ['Destination MAC',da,da===BC?'broadcast':m(da),''],
+  ['Source MAC',sa,m(sa),saWhy||''],
+  ['BSSID',bss,m(bss),''],
+  ['Sequence control','20 00','seq 2','']];
+  if(saFlag)r[3].push(saFlag); return r;}
+var SSID=['SSID element','00 0a 43 61 6d 70 75 73 57 69 46 69','CampusWiFi','The network name. Anyone can broadcast any name.'];
+var RATES=['Supported rates','01 08 82 84 8b 96 0c 12 18 24','1 to 18 Mb/s',''];
+
+P.push(
+{id:'arpspoof',name:'ARP spoofing',evil:1,nodes:['Victim PC','Attacker','Router'],icons:['pc','attacker','router'],
+ goals:['Explain how two forged ARP replies put an attacker in the middle.','Spot the forged field in a spoofed ARP reply.','Name the switch feature that prevents it.'],
+ intro:'<strong>ARP spoofing</strong> turns a neighbour on the LAN into an invisible relay. The attacker lies to the victim about the router, and to the router about the victim.',
+ steps:[
+ {from:1,to:0,bad:true,title:'Forged reply to the victim',stack:['Ethernet','ARP'],
+  say:'Nobody asked, but the attacker tells the victim: “192.168.1.1 is at my MAC address.” The victim updates its cache.',
+  f:eth(PCM,BADM,'08 06').concat(arp('00 02',BADM,RTI,PCM,PCI,'The lie. This is the attacker’s MAC paired with the router’s IP. ARP has no way to check it.','x'))},
+ {from:1,to:2,bad:true,title:'Forged reply to the router',stack:['Ethernet','ARP'],
+  say:'The attacker tells the router the mirror-image lie: “192.168.1.50 is at my MAC.” Now both directions flow through the attacker.',
+  f:eth(RTM,BADM,'08 06').concat(arp('00 02',BADM,PCI,RTM,RTI,'The attacker’s MAC paired with the victim’s IP.','x'))},
+ {from:0,to:1,title:'Victim sends traffic',stack:['Ethernet','IPv4','ICMP'],
+  say:'The victim sends a packet to the internet. The IP header is correct, but the frame is addressed to the attacker.',
+  f:eth(BADM,PCM,'08 00','The victim believes this is the router. The switch delivers the frame to the attacker’s port.').concat(ip4('00 54','01',PCI,WEB),ICMP)},
+ {from:1,to:2,bad:true,title:'Attacker relays it',stack:['Ethernet','IPv4','ICMP'],
+  say:'The attacker reads or alters the packet, then forwards it so nothing appears broken. Unencrypted traffic is fully exposed.',
+  f:eth(RTM,BADM,'08 00','','The only trace: the frame arrives from the attacker’s MAC rather than the victim’s.').concat(ip4('00 54','01',PCI,WEB,'Unchanged, so replies come back the same way.'),ICMP)},
+ {from:2,to:1,title:'Return traffic',stack:['Ethernet','IPv4','ICMP'],
+  say:'The reply takes the poisoned path too. Defenses: Dynamic ARP Inspection on the switch, which checks ARP against the DHCP snooping table, and end-to-end encryption, which makes the intercepted traffic unreadable.',
+  f:eth(BADM,RTM,'08 00','The router’s cache is poisoned as well.').concat(ip4('00 54','01',WEB,PCI),[
+   ['ICMP type, code','00 00','echo reply',''],
+   ['ICMP checksum','ff 4b','illustrative',''],
+   ['Identifier, sequence','00 01 00 01','id 1, seq 1',''],
+   ['Data','61 62 63 64 +52','56 bytes','']])}],
+ quiz:[
+ {q:'In an ARP spoofing attack, what does the attacker forge?',a:['The sender MAC paired with someone else’s IP','The destination IP address','The TCP sequence number','The DNS transaction ID'],why:'The attacker claims the router’s (or victim’s) IP belongs to the attacker’s MAC.'},
+ {q:'Which control stops ARP spoofing at the switch?',a:['Dynamic ARP Inspection','Port security alone','A longer DHCP lease','Disabling ICMP'],why:'DAI validates ARP packets against trusted IP-to-MAC bindings and drops mismatches.'}]},
+
+{id:'dnspoison',name:'DNS cache poisoning',evil:1,nodes:['Resolver','Attacker','Zone NS'],icons:['server','attacker','server'],
+ goals:['List what an off-path attacker must guess to forge a DNS response.','Explain how the Kaminsky technique poisons a whole zone.','Match each defense to the part of the attack it defeats.'],
+ intro:'<strong>Cache poisoning</strong> races a forged answer against the real one. If the resolver accepts the forgery, every user of that resolver is redirected until the record expires.',
+ steps:[
+ {from:1,to:0,bad:true,title:'Trigger a lookup',stack:['UDP 53','DNS'],
+  say:'The attacker asks the resolver for a name that cannot be cached, forcing it to query the authoritative server right now.',
+  f:dnsHdr('02 9a','01 00','standard query, RD = 1','','00','00').concat([
+   ['Query name','09 72 61 6e 64 6f 6d 31 32 33 07 65 78 61 6d 70 6c 65 03 63 6f 6d 00','random123.example.com.','A fresh random label each attempt means the attacker can try again immediately instead of waiting for a TTL to expire.'],
+   ['Query type + class','00 01 00 01','A, IN','']])},
+ {from:0,to:2,title:'Resolver asks the real server',stack:['IPv4','UDP','DNS'],
+  say:'The resolver sends its query. The attacker cannot see this packet, so it does not know the source port or transaction ID.',
+  f:udp('c3 5f','00 35','00 2f','50015: random per query. Before 2008 many resolvers used a fixed port, leaving only the 16-bit ID to guess.','53').concat(
+   dnsHdr('6e 12','00 00','standard query','','00','00'),[
+   ['Query name','09 72 61 6e 64 6f 6d 31 32 33 07 65 78 61 6d 70 6c 65 03 63 6f 6d 00','random123.example.com.',''],
+   ['Query type + class','00 01 00 01','A, IN','']])},
+ {from:1,to:0,bad:true,title:'Flood of forged answers',stack:['IPv4','UDP','DNS'],
+  say:'The attacker fires thousands of fake responses, each guessing a different port and ID, with the source address spoofed to look like the real name server.',
+  f:ip4('00 65','11','c0 00 02 35',RTI,'Spoofed: this is the real name server’s address. UDP has no handshake, so nothing verifies it.').concat(
+   udp('00 35','c3 5f','00 51','53','A guess. Must match the resolver’s source port.'),[
+   ['Transaction ID','6e 12','0x6e12','A guess. One in 65,536, multiplied by the number of possible ports.','x'],
+   ['Flags','84 00','response, authoritative',''],
+   ['Counts','00 01 00 00 00 01 00 01','1 question, 0 answers, 1 authority, 1 additional',''],
+   ['Question','09 72 61 6e 64 6f 6d 31 32 33 07 65 78 61 6d 70 6c 65 03 63 6f 6d 00 00 01 00 01','random123.example.com. A',''],
+   ['Authority: NS record','c0 16 00 02 00 01 00 01 51 80 00 06 03 6e 73 31 c0 16','example.com NS ns1.example.com','The Kaminsky twist: rather than forging one address, forge the delegation for the whole zone.','x'],
+   ['Additional: glue header','c0 33 00 01 00 01 00 01 51 80 00 04','ns1.example.com A, TTL 86400',''],
+   ['Glue address',EVIL_IP,'198.51.100.66 (the attacker)','If accepted, the resolver sends every future example.com query to the attacker for a day.','x']])},
+ {from:2,to:0,title:'Real answer arrives late',stack:['IPv4','UDP','DNS'],
+  say:'If a forgery matched first, the genuine reply is discarded as a duplicate. Defenses: random source ports and IDs make guessing impractical, and DNSSEC makes it pointless, because the forged records carry no valid signature.',
+  f:udp('00 35','c3 5f','00 2f').concat([
+   ['Transaction ID','6e 12','0x6e12',''],
+   ['Flags','84 03','response, authoritative, NXDOMAIN','The honest answer: no such name.'],
+   ['Counts','00 01 00 00 00 00 00 00','1 question',''],
+   ['Question','09 72 61 6e 64 6f 6d 31 32 33 07 65 78 61 6d 70 6c 65 03 63 6f 6d 00 00 01 00 01','random123.example.com. A','']])}],
+ quiz:[
+ {q:'What must an off-path attacker guess to forge a DNS response?',a:['The transaction ID and the resolver’s source port','The server’s private key','The TTL of the record','The victim’s MAC address'],why:'Together they give about 32 bits of unpredictability when both are random.'},
+ {q:'Why does DNSSEC defeat cache poisoning?',a:['Forged records fail signature validation','It encrypts the query','It hides the resolver’s IP address','It uses TCP instead of UDP'],why:'Winning the race no longer helps, because the attacker cannot produce a valid RRSIG.'}]},
+
+{id:'downgrade',name:'TLS downgrade',evil:1,nodes:['Browser','Attacker','Web server'],icons:['pc','attacker','server'],
+ goals:['Show which ClientHello fields an on-path attacker edits to force an older version.','Explain how the TLS 1.3 downgrade sentinel exposes the tampering.','Name two historical attacks that relied on downgrade.'],
+ intro:'A <strong>downgrade attack</strong> does not break strong cryptography. It tricks both ends into choosing weak cryptography. TLS 1.3 was built to make the trick detectable.',
+ steps:[
+ {from:0,to:1,title:'Honest ClientHello',stack:['TCP 443','TLS record','Handshake'],
+  say:'The browser offers TLS 1.3 and 1.2. The attacker, sitting on the path, intercepts it.',
+  f:[['Record + handshake headers','16 03 01 00 b2 01 00 00 ae','ClientHello, 174 bytes',''],
+   ['Legacy version','03 03','TLS 1.2',''],
+   ['Random + session ID','8f 2c 51 0a +61','65 bytes',''],
+   ['Cipher suites','00 0a 13 01 13 02 13 03 c0 2f c0 30','three TLS 1.3 suites, two TLS 1.2 ECDHE suites',''],
+   ['Compression','01 00','null',''],
+   ['Extensions length','00 5b','91 bytes',''],
+   ['SNI, groups, signature algorithms','00 00 00 10 +36','example.com, x25519',''],
+   ['Ext: supported_versions','00 2b 00 05 04 03 04 03 03','TLS 1.3, TLS 1.2','The real version offer.'],
+   ['Ext: key_share','00 33 00 26 +38','x25519 public key','']]},
+ {from:1,to:2,bad:true,title:'Tampered ClientHello',stack:['TCP 443','TLS record','Handshake'],
+  say:'The attacker rewrites the offer: TLS 1.3 is gone and a weak suite is the best on the list.',
+  f:[['Record + handshake headers','16 03 01 00 79 01 00 00 75','ClientHello, 117 bytes','Lengths recomputed so the message still parses.'],
+   ['Legacy version','03 03','TLS 1.2',''],
+   ['Random + session ID','8f 2c 51 0a +61','unchanged',''],
+   ['Cipher suites','00 04 00 2f 00 0a','RSA_AES_128_CBC_SHA, RSA_3DES_EDE_CBC_SHA','Static RSA with CBC and SHA-1, or 3DES. No forward secrecy and a long history of attacks.','x'],
+   ['Compression','01 00','null',''],
+   ['Extensions length','00 28','40 bytes','supported_versions and key_share have been deleted, so the server sees a TLS 1.2-only client.','x'],
+   ['SNI, groups, signature algorithms','00 00 00 10 +36','unchanged','']]},
+ {from:2,to:0,title:'ServerHello with sentinel',stack:['TCP 443','TLS record','Handshake'],
+  say:'The server supports TLS 1.3 but has been asked for 1.2. It complies, and leaves a warning in the one place the attacker cannot safely change.',
+  f:[['Record + handshake headers','16 03 03 00 4a 02 00 00 46','ServerHello, 70 bytes',''],
+   ['Version','03 03','TLS 1.2',''],
+   ['Server random (first 24 bytes)','e1 06 4d 92 +20','random',''],
+   ['Downgrade sentinel','44 4f 57 4e 47 52 44 01','ASCII “DOWNGRD” + 01','A TLS 1.3 server that negotiates 1.2 must end its random with these bytes. The random is covered by the server’s signature, so an attacker who alters it breaks the handshake anyway.'],
+   ['Session ID','20 51 b8 0c 77 +28','32 bytes',''],
+   ['Cipher suite','00 2f','TLS_RSA_WITH_AES_128_CBC_SHA','The weak suite the attacker wanted.'],
+   ['Compression','00','null','']]},
+ {from:0,to:2,title:'Browser aborts',stack:['TCP 443','TLS record','Alert'],
+  say:'The browser offered TLS 1.3, got 1.2, and sees the sentinel. It knows something on the path interfered and ends the connection.',
+  f:[['Record header','15 03 03 00 02','Alert, 2 bytes',''],
+   ['Alert level','02','fatal',''],
+   ['Alert description','2f','47 = illegal_parameter','The attack fails closed: no connection rather than a weak one. Older attacks such as POODLE, FREAK and Logjam succeeded because clients and servers still accepted obsolete versions or export-grade ciphers. Disabling them is the other half of the defense.']]}],
+ quiz:[
+ {q:'How does a TLS 1.3 client detect a forced downgrade to TLS 1.2?',a:['A sentinel value in the last 8 bytes of the server random','The certificate has expired','The SNI does not match','The record length is wrong'],why:'The sentinel is protected by the server’s signature, so removing it breaks the handshake.'},
+ {q:'What is the most reliable defense against downgrade attacks on older protocol versions?',a:['Disable the old versions and weak suites entirely','Use a longer certificate key','Rotate session IDs','Increase the TCP window'],why:'A protocol or cipher that neither side accepts cannot be negotiated.'}]},
+
+{id:'eviltwin',name:'Evil twin',evil:1,nodes:['Laptop','Evil twin','Real AP'],icons:['laptop','attacker','ap'],
+ goals:['Explain why a client cannot tell two access points with the same SSID apart.','Describe the role of a forged deauthentication frame.','Choose defenses for personal and enterprise Wi-Fi.'],
+ intro:'An <strong>evil twin</strong> is a rogue access point that copies a real network’s name. Wi-Fi clients choose by name and signal strength, so the loudest twin wins.',
+ steps:[
+ {from:2,to:0,title:'Real beacon',stack:['802.11 management','Beacon'],
+  say:'The legitimate access point advertises itself about ten times a second.',
+  f:mgmt('80 00','Management / Beacon','',BC,RTM,RTM).concat([
+   ['Timestamp','80 d1 f0 08 00 00 00 00','microseconds since the AP started',''],
+   ['Beacon interval','64 00','100 time units (about 102 ms)',''],
+   ['Capabilities','11 04','ESS, Privacy','Privacy = encryption required.'],
+   SSID,RATES,
+   ['Channel','03 01 06','channel 6',''],
+   ['RSN element','30 14 01 00 00 0f ac 04 01 00 00 0f ac 04 01 00 00 0f ac 02 00 00','WPA2, CCMP, PSK, management frame protection off','The last two bytes are the RSN capabilities. Zero means management frames are unprotected, which the attacker is about to exploit.']])},
+ {from:1,to:0,bad:true,title:'Twin beacon',stack:['802.11 management','Beacon'],
+  say:'The attacker broadcasts the same name on the same channel at higher power, as an open network so that anyone can join.',
+  f:mgmt('80 00','Management / Beacon','',BC,TWIN,TWIN,'A different BSSID, but users only ever see the network name.').concat([
+   ['Timestamp','10 2a 03 00 00 00 00 00','recently started',''],
+   ['Beacon interval','64 00','100 time units',''],
+   ['Capabilities','01 04','ESS, no Privacy','Open network: no encryption.','x'],
+   ['SSID element','00 0a 43 61 6d 70 75 73 57 69 46 69','CampusWiFi','Copied exactly.','x'],
+   RATES,
+   ['Channel','03 01 06','channel 6','']])},
+ {from:1,to:0,bad:true,title:'Forged deauthentication',stack:['802.11 management','Deauthentication'],
+  say:'To hurry things along, the attacker kicks the laptop off the real network by impersonating the real access point.',
+  f:mgmt('c0 00','Management / Deauthentication','',PCM,RTM,RTM,'Spoofed. The attacker sends this, but writes the real access point’s address here.','x').concat([
+   ['Reason code','07 00','7 = class 3 frame from non-associated station','Without management frame protection (802.11w) the laptop cannot tell this is forged and disconnects. WPA3 makes that protection mandatory.']])},
+ {from:0,to:1,title:'Laptop joins the twin',stack:['802.11 management','Association request'],
+  say:'The laptop looks for “CampusWiFi” again, finds the stronger signal, and associates. A device set to auto-join does this without asking.',
+  f:mgmt('00 00','Management / Association request','',TWIN,PCM,TWIN).concat([
+   ['Capabilities','01 04','ESS',''],
+   ['Listen interval','0a 00','10 beacons',''],
+   SSID,RATES])},
+ {from:1,to:0,bad:true,title:'Fake login page',stack:['TCP 80','HTTP'],
+  say:'Every web request now goes through the attacker, who answers with a convincing “captive portal”.',
+  f:[S('Status line','HTTP/1.1 200 OK',''),
+   S('Content-Type','Content-Type: text/html',''),
+   ['End of headers','0d 0a','blank line',''],
+   ['Body','s:<form action="/save"> Wi-Fi password: <input name="psk"> </form>','a form asking for the Wi-Fi password','Whatever the user types is sent to the attacker. Defenses: WPA3 or 802.11w so deauthentication cannot be forged; 802.1X with server certificate validation so the laptop authenticates the network; and never typing credentials into an unexpected portal.','x']]}],
+ quiz:[
+ {q:'Why does a forged deauthentication frame work on many WPA2 networks?',a:['Management frames are not authenticated without 802.11w','The attacker knows the pre-shared key','Beacons are encrypted','The laptop’s MAC address is random'],why:'Protected Management Frames are optional in WPA2 and mandatory in WPA3.'},
+ {q:'On an enterprise (802.1X) network, what stops a laptop from handing credentials to an evil twin?',a:['Validating the RADIUS server’s certificate','Hiding the SSID','MAC address filtering','A longer password'],why:'Without certificate validation the laptop will run PEAP with any server, including the attacker’s.'}]}
+);
+
+var OLD_GOALS={
+ tls:['Identify which handshake messages are cleartext and which are encrypted.','Explain how sending a key share in ClientHello saves a round trip.','Describe what SNI reveals to an observer.'],
+ ssh:['Order the SSH phases: version, algorithm negotiation, key exchange, authentication.','Explain what the host key signature proves and when it does not help.','State where in the exchange the user name first appears.'],
+ wpa3:['Distinguish the SAE exchange from the 4-way handshake.','Explain why a captured SAE handshake cannot be cracked offline.','Name the keys derived along the way: PMK, PTK, GTK.'],
+ dot1x:['Name the three 802.1X roles and what each one sees.','Follow an EAP message as it is re-wrapped in RADIUS.','Read the attributes in an Access-Accept.'],
+ ipsec:['Separate what IKE_SA_INIT and IKE_AUTH each accomplish.','List what stays visible in an ESP tunnel-mode packet.','Explain the purpose of the SPI and sequence number.'],
+ wg:['Describe the two-message WireGuard handshake.','Explain why a WireGuard endpoint is silent to unauthenticated probes.','Contrast fixed cryptography with negotiated cipher suites.'],
+ dnssec:['Follow the chain of trust from an A record to the parent’s DS record.','Tell RRSIG, DNSKEY and DS records apart.','State what DNSSEC does not protect.']
+};
+P.forEach(function(p){ if(!p.goals&&OLD_GOALS[p.id])p.goals=OLD_GOALS[p.id]; });
+
+var GROUPS=[
+ {id:'web',name:'Web trip',blurb:'From plugging in to loading a page. Start here.',ids:['dhcp','arp','dns','tcp','http']},
+ {id:'sec',name:'Encryption',blurb:'Protocols that protect data in transit.',ids:['tls','tls12','quic','ssh','smtp','doh','dnssec']},
+ {id:'net',name:'Access & VPN',blurb:'Proving who you are and tunnelling between networks.',ids:['wpa3','dot1x','krb','ipsec','wg']},
+ {id:'atk',name:'Attacks',blurb:'What goes wrong when the earlier protocols are trusted too much. Forged packets are marked.',ids:['arpspoof','dnspoison','downgrade','eviltwin']}
+];
+
+var GLOSSARY=[
+ ['AD bit','DNS header flag set by a validating resolver to say the answer passed DNSSEC checks.'],
+ ['AEAD','Authenticated encryption with associated data. A cipher mode, such as AES-GCM or ChaCha20-Poly1305, that encrypts and integrity-protects in one step.'],
+ ['ARP','Address Resolution Protocol. Maps an IPv4 address to a MAC address on the local network.'],
+ ['AS-REP roasting','Requesting an AS-REP for an account without pre-authentication and cracking its encrypted part offline.'],
+ ['Authenticator (802.1X)','The switch or access point that controls the port and relays EAP to the authentication server.'],
+ ['Authenticator (Kerberos)','An encrypted timestamp sent with a ticket to prove the sender holds the session key.'],
+ ['Beacon','A management frame an access point broadcasts to advertise its network.'],
+ ['BSSID','The MAC address that identifies one access point radio.'],
+ ['Certificate','A signed statement binding a public key to a name, such as a host name.'],
+ ['Cipher suite','A named combination of cryptographic algorithms that the two sides agree to use.'],
+ ['Ciphertext','Encrypted data. Without the key it should be indistinguishable from random bytes.'],
+ ['Connection ID','QUIC’s identifier for a connection, independent of IP address and port.'],
+ ['Cookie (HTTP)','A value the server asks the browser to send back on later requests, commonly a session identifier.'],
+ ['DHCP snooping','A switch feature that drops DHCP server messages from untrusted ports and records which address each port was given.'],
+ ['Diffie-Hellman','A key exchange in which two parties derive a shared secret from values sent in the open.'],
+ ['DO bit','EDNS flag in a DNS query asking for DNSSEC records in the response.'],
+ ['Downgrade attack','Forcing two parties to negotiate a weaker protocol version or cipher than both support.'],
+ ['DS record','A hash of a child zone’s key, published and signed in the parent zone.'],
+ ['Dynamic ARP Inspection','A switch feature that validates ARP packets against known IP-to-MAC bindings.'],
+ ['EAP','Extensible Authentication Protocol. A framework that carries authentication methods such as PEAP or EAP-TLS.'],
+ ['Ephemeral key','A key pair generated for one session and then discarded.'],
+ ['ESP','Encapsulating Security Payload. The IPsec protocol that encrypts and authenticates packets.'],
+ ['Forward secrecy','Property that past sessions stay secret even if a long-term key is later stolen.'],
+ ['Glue record','An address included with a DNS referral so the resolver can reach the name server it was referred to.'],
+ ['GTK','Group Temporal Key. Encrypts broadcast and multicast Wi-Fi traffic.'],
+ ['HMAC','A keyed hash used to verify integrity and authenticity.'],
+ ['ICV','Integrity Check Value. The authentication tag on an ESP or IKE packet.'],
+ ['IKE','Internet Key Exchange. Authenticates IPsec peers and sets up their keys.'],
+ ['ISN','Initial Sequence Number. The random starting point for a TCP connection’s byte numbering.'],
+ ['KDC','Key Distribution Center. The Kerberos server that issues tickets; a domain controller in Active Directory.'],
+ ['Kerberoasting','Requesting service tickets and cracking them offline to recover service account passwords.'],
+ ['MAC address','A 48-bit link-layer address that identifies a network interface on a LAN.'],
+ ['MIC','Message Integrity Code. A keyed checksum, used in the Wi-Fi 4-way handshake.'],
+ ['Nonce','A number used once, contributing freshness to a key derivation or an encryption.'],
+ ['On-path attacker','Someone positioned between two parties who can read and change traffic. Also called man-in-the-middle.'],
+ ['PMK','Pairwise Master Key. The shared secret a Wi-Fi client and access point start the 4-way handshake with.'],
+ ['PTK','Pairwise Transient Key. The per-session Wi-Fi keys derived from the PMK and two nonces.'],
+ ['RADIUS','A protocol that carries authentication requests from network devices to a central server.'],
+ ['Referral','A DNS response that points to other name servers instead of answering.'],
+ ['RRSIG','A DNSSEC record holding the signature over a set of records.'],
+ ['SAE','Simultaneous Authentication of Equals. The password-based key exchange used by WPA3-Personal.'],
+ ['SNI','Server Name Indication. The host name a TLS client sends in its ClientHello, normally unencrypted.'],
+ ['SPI','Security Parameter Index. A number in each IPsec packet identifying which security association applies.'],
+ ['SPN','Service Principal Name. The Kerberos name of a service, such as cifs/files.example.org.'],
+ ['STARTTLS','A command that upgrades a cleartext connection to TLS on the same port.'],
+ ['Supplicant','The device or software asking for network access in 802.1X.'],
+ ['TGT','Ticket-Granting Ticket. The Kerberos ticket used to request other tickets.'],
+ ['Trust on first use','Accepting a key the first time it is seen and warning if it later changes, as SSH does with host keys.'],
+ ['TTL','Time to live. In IP, a hop limit. In DNS, how long a record may be cached.'],
+ ['X25519','A widely used elliptic-curve Diffie-Hellman function.']
+];
+
+/*END*/
+
+function parseBytes(spec){
+  var out={shown:[],more:0};
+  if(spec.slice(0,2)==='s:'){
+    for(var i=2;i<spec.length;i++){var h=spec.charCodeAt(i).toString(16);out.shown.push(h.length<2?'0'+h:h);}
+    return out;
+  }
+  spec.split(' ').forEach(function(t){ if(!t)return; if(t.charAt(0)==='+')out.more+=parseInt(t.slice(1),10); else out.shown.push(t); });
+  return out;
+}
+function rng(seed){return function(){seed=(seed+0x6D2B79F5)|0;var t=Math.imul(seed^(seed>>>15),1|seed);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var x=a[i];a[i]=a[j];a[j]=x;}return a;}
+function el(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
+function $(id){return document.getElementById(id);}
+
+var BY={}, IDX={}, GOF={}, TOTAL=0;
+P.forEach(function(p,i){BY[p.id]=p;IDX[p.id]=i;});
+GROUPS.forEach(function(g){g.ids.forEach(function(id){GOF[id]=g.id;TOTAL++;});});
+var GBY={};GROUPS.forEach(function(g){GBY[g.id]=g;});
+var VIEWS=GROUPS.map(function(g){return {id:g.id,name:g.name};}).concat([{id:'gloss',name:'Glossary'},{id:'final',name:'Final quiz'}]);
+
+var KEY='wire-decoder-v2';
+var st={view:'web',lesson:{},s:0,mode:'wire',sel:-1};
+var prog={seen:{},done:{},best:null};
+GROUPS.forEach(function(g){st.lesson[g.id]=g.ids[0];});
+try{
+  var sv=JSON.parse(localStorage.getItem(KEY));
+  if(sv){
+    if(sv.mode==='dec')st.mode='dec';
+    if(sv.lesson)GROUPS.forEach(function(g){if(g.ids.indexOf(sv.lesson[g.id])>=0)st.lesson[g.id]=sv.lesson[g.id];});
+    if(VIEWS.some(function(v){return v.id===sv.view;}))st.view=sv.view;
+    if(sv.prog){prog.seen=sv.prog.seen||{};prog.done=sv.prog.done||{};prog.best=sv.prog.best==null?null:sv.prog.best;}
+  }
+}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({view:st.view,lesson:st.lesson,mode:st.mode,prog:prog}));}catch(e){}}
+function cur(){return BY[st.lesson[st.view]];}
+
+var timer=null, pkt=null;
+var LOCK='<svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true"><path fill="currentColor" d="M6 0a4 4 0 0 0-4 4v2H1v8h10V6h-1V4a4 4 0 0 0-4-4zm0 2a2 2 0 0 1 2 2v2H4V4a2 2 0 0 1 2-2z"/></svg>';
+var SV='<svg class="ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+var ICON={
+  pc:'<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M12 16v4M8 20h8"/>',
+  laptop:'<rect x="5" y="5" width="14" height="10" rx="1.2"/><path d="M2 19h20l-2-4H4z"/>',
+  server:'<rect x="4" y="3" width="16" height="8" rx="1.5"/><rect x="4" y="13" width="16" height="8" rx="1.5"/><path d="M7.5 7h.01M7.5 17h.01M12 7h5M12 17h5"/>',
+  ap:'<rect x="4" y="15" width="16" height="5" rx="1.5"/><path d="M12 15v-3M8.5 9.5a5 5 0 0 1 7 0M5.5 6.5a9.2 9.2 0 0 1 13 0"/>',
+  'switch':'<rect x="2" y="8" width="20" height="8" rx="1.5"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/>',
+  router:'<circle cx="12" cy="12" r="9"/><path d="M7 12h10M14.5 9.5L17 12l-2.5 2.5M9.5 9.5L7 12l2.5 2.5M12 5.5v3M12 15.5v3"/>',
+  attacker:'<path d="M3 11h18M6.5 11l1.5-6h8l1.5 6"/><circle cx="8.5" cy="15.5" r="2.5"/><circle cx="15.5" cy="15.5" r="2.5"/><path d="M11 15.5h2"/>'
+};
+
+/* ---------- navigation ---------- */
+function buildViews(){
+  var nv=$('views');
+  VIEWS.forEach(function(v){
+    var b=el('button',null,v.name);b.type='button';b.dataset.v=v.id;
+    b.addEventListener('click',function(){showView(v.id);});
+    nv.appendChild(b);
+  });
+}
+function showView(v){
+  stop(); st.view=v; save();
+  var bs=$('views').children;
+  for(var i=0;i<bs.length;i++){ if(bs[i].dataset.v===v){bs[i].setAttribute('aria-current','true');bs[i].scrollIntoView({block:'nearest',inline:'nearest'});} else bs[i].removeAttribute('aria-current'); }
+  var isLesson=!!GBY[v];
+  $('v-lessons').hidden=!isLesson; $('v-gloss').hidden=v!=='gloss'; $('v-final').hidden=v!=='final';
+  if(isLesson){ $('blurb').textContent=GBY[v].blurb; buildTabs(); pick(st.lesson[v]); }
+  if(v==='final')$('fbest').textContent=prog.best==null?'':'Best score so far: '+prog.best+' out of 10.';
+}
+function tabLabel(b,p){
+  b.textContent='';
+  if(prog.done[p.id]){b.appendChild(document.createTextNode('✓ '));var s=el('span','sr','completed: ');b.appendChild(s);}
+  b.appendChild(document.createTextNode(p.name));
+}
+function buildTabs(){
+  var tl=$('tabs'); tl.textContent='';
+  GBY[st.view].ids.forEach(function(id){
+    var p=BY[id], b=el('button');b.type='button';b.id='tab-'+id;b.dataset.id=id;b.setAttribute('role','tab');b.setAttribute('aria-controls','lesson');
+    tabLabel(b,p);
+    b.addEventListener('click',function(){pick(id);});
+    tl.appendChild(b);
+  });
+}
+$('tabs').addEventListener('keydown',function(e){
+  var d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0; if(!d)return;
+  e.preventDefault(); var ids=GBY[st.view].ids, n=(ids.indexOf(st.lesson[st.view])+d+ids.length)%ids.length;
+  pick(ids[n]); $('tab-'+ids[n]).focus();
+});
+function updateProgress(){
+  var n=0; for(var k in prog.done)if(prog.done[k]&&BY[k])n++;
+  $('prog').max=TOTAL; $('prog').value=n; $('progl').textContent=n+' of '+TOTAL+' lessons completed';
+}
+
+/* ---------- lesson ---------- */
+function pos(i,n){return ((i+0.5)/n*100)+'%';}
+function ppos(i,n){var W=$('stage').clientWidth,w=pkt.offsetWidth/2,c=(i+0.5)/n*W;return Math.min(W-w,Math.max(w,c))+'px';}
+
+function pick(id){
+  stop(); st.lesson[st.view]=id; st.s=0; st.sel=-1; save();
+  var p=BY[id], tl=$('tabs').children;
+  for(var k=0;k<tl.length;k++){var on=tl[k].dataset.id===id;tl[k].setAttribute('aria-selected',on?'true':'false');tl[k].tabIndex=on?0:-1;if(on)tl[k].scrollIntoView({block:'nearest',inline:'nearest'});}
+  $('lesson').setAttribute('aria-labelledby','tab-'+id);
+  $('intro').innerHTML=p.intro;
+  var gl=$('goals'); gl.textContent=''; (p.goals||[]).forEach(function(g){gl.appendChild(el('li',null,g));});
+  var sg=$('stage'); sg.textContent='';
+  sg.appendChild(el('div','lane'));
+  p.nodes.forEach(function(n,k){
+    var d=el('div','node'+(p.evil===k?' evil':''));d.innerHTML=SV+ICON[p.icons[k]]+'</svg>';d.appendChild(el('span',null,n));
+    d.style.left=pos(k,p.nodes.length);d.style.width='calc('+(100/p.nodes.length)+'% - 8px)';sg.appendChild(d);
+    var dr=el('div','drop');dr.style.left=pos(k,p.nodes.length);sg.appendChild(dr);
+  });
+  pkt=el('div','pkt jump');sg.appendChild(pkt);
+  var ol=$('steps'); ol.textContent='';
+  p.steps.forEach(function(s,k){
+    var li=el('li'),b=el('button');b.type='button';
+    var w=el('span'),t=el('span','t',s.title);
+    if(s.bad)t.appendChild(el('span','tag','forged'));
+    w.appendChild(t);w.appendChild(el('span','dir',p.nodes[s.from]+' → '+p.nodes[s.to]));
+    b.appendChild(w);b.addEventListener('click',function(){stop();go(k);});
+    li.appendChild(b);ol.appendChild(li);
+  });
+  buildQuiz(p);
+  go(0);
+}
+
+function go(k){
+  var p=cur(); st.s=k; st.sel=-1; var s=p.steps[k], n=p.nodes.length;
+  var seen=prog.seen[p.id]||(prog.seen[p.id]=[]);
+  if(seen.indexOf(k)<0)seen.push(k);
+  if(!prog.done[p.id]&&seen.length>=p.steps.length){prog.done[p.id]=true;var tb=$('tab-'+p.id);if(tb)tabLabel(tb,p);updateProgress();}
+  save();
+  var nodes=$('stage').querySelectorAll('.node');
+  for(var i=0;i<nodes.length;i++)nodes[i].classList.toggle('on',i===s.from||i===s.to);
+  var enc=s.f.some(function(f){return f[4]==='e';});
+  pkt.innerHTML=(enc?LOCK:'')+'<span></span>'; pkt.lastChild.textContent=(s.bad?'⚠ ':'')+s.title;
+  pkt.classList.toggle('bad',!!s.bad);
+  pkt.classList.add('jump'); pkt.style.left=ppos(s.from,n);
+  void pkt.offsetWidth; pkt.classList.remove('jump'); pkt.style.left=ppos(s.to,n);
+  var sb=$('steps').querySelectorAll('button');
+  for(i=0;i<sb.length;i++){if(i===k)sb[i].setAttribute('aria-current','step');else sb[i].removeAttribute('aria-current');}
+  $('prev').disabled=k===0; $('next').disabled=k===p.steps.length-1;
+  $('count').textContent='Step '+(k+1)+' of '+p.steps.length;
+  $('h-pkt').textContent=(k+1)+'. '+s.title+' · '+p.nodes[s.from]+' → '+p.nodes[s.to]+(s.bad?' · forged by the attacker':'');
+  $('say').textContent=s.say;
+  var sk=$('stack');sk.textContent='';s.stack.forEach(function(x){sk.appendChild(el('li',null,x));});
+  renderPacket();
+}
+
+function fieldLen(f){var b=parseBytes(f[1]);return b.shown.length+b.more;}
+
+function renderPacket(){
+  var p=cur(), s=p.steps[st.s], hex=$('hex'), fl=$('fields'), total=0, hidden=0;
+  hex.textContent=''; fl.textContent='';
+  $('v-wire').setAttribute('aria-pressed',st.mode==='wire'?'true':'false');
+  $('v-dec').setAttribute('aria-pressed',st.mode==='dec'?'true':'false');
+  s.f.forEach(function(f,i){
+    var b=parseBytes(f[1]), len=b.shown.length+b.more, enc=f[4]==='e', forged=f[4]==='x', cipher=enc&&st.mode==='wire';
+    total+=len; if(enc)hidden+=len;
+    var shown=b.shown;
+    if(cipher){var r=rng(IDX[p.id]*7919+st.s*104729+i*31+17);shown=shown.map(function(){var h=Math.floor(r()*256).toString(16);return h.length<2?'0'+h:h;});}
+    var run=el('button','run h'+(i%6)+(cipher?' cipher':'')+(forged?' forged':''));run.type='button';run.dataset.i=i;
+    run.setAttribute('aria-label',f[0]+', '+len+' bytes'+(cipher?', encrypted':'')+(forged?', forged':''));
+    run.appendChild(document.createTextNode(shown.join(' ')));
+    if(b.more){run.appendChild(document.createTextNode(' '));run.appendChild(el('span','more','+'+b.more));}
+    hex.appendChild(run); hex.appendChild(document.createTextNode(' '));
+
+    var li=el('li'), row=el('button','frow h'+(i%6));row.type='button';row.dataset.i=i;row.setAttribute('aria-expanded','false');
+    row.appendChild(el('span','n',f[0]));
+    row.appendChild(el('span','b',len+(len===1?' byte':' bytes')));
+    var v=el('span','v');
+    if(cipher){v.appendChild(el('span','lock','Encrypted'));v.appendChild(document.createTextNode(' · ciphertext only'));}
+    else{
+      if(enc)v.appendChild(el('span','lock','Decrypted: '));
+      if(forged)v.appendChild(el('span','warn','⚠ Forged: '));
+      v.appendChild(document.createTextNode(f[2]||''));
+    }
+    row.appendChild(v); li.appendChild(row);
+    var d=el('p','desc'); d.hidden=true;
+    d.textContent=cipher?'An eavesdropper sees only random-looking bytes here. Switch to “Decrypted” to see what the endpoint reads.':(f[3]||(f[2]?f[0]+': '+f[2]+'.':f[0]+'.'));
+    li.appendChild(d); fl.appendChild(li);
+  });
+  $('size').textContent=total+' bytes · '+(hidden?Math.round(hidden/total*100)+'% encrypted':'all cleartext');
+  if(st.sel>=0)select(st.sel,false);
+}
+
+function select(i,scroll){
+  st.sel=i;
+  var runs=$('hex').querySelectorAll('.run'), rows=$('fields').querySelectorAll('.frow');
+  for(var k=0;k<runs.length;k++){
+    var on=k===i; runs[k].classList.toggle('sel',on);
+    rows[k].setAttribute('aria-expanded',on?'true':'false'); rows[k].nextSibling.hidden=!on;
+  }
+  if(i>=0&&scroll==='row')rows[i].scrollIntoView({block:'nearest'});
+  if(i>=0&&scroll==='run'){var h=$('hex'),r=runs[i];h.scrollTop=Math.max(0,r.offsetTop-h.offsetTop-30);}
+}
+
+function buildQuiz(p){
+  var box=$('quiz'); box.textContent='';
+  p.quiz.forEach(function(q){
+    var fs=el('fieldset','q'); fs.appendChild(el('legend',null,q.q));
+    var opts=el('div','opts'), fb=el('p','fb'); fb.setAttribute('aria-live','polite');
+    shuffle(q.a.map(function(t,i){return {t:t,ok:i===0};})).forEach(function(o){
+      var b=el('button',null,o.t);b.type='button';
+      b.addEventListener('click',function(){
+        var all=opts.querySelectorAll('button');
+        for(var k=0;k<all.length;k++)all[k].classList.remove('wrong');
+        if(o.ok){b.classList.add('right');fb.className='fb ok';fb.textContent='✓ Correct. '+q.why;}
+        else{b.classList.add('wrong');fb.className='fb no';fb.textContent='✗ Not quite. Try another.';}
+      });
+      opts.appendChild(b);
+    });
+    fs.appendChild(opts);fs.appendChild(fb);box.appendChild(fs);
+  });
+}
+
+function stop(){if(timer){clearInterval(timer);timer=null;}$('play').textContent='Play';}
+function play(){
+  if(timer){stop();return;}
+  if(st.s===cur().steps.length-1)go(0);
+  $('play').textContent='Pause';
+  timer=setInterval(function(){ if(st.s<cur().steps.length-1)go(st.s+1); else stop(); },3200);
+}
+
+/* ---------- print summary ---------- */
+function buildPrint(p){
+  var box=$('print'); box.textContent='';
+  box.appendChild(el('h1',null,p.name+' · Wire Decoder summary'));
+  var intro=el('p');intro.innerHTML=p.intro;box.appendChild(intro);
+  box.appendChild(el('h2',null,'Learning objectives'));
+  var ul=el('ul');(p.goals||[]).forEach(function(g){ul.appendChild(el('li',null,g));});box.appendChild(ul);
+  p.steps.forEach(function(s,k){
+    box.appendChild(el('h2',null,(k+1)+'. '+s.title+' ('+p.nodes[s.from]+' → '+p.nodes[s.to]+')'+(s.bad?' [forged by the attacker]':'')));
+    box.appendChild(el('p',null,s.say));
+    box.appendChild(el('p','small',s.stack.join(' › ')));
+    var t=el('table'),hr=el('tr');['Field','Bytes','Value','On the wire'].forEach(function(h){var th=el('th',null,h);th.scope='col';hr.appendChild(th);});
+    var th=el('thead');th.appendChild(hr);t.appendChild(th);var tb=el('tbody');
+    s.f.forEach(function(f){
+      var tr=el('tr');tr.appendChild(el('td',null,f[0]));tr.appendChild(el('td',null,String(fieldLen(f))));
+      tr.appendChild(el('td',null,f[2]||''));tr.appendChild(el('td',null,f[4]==='e'?'encrypted':f[4]==='x'?'cleartext, forged':'cleartext'));
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);box.appendChild(t);
+  });
+  box.appendChild(el('h2',null,'Review questions'));
+  var ol=el('ol');p.quiz.forEach(function(q){var li=el('li',null,q.q);li.appendChild(el('p','small','Answer: '+q.a[0]+'. '+q.why));ol.appendChild(li);});
+  box.appendChild(ol);
+  box.appendChild(el('p','small','Values are invented for teaching. Brookdale Community College, 2026.'));
+}
+
+/* ---------- glossary ---------- */
+function renderGloss(){
+  var q=$('gq').value.trim().toLowerCase(), dl=$('gloss'), n=0; dl.textContent='';
+  GLOSSARY.forEach(function(g){
+    if(q&&(g[0]+' '+g[1]).toLowerCase().indexOf(q)<0)return;
+    var d=el('div');d.appendChild(el('dt',null,g[0]));d.appendChild(el('dd',null,g[1]));dl.appendChild(d);n++;
+  });
+  $('gcount').textContent=n+(n===1?' term':' terms')+(q?' matching “'+$('gq').value.trim()+'”':'');
+}
+
+/* ---------- final quiz ---------- */
+var fset=[];
+function startFinal(){
+  var pool=[];
+  GROUPS.forEach(function(g){g.ids.forEach(function(id){BY[id].quiz.forEach(function(q){pool.push({q:q,id:id});});});});
+  fset=shuffle(pool).slice(0,10);
+  var box=$('fqs'); box.textContent=''; $('fresult').textContent='';
+  fset.forEach(function(item,n){
+    var fs=el('fieldset','q'); fs.appendChild(el('legend',null,(n+1)+'. '+item.q.q));
+    var opts=el('div','opts');
+    shuffle(item.q.a.map(function(t,i){return {t:t,ok:i===0};})).forEach(function(o,j){
+      var lab=el('label'),inp=el('input');inp.type='radio';inp.name='fq'+n;inp.value=o.ok?'1':'0';inp.id='fq'+n+'_'+j;
+      lab.appendChild(inp);lab.appendChild(el('span',null,o.t));opts.appendChild(lab);
+    });
+    fs.appendChild(opts);fs.appendChild(el('p','fb'));box.appendChild(fs);
+  });
+  $('fform').hidden=false; $('fsubmit').hidden=false; $('fstart').textContent='New set of questions';
+  var first=box.querySelector('input'); if(first)first.focus();
+}
+function gradeFinal(e){
+  e.preventDefault();
+  var score=0, miss={}, sets=$('fqs').querySelectorAll('fieldset');
+  fset.forEach(function(item,n){
+    var inputs=sets[n].querySelectorAll('input'), fb=sets[n].querySelector('.fb'), ok=false;
+    for(var i=0;i<inputs.length;i++){
+      var lab=inputs[i].parentNode;
+      if(inputs[i].value==='1')lab.classList.add('right');
+      if(inputs[i].checked){ if(inputs[i].value==='1')ok=true; else lab.classList.add('wrong'); }
+      inputs[i].disabled=true;
+    }
+    if(ok){score++;fb.className='fb ok';fb.textContent='✓ Correct. '+item.q.why;}
+    else{miss[item.id]=true;fb.className='fb no';fb.textContent='✗ Answer: '+item.q.a[0]+'. '+item.q.why;}
+  });
+  if(prog.best==null||score>prog.best){prog.best=score;save();}
+  $('fsubmit').hidden=true;
+  var res=$('fresult'); res.textContent='';
+  res.appendChild(el('p','score','Score: '+score+' out of 10'));
+  var ids=Object.keys(miss);
+  if(ids.length){
+    res.appendChild(el('p',null,'Lessons to revisit:'));
+    var row=el('div','row');
+    ids.forEach(function(id){var b=el('button','btn',BY[id].name);b.type='button';b.addEventListener('click',function(){st.lesson[GOF[id]]=id;showView(GOF[id]);$('main').scrollIntoView();});row.appendChild(b);});
+    res.appendChild(row);
+  } else res.appendChild(el('p',null,'A perfect set. Try another for different questions.'));
+  $('fbest').textContent='Best score so far: '+prog.best+' out of 10.';
+  res.scrollIntoView({block:'nearest'});
+}
+
+/* ---------- wiring ---------- */
+$('prev').addEventListener('click',function(){stop();if(st.s>0)go(st.s-1);});
+$('next').addEventListener('click',function(){stop();if(st.s<cur().steps.length-1)go(st.s+1);});
+$('play').addEventListener('click',play);
+$('printb').addEventListener('click',function(){stop();buildPrint(cur());window.print();});
+$('v-wire').addEventListener('click',function(){st.mode='wire';save();renderPacket();});
+$('v-dec').addEventListener('click',function(){st.mode='dec';save();renderPacket();});
+$('hex').addEventListener('click',function(e){var r=e.target.closest('.run');if(r)select(+r.dataset.i,'row');});
+$('fields').addEventListener('click',function(e){var r=e.target.closest('.frow');if(!r)return;var i=+r.dataset.i;select(st.sel===i?-1:i,'run');});
+$('gq').addEventListener('input',renderGloss);
+$('fstart').addEventListener('click',startFinal);
+$('fform').addEventListener('submit',gradeFinal);
+window.addEventListener('resize',function(){if(!pkt||!GBY[st.view])return;var p=cur(),s=p.steps[st.s];pkt.classList.add('jump');pkt.style.left=ppos(s.to,p.nodes.length);});
+
+buildViews();
+renderGloss();
+updateProgress();
+showView(st.view);
+})();
+</script>
+</body>
+</html>
