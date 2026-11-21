@@ -1,437 +1,248 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Pomodoro Timer</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pomodoro Timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* House style. Layout idea: a plain left-aligned masthead, then a single readable column of bordered panels. */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --ink:#1a2233; --muted:#5a6578; --line:#d9dee7;
+  --brand:#1f4fd1; --brand-ink:#ffffff; --brand-soft:#e7edfc;
+  --warm:#a85605; --warm-soft:#fdf1df;
+  --good:#1a7f4b; --good-soft:#e3f4ea; --bad:#b3261e; --bad-soft:#fbe9e7;
+  --display:"Sora","Trebuchet MS",Verdana,sans-serif;
+  --body:"Source Sans 3","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"JetBrains Mono",Consolas,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10151f; --surface:#19202d; --ink:#e8ecf3; --muted:#9aa6ba; --line:#2b3547;
+    --brand:#8aa8ff; --brand-ink:#0d1530; --brand-soft:#1e2a4a;
+    --warm:#f0b35a; --warm-soft:#3a2c14;
+    --good:#5fd08f; --good-soft:#143524; --bad:#ff8a80; --bad-soft:#40201d;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10151f; --surface:#19202d; --ink:#e8ecf3; --muted:#9aa6ba; --line:#2b3547;
+  --brand:#8aa8ff; --brand-ink:#0d1530; --brand-soft:#1e2a4a;
+  --warm:#f0b35a; --warm-soft:#3a2c14;
+  --good:#5fd08f; --good-soft:#143524; --bad:#ff8a80; --bad-soft:#40201d;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px 56px}
+a{color:var(--brand)}
+:focus-visible{outline:3px solid var(--warm);outline-offset:2px}
+h1,h2,h3,h4{font-family:var(--display);line-height:1.2;text-wrap:balance;margin:0 0 10px}
+h1{font-size:clamp(28px,4.6vw,44px);font-weight:700}
+h2{font-size:clamp(21px,2.8vw,27px);font-weight:600}
+h3{font-size:18px;font-weight:600}
+h4{font-size:16px;font-weight:600}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 12px;padding-left:22px}
+li{margin-bottom:5px}
+code,.mono{font-family:var(--mono);font-size:.9em}
+code{background:var(--brand-soft);padding:1px 5px;border-radius:4px}
 
-        body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #3D2B56 0%, #2C497F 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-        }
+.masthead{padding:34px 0 22px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--brand);margin:0 0 8px}
+.lede{font-size:19px;color:var(--muted);max-width:64ch;margin:0}
+.asof{display:inline-block;margin-top:14px;font-size:14px;color:var(--warm);background:var(--warm-soft);border-radius:6px;padding:4px 10px}
 
-        .container {
-            text-align: center;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 40px;
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            max-width: 400px;
-            width: 90%;
-        }
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px}
+.panel>h2{padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card.soft{background:var(--bg)}
+.note{border-left:4px solid var(--brand);background:var(--brand-soft);border-radius:0 8px 8px 0;padding:14px 16px;margin:14px 0}
+.note.warm{border-color:var(--warm);background:var(--warm-soft)}
+.note.good{border-color:var(--good);background:var(--good-soft)}
+.note.bad{border-color:var(--bad);background:var(--bad-soft)}
+.note>:last-child,.card>:last-child,.panel>:last-child{margin-bottom:0}
+.muted{color:var(--muted)}
+.small{font-size:14.5px}
 
-        h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            background: linear-gradient(45deg, #CCF5AC, #BAD29F);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
+.btn{font:inherit;font-weight:600;font-size:15.5px;border-radius:8px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);padding:9px 16px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--brand)}
+.btn.quiet{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn[aria-pressed="true"],.btn.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.chip{display:inline-block;font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--brand-soft);color:var(--brand)}
+.chip.warm{background:var(--warm-soft);color:var(--warm)}
+.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
 
-        .subtitle {
-            font-size: 1.1em;
-            margin-bottom: 30px;
-            opacity: 0.9;
-        }
+label{display:block;font-weight:600;font-size:15px;margin-bottom:4px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+.fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:12px}
 
-        .timer-display {
-            font-size: 4em;
-            font-weight: bold;
-            margin: 30px 0;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s ease;
-        }
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--display);font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 
-        .timer-display.work {
-            color: #CCF5AC;
-        }
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.stat .k{font-size:13.5px;color:var(--muted)}
+.stat .v{font-family:var(--display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.v.bad{color:var(--bad)} .v.good{color:var(--good)}
 
-        .timer-display.break {
-            color: #BAD29F;
-        }
+.meter{height:14px;background:var(--line);border-radius:999px;overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--brand);border-radius:999px;width:0;transition:width .3s}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.out{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px}
+footer.foot{color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:16px;margin-top:26px}
+@media (max-width:520px){body{font-size:16px}.panel{padding:16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+@media print{body{background:#fff}.noprint{display:none!important}.panel{break-inside:avoid}}
 
-        .mode-indicator {
-            font-size: 1.3em;
-            margin: 20px 0;
-            padding: 10px 20px;
-            border-radius: 25px;
-            display: inline-block;
-            transition: all 0.3s ease;
-        }
-
-        .mode-indicator.work {
-            background: rgba(204, 245, 172, 0.2);
-            border: 2px solid #CCF5AC;
-        }
-
-        .mode-indicator.break {
-            background: rgba(186, 210, 159, 0.2);
-            border: 2px solid #BAD29F;
-        }
-
-        .controls {
-            margin: 30px 0;
-        }
-
-        button {
-            background: linear-gradient(45deg, #CCF5AC, #BAD29F);
-            color: #2C497F;
-            border: none;
-            padding: 15px 30px;
-            margin: 0 10px;
-            border-radius: 50px;
-            font-size: 1.1em;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(204, 245, 172, 0.3);
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(204, 245, 172, 0.4);
-            background: linear-gradient(45deg, #BAD29F, #CCF5AC);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        button.pause {
-            background: linear-gradient(45deg, #808A9F, #BAD29F);
-            color: white;
-            box-shadow: 0 4px 15px rgba(128, 138, 159, 0.3);
-        }
-
-        button.pause:hover {
-            box-shadow: 0 6px 20px rgba(128, 138, 159, 0.4);
-            background: linear-gradient(45deg, #BAD29F, #808A9F);
-        }
-
-        button.reset {
-            background: linear-gradient(45deg, #808A9F, #2C497F);
-            color: white;
-            box-shadow: 0 4px 15px rgba(44, 73, 127, 0.3);
-        }
-
-        button.reset:hover {
-            box-shadow: 0 6px 20px rgba(44, 73, 127, 0.4);
-            background: linear-gradient(45deg, #2C497F, #808A9F);
-        }
-
-        .progress-ring {
-            margin: 20px auto;
-            width: 200px;
-            height: 200px;
-            position: relative;
-        }
-
-        .progress-ring svg {
-            width: 100%;
-            height: 100%;
-            transform: rotate(-90deg);
-        }
-
-        .progress-ring circle {
-            fill: none;
-            stroke-width: 8;
-        }
-
-        .progress-ring .background {
-            stroke: rgba(255, 255, 255, 0.1);
-        }
-
-        .progress-ring .progress {
-            stroke: #CCF5AC;
-            stroke-linecap: round;
-            transition: stroke-dashoffset 1s ease;
-        }
-
-        .progress-ring.break .progress {
-            stroke: #BAD29F;
-        }
-
-        .sessions-counter {
-            margin-top: 20px;
-            font-size: 1.2em;
-            opacity: 0.9;
-        }
-
-        .tomato {
-            font-size: 1.5em;
-            margin: 0 5px;
-            transition: all 0.3s ease;
-        }
-
-        .tomato.completed {
-            opacity: 1;
-            transform: scale(1.1);
-        }
-
-        .tomato.current {
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.7; }
-            50% { transform: scale(1.1); opacity: 1; }
-        }
-
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            color: #333;
-            padding: 15px 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            transform: translateX(400px);
-            transition: transform 0.3s ease;
-            font-weight: bold;
-        }
-
-        .notification.show {
-            transform: translateX(0);
-        }
-    </style>
+.timer{max-width:460px;margin:0 auto;text-align:center}
+.ring{position:relative;width:min(280px,78vw);aspect-ratio:1;margin:8px auto 14px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:10}
+.ring .track{stroke:var(--line)}
+.ring .arc{stroke:var(--brand);stroke-linecap:round;transition:stroke-dashoffset .4s linear}
+.timer.break .ring .arc{stroke:var(--good)}
+.ring .face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.time{font-family:var(--display);font-weight:700;font-size:clamp(44px,13vw,64px);font-variant-numeric:tabular-nums;line-height:1}
+.mode{font-weight:600}
+.timer.break .chip{background:var(--good-soft);color:var(--good)}
+.dots{display:flex;gap:10px;justify-content:center;margin:6px 0 4px;padding:0;list-style:none}
+.dots li{width:18px;height:18px;border-radius:50%;border:2px solid var(--brand);margin:0}
+.dots li.done{background:var(--brand)}
+.dots li.now{box-shadow:0 0 0 4px var(--brand-soft)}
+.row.center{justify-content:center}
+details summary{cursor:pointer;font-weight:600}
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>🍅 Pomodoro Timer</h1>
-        <p class="subtitle">Stay focused, study smart!</p>
-        
-        <div class="progress-ring" id="progressRing">
-            <svg>
-                <circle class="background" cx="100" cy="100" r="90"></circle>
-                <circle class="progress" cx="100" cy="100" r="90" id="progressCircle"></circle>
-            </svg>
-        </div>
-        
-        <div class="timer-display work" id="timerDisplay">25:00</div>
-        <div class="mode-indicator work" id="modeIndicator">Focus Time</div>
-        
-        <div class="controls">
-            <button id="startBtn">Start</button>
-            <button id="pauseBtn" class="pause" style="display: none;">Pause</button>
-            <button id="resetBtn" class="reset">Reset</button>
-        </div>
-        
-        <div class="sessions-counter">
-            <div>Sessions completed:</div>
-            <div id="tomatoCounter">
-                <span class="tomato current">🍅</span>
-                <span class="tomato">🍅</span>
-                <span class="tomato">🍅</span>
-                <span class="tomato">🍅</span>
-            </div>
-        </div>
-    </div>
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Student success</p>
+    <h1>Pomodoro Timer</h1>
+    <p class="lede">Work in focused blocks with short breaks between them. After four blocks, take a longer break.</p>
+  </header>
 
-    <div class="notification" id="notification">
-        Time's up! Great work! 🎉
+  <section class="panel timer" id="timer">
+    <span class="chip" id="mode">Focus</span>
+    <div class="ring">
+      <svg viewBox="0 0 200 200" aria-hidden="true"><circle class="track" cx="100" cy="100" r="90"></circle><circle class="arc" id="arc" cx="100" cy="100" r="90"></circle></svg>
+      <div class="face"><div class="time" id="time" role="timer" aria-live="off">25:00</div><div class="mode muted small" id="sub">Ready when you are</div></div>
     </div>
+    <div class="row center">
+      <button class="btn" id="startBtn">Start</button>
+      <button class="btn quiet" id="skipBtn">Skip</button>
+      <button class="btn quiet" id="resetBtn">Reset</button>
+    </div>
+    <p class="small muted" style="margin:14px 0 6px">Focus blocks this round</p>
+    <ol class="dots" id="dots" aria-label="Focus blocks completed this round"></ol>
+    <p class="small muted" id="total" style="margin-top:8px">0 focus blocks completed today</p>
+    <p class="small" id="msg" role="status" style="min-height:1.5em;margin-top:8px"></p>
+  </section>
 
-    <script>
-        class PomodoroTimer {
-            constructor() {
-                this.workTime = 25 * 60; // 25 minutes in seconds
-                this.breakTime = 5 * 60; // 5 minutes in seconds
-                this.currentTime = this.workTime;
-                this.isRunning = false;
-                this.isWorkSession = true;
-                this.sessionsCompleted = 0;
-                this.interval = null;
-                this.totalTime = this.workTime;
-                
-                this.initializeElements();
-                this.updateProgressRing();
-                this.updateTomatoCounter();
-            }
-            
-            initializeElements() {
-                this.timerDisplay = document.getElementById('timerDisplay');
-                this.modeIndicator = document.getElementById('modeIndicator');
-                this.startBtn = document.getElementById('startBtn');
-                this.pauseBtn = document.getElementById('pauseBtn');
-                this.resetBtn = document.getElementById('resetBtn');
-                this.progressRing = document.getElementById('progressRing');
-                this.progressCircle = document.getElementById('progressCircle');
-                this.notification = document.getElementById('notification');
-                this.tomatoCounter = document.getElementById('tomatoCounter');
-                
-                // Set up progress ring
-                const circumference = 2 * Math.PI * 90;
-                this.progressCircle.style.strokeDasharray = circumference;
-                this.progressCircle.style.strokeDashoffset = circumference;
-                
-                this.setupEventListeners();
-            }
-            
-            setupEventListeners() {
-                this.startBtn.addEventListener('click', () => this.start());
-                this.pauseBtn.addEventListener('click', () => this.pause());
-                this.resetBtn.addEventListener('click', () => this.reset());
-                
-                // Add spacebar functionality
-                document.addEventListener('keydown', (e) => {
-                    if (e.code === 'Space') {
-                        e.preventDefault(); // Prevent page scrolling
-                        if (this.isRunning) {
-                            this.pause();
-                        } else {
-                            this.start();
-                        }
-                    }
-                });
-            }
-            
-            start() {
-                this.isRunning = true;
-                this.startBtn.style.display = 'none';
-                this.pauseBtn.style.display = 'inline-block';
-                
-                this.interval = setInterval(() => {
-                    this.currentTime--;
-                    this.updateDisplay();
-                    this.updateProgressRing();
-                    
-                    if (this.currentTime <= 0) {
-                        this.sessionComplete();
-                    }
-                }, 1000);
-            }
-            
-            pause() {
-                this.isRunning = false;
-                clearInterval(this.interval);
-                this.startBtn.style.display = 'inline-block';
-                this.pauseBtn.style.display = 'none';
-            }
-            
-            reset() {
-                this.pause();
-                this.isWorkSession = true;
-                this.currentTime = this.workTime;
-                this.totalTime = this.workTime;
-                this.updateDisplay();
-                this.updateMode();
-                this.updateProgressRing();
-            }
-            
-            sessionComplete() {
-                this.pause();
-                this.playNotificationSound();
-                this.showNotification();
-                
-                if (this.isWorkSession) {
-                    this.sessionsCompleted++;
-                    this.updateTomatoCounter();
-                    this.isWorkSession = false;
-                    this.currentTime = this.breakTime;
-                    this.totalTime = this.breakTime;
-                } else {
-                    this.isWorkSession = true;
-                    this.currentTime = this.workTime;
-                    this.totalTime = this.workTime;
-                }
-                
-                this.updateDisplay();
-                this.updateMode();
-                this.updateProgressRing();
-            }
-            
-            updateDisplay() {
-                const minutes = Math.floor(this.currentTime / 60);
-                const seconds = this.currentTime % 60;
-                this.timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            }
-            
-            updateMode() {
-                if (this.isWorkSession) {
-                    this.timerDisplay.className = 'timer-display work';
-                    this.modeIndicator.className = 'mode-indicator work';
-                    this.modeIndicator.textContent = 'Focus Time';
-                    this.progressRing.className = 'progress-ring';
-                } else {
-                    this.timerDisplay.className = 'timer-display break';
-                    this.modeIndicator.className = 'mode-indicator break';
-                    this.modeIndicator.textContent = 'Break Time';
-                    this.progressRing.className = 'progress-ring break';
-                }
-            }
-            
-            updateProgressRing() {
-                const circumference = 2 * Math.PI * 90;
-                const progress = (this.totalTime - this.currentTime) / this.totalTime;
-                const offset = circumference - (progress * circumference);
-                this.progressCircle.style.strokeDashoffset = offset;
-            }
-            
-            updateTomatoCounter() {
-                const tomatoes = this.tomatoCounter.querySelectorAll('.tomato');
-                tomatoes.forEach((tomato, index) => {
-                    tomato.className = 'tomato';
-                    if (index < this.sessionsCompleted) {
-                        tomato.classList.add('completed');
-                    } else if (index === this.sessionsCompleted && this.isWorkSession) {
-                        tomato.classList.add('current');
-                    }
-                });
-            }
-            
-            showNotification() {
-                const message = this.isWorkSession ? 
-                    "Break time! Step away from your work 🌟" : 
-                    "Time to focus! Let's get back to work 💪";
-                
-                this.notification.textContent = message;
-                this.notification.classList.add('show');
-                
-                setTimeout(() => {
-                    this.notification.classList.remove('show');
-                }, 3000);
-            }
-            
-            playNotificationSound() {
-                // Create a simple audio context for a pleasant notification sound
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-                oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
-                
-                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.3);
-            }
-        }
-        
-        // Initialize the timer when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            new PomodoroTimer();
-        });
-    </script>
+  <details class="panel">
+    <summary>Change the lengths</summary>
+    <div class="fields" style="margin-top:14px">
+      <div><label for="focusMin">Focus (minutes)</label><input type="number" id="focusMin" min="1" max="120" value="25"></div>
+      <div><label for="shortMin">Short break (minutes)</label><input type="number" id="shortMin" min="1" max="60" value="5"></div>
+      <div><label for="longMin">Long break (minutes)</label><input type="number" id="longMin" min="1" max="90" value="15"></div>
+    </div>
+    <p class="small muted">Changes apply from the next block, or straight away if the timer is reset.</p>
+  </details>
+
+  <section class="panel">
+    <h2>How to use it</h2>
+    <ol>
+      <li>Pick one task before you press Start.</li>
+      <li>Work on only that task until the timer ends. If something else comes to mind, write it down for later.</li>
+      <li>Take the short break away from your screen.</li>
+      <li>After four focus blocks, take the long break.</li>
+    </ol>
+    <p class="small muted">Press the space bar to start or pause. The timer keeps correct time if you switch tabs.</p>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const C = 2 * Math.PI * 90;
+const ROUND = 4;
+const S = { mode: "focus", running: false, left: 25 * 60, total: 25 * 60, endAt: 0, inRound: 0, today: 0, tick: null };
+const minutes = id => Math.max(1, parseInt($(id).value, 10) || 1);
+const lengthOf = mode => (mode === "focus" ? minutes("focusMin") : mode === "short" ? minutes("shortMin") : minutes("longMin")) * 60;
+const LABEL = { focus: "Focus", short: "Short break", long: "Long break" };
+
+function paint() {
+  const m = Math.floor(S.left / 60), s = S.left % 60, text = m + ":" + String(s).padStart(2, "0");
+  $("time").textContent = text;
+  $("mode").textContent = LABEL[S.mode];
+  $("timer").classList.toggle("break", S.mode !== "focus");
+  $("arc").style.strokeDasharray = C;
+  $("arc").style.strokeDashoffset = C * (S.left / S.total);
+  $("startBtn").textContent = S.running ? "Pause" : S.left < S.total ? "Resume" : "Start";
+  $("sub").textContent = S.running ? (S.mode === "focus" ? "Stay with one task" : "Step away from the screen") : S.left < S.total ? "Paused" : "Ready when you are";
+  $("dots").innerHTML = Array.from({ length: ROUND }, (_, i) => `<li class="${i < S.inRound ? "done" : i === S.inRound && S.mode === "focus" ? "now" : ""}"></li>`).join("");
+  $("total").textContent = S.today + " focus block" + (S.today === 1 ? "" : "s") + " completed today";
+  document.title = (S.running ? text + " " + LABEL[S.mode] + " | " : "") + "Pomodoro Timer";
+}
+function setMode(mode) { S.mode = mode; S.total = S.left = lengthOf(mode); }
+function chime() {
+  try {
+    const A = new (window.AudioContext || window.webkitAudioContext)(), o = A.createOscillator(), g = A.createGain();
+    o.connect(g); g.connect(A.destination);
+    o.frequency.setValueAtTime(800, A.currentTime); o.frequency.setValueAtTime(600, A.currentTime + 0.15); o.frequency.setValueAtTime(800, A.currentTime + 0.3);
+    g.gain.setValueAtTime(0.12, A.currentTime); g.gain.exponentialRampToValueAtTime(0.01, A.currentTime + 0.5);
+    o.start(); o.stop(A.currentTime + 0.5);
+  } catch (e) {}
+}
+function stop() { S.running = false; clearInterval(S.tick); S.tick = null; }
+function finish(skipped) {
+  stop();
+  if (S.mode === "focus") {
+    if (!skipped) { S.inRound++; S.today++; }
+    const long = S.inRound >= ROUND;
+    setMode(long ? "long" : "short");
+    $("msg").textContent = skipped ? "Focus block skipped." : long ? "Four blocks done. Take a long break." : "Block done. Take a short break.";
+  } else {
+    if (S.mode === "long") S.inRound = 0;
+    setMode("focus");
+    $("msg").textContent = skipped ? "Break skipped." : "Break over. Ready for the next focus block.";
+  }
+  if (!skipped) chime();
+  paint();
+}
+function step() {
+  S.left = Math.max(0, Math.round((S.endAt - Date.now()) / 1000));
+  if (S.left <= 0) finish(false); else paint();
+}
+function start() {
+  if (S.running) return;
+  S.running = true; S.endAt = Date.now() + S.left * 1000; $("msg").textContent = "";
+  S.tick = setInterval(step, 250); paint();
+}
+function pause() { if (!S.running) return; step(); if (S.running) { stop(); paint(); } }
+function toggle() { S.running ? pause() : start(); }
+function reset() { stop(); S.inRound = 0; setMode("focus"); $("msg").textContent = "Timer reset."; paint(); }
+
+$("startBtn").addEventListener("click", toggle);
+$("skipBtn").addEventListener("click", () => finish(true));
+$("resetBtn").addEventListener("click", reset);
+["focusMin", "shortMin", "longMin"].forEach(id => $(id).addEventListener("change", () => { if (!S.running && S.left === S.total) { setMode(S.mode); paint(); } }));
+document.addEventListener("keydown", e => {
+  if (e.code !== "Space" || /^(INPUT|TEXTAREA|SELECT|BUTTON|SUMMARY)$/.test(e.target.tagName)) return;
+  e.preventDefault(); toggle();
+});
+document.addEventListener("visibilitychange", () => { if (S.running) step(); });
+paint();
+</script>
 </body>
 </html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NSF FY 2027 Budget Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* House style. Layout idea: a plain left-aligned masthead, then a single readable column of bordered panels. */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --ink:#1a2233; --muted:#5a6578; --line:#d9dee7;
+  --brand:#1f4fd1; --brand-ink:#ffffff; --brand-soft:#e7edfc;
+  --warm:#a85605; --warm-soft:#fdf1df;
+  --good:#1a7f4b; --good-soft:#e3f4ea; --bad:#b3261e; --bad-soft:#fbe9e7;
+  --display:"Sora","Trebuchet MS",Verdana,sans-serif;
+  --body:"Source Sans 3","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"JetBrains Mono",Consolas,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10151f; --surface:#19202d; --ink:#e8ecf3; --muted:#9aa6ba; --line:#2b3547;
+    --brand:#8aa8ff; --brand-ink:#0d1530; --brand-soft:#1e2a4a;
+    --warm:#f0b35a; --warm-soft:#3a2c14;
+    --good:#5fd08f; --good-soft:#143524; --bad:#ff8a80; --bad-soft:#40201d;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10151f; --surface:#19202d; --ink:#e8ecf3; --muted:#9aa6ba; --line:#2b3547;
+  --brand:#8aa8ff; --brand-ink:#0d1530; --brand-soft:#1e2a4a;
+  --warm:#f0b35a; --warm-soft:#3a2c14;
+  --good:#5fd08f; --good-soft:#143524; --bad:#ff8a80; --bad-soft:#40201d;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px 56px}
+a{color:var(--brand)}
+:focus-visible{outline:3px solid var(--warm);outline-offset:2px}
+h1,h2,h3,h4{font-family:var(--display);line-height:1.2;text-wrap:balance;margin:0 0 10px}
+h1{font-size:clamp(28px,4.6vw,44px);font-weight:700}
+h2{font-size:clamp(21px,2.8vw,27px);font-weight:600}
+h3{font-size:18px;font-weight:600}
+h4{font-size:16px;font-weight:600}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 12px;padding-left:22px}
+li{margin-bottom:5px}
+code,.mono{font-family:var(--mono);font-size:.9em}
+code{background:var(--brand-soft);padding:1px 5px;border-radius:4px}
+
+.masthead{padding:34px 0 22px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--brand);margin:0 0 8px}
+.lede{font-size:19px;color:var(--muted);max-width:64ch;margin:0}
+.asof{display:inline-block;margin-top:14px;font-size:14px;color:var(--warm);background:var(--warm-soft);border-radius:6px;padding:4px 10px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px}
+.panel>h2{padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card.soft{background:var(--bg)}
+.note{border-left:4px solid var(--brand);background:var(--brand-soft);border-radius:0 8px 8px 0;padding:14px 16px;margin:14px 0}
+.note.warm{border-color:var(--warm);background:var(--warm-soft)}
+.note.good{border-color:var(--good);background:var(--good-soft)}
+.note.bad{border-color:var(--bad);background:var(--bad-soft)}
+.note>:last-child,.card>:last-child,.panel>:last-child{margin-bottom:0}
+.muted{color:var(--muted)}
+.small{font-size:14.5px}
+
+.btn{font:inherit;font-weight:600;font-size:15.5px;border-radius:8px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);padding:9px 16px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--brand)}
+.btn.quiet{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn[aria-pressed="true"],.btn.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.chip{display:inline-block;font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--brand-soft);color:var(--brand)}
+.chip.warm{background:var(--warm-soft);color:var(--warm)}
+.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+
+label{display:block;font-weight:600;font-size:15px;margin-bottom:4px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+.fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:12px}
+
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--display);font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.stat .k{font-size:13.5px;color:var(--muted)}
+.stat .v{font-family:var(--display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.v.bad{color:var(--bad)} .v.good{color:var(--good)}
+
+.meter{height:14px;background:var(--line);border-radius:999px;overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--brand);border-radius:999px;width:0;transition:width .3s}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.out{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px}
+footer.foot{color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:16px;margin-top:26px}
+@media (max-width:520px){body{font-size:16px}.panel{padding:16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+@media print{body{background:#fff}.noprint{display:none!important}.panel{break-inside:avoid}}
+
+.view[hidden]{display:none}
+.bars{display:grid;gap:14px}
+.barrow{display:grid;grid-template-columns:minmax(64px,150px) 1fr minmax(64px,auto);gap:10px;align-items:center}
+.barrow .name{font-weight:600;font-size:15.5px}
+.barrow .name small{display:block;font-weight:400;color:var(--muted);font-size:13px}
+.pair{display:grid;gap:4px}
+.bar{height:16px;border-radius:4px;min-width:2px;position:relative}
+.bar.base{background:var(--muted);opacity:.55}
+.bar.req{background:var(--brand)}
+.pair span{display:flex;align-items:center;gap:8px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.pct{font-family:var(--display);font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.pct.down{color:var(--bad)}.pct.up{color:var(--good)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin-bottom:14px}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.rank{display:grid;gap:6px;counter-reset:r;list-style:none;padding:0;margin:0}
+.rank li{counter-increment:r;display:flex;justify-content:space-between;gap:10px;background:var(--bg);border-radius:8px;padding:9px 12px;margin:0}
+.rank li::before{content:counter(r);font-family:var(--mono);color:var(--muted);margin-right:10px}
+.rank li span:first-of-type{flex:1;font-weight:600}
+.two{display:grid;gap:22px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+@media (max-width:520px){.barrow{grid-template-columns:1fr auto}.barrow .pair{grid-column:1/-1;order:3}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Data and policy</p>
+    <h1>NSF FY 2027 Budget Explorer</h1>
+    <p class="lede">The administration's fiscal year 2027 budget request for the National Science Foundation, compared with what Congress enacted for FY 2026 and with FY 2025 funding by directorate.</p>
+    <span class="asof">Request sent to Congress April 3, 2026. Page updated November 21, 2026.</span>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="k">FY 2026 enacted</div><div class="v" id="sEnacted"></div></div>
+    <div class="stat"><div class="k">FY 2027 request</div><div class="v" id="sRequest"></div></div>
+    <div class="stat"><div class="k">Proposed reduction</div><div class="v bad" id="sCut"></div></div>
+    <div class="stat"><div class="k">Change</div><div class="v bad" id="sPct"></div></div>
+  </div>
+
+  <div class="tabs noprint" role="tablist" aria-label="Views">
+    <button class="btn quiet on" role="tab" data-view="overview" aria-selected="true">Overview</button>
+    <button class="btn quiet" role="tab" data-view="directorates" aria-selected="false">By directorate</button>
+    <button class="btn quiet" role="tab" data-view="accounts" aria-selected="false">Accounts</button>
+    <button class="btn quiet" role="tab" data-view="impact" aria-selected="false">Projected impact</button>
+  </div>
+
+  <section class="panel view" id="view-overview">
+    <h2>Overview</h2>
+    <div class="two">
+      <div>
+        <h3>Where the requested $<span id="dirSum"></span>M for directorates would go</h3>
+        <div class="bars" id="shareBars"></div>
+        <p class="small muted" style="margin-top:12px">Share of the eight research and education directorates' combined FY 2027 request. Polar programs, facilities construction and agency operations are separate.</p>
+      </div>
+      <div>
+        <h3>Context</h3>
+        <div class="note warm"><strong>A request, not a budget.</strong> The President proposes; Congress appropriates. Final funding is set through the appropriations process.</div>
+        <div class="note"><strong>Last year's outcome.</strong> The FY 2026 request also proposed about $3.9 billion. Congress instead provided $8.75 billion in the appropriations act signed January 23, 2026.</div>
+        <div class="note"><strong>Where FY 2027 stands.</strong> No FY 2027 appropriation for NSF has been enacted. The government is operating under a continuing resolution through December 11, 2026.</div>
+        <div class="note"><strong>One directorate eliminated.</strong> The request provides no funding for the Social, Behavioral and Economic Sciences directorate. Only its statistics center (NCSES) would continue, at $44 million, down from $74 million.</div>
+        <div class="note"><strong>Outside the headline figure.</strong> The request also includes $900 million in mandatory funding for an Antarctic research vessel, for $4.86 billion in total.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel view" id="view-directorates" hidden>
+    <h2>By directorate</h2>
+    <div class="fields" style="max-width:340px"><div><label for="dirFilter">Show</label><select id="dirFilter"></select></div></div>
+    <div class="legend"><span><i style="background:var(--muted);opacity:.55"></i>FY 2025 funding</span><span><i style="background:var(--brand)"></i>FY 2027 request</span></div>
+    <div class="bars" id="dirBars"></div>
+    <p class="small muted" style="margin-top:14px">NSF has not published FY 2026 funding by directorate, so directorates are compared with FY 2025. Amounts in millions of dollars.</p>
+    <h3 style="margin-top:22px">Ranked by size of proposed cut</h3>
+    <ol class="rank" id="rankList"></ol>
+  </section>
+
+  <section class="panel view" id="view-accounts" hidden>
+    <h2>Appropriations accounts</h2>
+    <p>Congress funds NSF through a handful of accounts rather than by directorate. These compare the FY 2027 request with FY 2026 enacted levels.</p>
+    <div class="legend"><span><i style="background:var(--muted);opacity:.55"></i>FY 2026 enacted</span><span><i style="background:var(--brand)"></i>FY 2027 request</span></div>
+    <div class="bars" id="acctBars"></div>
+    <p class="small muted" style="margin-top:14px">The request would fold STEM Education into Research and Related Activities; it is shown separately here for comparison. The facilities construction figure excludes the $900 million mandatory request for the Antarctic research vessel. Amounts in millions of dollars.</p>
+    <h3 style="margin-top:22px">Selected program lines</h3>
+    <div class="tablewrap"><table><thead><tr><th>Program</th><th class="num">Before</th><th class="num">FY 2027 request</th><th class="num">Change</th></tr></thead><tbody id="progRows"></tbody></table></div>
+  </section>
+
+  <section class="panel view" id="view-impact" hidden>
+    <h2>Projected impact if enacted</h2>
+    <p>NSF's own request estimates what the proposed funding level would support.</p>
+    <div class="tablewrap"><table><thead><tr><th>Measure</th><th class="num">FY 2025</th><th class="num">FY 2027 if enacted</th><th class="num">Change</th></tr></thead><tbody id="impactRows"></tbody></table></div>
+    <p class="small muted" style="margin-top:10px">Summaries of the request differ slightly on the funding rate: 7% for research grants and 8% for all competitive awards.</p>
+    <div class="grid" style="margin-top:16px">
+      <div class="card soft"><h3>Research capacity</h3><p>About one proposal in five was funded in FY 2025. At the requested level, fewer than one in twelve would be.</p></div>
+      <div class="card soft"><h3>People</h3><p>Roughly 211,000 fewer researchers, students, postdocs and teachers would take part in NSF-supported work.</p></div>
+      <div class="card soft"><h3>Education</h3><p>STEM Education would fall by about 64% from FY 2025, and its account would be merged into the research account.</p></div>
+      <div class="card soft"><h3>Priorities named in the request</h3><p>Artificial intelligence, quantum information science, advanced manufacturing, biotechnology and research infrastructure. NSF-wide AI and quantum funding would still fall by about a third.</p></div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p><strong>Sources.</strong>
+      <a href="https://www.nsf.gov/mps/budget.jsp" target="_blank" rel="noopener">NSF FY 2027 Budget Request</a>;
+      <a href="https://aas.org/posts/news/2026/04/fy27-presidents-budget-request-nasa-nsf-and-doe-details" target="_blank" rel="noopener">American Astronomical Society, FY27 request details</a>;
+      <a href="https://cra.org/govaffairs/blog/2026/04/nsf-fy2027-pbr/" target="_blank" rel="noopener">Computing Research Association, NSF FY 2027 request</a>;
+      <a href="https://cossa.org/trump-proposes-steep-cuts-to-federal-funding-in-fy-2027-budget-request/" target="_blank" rel="noopener">COSSA, FY 2027 budget request</a>;
+      <a href="https://www.congress.gov/crs-product/R48694" target="_blank" rel="noopener">Congressional Research Service, Federal R&amp;D Funding: FY2026</a>;
+      <a href="https://www.asme.org/government-relations/policy-impact/congress-finalizes-most-fy-2026-appropriations" target="_blank" rel="noopener">ASME, FY 2026 appropriations</a>;
+      Virginia Tech Faculty Activity Support Team, directorate table.</p>
+    <p>Directorate figures for FY 2025 are current-plan amounts as reported in those summaries. To update the page, edit the data block at the top of the script.</p>
+  </footer>
+</div>
+
+<script>
+/* ===== Edit this block to update the page (amounts in $ millions) ===== */
+const TOTAL = { enacted26: 8750, request27: 3963 };
+const DIRECTORATES = [
+  { code:"BIO",  name:"Biological Sciences",                          fy25:794.61,  fy27:224.89 },
+  { code:"CISE", name:"Computer and Information Science and Engineering", fy25:932.72, fy27:346.27 },
+  { code:"EDU",  name:"STEM Education",                               fy25:1197.00, fy27:427.68 },
+  { code:"ENG",  name:"Engineering",                                  fy25:738.13,  fy27:185.20 },
+  { code:"GEO",  name:"Geosciences",                                  fy25:1020.61, fy27:426.32 },
+  { code:"MPS",  name:"Mathematical and Physical Sciences",           fy25:1548.25, fy27:515.28 },
+  { code:"SBE",  name:"Social, Behavioral and Economic Sciences",     fy25:150.00,  fy27:0 },
+  { code:"TIP",  name:"Technology, Innovation and Partnerships",      fy25:617.90,  fy27:350.00 }
+];
+const ACCOUNTS = [
+  { code:"R&RA",  name:"Research and Related Activities", base:7180, fy27:3409 },
+  { code:"EDU",   name:"STEM Education",                  base:938,  fy27:428 },
+  { code:"MREFC", name:"Major facilities construction",   base:251,  fy27:173 }
+];
+const PROGRAMS = [
+  { name:"Artificial intelligence, NSF-wide",        before:965.18, basis:"FY 2025", fy27:655.23 },
+  { name:"Quantum information science, NSF-wide",    before:365.46, basis:"FY 2025", fy27:231.15 },
+  { name:"Graduate Research Fellowship Program",     before:285,    basis:"FY 2026", fy27:246.5 },
+  { name:"Research Experiences for Undergraduates",  before:47,     basis:"FY 2024", fy27:15 },
+  { name:"Polar Programs",                           before:573,    basis:"FY 2025", fy27:497 }
+];
+const IMPACT = [
+  { name:"Share of proposals funded",   fy25:"19%",     fy27:"7 to 8%", change:"less than half" },
+  { name:"Competitive awards",          fy25:7400,      fy27:2900 },
+  { name:"Research grants",             fy25:5800,      fy27:2100 },
+  { name:"People involved in NSF-supported activities", fy25:305400, fy27:94100 }
+];
+/* ===== End of editable block ===== */
+
+const $ = id => document.getElementById(id);
+const m$ = n => "$" + Math.round(n).toLocaleString("en-US") + "M";
+const pct = (a, b) => (b - a) / a * 100;
+const pctText = p => (p > 0 ? "+" : "") + p.toFixed(1) + "%";
+
+$("sEnacted").textContent = m$(TOTAL.enacted26);
+$("sRequest").textContent = m$(TOTAL.request27);
+$("sCut").textContent = m$(TOTAL.enacted26 - TOTAL.request27);
+$("sPct").textContent = pctText(pct(TOTAL.enacted26, TOTAL.request27));
+
+function pairBars(rows, baseKey, max) {
+  return rows.map(r => { const p = pct(r[baseKey], r.fy27);
+    return `<div class="barrow"><div class="name">${r.code}<small>${r.name}</small></div>
+      <div class="pair"><span><i class="bar base" style="width:${r[baseKey] / max * 78}%"></i>${m$(r[baseKey])}</span><span><i class="bar req" style="width:${r.fy27 / max * 78}%"></i>${m$(r.fy27)}</span></div>
+      <div class="pct ${p < 0 ? "down" : "up"}">${pctText(p)}</div></div>`; }).join("");
+}
+
+const sum27 = DIRECTORATES.reduce((s, d) => s + d.fy27, 0);
+$("dirSum").textContent = Math.round(sum27).toLocaleString("en-US");
+const maxShare = Math.max(...DIRECTORATES.map(d => d.fy27));
+$("shareBars").innerHTML = DIRECTORATES.slice().sort((a, b) => b.fy27 - a.fy27).map(d =>
+  `<div class="barrow"><div class="name">${d.code}</div><div class="pair"><span><i class="bar req" style="width:${d.fy27 / maxShare * 78}%"></i>${m$(d.fy27)}</span></div><div class="pct">${(d.fy27 / sum27 * 100).toFixed(0)}%</div></div>`).join("");
+
+$("dirFilter").innerHTML = '<option value="all">All directorates</option>' + DIRECTORATES.map(d => `<option value="${d.code}">${d.code}: ${d.name}</option>`).join("");
+function showDirs() {
+  const f = $("dirFilter").value, rows = f === "all" ? DIRECTORATES : DIRECTORATES.filter(d => d.code === f);
+  $("dirBars").innerHTML = pairBars(rows, "fy25", Math.max(...DIRECTORATES.map(d => d.fy25)));
+}
+$("dirFilter").addEventListener("change", showDirs);
+showDirs();
+$("rankList").innerHTML = DIRECTORATES.slice().sort((a, b) => pct(a.fy25, a.fy27) - pct(b.fy25, b.fy27)).map(d =>
+  `<li><span>${d.code}</span><span class="pct down">${pctText(pct(d.fy25, d.fy27))}</span></li>`).join("");
+
+$("acctBars").innerHTML = pairBars(ACCOUNTS, "base", Math.max(...ACCOUNTS.map(a => a.base)));
+$("progRows").innerHTML = PROGRAMS.map(p => `<tr><td>${p.name}</td><td class="num">${m$(p.before)} <span class="muted small">(${p.basis})</span></td><td class="num">${m$(p.fy27)}</td><td class="num">${pctText(pct(p.before, p.fy27))}</td></tr>`).join("");
+$("impactRows").innerHTML = IMPACT.map(r => { const n = typeof r.fy25 === "number";
+  return `<tr><td>${r.name}</td><td class="num">${n ? r.fy25.toLocaleString("en-US") : r.fy25}</td><td class="num">${n ? "about " + r.fy27.toLocaleString("en-US") : r.fy27}</td><td class="num">${n ? pctText(pct(r.fy25, r.fy27)) : r.change}</td></tr>`; }).join("");
+
+document.querySelectorAll(".tabs .btn").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".tabs .btn").forEach(x => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-selected", on); });
+  document.querySelectorAll(".view").forEach(v => v.hidden = v.id !== "view-" + b.dataset.view);
+}));
+</script>
+</body>
+</html>

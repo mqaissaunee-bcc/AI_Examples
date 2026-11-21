@@ -1,1156 +1,334 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Understanding LLM Tokenization</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #333;
-            line-height: 1.6;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .header {
-            text-align: center;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 30px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-        
-        .header p {
-            font-size: 1.2em;
-            color: #7f8c8d;
-            margin-bottom: 20px;
-        }
-        
-        .update-banner {
-            background: linear-gradient(135deg, #28a745, #20c997);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: 600;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .lesson-section {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            margin-bottom: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-        
-        .section-header {
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            color: white;
-            padding: 20px 25px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.3s ease;
-        }
-        
-        .section-header:hover {
-            background: linear-gradient(135deg, #2980b9, #1f618d);
-        }
-        
-        .section-header h3 {
-            font-size: 1.4em;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .expand-icon {
-            font-size: 1.2em;
-            transition: transform 0.3s ease;
-        }
-        
-        .section-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            background: white;
-        }
-        
-        .section-content.expanded {
-            max-height: 2000px;
-            padding: 25px;
-        }
-        
-        .section-content.expanded {
-            animation: fadeIn 0.5s ease-in-out;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        .analogy-box {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            border-left: 4px solid #3498db;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        
-        .analogy-box h4 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-size: 1.1em;
-        }
-        
-        .analogy-box .analogy-icon {
-            font-size: 2em;
-            margin-bottom: 10px;
-            display: block;
-        }
-        
-        .concept-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-        
-        .concept-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            border: 1px solid #e9ecef;
-            transition: transform 0.3s ease;
-        }
-        
-        .concept-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .concept-card h5 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-size: 1.1em;
-        }
-        
-        .interactive-demo {
-            background: linear-gradient(135deg, #e8f4f8, #d1ecf1);
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-            border: 2px solid #3498db;
-        }
-        
-        .demo-controls {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .demo-input {
-            flex: 1;
-            min-width: 200px;
-        }
-        
-        .demo-input label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        
-        .demo-input input,
-        .demo-input select,
-        .demo-input textarea {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            font-size: 1em;
-        }
-        
-        .demo-input input:focus,
-        .demo-input select:focus,
-        .demo-input textarea:focus {
-            outline: none;
-            border-color: #3498db;
-        }
-        
-        .btn {
-            background: #3498db;
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1em;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-        }
-        
-        .btn:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-        }
-        
-        .result-display {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
-            border: 2px solid #3498db;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .token-visualization {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-            margin-top: 15px;
-        }
-        
-        .token {
-            background: #3498db;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 0.9em;
-            font-family: monospace;
-            transition: all 0.3s ease;
-        }
-        
-        .token:hover {
-            background: #2980b9;
-            transform: scale(1.05);
-        }
-        
-        .progress-bar {
-            background: #e9ecef;
-            border-radius: 10px;
-            height: 25px;
-            margin: 15px 0;
-            overflow: hidden;
-            position: relative;
-        }
-        
-        .progress-fill {
-            background: linear-gradient(90deg, #3498db, #2980b9);
-            height: 100%;
-            transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 0.9em;
-        }
-        
-        .comparison-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .comparison-table th,
-        .comparison-table td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #e9ecef;
-        }
-        
-        .comparison-table th {
-            background: linear-gradient(135deg, #2c3e50, #34495e);
-            color: white;
-            font-weight: 600;
-        }
-        
-        .comparison-table tr:hover {
-            background: #f8f9fa;
-        }
-        
-        .highlight {
-            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-        
-        .new-badge {
-            background: #e74c3c;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.7em;
-            font-weight: 600;
-            margin-left: 8px;
-        }
-        
-        .model-showcase {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-        
-        .model-card {
-            background: linear-gradient(135deg, #ffffff, #f8f9fa);
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-            border: 1px solid #e9ecef;
-            transition: all 0.3s ease;
-        }
-        
-        .model-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
-        }
-        
-        .model-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .model-name {
-            font-size: 1.3em;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        
-        .model-stats {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .stat-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .stat-label {
-            font-weight: 500;
-            color: #666;
-        }
-        
-        .stat-value {
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        
-        .cost-breakdown {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        
-        .cost-example {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-            border-left: 4px solid #3498db;
-        }
-        
-        .use-case-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-        
-        .use-case-card {
-            background: linear-gradient(135deg, #e8f4f8, #d1ecf1);
-            border-radius: 10px;
-            padding: 20px;
-            border: 1px solid #3498db;
-            transition: all 0.3s ease;
-        }
-        
-        .use-case-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .use-case-title {
-            font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-        
-        .expanded .expand-icon {
-            transform: rotate(180deg);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Understanding LLM Tokenization</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* House style. Layout idea: a plain left-aligned masthead, then a single readable column of bordered panels. */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --ink:#1a2233; --muted:#5a6578; --line:#d9dee7;
+  --brand:#1f4fd1; --brand-ink:#ffffff; --brand-soft:#e7edfc;
+  --warm:#a85605; --warm-soft:#fdf1df;
+  --good:#1a7f4b; --good-soft:#e3f4ea; --bad:#b3261e; --bad-soft:#fbe9e7;
+  --display:"Sora","Trebuchet MS",Verdana,sans-serif;
+  --body:"Source Sans 3","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"JetBrains Mono",Consolas,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10151f; --surface:#19202d; --ink:#e8ecf3; --muted:#9aa6ba; --line:#2b3547;
+    --brand:#8aa8ff; --brand-ink:#0d1530; --brand-soft:#1e2a4a;
+    --warm:#f0b35a; --warm-soft:#3a2c14;
+    --good:#5fd08f; --good-soft:#143524; --bad:#ff8a80; --bad-soft:#40201d;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10151f; --surface:#19202d; --ink:#e8ecf3; --muted:#9aa6ba; --line:#2b3547;
+  --brand:#8aa8ff; --brand-ink:#0d1530; --brand-soft:#1e2a4a;
+  --warm:#f0b35a; --warm-soft:#3a2c14;
+  --good:#5fd08f; --good-soft:#143524; --bad:#ff8a80; --bad-soft:#40201d;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px 56px}
+a{color:var(--brand)}
+:focus-visible{outline:3px solid var(--warm);outline-offset:2px}
+h1,h2,h3,h4{font-family:var(--display);line-height:1.2;text-wrap:balance;margin:0 0 10px}
+h1{font-size:clamp(28px,4.6vw,44px);font-weight:700}
+h2{font-size:clamp(21px,2.8vw,27px);font-weight:600}
+h3{font-size:18px;font-weight:600}
+h4{font-size:16px;font-weight:600}
+p{margin:0 0 12px}
+ul,ol{margin:0 0 12px;padding-left:22px}
+li{margin-bottom:5px}
+code,.mono{font-family:var(--mono);font-size:.9em}
+code{background:var(--brand-soft);padding:1px 5px;border-radius:4px}
+
+.masthead{padding:34px 0 22px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--brand);margin:0 0 8px}
+.lede{font-size:19px;color:var(--muted);max-width:64ch;margin:0}
+.asof{display:inline-block;margin-top:14px;font-size:14px;color:var(--warm);background:var(--warm-soft);border-radius:6px;padding:4px 10px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px}
+.panel>h2{padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card.soft{background:var(--bg)}
+.note{border-left:4px solid var(--brand);background:var(--brand-soft);border-radius:0 8px 8px 0;padding:14px 16px;margin:14px 0}
+.note.warm{border-color:var(--warm);background:var(--warm-soft)}
+.note.good{border-color:var(--good);background:var(--good-soft)}
+.note.bad{border-color:var(--bad);background:var(--bad-soft)}
+.note>:last-child,.card>:last-child,.panel>:last-child{margin-bottom:0}
+.muted{color:var(--muted)}
+.small{font-size:14.5px}
+
+.btn{font:inherit;font-weight:600;font-size:15.5px;border-radius:8px;border:1px solid var(--brand);background:var(--brand);color:var(--brand-ink);padding:9px 16px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--brand)}
+.btn.quiet{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn[aria-pressed="true"],.btn.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.chip{display:inline-block;font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:2px 9px;background:var(--brand-soft);color:var(--brand)}
+.chip.warm{background:var(--warm-soft);color:var(--warm)}
+.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+
+label{display:block;font-weight:600;font-size:15px;margin-bottom:4px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+.fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:12px}
+
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--display);font-size:13.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.stat .k{font-size:13.5px;color:var(--muted)}
+.stat .v{font-family:var(--display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.v.bad{color:var(--bad)} .v.good{color:var(--good)}
+
+.meter{height:14px;background:var(--line);border-radius:999px;overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--brand);border-radius:999px;width:0;transition:width .3s}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.out{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:12px}
+footer.foot{color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:16px;margin-top:26px}
+@media (max-width:520px){body{font-size:16px}.panel{padding:16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+@media print{body{background:#fff}.noprint{display:none!important}.panel{break-inside:avoid}}
+
+.jump{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.jump a{font-size:14.5px;font-weight:600;text-decoration:none;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.tokens{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.tok{font-family:var(--mono);font-size:14px;padding:3px 8px;border-radius:5px;background:var(--brand-soft);color:var(--ink);white-space:pre}
+.tok:nth-child(3n+2){background:var(--warm-soft)}
+.tok:nth-child(3n){background:var(--good-soft)}
+.facts{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:6px}
+.facts div{font-size:15px}.facts b{display:block;font-family:var(--display);font-size:20px;font-variant-numeric:tabular-nums}
+.model h3{margin-bottom:2px}
+.model dl{margin:10px 0 0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:15px}
+.model dt{color:var(--muted)}.model dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+section[id]{scroll-margin-top:64px}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Understanding LLM Tokenization</h1>
-            <p>A comprehensive guide to tokens, context windows, and costs in Large Language Models</p>
-        </div>
-        
-        <div class="update-banner">
-            📊 Updated July 2025 with latest pricing and models including GPT-4.1, Claude 4, and Gemini 2.5 Pro!
-        </div>
-        
-        <!-- What Are Tokens Section -->
-        <div class="lesson-section">
-            <div class="section-header" onclick="toggleSection('tokens')">
-                <h3>🧩 What Are Tokens?</h3>
-                <span class="expand-icon">▼</span>
-            </div>
-            <div class="section-content" id="tokens-content">
-                <p>Tokens are the fundamental building blocks that Large Language Models use to understand and process text. Think of them as the "words" in the AI's vocabulary, though they're more sophisticated than simple words.</p>
-                
-                <div class="analogy-box">
-                    <span class="analogy-icon">📚</span>
-                    <h4>Library Analogy</h4>
-                    <p>Imagine a vast library where each book represents a piece of text you want to process. Tokens are like the individual pages of these books. Just as a librarian processes a book page by page to understand its content, an LLM processes text token by token to understand meaning and generate responses.</p>
-                </div>
-                
-                <div class="concept-grid">
-                    <div class="concept-card">
-                        <h5>Token Types</h5>
-                        <ul>
-                            <li><strong>Whole words:</strong> "hello", "world"</li>
-                            <li><strong>Subwords:</strong> "un-", "ing", "-tion"</li>
-                            <li><strong>Punctuation:</strong> ".", "!", "?"</li>
-                            <li><strong>Special characters:</strong> "@", "#", numbers</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="concept-card">
-                        <h5>Key Statistics</h5>
-                        <ul>
-                            <li>1 token ≈ 4 characters</li>
-                            <li>1 token ≈ 0.75 words (English)</li>
-                            <li>1,000 tokens ≈ 750 words</li>
-                            <li>Different languages have different ratios</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="interactive-demo">
-                    <h4>🎯 Interactive Token Demo</h4>
-                    <div class="demo-controls">
-                        <div class="demo-input">
-                            <label for="token-text">Enter text to tokenize:</label>
-                            <textarea id="token-text" rows="3" placeholder="The quick brown fox jumps over the lazy dog. This text will be broken into tokens!">The quick brown fox jumps over the lazy dog. This text will be broken into tokens!</textarea>
-                        </div>
-                        <div class="demo-input">
-                            <label for="token-model">Model:</label>
-                            <select id="token-model">
-                                <option value="gpt4">GPT-4 (BPE)</option>
-                                <option value="claude">Claude (BPE)</option>
-                                <option value="gemini">Gemini (SentencePiece)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button class="btn" onclick="demonstrateTokenization()">Tokenize!</button>
-                    
-                    <div class="result-display" id="token-result" style="display: none;">
-                        <h5>Tokenization Result:</h5>
-                        <div id="token-stats"></div>
-                        <div class="token-visualization" id="token-visual"></div>
-                    </div>
-                </div>
-                
-                <div class="analogy-box">
-                    <span class="analogy-icon">🔧</span>
-                    <h4>Byte Pair Encoding (BPE) Explained</h4>
-                    <p>Think of BPE like a smart text compressor. It starts with individual characters and gradually builds up common patterns. For example, if "ing" appears frequently, it becomes a single token instead of three separate letters. This helps the AI understand common word patterns more efficiently.</p>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Context Windows Section -->
-        <div class="lesson-section">
-            <div class="section-header" onclick="toggleSection('context')">
-                <h3>📏 Context Windows</h3>
-                <span class="expand-icon">▼</span>
-            </div>
-            <div class="section-content" id="context-content">
-                <p>The context window is like the AI's "working memory" - it determines how much information the model can consider at once when generating responses.</p>
-                
-                <div class="analogy-box">
-                    <span class="analogy-icon">🧠</span>
-                    <h4>Human Memory Analogy</h4>
-                    <p>Imagine you're having a conversation with a friend. Your brain can remember the last few minutes of conversation clearly, but details from an hour ago might be fuzzy. Similarly, an LLM's context window determines how much of your conversation it can "remember" and use to generate relevant responses.</p>
-                </div>
-                
-                <div class="model-showcase">
-                    <div class="model-card">
-                        <div class="model-header">
-                            <div class="model-name">GPT-4.1</div>
-                            <div class="new-badge">NEW</div>
-                        </div>
-                        <div class="model-stats">
-                            <div class="stat-row">
-                                <span class="stat-label">Context Window</span>
-                                <span class="stat-value">1,000,000 tokens</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Equivalent Pages</span>
-                                <span class="stat-value">~2,000 pages</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Best For</span>
-                                <span class="stat-value">Long documents, complex reasoning</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="model-card">
-                        <div class="model-header">
-                            <div class="model-name">Claude Opus 4</div>
-                            <div class="new-badge">NEW</div>
-                        </div>
-                        <div class="model-stats">
-                            <div class="stat-row">
-                                <span class="stat-label">Context Window</span>
-                                <span class="stat-value">200,000 tokens</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Equivalent Pages</span>
-                                <span class="stat-value">~400 pages</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Best For</span>
-                                <span class="stat-value">Advanced coding, analysis</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="model-card">
-                        <div class="model-header">
-                            <div class="model-name">Gemini 2.5 Pro</div>
-                            <div class="new-badge">NEW</div>
-                        </div>
-                        <div class="model-stats">
-                            <div class="stat-row">
-                                <span class="stat-label">Context Window</span>
-                                <span class="stat-value">1,000,000 tokens</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Equivalent Pages</span>
-                                <span class="stat-value">~2,000 pages</span>
-                            </div>
-                            <div class="stat-row">
-                                <span class="stat-label">Best For</span>
-                                <span class="stat-value">Multimodal tasks, research</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="interactive-demo">
-                    <h4>🎯 Context Window Visualizer</h4>
-                    <div class="demo-controls">
-                        <div class="demo-input">
-                            <label for="context-tokens">Number of tokens in your conversation:</label>
-                            <input type="number" id="context-tokens" value="50000" min="0" max="1000000">
-                        </div>
-                        <div class="demo-input">
-                            <label for="context-model">Model:</label>
-                            <select id="context-model">
-                                <option value="1000000">GPT-4.1 / Gemini 2.5 Pro (1M)</option>
-                                <option value="200000">Claude Opus 4 (200K)</option>
-                                <option value="128000">GPT-4o (128K)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button class="btn" onclick="visualizeContext()">Show Context Usage</button>
-                    
-                    <div class="result-display" id="context-result" style="display: none;">
-                        <h5>Context Window Usage:</h5>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="context-progress"></div>
-                        </div>
-                        <div id="context-details"></div>
-                    </div>
-                </div>
-                
-                <div class="use-case-grid">
-                    <div class="use-case-card">
-                        <div class="use-case-title">📖 Document Analysis</div>
-                        <p>Process entire research papers, legal documents, or technical manuals in a single conversation</p>
-                    </div>
-                    
-                    <div class="use-case-card">
-                        <div class="use-case-title">💬 Long Conversations</div>
-                        <p>Maintain context across extended dialogues without losing track of earlier topics</p>
-                    </div>
-                    
-                    <div class="use-case-card">
-                        <div class="use-case-title">📊 Code Analysis</div>
-                        <p>Analyze entire codebases, understand complex software architectures</p>
-                    </div>
-                    
-                    <div class="use-case-card">
-                        <div class="use-case-title">🎯 Multi-step Tasks</div>
-                        <p>Complete complex workflows that require maintaining state across many steps</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Pricing and Costs Section -->
-        <div class="lesson-section">
-            <div class="section-header" onclick="toggleSection('pricing')">
-                <h3>💰 Pricing & Costs</h3>
-                <span class="expand-icon">▼</span>
-            </div>
-            <div class="section-content" id="pricing-content">
-                <p>Understanding LLM pricing is crucial for anyone using these tools professionally or educationally. Most providers use a token-based pricing model with separate rates for input and output.</p>
-                
-                <div class="analogy-box">
-                    <span class="analogy-icon">⚡</span>
-                    <h4>Electricity Bill Analogy</h4>
-                    <p>Think of LLM pricing like your electricity bill. Just as you pay for the electricity you consume (measured in kilowatt-hours), you pay for the "computational power" you use (measured in tokens). Input tokens are like the power needed to turn on your appliances, while output tokens are like the power consumed while they're running - typically higher because generation requires more computational work.</p>
-                </div>
-                
-                <div class="comparison-table">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Model</th>
-                                <th>Input ($/1M tokens)</th>
-                                <th>Output ($/1M tokens)</th>
-                                <th>Context Window</th>
-                                <th>Best Use Case</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>GPT-4.1</strong> <span class="new-badge">NEW</span></td>
-                                <td>$15.00</td>
-                                <td>$60.00</td>
-                                <td>1,000,000</td>
-                                <td>Complex reasoning</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Claude Opus 4</strong> <span class="new-badge">NEW</span></td>
-                                <td>$15.00</td>
-                                <td>$75.00</td>
-                                <td>200,000</td>
-                                <td>Advanced coding</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Gemini 2.5 Pro</strong> <span class="new-badge">NEW</span></td>
-                                <td>$1.25</td>
-                                <td>$10.00</td>
-                                <td>1,000,000</td>
-                                <td>Cost-effective reasoning</td>
-                            </tr>
-                            <tr>
-                                <td><strong>GPT-4o</strong></td>
-                                <td>$2.50</td>
-                                <td>$10.00</td>
-                                <td>128,000</td>
-                                <td>General purpose</td>
-                            </tr>
-                            <tr>
-                                <td><strong>GPT-4o mini</strong></td>
-                                <td>$0.15</td>
-                                <td>$0.60</td>
-                                <td>128,000</td>
-                                <td>High-volume tasks</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="cost-breakdown">
-                    <h4>💡 Cost Breakdown Examples</h4>
-                    
-                    <div class="cost-example">
-                        <h5>📝 Student Essay Review (1,000 words)</h5>
-                        <p><strong>Input:</strong> ~1,333 tokens | <strong>Output:</strong> ~667 tokens</p>
-                        <p><strong>GPT-4o mini cost:</strong> $0.0002 input + $0.0004 output = <span class="highlight">$0.0006 total</span></p>
-                    </div>
-                    
-                    <div class="cost-example">
-                        <h5>📊 Business Report Analysis (5,000 words)</h5>
-                        <p><strong>Input:</strong> ~6,667 tokens | <strong>Output:</strong> ~1,333 tokens</p>
-                        <p><strong>GPT-4o cost:</strong> $0.0167 input + $0.0133 output = <span class="highlight">$0.03 total</span></p>
-                    </div>
-                    
-                    <div class="cost-example">
-                        <h5>💻 Complex Code Review (20,000 tokens)</h5>
-                        <p><strong>Input:</strong> ~20,000 tokens | <strong>Output:</strong> ~5,000 tokens</p>
-                        <p><strong>Claude Opus 4 cost:</strong> $0.30 input + $0.375 output = <span class="highlight">$0.675 total</span></p>
-                    </div>
-                </div>
-                
-                <div class="interactive-demo">
-                    <h4>🎯 Cost Calculator</h4>
-                    <div class="demo-controls">
-                        <div class="demo-input">
-                            <label for="calc-input">Input Tokens:</label>
-                            <input type="number" id="calc-input" value="1000" min="0">
-                        </div>
-                        <div class="demo-input">
-                            <label for="calc-output">Output Tokens:</label>
-                            <input type="number" id="calc-output" value="500" min="0">
-                        </div>
-                        <div class="demo-input">
-                            <label for="calc-model">Model:</label>
-                            <select id="calc-model">
-                                <option value="gpt41">GPT-4.1 ($15/$60)</option>
-                                <option value="claude4">Claude Opus 4 ($15/$75)</option>
-                                <option value="gemini25">Gemini 2.5 Pro ($1.25/$10)</option>
-                                <option value="gpt4o">GPT-4o ($2.50/$10)</option>
-                                <option value="gpt4omini">GPT-4o mini ($0.15/$0.60)</option>
-                            </select>
-                        </div>
-                        <div class="demo-input">
-                            <label for="calc-requests">Number of Requests:</label>
-                            <input type="number" id="calc-requests" value="1" min="1">
-                        </div>
-                    </div>
-                    <button class="btn" onclick="calculateCost()">Calculate Cost</button>
-                    
-                    <div class="result-display" id="cost-result" style="display: none;">
-                        <h5>Cost Analysis:</h5>
-                        <div id="cost-details"></div>
-                    </div>
-                </div>
-                
-                <div class="analogy-box">
-                    <div style="display: flex; align-items: flex-start; gap: 15px;">
-                        <span style="font-size: 2em; flex-shrink: 0;">💡</span>
-                        <div style="flex: 1;">
-                            <h4 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 1.1em;">Why Output Costs More</h4>
-                            <p style="margin: 0; line-height: 1.6;">Think of input processing like reading a book (the AI just needs to understand what you're saying), while output generation is like writing a book (the AI must create new, coherent content word by word). Writing requires much more mental effort and computational resources than reading, which is why output tokens cost 2-5x more than input tokens.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Advanced Concepts Section -->
-        <div class="lesson-section">
-            <div class="section-header" onclick="toggleSection('advanced')">
-                <h3>🔬 Advanced Concepts</h3>
-                <span class="expand-icon">▼</span>
-            </div>
-            <div class="section-content" id="advanced-content">
-                <p>Dive deeper into the technical aspects of tokenization and how they impact real-world applications.</p>
-                
-                <div class="concept-grid">
-                    <div class="concept-card">
-                        <h5>🌍 Multilingual Tokenization</h5>
-                        <p>Different languages have vastly different tokenization efficiency. Chinese text might use 1.5x more tokens than English for the same meaning, while some languages like German can be even more token-intensive due to compound words.</p>
-                    </div>
-                    
-                    <div class="concept-card">
-                        <h5>🔄 Prompt Caching</h5>
-                        <p>Many providers now offer "prompt caching" - if you repeatedly use the same system prompt or context, they'll cache it and give you up to 90% discounts on those cached tokens.</p>
-                    </div>
-                    
-                    <div class="concept-card">
-                        <h5>⚡ Batch Processing</h5>
-                        <p>For non-urgent tasks, batch processing can provide 50% discounts by processing multiple requests together, though with slower response times.</p>
-                    </div>
-                    
-                    <div class="concept-card">
-                        <h5>🧠 Reasoning Tokens</h5>
-                        <p>New "reasoning" models like o1 and Gemini 2.5 Pro use hidden "thinking" tokens to work through problems step-by-step, which are included in your output token count.</p>
-                    </div>
-                </div>
-                
-                <div class="analogy-box">
-                    <span class="analogy-icon">🏭</span>
-                    <h4>The Token Factory</h4>
-                    <p>Imagine a factory that processes raw materials (text) into finished products (AI responses). The tokenizer is like the factory's intake system - it breaks down incoming materials into standard units that the factory machines can process. Different factories (models) might prefer different unit sizes, which is why the same text gets tokenized differently across models.</p>
-                </div>
-                
-                <div class="interactive-demo">
-                    <h4>🎯 Token Efficiency Analyzer</h4>
-                    <div class="demo-controls">
-                        <div class="demo-input">
-                            <label for="efficiency-text">Compare text efficiency:</label>
-                            <textarea id="efficiency-text" rows="4" placeholder="Enter text to analyze across different models...">Artificial intelligence is revolutionizing how we process and understand human language through advanced tokenization techniques.</textarea>
-                        </div>
-                    </div>
-                    <button class="btn" onclick="analyzeEfficiency()">Analyze Efficiency</button>
-                    
-                    <div class="result-display" id="efficiency-result" style="display: none;">
-                        <h5>Cross-Model Efficiency Analysis:</h5>
-                        <div id="efficiency-comparison"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Practical Applications Section -->
-        <div class="lesson-section">
-            <div class="section-header" onclick="toggleSection('applications')">
-                <h3>🚀 Practical Applications</h3>
-                <span class="expand-icon">▼</span>
-            </div>
-            <div class="section-content" id="applications-content">
-                <p>Learn how to apply your tokenization knowledge in real-world scenarios to optimize performance and reduce costs.</p>
-                
-                <div class="use-case-grid">
-                    <div class="use-case-card">
-                        <div class="use-case-title">🎓 Educational Use</div>
-                        <p><strong>Best Model:</strong> GPT-4o mini for most tasks</p>
-                        <p><strong>Why:</strong> Cost-effective for student assignments, essay feedback, and basic research assistance</p>
-                        <p><strong>Estimated Cost:</strong> $0.001-0.01 per interaction</p>
-                    </div>
-                    
-                    <div class="use-case-card">
-                        <div class="use-case-title">💼 Business Analysis</div>
-                        <p><strong>Best Model:</strong> Gemini 2.5 Pro</p>
-                        <p><strong>Why:</strong> Large context window for documents, competitive pricing for reasoning tasks</p>
-                        <p><strong>Estimated Cost:</strong> $0.01-0.10 per analysis</p>
-                    </div>
-                    
-                    <div class="use-case-card">
-                        <div class="use-case-title">💻 Software Development</div>
-                        <p><strong>Best Model:</strong> Claude Opus 4</p>
-                        <p><strong>Why:</strong> Superior coding capabilities, extended thinking for complex problems</p>
-                        <p><strong>Estimated Cost:</strong> $0.10-1.00 per coding session</p>
-                    </div>
-                    
-                    <div class="use-case-card">
-                        <div class="use-case-title">🔬 Research & Analysis</div>
-                        <p><strong>Best Model:</strong> GPT-4.1</p>
-                        <p><strong>Why:</strong> Massive context window for processing large datasets and documents</p>
-                        <p><strong>Estimated Cost:</strong> $0.50-5.00 per deep analysis</p>
-                    </div>
-                </div>
-                
-                <div class="cost-breakdown">
-                    <h4>💰 Cost Optimization Strategies</h4>
-                    
-                    <div class="cost-example">
-                        <h5>✂️ Prompt Engineering</h5>
-                        <p>Use concise, specific prompts to reduce input tokens. Instead of "Please analyze this document and tell me everything about it," try "Summarize the key findings in 3 bullet points."</p>
-                        <p><strong>Potential Savings:</strong> 30-50% reduction in costs</p>
-                    </div>
-                    
-                    <div class="cost-example">
-                        <h5>🎯 Model Selection</h5>
-                        <p>Use the smallest model that can handle your task. GPT-4o mini is 10x cheaper than GPT-4.1 for simple tasks with similar quality.</p>
-                        <p><strong>Potential Savings:</strong> 80-90% for appropriate tasks</p>
-                    </div>
-                    
-                    <div class="cost-example">
-                        <h5>📦 Batch Processing</h5>
-                        <p>For non-urgent tasks, use batch APIs which offer 50% discounts but with 24-hour processing times.</p>
-                        <p><strong>Potential Savings:</strong> 50% for suitable workflows</p>
-                    </div>
-                </div>
-                
-                <div class="analogy-box">
-                    <span class="analogy-icon">🎪</span>
-                    <h4>The AI Talent Show</h4>
-                    <p>Think of different AI models like performers in a talent show. GPT-4.1 is the expensive headliner who can do amazing complex acts, Claude Opus 4 is the coding virtuoso, Gemini 2.5 Pro is the cost-effective all-rounder, and GPT-4o mini is the energetic opening act who's perfect for getting the crowd warmed up. Choose the right performer for your specific show (task) to get the best value.</p>
-                </div>
-            </div>
-        </div>
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">How LLMs work</p>
+    <h1>Understanding LLM Tokenization</h1>
+    <p class="lede">Tokens, context windows and costs: what a language model actually counts, how much it can hold, and what you pay for.</p>
+    <span class="asof">Models and prices as of <span data-asof></span></span>
+  </header>
+
+  <nav class="jump row noprint" aria-label="Sections">
+    <a href="#tokens">Tokens</a><a href="#context">Context windows</a><a href="#pricing">Pricing</a><a href="#advanced">Going deeper</a><a href="#practice">In practice</a>
+  </nav>
+
+  <section class="panel" id="tokens">
+    <h2>What are tokens?</h2>
+    <p>Tokens are the units a large language model reads and writes. A token is often a whole word, but it can also be part of a word, a punctuation mark, or a space plus a word.</p>
+    <div class="note"><h4>Library analogy</h4><p>If a document is a book, tokens are its pages. A librarian works through a book page by page; a model works through text token by token.</p></div>
+    <div class="grid">
+      <div class="card soft"><h3>What becomes a token</h3><ul><li><strong>Whole words:</strong> "hello", "world"</li><li><strong>Word pieces:</strong> "un", "ing", "tion"</li><li><strong>Punctuation:</strong> ".", "!", "?"</li><li><strong>Numbers and symbols:</strong> "@", "#", "2026"</li></ul></div>
+      <div class="card soft"><h3>Rules of thumb (English)</h3><ul><li>1 token is about 4 characters</li><li>1 token is about three-quarters of a word</li><li>1,000 tokens is about 750 words</li><li>Other languages have different ratios</li></ul></div>
     </div>
-    
-    <script>
-        // Track which sections are expanded
-        const expandedSections = new Set();
-        
-        function toggleSection(sectionId) {
-            const content = document.getElementById(sectionId + '-content');
-            const header = content.previousElementSibling;
-            const icon = header.querySelector('.expand-icon');
-            
-            if (expandedSections.has(sectionId)) {
-                content.classList.remove('expanded');
-                icon.style.transform = 'rotate(0deg)';
-                expandedSections.delete(sectionId);
-            } else {
-                content.classList.add('expanded');
-                icon.style.transform = 'rotate(180deg)';
-                expandedSections.add(sectionId);
-            }
-        }
-        
-        // Enhanced tokenization demonstration
-        function demonstrateTokenization() {
-            const text = document.getElementById('token-text').value;
-            const model = document.getElementById('token-model').value;
-            
-            if (!text.trim()) {
-                alert('Please enter some text to tokenize!');
-                return;
-            }
-            
-            const tokens = tokenizeText(text, model);
-            const tokenCount = tokens.length;
-            
-            // Calculate approximate costs
-            const pricing = getModelPricing(model);
-            const inputCost = (tokenCount / 1000000) * pricing.input;
-            const outputCost = (tokenCount / 1000000) * pricing.output;
-            
-            // Display results
-            document.getElementById('token-result').style.display = 'block';
-            document.getElementById('token-stats').innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
-                    <div><strong>Token Count:</strong> ${tokenCount.toLocaleString()}</div>
-                    <div><strong>Character Count:</strong> ${text.length.toLocaleString()}</div>
-                    <div><strong>Word Count:</strong> ${text.split(/\s+/).length.toLocaleString()}</div>
-                    <div><strong>Tokens/Word Ratio:</strong> ${(tokenCount / text.split(/\s+/).length).toFixed(2)}</div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <div><strong>Input Cost:</strong> $${inputCost.toFixed(6)}</div>
-                    <div><strong>Output Cost:</strong> $${outputCost.toFixed(6)}</div>
-                </div>
-            `;
-            
-            document.getElementById('token-visual').innerHTML = tokens.map(token => 
-                `<span class="token" title="Token: ${token}">${token}</span>`
-            ).join('');
-        }
-        
-        function tokenizeText(text, model) {
-            // Simplified tokenization for demonstration
-            switch(model) {
-                case 'gpt4':
-                    return tokenizeGPT(text);
-                case 'claude':
-                    return tokenizeClaude(text);
-                case 'gemini':
-                    return tokenizeGemini(text);
-                default:
-                    return tokenizeGPT(text);
-            }
-        }
-        
-        function tokenizeGPT(text) {
-            const words = text.split(/(\s+|[^\w\s])/);
-            const tokens = [];
-            for (let word of words) {
-                if (word.trim()) {
-                    if (word.length > 6) {
-                        tokens.push(word.substring(0, 4));
-                        tokens.push(word.substring(4));
-                    } else {
-                        tokens.push(word);
-                    }
-                }
-            }
-            return tokens;
-        }
-        
-        function tokenizeClaude(text) {
-            const words = text.split(/\s+/);
-            const tokens = [];
-            for (let word of words) {
-                if (word.length > 7) {
-                    tokens.push(word.substring(0, 4));
-                    tokens.push(word.substring(4));
-                } else {
-                    tokens.push(word);
-                }
-            }
-            return tokens;
-        }
-        
-        function tokenizeGemini(text) {
-            const words = text.split(/(\s+|[^\w\s])/);
-            const tokens = [];
-            for (let word of words) {
-                if (word.trim()) {
-                    if (word.length > 5) {
-                        tokens.push(word.substring(0, 3));
-                        tokens.push(word.substring(3));
-                    } else {
-                        tokens.push(word);
-                    }
-                }
-            }
-            return tokens;
-        }
-        
-        function getModelPricing(model) {
-            const pricing = {
-                gpt4: { input: 2.5, output: 10 },
-                claude: { input: 15, output: 75 },
-                gemini: { input: 1.25, output: 10 }
-            };
-            return pricing[model] || pricing.gpt4;
-        }
-        
-        // Context window visualization
-        function visualizeContext() {
-            const tokens = parseInt(document.getElementById('context-tokens').value);
-            const maxTokens = parseInt(document.getElementById('context-model').value);
-            
-            const percentage = Math.min((tokens / maxTokens) * 100, 100);
-            const remainingTokens = Math.max(maxTokens - tokens, 0);
-            
-            document.getElementById('context-result').style.display = 'block';
-            document.getElementById('context-progress').style.width = percentage + '%';
-            document.getElementById('context-progress').textContent = `${percentage.toFixed(1)}% Used`;
-            
-            let status = '';
-            if (percentage < 50) {
-                status = '✅ Plenty of room for more content';
-            } else if (percentage < 80) {
-                status = '⚠️ Moderate usage - consider chunking large inputs';
-            } else if (percentage < 100) {
-                status = '🔴 High usage - approaching context limit';
-            } else {
-                status = '❌ Context limit exceeded - content will be truncated';
-            }
-            
-            document.getElementById('context-details').innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
-                    <div><strong>Used:</strong> ${tokens.toLocaleString()} tokens</div>
-                    <div><strong>Remaining:</strong> ${remainingTokens.toLocaleString()} tokens</div>
-                    <div><strong>Status:</strong> ${status}</div>
-                    <div><strong>Equivalent Pages:</strong> ~${Math.round(tokens / 500)} pages</div>
-                </div>
-            `;
-        }
-        
-        // Cost calculator
-        function calculateCost() {
-            const inputTokens = parseInt(document.getElementById('calc-input').value) || 0;
-            const outputTokens = parseInt(document.getElementById('calc-output').value) || 0;
-            const model = document.getElementById('calc-model').value;
-            const requests = parseInt(document.getElementById('calc-requests').value) || 1;
-            
-            const pricing = {
-                gpt41: { input: 15, output: 60, name: 'GPT-4.1' },
-                claude4: { input: 15, output: 75, name: 'Claude Opus 4' },
-                gemini25: { input: 1.25, output: 10, name: 'Gemini 2.5 Pro' },
-                gpt4o: { input: 2.5, output: 10, name: 'GPT-4o' },
-                gpt4omini: { input: 0.15, output: 0.6, name: 'GPT-4o mini' }
-            };
-            
-            const modelPricing = pricing[model];
-            const inputCost = (inputTokens / 1000000) * modelPricing.input;
-            const outputCost = (outputTokens / 1000000) * modelPricing.output;
-            const totalCost = (inputCost + outputCost) * requests;
-            
-            const dailyEstimate = totalCost * 10; // 10 requests per day
-            const monthlyEstimate = dailyEstimate * 30;
-            
-            document.getElementById('cost-result').style.display = 'block';
-            document.getElementById('cost-details').innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                    <div><strong>Per Request:</strong> $${totalCost.toFixed(6)}</div>
-                    <div><strong>Input Cost:</strong> $${(inputCost * requests).toFixed(6)}</div>
-                    <div><strong>Output Cost:</strong> $${(outputCost * requests).toFixed(6)}</div>
-                    <div><strong>Total (${requests} requests):</strong> $${totalCost.toFixed(6)}</div>
-                </div>
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
-                    <h6>Usage Estimates:</h6>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
-                        <div><strong>Daily (10 requests):</strong> $${dailyEstimate.toFixed(4)}</div>
-                        <div><strong>Monthly (300 requests):</strong> $${monthlyEstimate.toFixed(2)}</div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Efficiency analyzer
-        function analyzeEfficiency() {
-            const text = document.getElementById('efficiency-text').value;
-            
-            if (!text.trim()) {
-                alert('Please enter some text to analyze!');
-                return;
-            }
-            
-            const models = [
-                { name: 'GPT-4.1', id: 'gpt4', pricing: { input: 15, output: 60 } },
-                { name: 'Claude Opus 4', id: 'claude', pricing: { input: 15, output: 75 } },
-                { name: 'Gemini 2.5 Pro', id: 'gemini', pricing: { input: 1.25, output: 10 } },
-                { name: 'GPT-4o', id: 'gpt4', pricing: { input: 2.5, output: 10 } },
-                { name: 'GPT-4o mini', id: 'gpt4', pricing: { input: 0.15, output: 0.6 } }
-            ];
-            
-            document.getElementById('efficiency-result').style.display = 'block';
-            
-            let comparisonHTML = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">';
-            
-            models.forEach(model => {
-                const tokens = tokenizeText(text, model.id);
-                const tokenCount = tokens.length;
-                const inputCost = (tokenCount / 1000000) * model.pricing.input;
-                const outputCost = (tokenCount / 1000000) * model.pricing.output;
-                
-                comparisonHTML += `
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #3498db;">
-                        <h6 style="margin-bottom: 10px; color: #2c3e50;">${model.name}</h6>
-                        <div style="font-size: 0.9em;">
-                            <div><strong>Tokens:</strong> ${tokenCount}</div>
-                            <div><strong>Input Cost:</strong> $${inputCost.toFixed(6)}</div>
-                            <div><strong>Output Cost:</strong> $${outputCost.toFixed(6)}</div>
-                            <div><strong>Efficiency:</strong> ${(text.length / tokenCount).toFixed(2)} chars/token</div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            comparisonHTML += '</div>';
-            document.getElementById('efficiency-comparison').innerHTML = comparisonHTML;
-        }
-        
-        // Initialize some sections as expanded
-        document.addEventListener('DOMContentLoaded', function() {
-            // Expand the first section by default
-            toggleSection('tokens');
-            
-            // Pre-populate some interactive elements
-            setTimeout(() => {
-                demonstrateTokenization();
-                visualizeContext();
-                calculateCost();
-            }, 500);
-        });
-    </script>
+    <div class="note warm" style="margin-top:16px">
+      <h4>Try it: split text into tokens</h4>
+      <div class="fields">
+        <div style="grid-column:1/-1"><label for="tokText">Text</label><textarea id="tokText" rows="3">The quick brown fox jumps over the lazy dog. This text will be broken into tokens!</textarea></div>
+        <div><label for="tokModel">Price it with</label><select id="tokModel"></select></div>
+      </div>
+      <div class="out" id="tokOut" aria-live="polite"></div>
+      <p class="small muted" style="margin-top:10px">This is a simplified illustration. Real tokenizers are learned from data, differ from model to model, and will split the same text differently.</p>
+    </div>
+    <div class="note"><h4>Byte pair encoding in one paragraph</h4><p>Most tokenizers start from single characters and repeatedly merge the pairs that appear together most often. If "ing" is common, it becomes one token instead of three letters. Common words end up as single tokens; rare words are spelled out in pieces.</p></div>
+  </section>
+
+  <section class="panel" id="context">
+    <h2>Context windows</h2>
+    <p>The context window is the model's working memory: the most tokens it can consider at once, counting your prompt, any attached documents, the conversation so far, and its own reply.</p>
+    <div class="note"><h4>Conversation analogy</h4><p>You remember the last few minutes of a conversation clearly and the first hour only vaguely. A model has a hard version of that limit: anything outside the window is not there at all.</p></div>
+    <div class="grid" id="ctxCards"></div>
+    <div class="note warm" style="margin-top:16px">
+      <h4>Try it: how full is the window?</h4>
+      <div class="fields">
+        <div><label for="ctxTokens">Tokens in your conversation</label><input type="number" id="ctxTokens" value="50000" min="0" step="1000"></div>
+        <div><label for="ctxModel">Model</label><select id="ctxModel"></select></div>
+      </div>
+      <div class="meter" role="img" aria-label="Context used"><i id="ctxBar"></i></div>
+      <div class="out" id="ctxOut" aria-live="polite"></div>
+    </div>
+    <div class="grid" style="margin-top:16px">
+      <div class="card soft"><h3>Document analysis</h3><p>Read a full research paper, contract or manual in one conversation.</p></div>
+      <div class="card soft"><h3>Long conversations</h3><p>Keep earlier topics available deep into a dialogue.</p></div>
+      <div class="card soft"><h3>Code analysis</h3><p>Hold many source files at once to reason about how they fit together.</p></div>
+      <div class="card soft"><h3>Multi-step tasks</h3><p>Carry state through a workflow with many steps.</p></div>
+    </div>
+  </section>
+
+  <section class="panel" id="pricing">
+    <h2>Pricing and costs</h2>
+    <p>When you use a model through its API, you pay per token, with one rate for input (what you send) and a higher rate for output (what it writes). Chat subscriptions hide this, but the same metering sits underneath.</p>
+    <div class="note"><h4>Utility bill analogy</h4><p>You pay for electricity by the kilowatt-hour. You pay for a model by the token. Prices are quoted per million tokens.</p></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Model</th><th>Maker</th><th>Tier</th><th class="num">Input $/1M</th><th class="num">Output $/1M</th><th class="num">Context window</th></tr></thead>
+      <tbody id="priceRows"></tbody>
+    </table></div>
+    <p class="small muted" id="priceNotes" style="margin-top:10px"></p>
+    <h3 style="margin-top:20px">What real tasks cost</h3>
+    <div class="grid" id="examples"></div>
+    <div class="note warm" style="margin-top:16px">
+      <h4>Try it: cost calculator</h4>
+      <div class="fields">
+        <div><label for="calcIn">Input tokens</label><input type="number" id="calcIn" value="1000" min="0"></div>
+        <div><label for="calcOut">Output tokens</label><input type="number" id="calcOut" value="500" min="0"></div>
+        <div><label for="calcModel">Model</label><select id="calcModel"></select></div>
+        <div><label for="calcReq">Number of requests</label><input type="number" id="calcReq" value="1" min="1"></div>
+      </div>
+      <div class="out" id="calcOutBox" aria-live="polite"></div>
+    </div>
+    <div class="note"><h4>Why output costs more</h4><p>Reading is one pass over text that already exists. Writing means producing new text one token at a time, each token depending on everything before it. On every model in the table above, an output token costs five times as much as an input token.</p></div>
+  </section>
+
+  <section class="panel" id="advanced">
+    <h2>Going deeper</h2>
+    <div class="grid">
+      <div class="card soft"><h3>Other languages</h3><p>Token counts depend on the language. Text in languages that are less common in the training data, or that use long compound words, usually takes more tokens for the same meaning.</p></div>
+      <div class="card soft"><h3>Prompt caching</h3><p>If you send the same long instructions or document again and again, providers can cache it. Cached input is billed at a small fraction of the normal rate. <span id="cacheEx"></span></p></div>
+      <div class="card soft"><h3>Batch processing</h3><p>Work that can wait can be sent as a batch. OpenAI, Anthropic and Google all list batch rates at half the standard price.</p></div>
+      <div class="card soft"><h3>Thinking tokens</h3><p>Many current models work through a problem before answering. That hidden reasoning is billed as output tokens, so a hard question can cost far more than its short answer suggests.</p></div>
+      <div class="card soft"><h3>Long-prompt surcharges</h3><p>A large context window does not always come at one price. <span id="surchargeEx"></span></p></div>
+    </div>
+    <div class="note" style="margin-top:16px"><h4>The intake desk</h4><p>Think of a tokenizer as a factory's intake desk. It breaks incoming material into standard units the machines can handle. Different factories use different unit sizes, which is why the same sentence has a different token count on different models.</p></div>
+  </section>
+
+  <section class="panel" id="practice">
+    <h2>In practice</h2>
+    <p>Most of the skill is matching the size of the model to the size of the job.</p>
+    <div class="grid" id="useCases"></div>
+    <h3 style="margin-top:20px">Ways to spend less</h3>
+    <div class="grid">
+      <div class="card soft"><h3>Ask for less</h3><p>Output is the expensive side. "Summarize the key findings in three bullet points" costs less than "tell me everything about this document".</p></div>
+      <div class="card soft"><h3>Use the smallest model that works</h3><p id="saveModel"></p></div>
+      <div class="card soft"><h3>Batch what can wait</h3><p>Half price for work that does not need an immediate answer.</p></div>
+      <div class="card soft"><h3>Cache what repeats</h3><p>A long system prompt or reference document sent with every request is the ideal thing to cache.</p></div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p><strong>Where the numbers come from.</strong> Prices and context windows are list prices per million tokens at the standard tier, compiled from published price trackers that cite each provider's own pricing page (<a href="https://nhimg.org/llm-pricing-tracker" target="_blank" rel="noopener">NHIMG LLM Pricing Tracker</a>, checked <span data-asof></span>). Providers change prices often. To update this page, edit the <code>MODELS</code> block near the top of the script.</p>
+  </footer>
+</div>
+
+<script>
+/* ===== Edit this block to update the page ===== */
+const AS_OF = "November 15, 2026";
+const MODELS = [
+  { id:"astra",  name:"GPT-6 Astra",       maker:"OpenAI",    tier:"Top",      inp:10,   out:50,   ctx:1050000 },
+  { id:"fable",  name:"Claude Fable 5.2",  maker:"Anthropic", tier:"Top",      inp:8,    out:40,   ctx:1000000 },
+  { id:"opus",   name:"Claude Opus 5.5",   maker:"Anthropic", tier:"Flagship", inp:4,    out:20,   ctx:1000000 },
+  { id:"sol",    name:"GPT-6.1 Sol",       maker:"OpenAI",    tier:"Flagship", inp:2,    out:10,   ctx:1050000 },
+  { id:"argon",  name:"Gemini 4 Argon",    maker:"Google",    tier:"Flagship", inp:2,    out:10,   ctx:1048576, note:"Gemini 4 Argon is listed to rise to $4 / $20 on December 1, 2026." },
+  { id:"sonnet", name:"Claude Sonnet 5.5", maker:"Anthropic", tier:"Mid",      inp:2,    out:10,   ctx:1000000 },
+  { id:"terra",  name:"GPT-6.1 Terra",     maker:"OpenAI",    tier:"Mid",      inp:1,    out:5,    ctx:1050000 },
+  { id:"flash",  name:"Gemini 3.8 Flash",  maker:"Google",    tier:"Mid",      inp:0.75, out:3.75, ctx:null,    note:"Gemini 3.8 Flash is listed to rise to $1.50 / $7.50 on January 1, 2027." },
+  { id:"luna",   name:"GPT-6 Luna",        maker:"OpenAI",    tier:"Small",    inp:0.10, out:0.50, ctx:1050000 },
+  { id:"haiku",  name:"Claude Haiku 5.5",  maker:"Anthropic", tier:"Small",    inp:0.10, out:0.50, ctx:null }
+];
+const CACHE_EXAMPLE = "GPT-6.1 Sol lists cached input at $0.10 per million tokens against $2.00 uncached.";
+const SURCHARGE_EXAMPLE = "OpenAI charges some models double for input once a request passes 272,000 tokens, and Claude Haiku 5.5 costs more above 100,000 prompt tokens.";
+const SHOWCASE = ["sol","opus","argon"];          // cards in the context section
+const TOKENS_PER_PAGE = 500;
+/* ===== End of editable block ===== */
+
+const $ = id => document.getElementById(id);
+const byId = id => MODELS.find(m => m.id === id);
+const money = n => n >= 100 ? "$" + n.toFixed(0) : n >= 1 ? "$" + n.toFixed(2) : n >= 0.01 ? "$" + n.toFixed(3) : "$" + n.toFixed(5);
+const rate = n => "$" + (n < 1 ? n.toFixed(2) : n % 1 ? n.toFixed(2) : n.toFixed(0));
+const num = n => n.toLocaleString("en-US");
+const cost = (m, i, o) => (i / 1e6) * m.inp + (o / 1e6) * m.out;
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+
+document.querySelectorAll("[data-asof]").forEach(e => e.textContent = AS_OF);
+$("cacheEx").textContent = CACHE_EXAMPLE;
+$("surchargeEx").textContent = SURCHARGE_EXAMPLE;
+
+function fillSelect(id, list, chosen) {
+  $(id).innerHTML = list.map(m => `<option value="${m.id}"${m.id === chosen ? " selected" : ""}>${m.name} (${rate(m.inp)} / ${rate(m.out)})</option>`).join("");
+}
+fillSelect("tokModel", MODELS, "sol");
+fillSelect("calcModel", MODELS, "sol");
+const withCtx = MODELS.filter(m => m.ctx);
+$("ctxModel").innerHTML = withCtx.map(m => `<option value="${m.id}"${m.id === "sol" ? " selected" : ""}>${m.name} (${num(m.ctx)})</option>`).join("");
+
+$("priceRows").innerHTML = MODELS.map(m => `<tr><td><strong>${m.name}</strong></td><td>${m.maker}</td><td><span class="chip${m.tier === "Small" ? " good" : m.tier === "Top" ? " warm" : ""}">${m.tier}</span></td><td class="num">${rate(m.inp)}</td><td class="num">${rate(m.out)}</td><td class="num">${m.ctx ? num(m.ctx) : "not listed"}</td></tr>`).join("");
+$("priceNotes").textContent = MODELS.filter(m => m.note).map(m => m.note).join(" ");
+
+$("ctxCards").innerHTML = SHOWCASE.map(byId).map(m => `<div class="card model"><h3>${m.name}</h3><span class="muted small">${m.maker}</span><dl><dt>Context window</dt><dd>${num(m.ctx)} tokens</dd><dt>Roughly</dt><dd>${num(Math.round(m.ctx / TOKENS_PER_PAGE))} pages</dd><dt>Or about</dt><dd>${num(Math.round(m.ctx * 0.75))} words</dd></dl></div>`).join("");
+
+/* Simplified splitter: words, punctuation, and long words cut into pieces. */
+function tokenize(text) {
+  const out = [];
+  (text.match(/\s*[A-Za-z0-9']+|\s*[^\sA-Za-z0-9']/g) || []).forEach(piece => {
+    const lead = piece.match(/^\s*/)[0], word = piece.slice(lead.length);
+    if (word.length > 7) { out.push(lead + word.slice(0, 4)); for (let i = 4; i < word.length; i += 4) out.push(word.slice(i, i + 4)); }
+    else out.push(piece);
+  });
+  return out;
+}
+function showTokens() {
+  const text = $("tokText").value, m = byId($("tokModel").value);
+  if (!text.trim()) { $("tokOut").innerHTML = '<p class="muted">Type some text above to see it split.</p>'; return; }
+  const toks = tokenize(text), words = text.trim().split(/\s+/).length;
+  $("tokOut").innerHTML = `<div class="facts"><div><b>${num(toks.length)}</b>tokens</div><div><b>${num(text.length)}</b>characters</div><div><b>${num(words)}</b>words</div><div><b>${(toks.length / words).toFixed(2)}</b>tokens per word</div><div><b>${money(cost(m, toks.length, 0))}</b>to send to ${m.name}</div></div><div class="tokens">${toks.map(t => `<span class="tok">${esc(t)}</span>`).join("")}</div>`;
+}
+function showContext() {
+  const used = Math.max(0, parseInt($("ctxTokens").value, 10) || 0), m = byId($("ctxModel").value);
+  const pct = used / m.ctx * 100, left = Math.max(m.ctx - used, 0);
+  $("ctxBar").style.width = Math.min(pct, 100) + "%";
+  const status = pct < 50 ? "Plenty of room left." : pct < 80 ? "More than half used. Long documents may need to be trimmed." : pct <= 100 ? "Close to the limit." : "Over the limit. This would not fit in one request.";
+  $("ctxOut").innerHTML = `<div class="facts"><div><b>${pct.toFixed(1)}%</b>of ${m.name} used</div><div><b>${num(left)}</b>tokens remaining</div><div><b>${num(Math.round(used / TOKENS_PER_PAGE))}</b>pages, roughly</div></div><p style="margin:8px 0 0">${status}</p>`;
+}
+function showCost() {
+  const i = Math.max(0, parseInt($("calcIn").value, 10) || 0), o = Math.max(0, parseInt($("calcOut").value, 10) || 0);
+  const r = Math.max(1, parseInt($("calcReq").value, 10) || 1), m = byId($("calcModel").value);
+  const one = cost(m, i, o);
+  $("calcOutBox").innerHTML = `<div class="facts"><div><b>${money(one)}</b>per request</div><div><b>${money(cost(m, i, 0) * r)}</b>input, ${num(r)} request${r > 1 ? "s" : ""}</div><div><b>${money(cost(m, 0, o) * r)}</b>output, ${num(r)} request${r > 1 ? "s" : ""}</div><div><b>${money(one * r)}</b>total</div><div><b>${money(one * 300)}</b>at 10 requests a day for a month</div></div>`;
+}
+["tokText","tokModel"].forEach(id => $(id).addEventListener("input", showTokens));
+["ctxTokens","ctxModel"].forEach(id => $(id).addEventListener("input", showContext));
+["calcIn","calcOut","calcModel","calcReq"].forEach(id => $(id).addEventListener("input", showCost));
+
+const EXAMPLES = [
+  { title:"Feedback on a 1,000-word essay", model:"luna", i:1333, o:667 },
+  { title:"Analysis of a 5,000-word report", model:"sol", i:6667, o:1333 },
+  { title:"Review of a large code change", model:"opus", i:20000, o:5000 }
+];
+$("examples").innerHTML = EXAMPLES.map(e => { const m = byId(e.model); return `<div class="card soft"><h3>${e.title}</h3><p class="small muted">${num(e.i)} tokens in, ${num(e.o)} tokens out, ${m.name}</p><p><strong>${money(cost(m, e.i, 0))}</strong> input + <strong>${money(cost(m, 0, e.o))}</strong> output = <strong>${money(cost(m, e.i, e.o))}</strong></p></div>`; }).join("");
+
+const USES = [
+  { title:"Coursework and study help", tier:"Small", why:"Explaining a concept, quizzing yourself or checking a paragraph rarely needs the largest model.", i:1500, o:800 },
+  { title:"Reports and long documents", tier:"Mid", why:"Enough capability for careful reading, with room in the context window for the whole document.", i:30000, o:2000 },
+  { title:"Software development", tier:"Flagship", why:"Reasoning across many files and catching subtle errors is where a stronger model earns its price.", i:40000, o:8000 },
+  { title:"Hard research problems", tier:"Top", why:"Save the most expensive tier for problems the others get wrong.", i:100000, o:20000 }
+];
+$("useCases").innerHTML = USES.map(u => { const ms = MODELS.filter(m => m.tier === u.tier), cs = ms.map(m => cost(m, u.i, u.o));
+  const lo = Math.min(...cs), hi = Math.max(...cs);
+  return `<div class="card"><span class="chip">${u.tier} tier</span><h3 style="margin-top:8px">${u.title}</h3><p>${u.why}</p><p class="small muted">Models: ${ms.map(m => m.name).join(", ")}.<br>A typical request (${num(u.i)} in, ${num(u.o)} out): ${lo === hi ? money(lo) : money(lo) + " to " + money(hi)}.</p></div>`; }).join("");
+
+const small = MODELS.filter(m => m.tier === "Small").sort((a, b) => a.inp - b.inp)[0], priciest = MODELS.slice().sort((a, b) => b.inp - a.inp)[0];
+$("saveModel").textContent = `${small.name} costs ${rate(small.inp)} per million input tokens; ${priciest.name} costs ${rate(priciest.inp)}. That is a ${Math.round(priciest.inp / small.inp)}-fold difference for tasks either can do.`;
+
+showTokens(); showContext(); showCost();
+</script>
 </body>
 </html>
