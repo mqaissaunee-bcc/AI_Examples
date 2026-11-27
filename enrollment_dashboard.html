@@ -2,9 +2,23 @@
 <!--
   Enrollment Dashboard — Brookdale Community College
   ====================================================
-  Version:  v5.38
-  Date:     November 18, 2026
-  Features: Change — removed per-section signal badges (✦ Pressure,
+  Version:  v5.39
+  Date:     November 26, 2026
+  Features: Feature — data freshness badge next to "Latest report: …" in
+            the subline. Three visual states based on how old the active
+            snapshot is relative to today:
+              - FRESH (≤ 2 days old): green pill, "Fresh today" / "Fresh"
+              - STALE (3-7 days):     amber pill, "N days old"
+              - OLD (> 7 days):       red pill, "N days old"
+            Tooltip on each explains what the age means and what to do.
+            For COMPLETE terms (Fall after end-of-term, etc.), the badge
+            is suppressed — stale data is expected and meaningful there,
+            not a problem. Directly addresses chairs' "how fresh is this?"
+            question raised at the November demo.
+            Built on v5.38.
+
+  v5.38 (previous):
+            Change — removed per-section signal badges (✦ Pressure,
             ↑ Gainer, ↓ Loser, ⚠ At-risk) from the By Discipline section
             cards. Laura flagged two concerns: (1) "Loser" reads as a
             judgment on faculty teaching that section, and (2) sections
@@ -668,6 +682,45 @@
     border-bottom: 1px solid var(--rule);
   }
   .subline .pipe { color: var(--ink-mute); margin: 0 10px; }
+
+  /* v5.39: Freshness badge next to "Latest report". Communicates at a
+     glance whether the data is current. Three states:
+       - fresh  (snapshot age <= 2 days): green pill, "FRESH"
+       - stale  (3-7 days):               amber pill, "N DAYS OLD"
+       - old    (>7 days):                red pill, "N DAYS OLD"
+     For COMPLETE terms (Fall after end-of-term), the badge is suppressed
+     — stale data is expected and meaningful there, not a problem.
+     The tooltip (title attribute) explains what the age means. */
+  .freshness-badge {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-family: 'Helvetica Neue', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-style: normal;
+    vertical-align: 2px;
+    cursor: help;
+    line-height: 1.5;
+  }
+  .freshness-badge.is-fresh {
+    background: color-mix(in srgb, var(--good) 18%, var(--surface));
+    color: var(--good);
+    border: 1px solid color-mix(in srgb, var(--good) 40%, transparent);
+  }
+  .freshness-badge.is-stale {
+    background: color-mix(in srgb, var(--wait) 18%, var(--surface));
+    color: var(--wait);
+    border: 1px solid color-mix(in srgb, var(--wait) 40%, transparent);
+  }
+  .freshness-badge.is-old {
+    background: color-mix(in srgb, var(--warn) 18%, var(--surface));
+    color: var(--warn);
+    border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  }
 
   /* "What's new" button in the subline. Restrained typographic treatment
      so it sits naturally among the metadata items. The NEW pill draws
@@ -3115,6 +3168,7 @@
 
   <div class="subline" id="subline">
     <span id="reportDate">No data loaded</span>
+    <span id="freshnessBadge" class="freshness-badge" style="display:none" title=""></span>
     <span class="pipe">|</span>
     <span id="disciplineSummary">No disciplines selected</span>
     <span class="pipe">|</span>
@@ -3132,7 +3186,7 @@
   <main id="dashboard"></main>
 
   <footer>
-    <span>Enrollment Dashboard · Generic faculty tool · v5.38</span>
+    <span>Enrollment Dashboard · Generic faculty tool · v5.39</span>
     <span id="footerStamp"></span>
     <span class="footer-note">Special projects (-295) and internships (-299) are excluded from all views and totals.</span>
   </footer>
@@ -4814,6 +4868,47 @@
       el('reportDate').textContent = `Latest report: ${fmtDate(snap.date)}`;
     } else {
       el('reportDate').textContent = 'No data loaded';
+    }
+
+    // v5.39: Freshness badge. Compares the active snapshot's date to today,
+    // excluding COMPLETE terms where stale data is expected (Fall after
+    // end-of-term still reads correctly; a "7 days old" badge there would
+    // be misleading rather than helpful).
+    const badge = el('freshnessBadge');
+    if (badge) {
+      badge.style.display = 'none';
+      badge.className = 'freshness-badge';
+      badge.textContent = '';
+      badge.title = '';
+      if (snap && state.loadStatus === 'loaded') {
+        // Check the active term's lifecycle — suppress badge for COMPLETE
+        const opts = (typeof allTermPotOptions === 'function') ? allTermPotOptions() : [];
+        const activeOpt = opts.find(o => o.term === state.activeTerm && o.pot === state.activePartOfTerm);
+        const isComplete = activeOpt && activeOpt.lifecycle === 'COMPLETE';
+        if (!isComplete) {
+          const todayTs = new Date();
+          todayTs.setHours(0, 0, 0, 0);
+          const snapTs = new Date(snap.date + 'T00:00:00').getTime();
+          const ageDays = Math.round((todayTs.getTime() - snapTs) / 86400000);
+          const dayWord = d => `${d} day${d === 1 ? '' : 's'} old`;
+          if (ageDays <= 2) {
+            badge.classList.add('is-fresh');
+            badge.textContent = ageDays === 0 ? 'Fresh today' : (ageDays === 1 ? 'Fresh' : 'Fresh');
+            badge.title = `Latest report is ${ageDays} day${ageDays === 1 ? '' : 's'} old. Data is current.`;
+            badge.style.display = 'inline-block';
+          } else if (ageDays <= 7) {
+            badge.classList.add('is-stale');
+            badge.textContent = dayWord(ageDays);
+            badge.title = `Latest report is ${ageDays} days old. A new snapshot is overdue — consider uploading today's data.`;
+            badge.style.display = 'inline-block';
+          } else {
+            badge.classList.add('is-old');
+            badge.textContent = dayWord(ageDays);
+            badge.title = `Latest report is ${ageDays} days old. This dashboard may be significantly out of date.`;
+            badge.style.display = 'inline-block';
+          }
+        }
+      }
     }
 
     // v5.33: Title subtitle shows the ACTIVE (term, POT) context, pulled
